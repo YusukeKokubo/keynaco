@@ -24,6 +24,10 @@ class InputController: IMKInputController {
         // 候補ウィンドウ表示中
         if candidateWindow.isVisible {
             switch keyCode {
+            case 48 where event.modifierFlags.contains(.shift): // Shift+Tab
+                candidateWindow.selectPrev()
+                updateMarkedText(client: sender)
+                return true
             case 48, 125: // Tab, ↓
                 candidateWindow.selectNext()
                 updateMarkedText(client: sender)
