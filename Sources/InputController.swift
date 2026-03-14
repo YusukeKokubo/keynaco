@@ -113,10 +113,14 @@ class InputController: IMKInputController {
     // MARK: - Private helpers
 
     private func refreshCandidates(client: Any?) {
-        var candidates = DatabaseManager.shared.fetchCandidates(prefix: composedHiragana)
+        let result = DatabaseManager.shared.fetchCandidates(prefix: composedHiragana)
+        var candidates = result.candidates
         // ひらがな自体を先頭候補として追加（重複除去）
+        let hadHiragana = candidates.contains(composedHiragana)
         candidates.removeAll { $0 == composedHiragana }
         candidates.insert(composedHiragana, at: 0)
+        // ひらがな挿入分 + 履歴件数（ひらがなが履歴にあった場合は重複除去済みなのでそのまま）
+        let historyEnd = 1 + (hadHiragana ? result.historyCount - 1 : result.historyCount)
         currentCandidates = candidates
         if currentCandidates.isEmpty {
             candidateWindow.dismiss()
@@ -128,7 +132,7 @@ class InputController: IMKInputController {
         if let c = client as? IMKTextInput {
             c.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
         }
-        candidateWindow.show(candidates: currentCandidates, near: cursorRect)
+        candidateWindow.show(candidates: currentCandidates, historySectionEnd: historyEnd, near: cursorRect)
     }
 
     private func confirmSelection(client: Any?) -> Bool {

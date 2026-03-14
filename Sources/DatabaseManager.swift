@@ -57,7 +57,8 @@ final class DatabaseManager {
     // MARK: - 検索
 
     /// 履歴 + 辞書から候補を返す（履歴優先、重複除去）
-    func fetchCandidates(prefix: String) -> [String] {
+    /// - Returns: candidates と履歴セクションの件数
+    func fetchCandidates(prefix: String) -> (candidates: [String], historyCount: Int) {
         var results: [String] = []
         var seen = Set<String>()
 
@@ -81,6 +82,8 @@ final class DatabaseManager {
             }
         }
         sqlite3_finalize(stmt)
+
+        let historyCount = results.count
 
         // 2. 辞書（完全一致、優先度順）
         for candidate in fetchDict(reading: prefix) {
@@ -109,7 +112,7 @@ final class DatabaseManager {
             }
         }
 
-        return Array(results.prefix(30))
+        return (Array(results.prefix(30)), historyCount)
     }
 
     /// 辞書から読みの完全一致で候補を取得

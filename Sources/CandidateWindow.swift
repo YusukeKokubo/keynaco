@@ -6,6 +6,8 @@ final class CandidateWindow: NSWindow {
     private let scrollView = NSScrollView()
     private(set) var candidates: [String] = []
     private(set) var selectedRow: Int = 0
+    /// 履歴セクションの末尾インデックス（この行の後にセパレータを描画）
+    private var historySectionEnd: Int = 0
 
     var onSelect: ((String) -> Void)?
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
@@ -55,8 +57,9 @@ final class CandidateWindow: NSWindow {
 
     // MARK: - Public API
 
-    func show(candidates: [String], near rect: NSRect) {
+    func show(candidates: [String], historySectionEnd: Int = 0, near rect: NSRect) {
         self.candidates = candidates
+        self.historySectionEnd = historySectionEnd
         self.selectedRow = 0
         tableView.reloadData()
 
@@ -80,6 +83,7 @@ final class CandidateWindow: NSWindow {
         orderOut(nil)
         candidates = []
         selectedRow = 0
+        historySectionEnd = 0
     }
 
     func selectNext() {
@@ -105,6 +109,9 @@ final class CandidateWindow: NSWindow {
     func removeCandidate(at row: Int) {
         guard row >= 0, row < candidates.count else { return }
         candidates.remove(at: row)
+        if row < historySectionEnd {
+            historySectionEnd -= 1
+        }
         tableView.reloadData()
         if candidates.isEmpty {
             dismiss()
@@ -135,22 +142,26 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
         let container: NSView
         let label: NSTextField
         let button: NSButton
+        let separator: NSView
 
         if let existing = tableView.makeView(withIdentifier: id, owner: nil) {
             container = existing
-            label = container.subviews.compactMap { $0 as? NSTextField }.first!
-            button = container.subviews.compactMap { $0 as? NSButton }.first!
+            label = container.viewWithTag(1) as! NSTextField
+            button = container.viewWithTag(2) as! NSButton
+            separator = container.subviews.first { $0 is NSBox }!
         } else {
             container = NSView()
             container.identifier = id
 
             label = NSTextField(labelWithString: "")
+            label.tag = 1
             label.font = .systemFont(ofSize: 15)
             label.textColor = .labelColor
             label.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(label)
 
             button = NSButton(title: "\u{2715}", target: self, action: #selector(deleteButtonClicked(_:)))
+            button.tag = 2
             button.bezelStyle = .inline
             button.isBordered = false
             button.font = .systemFont(ofSize: 11)
@@ -158,20 +169,32 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
             button.setContentHuggingPriority(.required, for: .horizontal)
             container.addSubview(button)
 
+            let sep = NSBox()
+            sep.boxType = .separator
+            sep.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(sep)
+            separator = sep
+
             NSLayoutConstraint.activate([
                 label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
                 label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
                 button.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
                 button.centerYAnchor.constraint(equalTo: container.centerYAnchor),
                 label.trailingAnchor.constraint(lessThanOrEqualTo: button.leadingAnchor, constant: -4),
+                separator.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 4),
+                separator.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -4),
+                separator.bottomAnchor.constraint(equalTo: container.bottomAnchor),
             ])
         }
 
         label.stringValue = candidates[row]
+        // 削除ボタンの行番号を更新
         button.tag = row
         // 先頭（ひらがな候補）は削除ボタン非表示
         button.isHidden = (row == 0)
-
+        // 履歴セクション末尾の行にセパレータを表示（辞書候補がある場合のみ）
+        let showSeparator = (row == historySectionEnd - 1) && historySectionEnd < candidates.count
+        separator.isHidden = !showSeparator
         return container
     }
 }
