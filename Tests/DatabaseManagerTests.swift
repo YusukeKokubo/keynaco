@@ -114,4 +114,24 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(result.candidates.contains("いい感じ"), "ひらがな前半 + 辞書後半")
         XCTAssertTrue(result.candidates.contains("良い感じ"), "辞書前半 + 辞書後半")
     }
+
+    func testCompoundWithHiraganaTail() {
+        // "よさそう" → "良さそう"（辞書前半 + ひらがな後半）
+        db.insertDict(reading: "よさ", candidate: "良さ", priority: 0)
+        db.insertDict(reading: "そう", candidate: "層", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "よさそう")
+        XCTAssertTrue(result.candidates.contains("良さそう"), "辞書前半 + ひらがな後半")
+    }
+
+    func testCompoundHiraganaTailBeforeDictTail() {
+        // ひらがな後半の候補が辞書後半より先に来る
+        db.insertDict(reading: "よさ", candidate: "良さ", priority: 0)
+        db.insertDict(reading: "そう", candidate: "層", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "よさそう")
+        let idxHiragana = result.candidates.firstIndex(of: "良さそう")!
+        let idxDict = result.candidates.firstIndex(of: "良さ層")!
+        XCTAssertLessThan(idxHiragana, idxDict, "ひらがな後半が辞書後半より先")
+    }
 }

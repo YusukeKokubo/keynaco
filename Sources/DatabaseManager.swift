@@ -98,19 +98,24 @@ final class DatabaseManager {
             }
         }
 
-        // 3. 分割変換（前半ひらがな or 辞書 + 後半辞書）
+        // 3. 分割変換（各パート2文字以上）
+        //    前半: ひらがな or 辞書、後半: ひらがな or 辞書
+        //    前半・後半いずれかが辞書にある場合のみ候補生成
         let chars = Array(prefix)
-        for i in 1..<chars.count {
+        for i in 2..<chars.count where chars.count - i >= 2 {
             let head = String(chars[..<i])
             let tail = String(chars[i...])
-            let tailCandidates = fetchDict(reading: tail)
-            if tailCandidates.isEmpty { continue }
-            // 前半も辞書で変換を試みる
-            let headCandidates = fetchDict(reading: head)
-            let heads = [head] + headCandidates.filter { $0 != head }
-            for h in heads.prefix(3) {
-                for t in tailCandidates.prefix(5) {
+            let headDictCandidates = fetchDict(reading: head)
+            let tailDictCandidates = fetchDict(reading: tail)
+            // どちらも辞書になければスキップ
+            if headDictCandidates.isEmpty && tailDictCandidates.isEmpty { continue }
+            let heads = [head] + headDictCandidates.filter { $0 != head }
+            let tails = [tail] + tailDictCandidates.filter { $0 != tail }
+            // 後半を外側にして、ひらがな後半の候補を先に出す
+            for t in tails.prefix(5) {
+                for h in heads.prefix(3) {
                     let compound = h + t
+                    if compound == prefix { continue } // 元のひらがなと同じならスキップ
                     if seen.insert(compound).inserted {
                         results.append(compound)
                     }

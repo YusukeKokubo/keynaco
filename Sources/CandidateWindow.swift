@@ -1,5 +1,50 @@
 import Cocoa
 
+// MARK: - セル用のカスタムビュー
+
+private class CandidateRowView: NSView {
+    let label = NSTextField(labelWithString: "")
+    let deleteButton = NSButton(title: "\u{2715}", target: nil, action: nil)
+    let separator = NSBox()
+
+    init(deleteTarget: AnyObject, deleteAction: Selector) {
+        super.init(frame: .zero)
+
+        label.font = .systemFont(ofSize: 15)
+        label.textColor = .labelColor
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+
+        deleteButton.target = deleteTarget
+        deleteButton.action = deleteAction
+        deleteButton.bezelStyle = .inline
+        deleteButton.isBordered = false
+        deleteButton.font = .systemFont(ofSize: 11)
+        deleteButton.translatesAutoresizingMaskIntoConstraints = false
+        deleteButton.setContentHuggingPriority(.required, for: .horizontal)
+        addSubview(deleteButton)
+
+        separator.boxType = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(separator)
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -4),
+            separator.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            separator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            separator.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+// MARK: - 候補ウィンドウ
+
 final class CandidateWindow: NSWindow {
 
     private let tableView = NSTableView()
@@ -139,62 +184,21 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let id = NSUserInterfaceItemIdentifier("candidateRow")
-        let container: NSView
-        let label: NSTextField
-        let button: NSButton
-        let separator: NSView
+        let rowView: CandidateRowView
 
-        if let existing = tableView.makeView(withIdentifier: id, owner: nil) {
-            container = existing
-            label = container.viewWithTag(1) as! NSTextField
-            button = container.viewWithTag(2) as! NSButton
-            separator = container.subviews.first { $0 is NSBox }!
+        if let existing = tableView.makeView(withIdentifier: id, owner: nil) as? CandidateRowView {
+            rowView = existing
         } else {
-            container = NSView()
-            container.identifier = id
-
-            label = NSTextField(labelWithString: "")
-            label.tag = 1
-            label.font = .systemFont(ofSize: 15)
-            label.textColor = .labelColor
-            label.translatesAutoresizingMaskIntoConstraints = false
-            container.addSubview(label)
-
-            button = NSButton(title: "\u{2715}", target: self, action: #selector(deleteButtonClicked(_:)))
-            button.tag = 2
-            button.bezelStyle = .inline
-            button.isBordered = false
-            button.font = .systemFont(ofSize: 11)
-            button.translatesAutoresizingMaskIntoConstraints = false
-            button.setContentHuggingPriority(.required, for: .horizontal)
-            container.addSubview(button)
-
-            let sep = NSBox()
-            sep.boxType = .separator
-            sep.translatesAutoresizingMaskIntoConstraints = false
-            container.addSubview(sep)
-            separator = sep
-
-            NSLayoutConstraint.activate([
-                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-                label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-                button.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
-                button.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-                label.trailingAnchor.constraint(lessThanOrEqualTo: button.leadingAnchor, constant: -4),
-                separator.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 4),
-                separator.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -4),
-                separator.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            ])
+            rowView = CandidateRowView(deleteTarget: self, deleteAction: #selector(deleteButtonClicked(_:)))
+            rowView.identifier = id
         }
 
-        label.stringValue = candidates[row]
-        // 削除ボタンの行番号を更新
-        button.tag = row
-        // 先頭（ひらがな候補）は削除ボタン非表示
-        button.isHidden = (row == 0)
-        // 履歴セクション末尾の行にセパレータを表示（辞書候補がある場合のみ）
+        rowView.label.stringValue = candidates[row]
+        rowView.deleteButton.tag = row
+        rowView.deleteButton.isHidden = (row == 0)
         let showSeparator = (row == historySectionEnd - 1) && historySectionEnd < candidates.count
-        separator.isHidden = !showSeparator
-        return container
+        rowView.separator.isHidden = !showSeparator
+
+        return rowView
     }
 }
