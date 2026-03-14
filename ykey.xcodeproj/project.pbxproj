@@ -11,6 +11,7 @@
 		42D219A0DAFAEF4692836AF2 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E5DAA6B763B4C6760BC189 /* DatabaseManager.swift */; };
 		4D96EB15856B9581B69B3DF7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C67883B3619FFDADD18F97 /* AppDelegate.swift */; };
 		521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD356B30238B7065EE499D4B /* NSManualApplication.swift */; };
+		57C98264BB86D2D2A6555750 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */; };
 		89680704C115BBC286071022 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1744963E612A90E6E63C9CF5 /* libsqlite3.tbd */; };
 		9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805D3A35A6C37A38445EF2F0 /* InputController.swift */; };
 		C8F4B74863C0D1F6F7DBD368 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317B125398998017C88935B9 /* main.swift */; };
@@ -24,6 +25,7 @@
 		317B125398998017C88935B9 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		805D3A35A6C37A38445EF2F0 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		8E35CE6CB27B9F78A9E80F12 /* ykey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ykey.entitlements; sourceTree = "<group>"; };
+		979A7EC201CD395D75A33AE3 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B989A9A94B827722E59AF1FC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BD356B30238B7065EE499D4B /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
 		C8C67883B3619FFDADD18F97 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -70,6 +72,7 @@
 				317B125398998017C88935B9 /* main.swift */,
 				BD356B30238B7065EE499D4B /* NSManualApplication.swift */,
 				8E35CE6CB27B9F78A9E80F12 /* ykey.entitlements */,
+				DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -90,6 +93,7 @@
 			buildConfigurationList = 9672B84087C490F45E3C9FB7 /* Build configuration list for PBXNativeTarget "ykey" */;
 			buildPhases = (
 				EBE5EEFAB9479C3DA01BA299 /* Sources */,
+				1AAD516D8838A2A88B89F057 /* Resources */,
 				D014DDCD61BA32CC66DA6026 /* Frameworks */,
 			);
 			buildRules = (
@@ -137,6 +141,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		1AAD516D8838A2A88B89F057 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				57C98264BB86D2D2A6555750 /* InfoPlist.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		EBE5EEFAB9479C3DA01BA299 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -151,6 +166,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				979A7EC201CD395D75A33AE3 /* en */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		3122BA808C24E5B9B587059E /* Release */ = {
