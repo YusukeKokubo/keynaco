@@ -87,6 +87,9 @@ class InputController: IMKInputController {
               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
         let baseChars = event.charactersIgnoringModifiers ?? chars
 
+        NSLog("ykey: keyCode=%d chars=%@ base=%@ modifiers=0x%lx shift=%d",
+              keyCode, chars, baseChars, modifiers.rawValue, modifiers.contains(.shift) ? 1 : 0)
+
         // Shift が押されていれば英字を直接挿入（未確定があれば先に確定）
         // RomajiConverter が lowercased() するため modifier flags より文字変化で検出する
         if Self.isShiftInput(characters: chars, baseCharacters: baseChars) || modifiers.contains(.shift) {
