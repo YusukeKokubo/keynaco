@@ -23,9 +23,9 @@
 	<key>InputMethodConnectionName</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)_Connection</string>
 	<key>InputMethodServerControllerClass</key>
-	<string>$(PRODUCT_MODULE_NAME).InputController</string>
+	<string>InputController</string>
 	<key>NSPrincipalClass</key>
-	<string>$(PRODUCT_MODULE_NAME).NSManualApplication</string>
+	<string>NSManualApplication</string>
 
 	<!-- バックグラウンド専用 -->
 	<key>LSBackgroundOnly</key>

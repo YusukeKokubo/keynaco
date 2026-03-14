@@ -1,58 +1,71 @@
 import Cocoa
 import InputMethodKit
 
+@objc(InputController)
 class InputController: IMKInputController {
 
-    // 現在の未確定バッファ
     private var buffer = ""
+    private var currentCandidates: [String] = []
 
-    // 候補ウィンドウ（サーバーが確定してから lazy 生成）
-    private lazy var candidatesWindow: IMKCandidates = {
-        IMKCandidates(server: gServer!, panelType: kIMKSingleColumnScrollingCandidatePanel)
-    }()
+    private static let candidateWindow = CandidateWindow(
+        contentRect: .zero, styleMask: [.borderless],
+        backing: .buffered, defer: true
+    )
 
-    // MARK: - キー入力
+    private var candidateWindow: CandidateWindow { Self.candidateWindow }
 
-    override func inputText(_ string: String!, key keyCode: Int, modifiers flags: Int, client sender: Any!) -> Bool {
-        guard let ch = string, !ch.isEmpty else { return false }
+    // MARK: - イベントハンドリング
 
-        switch keyCode {
-        case 51: // Delete/Backspace
-            return handleBackspace(client: sender)
-        case 36: // Return
-            return handleReturn(client: sender)
-        case 53: // Escape
-            return handleEscape(client: sender)
-        default:
-            break
+    override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        guard let event = event, event.type == .keyDown else { return false }
+
+        let keyCode = event.keyCode
+
+        // 候補ウィンドウ表示中
+        if candidateWindow.isVisible {
+            switch keyCode {
+            case 48: // Tab
+                candidateWindow.selectNext()
+                updateMarkedText(client: sender)
+                return true
+            case 36: // Return
+                return confirmSelection(client: sender)
+            case 53: // Escape
+                return handleEscape(client: sender)
+            case 51: // Backspace
+                return handleBackspace(client: sender)
+            default:
+                break
+            }
+        } else {
+            switch keyCode {
+            case 36:
+                return handleReturn(client: sender)
+            case 53:
+                return handleEscape(client: sender)
+            case 51:
+                return handleBackspace(client: sender)
+            default:
+                break
+            }
         }
 
-        // 制御文字・修飾キー単体は無視
-        let modifiers = NSEvent.ModifierFlags(rawValue: UInt(flags))
+        // 修飾キー付きはスルー
+        let modifiers = event.modifierFlags
         guard modifiers.intersection([.command, .control, .option]).isEmpty else { return false }
 
-        buffer += ch
+        guard let chars = event.characters, !chars.isEmpty else { return false }
+
+        buffer += chars
         updateMarkedText(client: sender)
 
         if buffer.count >= 2 {
-            refreshCandidates()
+            refreshCandidates(client: sender)
+        } else {
+            candidateWindow.dismiss()
         }
 
         return true
-    }
-
-    // MARK: - 候補リスト供給（IMKCandidates が呼び出す）
-
-    override func candidates(_ sender: Any!) -> [Any]! {
-        DatabaseManager.shared.fetchCandidates(prefix: buffer)
-    }
-
-    // MARK: - 候補選択
-
-    override func candidateSelected(_ candidateString: NSAttributedString!) {
-        let output = candidateString.string
-        DatabaseManager.shared.record(input: buffer, output: output)
-        commit(text: output, client: client())
     }
 
     // MARK: - 確定
@@ -65,24 +78,48 @@ class InputController: IMKInputController {
 
     // MARK: - Private helpers
 
-    private func refreshCandidates() {
-        let hits = DatabaseManager.shared.fetchCandidates(prefix: buffer)
-        if hits.isEmpty {
-            candidatesWindow.hide()
-        } else {
-            candidatesWindow.update()
-            candidatesWindow.show(kIMKLocateCandidatesLeftHint)
+    private func refreshCandidates(client: Any?) {
+        currentCandidates = DatabaseManager.shared.fetchCandidates(prefix: buffer)
+        if currentCandidates.isEmpty {
+            candidateWindow.dismiss()
+            return
         }
+
+        // カーソル位置を取得
+        var cursorRect = NSRect.zero
+        if let c = client as? IMKTextInput {
+            c.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
+        }
+        candidateWindow.show(candidates: currentCandidates, near: cursorRect)
+    }
+
+    private func confirmSelection(client: Any?) -> Bool {
+        guard !buffer.isEmpty else { return false }
+        if let selected = candidateWindow.selectedText() {
+            DatabaseManager.shared.record(input: buffer, output: selected)
+            commit(text: selected, client: client)
+        } else {
+            commitComposition(client)
+        }
+        return true
+    }
+
+    private func displayText() -> String {
+        if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
+            return selected
+        }
+        return buffer
     }
 
     private func updateMarkedText(client: Any?) {
         guard let c = client as? IMKTextInput else { return }
-        if buffer.isEmpty {
+        let text = displayText()
+        if text.isEmpty {
             c.insertText("", replacementRange: .notFound)
         } else {
             c.setMarkedText(
-                buffer,
-                selectionRange: NSRange(location: buffer.count, length: 0),
+                text,
+                selectionRange: NSRange(location: text.count, length: 0),
                 replacementRange: .notFound
             )
         }
@@ -92,14 +129,19 @@ class InputController: IMKInputController {
         guard let c = client as? IMKTextInput else { return }
         c.insertText(text, replacementRange: .notFound)
         buffer = ""
-        candidatesWindow.hide()
+        currentCandidates = []
+        candidateWindow.dismiss()
     }
 
     private func handleBackspace(client: Any?) -> Bool {
         guard !buffer.isEmpty else { return false }
         buffer.removeLast()
         updateMarkedText(client: client)
-        if buffer.count >= 2 { refreshCandidates() } else { candidatesWindow.hide() }
+        if buffer.count >= 2 {
+            refreshCandidates(client: client)
+        } else {
+            candidateWindow.dismiss()
+        }
         return true
     }
 
@@ -112,13 +154,12 @@ class InputController: IMKInputController {
     private func handleEscape(client: Any?) -> Bool {
         guard !buffer.isEmpty else { return false }
         buffer = ""
+        currentCandidates = []
         updateMarkedText(client: client)
-        candidatesWindow.hide()
+        candidateWindow.dismiss()
         return true
     }
 }
-
-// MARK: - NSRange convenience
 
 private extension NSRange {
     static let notFound = NSRange(location: NSNotFound, length: NSNotFound)

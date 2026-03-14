@@ -44,6 +44,24 @@ final class DatabaseManager {
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
         """
         sqlite3_exec(db, sql, nil, nil, nil)
+        seedIfEmpty()
+    }
+
+    private func seedIfEmpty() {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM history", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW, sqlite3_column_int(stmt, 0) == 0 else { return }
+
+        let seeds = [
+            ("he", "hello"), ("he", "help"), ("he", "heart"),
+            ("th", "the"), ("th", "thanks"), ("th", "there"),
+            ("go", "good"), ("go", "google"), ("go", "goodbye"),
+        ]
+        for (input, output) in seeds {
+            record(input: input, output: output)
+        }
+        NSLog("ykey: seeded %d entries", seeds.count)
     }
 
     // MARK: - 検索
@@ -52,7 +70,7 @@ final class DatabaseManager {
     func fetchCandidates(prefix: String) -> [String] {
         let sql = """
         SELECT output FROM history
-        WHERE input = ?
+        WHERE input LIKE ? || '%'
         ORDER BY count DESC, used_at DESC
         LIMIT 20;
         """

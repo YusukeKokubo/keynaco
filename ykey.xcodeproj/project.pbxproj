@@ -12,6 +12,7 @@
 		4D96EB15856B9581B69B3DF7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C67883B3619FFDADD18F97 /* AppDelegate.swift */; };
 		521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD356B30238B7065EE499D4B /* NSManualApplication.swift */; };
 		57C98264BB86D2D2A6555750 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */; };
+		75BFBACA840D87C6EB3092E4 /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */; };
 		89680704C115BBC286071022 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1744963E612A90E6E63C9CF5 /* libsqlite3.tbd */; };
 		9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805D3A35A6C37A38445EF2F0 /* InputController.swift */; };
 		C8F4B74863C0D1F6F7DBD368 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317B125398998017C88935B9 /* main.swift */; };
@@ -21,6 +22,7 @@
 		0001B7C6DF069A72FF35D736 /* ykey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ykey.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		146884B9C7BA0172914C5E6E /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = System/Library/Frameworks/InputMethodKit.framework; sourceTree = SDKROOT; };
 		1744963E612A90E6E63C9CF5 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
 		30E5DAA6B763B4C6760BC189 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
 		317B125398998017C88935B9 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		805D3A35A6C37A38445EF2F0 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
@@ -66,6 +68,7 @@
 			isa = PBXGroup;
 			children = (
 				C8C67883B3619FFDADD18F97 /* AppDelegate.swift */,
+				2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */,
 				30E5DAA6B763B4C6760BC189 /* DatabaseManager.swift */,
 				B989A9A94B827722E59AF1FC /* Info.plist */,
 				805D3A35A6C37A38445EF2F0 /* InputController.swift */,
@@ -158,6 +161,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D96EB15856B9581B69B3DF7 /* AppDelegate.swift in Sources */,
+				75BFBACA840D87C6EB3092E4 /* CandidateWindow.swift in Sources */,
 				42D219A0DAFAEF4692836AF2 /* DatabaseManager.swift in Sources */,
 				9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */,
 				521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */,
