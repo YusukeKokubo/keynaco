@@ -83,27 +83,55 @@ final class DatabaseManager {
         sqlite3_finalize(stmt)
 
         // 2. 辞書（完全一致、優先度順）
-        let dictSQL = """
-        SELECT candidate FROM dictionary
-        WHERE reading = ?
-        ORDER BY priority ASC
-        LIMIT 30;
-        """
-        stmt = nil
-        if sqlite3_prepare_v2(db, dictSQL, -1, &stmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(stmt, 1, prefix, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                if let ptr = sqlite3_column_text(stmt, 0) {
-                    let s = String(cString: ptr)
-                    if seen.insert(s).inserted {
-                        results.append(s)
+        for candidate in fetchDict(reading: prefix) {
+            if seen.insert(candidate).inserted {
+                results.append(candidate)
+            }
+        }
+
+        // 3. 分割変換（前半ひらがな or 辞書 + 後半辞書）
+        let chars = Array(prefix)
+        for i in 1..<chars.count {
+            let head = String(chars[..<i])
+            let tail = String(chars[i...])
+            let tailCandidates = fetchDict(reading: tail)
+            if tailCandidates.isEmpty { continue }
+            // 前半も辞書で変換を試みる
+            let headCandidates = fetchDict(reading: head)
+            let heads = [head] + headCandidates.filter { $0 != head }
+            for h in heads.prefix(3) {
+                for t in tailCandidates.prefix(5) {
+                    let compound = h + t
+                    if seen.insert(compound).inserted {
+                        results.append(compound)
                     }
                 }
             }
         }
-        sqlite3_finalize(stmt)
 
         return Array(results.prefix(30))
+    }
+
+    /// 辞書から読みの完全一致で候補を取得
+    private func fetchDict(reading: String) -> [String] {
+        let sql = """
+        SELECT candidate FROM dictionary
+        WHERE reading = ?
+        ORDER BY priority ASC
+        LIMIT 10;
+        """
+        var stmt: OpaquePointer?
+        var results: [String] = []
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, reading, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let ptr = sqlite3_column_text(stmt, 0) {
+                    results.append(String(cString: ptr))
+                }
+            }
+        }
+        sqlite3_finalize(stmt)
+        return results
     }
 
     // MARK: - 記録
