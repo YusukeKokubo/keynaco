@@ -134,4 +134,23 @@ final class DatabaseManagerTests: XCTestCase {
         let idxDict = result.candidates.firstIndex(of: "良さ層")!
         XCTAssertLessThan(idxHiragana, idxDict, "ひらがな後半が辞書後半より先")
     }
+
+    // MARK: - 動詞活用（okuri-ari 展開）
+
+    func testVerbMasuForm() {
+        // okuri-ari 展開で "いき" → "行き" が登録されていれば
+        // 分割変換 "いき" + "ます" → "行きます" が得られる
+        db.insertDict(reading: "いき", candidate: "行き", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "いきます")
+        XCTAssertTrue(result.candidates.contains("行きます"), "いきます → 行きます")
+    }
+
+    func testVerbDictForm() {
+        // "いく" → "行く" が辞書にある場合（okuri-ari 展開の辞書形）
+        db.insertDict(reading: "いく", candidate: "行く", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "いく")
+        XCTAssertTrue(result.candidates.contains("行く"), "いく → 行く")
+    }
 }

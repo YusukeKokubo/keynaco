@@ -113,7 +113,7 @@ final class DatabaseManager {
             let tails = [tail] + tailDictCandidates.filter { $0 != tail }
             // 後半を外側にして、ひらがな後半の候補を先に出す
             for t in tails.prefix(5) {
-                for h in heads.prefix(3) {
+                for h in heads.prefix(10) {
                     let compound = h + t
                     if compound == prefix { continue } // 元のひらがなと同じならスキップ
                     if seen.insert(compound).inserted {
