@@ -58,11 +58,16 @@ class InputController: IMKInputController {
             }
         }
 
+        // 矢印キー等の特殊キーはスルー
+        if keyCode >= 123 && keyCode <= 126 { return false }
+
         // 修飾キー付きはスルー
         let modifiers = event.modifierFlags
         guard modifiers.intersection([.command, .control, .option]).isEmpty else { return false }
 
-        guard let chars = event.characters, !chars.isEmpty else { return false }
+        // 印字可能文字のみ受け付ける
+        guard let chars = event.characters, !chars.isEmpty,
+              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
 
         buffer += chars
         updateMarkedText(client: sender)
