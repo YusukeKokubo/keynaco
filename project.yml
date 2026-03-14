@@ -13,6 +13,8 @@ targets:
     platform: macOS
     sources:
       - path: Sources
+      - path: Resources/SKK-JISYO-L.utf8
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yusuke.inputmethod.ykey

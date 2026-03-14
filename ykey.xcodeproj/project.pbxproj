@@ -15,8 +15,10 @@
 		73DE04D3E224CA0037B41437 /* RomajiConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A7749939F71C6542311C39 /* RomajiConverter.swift */; };
 		75BFBACA840D87C6EB3092E4 /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */; };
 		89680704C115BBC286071022 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1744963E612A90E6E63C9CF5 /* libsqlite3.tbd */; };
+		8E27E6F8B2698058CCA27CB0 /* SKK-JISYO-L.utf8 in Resources */ = {isa = PBXBuildFile; fileRef = ED17BB8D59C70BCE770F037F /* SKK-JISYO-L.utf8 */; };
 		9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805D3A35A6C37A38445EF2F0 /* InputController.swift */; };
 		C8F4B74863C0D1F6F7DBD368 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317B125398998017C88935B9 /* main.swift */; };
+		E724B7690653FB1DE17236AB /* DictionaryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF414E600ACE1EB9860D6767 /* DictionaryImporter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +35,8 @@
 		BD356B30238B7065EE499D4B /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
 		C8C67883B3619FFDADD18F97 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		E6A7749939F71C6542311C39 /* RomajiConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverter.swift; sourceTree = "<group>"; };
+		ED17BB8D59C70BCE770F037F /* SKK-JISYO-L.utf8 */ = {isa = PBXFileReference; path = "SKK-JISYO-L.utf8"; sourceTree = "<group>"; };
+		FF414E600ACE1EB9860D6767 /* DictionaryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryImporter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,6 +55,7 @@
 		3B9905A683388DBB52DA9963 = {
 			isa = PBXGroup;
 			children = (
+				DE905ACEBEE5666C7039C41B /* Resources */,
 				DB87CE9A3E9742EA66EF0890 /* Sources */,
 				AE74355E8C13AF11CCBC2978 /* Frameworks */,
 				DC646D0D6B4B93A0147713EA /* Products */,
@@ -72,6 +77,7 @@
 				C8C67883B3619FFDADD18F97 /* AppDelegate.swift */,
 				2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */,
 				30E5DAA6B763B4C6760BC189 /* DatabaseManager.swift */,
+				FF414E600ACE1EB9860D6767 /* DictionaryImporter.swift */,
 				B989A9A94B827722E59AF1FC /* Info.plist */,
 				805D3A35A6C37A38445EF2F0 /* InputController.swift */,
 				317B125398998017C88935B9 /* main.swift */,
@@ -89,6 +95,14 @@
 				0001B7C6DF069A72FF35D736 /* ykey.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		DE905ACEBEE5666C7039C41B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				ED17BB8D59C70BCE770F037F /* SKK-JISYO-L.utf8 */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -153,6 +167,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				57C98264BB86D2D2A6555750 /* InfoPlist.strings in Resources */,
+				8E27E6F8B2698058CCA27CB0 /* SKK-JISYO-L.utf8 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -166,6 +181,7 @@
 				4D96EB15856B9581B69B3DF7 /* AppDelegate.swift in Sources */,
 				75BFBACA840D87C6EB3092E4 /* CandidateWindow.swift in Sources */,
 				42D219A0DAFAEF4692836AF2 /* DatabaseManager.swift in Sources */,
+				E724B7690653FB1DE17236AB /* DictionaryImporter.swift in Sources */,
 				9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */,
 				521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */,
 				73DE04D3E224CA0037B41437 /* RomajiConverter.swift in Sources */,

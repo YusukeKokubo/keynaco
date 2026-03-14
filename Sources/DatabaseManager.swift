@@ -8,7 +8,8 @@ final class DatabaseManager {
 
     private init() {
         openDatabase()
-        createTable()
+        createTables()
+        DictionaryImporter.importIfNeeded(db: db)
     }
 
     deinit {
@@ -31,7 +32,7 @@ final class DatabaseManager {
         NSLog("ykey: DB パス = \(path)")
     }
 
-    private func createTable() {
+    private func createTables() {
         let sql = """
         CREATE TABLE IF NOT EXISTS history (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,53 +43,67 @@ final class DatabaseManager {
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
+        CREATE TABLE IF NOT EXISTS dictionary (
+            reading   TEXT    NOT NULL,
+            candidate TEXT    NOT NULL,
+            priority  INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(reading, candidate)
+        );
+        CREATE INDEX IF NOT EXISTS idx_reading ON dictionary(reading);
         """
         sqlite3_exec(db, sql, nil, nil, nil)
-        seedIfEmpty()
-    }
-
-    private func seedIfEmpty() {
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM history", -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_step(stmt) == SQLITE_ROW, sqlite3_column_int(stmt, 0) == 0 else { return }
-
-        let seeds = [
-            ("かい", "会議"), ("かい", "会社"), ("かい", "会員"),
-            ("あり", "ありがとう"), ("あり", "ありがとうございます"),
-            ("おね", "お願いします"), ("おは", "おはようございます"),
-            ("よろ", "よろしくお願いします"), ("すみ", "すみません"),
-        ]
-        for (input, output) in seeds {
-            record(input: input, output: output)
-        }
-        NSLog("ykey: seeded %d entries", seeds.count)
     }
 
     // MARK: - 検索
 
-    /// input が prefix と完全一致するエントリを返す（count 降順）
+    /// 履歴 + 辞書から候補を返す（履歴優先、重複除去）
     func fetchCandidates(prefix: String) -> [String] {
-        let sql = """
+        var results: [String] = []
+        var seen = Set<String>()
+
+        // 1. 履歴（前方一致、使用頻度順）
+        let histSQL = """
         SELECT output FROM history
         WHERE input LIKE ? || '%'
         ORDER BY count DESC, used_at DESC
         LIMIT 20;
         """
         var stmt: OpaquePointer?
-        var results: [String] = []
-
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        defer { sqlite3_finalize(stmt) }
-
-        sqlite3_bind_text(stmt, 1, prefix, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) {
-                results.append(String(cString: ptr))
+        if sqlite3_prepare_v2(db, histSQL, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, prefix, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let ptr = sqlite3_column_text(stmt, 0) {
+                    let s = String(cString: ptr)
+                    if seen.insert(s).inserted {
+                        results.append(s)
+                    }
+                }
             }
         }
-        return results
+        sqlite3_finalize(stmt)
+
+        // 2. 辞書（完全一致、優先度順）
+        let dictSQL = """
+        SELECT candidate FROM dictionary
+        WHERE reading = ?
+        ORDER BY priority ASC
+        LIMIT 30;
+        """
+        stmt = nil
+        if sqlite3_prepare_v2(db, dictSQL, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, prefix, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let ptr = sqlite3_column_text(stmt, 0) {
+                    let s = String(cString: ptr)
+                    if seen.insert(s).inserted {
+                        results.append(s)
+                    }
+                }
+            }
+        }
+        sqlite3_finalize(stmt)
+
+        return Array(results.prefix(30))
     }
 
     // MARK: - 記録
