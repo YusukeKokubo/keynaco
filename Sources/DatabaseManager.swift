@@ -134,6 +134,18 @@ final class DatabaseManager {
         return results
     }
 
+    // MARK: - 削除
+
+    /// 履歴から指定の output を持つエントリを削除
+    func deleteHistory(output: String) {
+        let sql = "DELETE FROM history WHERE output = ?"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, output, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_step(stmt)
+    }
+
     // MARK: - 記録
 
     /// 変換確定時に履歴へ追記（同じ input/output ペアはカウントアップ）

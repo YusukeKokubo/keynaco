@@ -8,12 +8,23 @@ class InputController: IMKInputController {
     private var pendingRomaji = ""
     private var currentCandidates: [String] = []
 
-    private static let candidateWindow = CandidateWindow(
-        contentRect: .zero, styleMask: [.borderless],
-        backing: .buffered, defer: true
-    )
+    private static let candidateWindow: CandidateWindow = {
+        let w = CandidateWindow(
+            contentRect: .zero, styleMask: [.borderless],
+            backing: .buffered, defer: true
+        )
+        return w
+    }()
 
     private var candidateWindow: CandidateWindow { Self.candidateWindow }
+
+    override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
+        super.init(server: server, delegate: delegate, client: inputClient)
+        candidateWindow.onDelete = { [weak self] text, row in
+            DatabaseManager.shared.deleteHistory(output: text)
+            self?.candidateWindow.removeCandidate(at: row)
+        }
+    }
 
     /// マークドテキストに表示する未確定文字列
     private var composingText: String {

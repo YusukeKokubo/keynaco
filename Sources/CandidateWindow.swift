@@ -8,6 +8,8 @@ final class CandidateWindow: NSWindow {
     private(set) var selectedRow: Int = 0
 
     var onSelect: ((String) -> Void)?
+    /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
+    var onDelete: ((String, Int) -> Void)?
 
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask,
                   backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
@@ -98,6 +100,26 @@ final class CandidateWindow: NSWindow {
         guard selectedRow >= 0, selectedRow < candidates.count else { return nil }
         return candidates[selectedRow]
     }
+
+    /// 指定行を候補リストから削除してテーブルを更新
+    func removeCandidate(at row: Int) {
+        guard row >= 0, row < candidates.count else { return }
+        candidates.remove(at: row)
+        tableView.reloadData()
+        if candidates.isEmpty {
+            dismiss()
+            return
+        }
+        selectedRow = min(selectedRow, candidates.count - 1)
+        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
+    }
+
+    @objc private func deleteButtonClicked(_ sender: NSButton) {
+        let row = sender.tag
+        guard row >= 0, row < candidates.count else { return }
+        let text = candidates[row]
+        onDelete?(text, row)
+    }
 }
 
 // MARK: - NSTableViewDataSource & Delegate
@@ -109,13 +131,47 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let id = NSUserInterfaceItemIdentifier("cell")
-        let cell = tableView.makeView(withIdentifier: id, owner: nil) as? NSTextField
-            ?? NSTextField(labelWithString: "")
-        cell.identifier = id
-        cell.stringValue = candidates[row]
-        cell.font = .systemFont(ofSize: 15)
-        cell.textColor = .labelColor
-        return cell
+        let id = NSUserInterfaceItemIdentifier("candidateRow")
+        let container: NSView
+        let label: NSTextField
+        let button: NSButton
+
+        if let existing = tableView.makeView(withIdentifier: id, owner: nil) {
+            container = existing
+            label = container.subviews.compactMap { $0 as? NSTextField }.first!
+            button = container.subviews.compactMap { $0 as? NSButton }.first!
+        } else {
+            container = NSView()
+            container.identifier = id
+
+            label = NSTextField(labelWithString: "")
+            label.font = .systemFont(ofSize: 15)
+            label.textColor = .labelColor
+            label.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(label)
+
+            button = NSButton(title: "\u{2715}", target: self, action: #selector(deleteButtonClicked(_:)))
+            button.bezelStyle = .inline
+            button.isBordered = false
+            button.font = .systemFont(ofSize: 11)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.setContentHuggingPriority(.required, for: .horizontal)
+            container.addSubview(button)
+
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
+                label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+                button.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
+                button.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+                label.trailingAnchor.constraint(lessThanOrEqualTo: button.leadingAnchor, constant: -4),
+            ])
+        }
+
+        label.stringValue = candidates[row]
+        button.tag = row
+        // 先頭（ひらがな候補）は削除ボタン非表示
+        button.isHidden = (row == 0)
+
+        return container
     }
 }
