@@ -80,14 +80,13 @@ class InputController: IMKInputController {
         composedHiragana += result.converted
         pendingRomaji = result.pending
 
-        updateMarkedText(client: sender)
-
-        if composedHiragana.count >= 1 {
+        if composedHiragana.count >= 2 {
             refreshCandidates(client: sender)
         } else {
             candidateWindow.dismiss()
         }
 
+        updateMarkedText(client: sender)
         return true
     }
 
@@ -103,7 +102,11 @@ class InputController: IMKInputController {
     // MARK: - Private helpers
 
     private func refreshCandidates(client: Any?) {
-        currentCandidates = DatabaseManager.shared.fetchCandidates(prefix: composedHiragana)
+        var candidates = DatabaseManager.shared.fetchCandidates(prefix: composedHiragana)
+        // ひらがな自体を先頭候補として追加（重複除去）
+        candidates.removeAll { $0 == composedHiragana }
+        candidates.insert(composedHiragana, at: 0)
+        currentCandidates = candidates
         if currentCandidates.isEmpty {
             candidateWindow.dismiss()
             return
@@ -131,7 +134,7 @@ class InputController: IMKInputController {
 
     private func displayText() -> String {
         if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
-            return selected
+            return selected + pendingRomaji
         }
         return composingText
     }
@@ -167,7 +170,7 @@ class InputController: IMKInputController {
             composedHiragana.removeLast()
         }
         updateMarkedText(client: client)
-        if composedHiragana.count >= 1 {
+        if composedHiragana.count >= 2 {
             refreshCandidates(client: client)
         } else {
             candidateWindow.dismiss()
