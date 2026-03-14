@@ -21,23 +21,52 @@
 
 	<!-- IME 必須キー -->
 	<key>InputMethodConnectionName</key>
-	<string>ykey</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)_Connection</string>
 	<key>InputMethodServerControllerClass</key>
-	<string>InputController</string>
+	<string>$(PRODUCT_MODULE_NAME).InputController</string>
+	<key>NSPrincipalClass</key>
+	<string>$(PRODUCT_MODULE_NAME).NSManualApplication</string>
 
-	<!-- バックグラウンド専用 / Dock に表示しない -->
+	<!-- バックグラウンド専用 -->
 	<key>LSBackgroundOnly</key>
 	<true/>
 	<key>LSUIElement</key>
 	<true/>
 
 	<!-- 入力モード定義 -->
+	<key>TISIntendedLanguage</key>
+	<string>en</string>
 	<key>ComponentInputModeDict</key>
 	<dict>
-		<key>tsInputMethodCharacterSubsets</key>
+		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
-			<string>GeneralCharacterSubset</string>
+			<string>com.apple.inputmethod.Roman</string>
 		</array>
+		<key>tsInputModeListKey</key>
+		<dict>
+			<key>com.apple.inputmethod.Roman</key>
+			<dict>
+				<key>TISInputSourceID</key>
+				<string>com.yusuke.inputmethod.ykey.Roman</string>
+				<key>tsInputModeScriptKey</key>
+				<string>smRoman</string>
+				<key>tsInputModePrimaryInScriptKey</key>
+				<true/>
+				<key>tsInputModeIsVisibleKey</key>
+				<true/>
+				<key>tsInputModeDefaultStateKey</key>
+				<true/>
+				<key>TISIntendedLanguage</key>
+				<string>en</string>
+				<key>TISIconIsTemplate</key>
+				<true/>
+			</dict>
+		</dict>
 	</dict>
+
+	<key>tsInputMethodCharacterRepertoireKey</key>
+	<array>
+		<string>Latn</string>
+	</array>
 </dict>
 </plist>

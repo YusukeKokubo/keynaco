@@ -15,13 +15,14 @@ targets:
       - path: Sources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.yusuke.ykey
+        PRODUCT_BUNDLE_IDENTIFIER: com.yusuke.inputmethod.ykey
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
-        # IME は App Sandbox 無効が必要
-        ENABLE_APP_SANDBOX: NO
-        # 開発中は自動署名
+        # App Sandbox 有効（azooKey に倣う）
+        ENABLE_APP_SANDBOX: YES
+        CODE_SIGN_ENTITLEMENTS: Sources/ykey.entitlements
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: R2ZZ3ALJ36
         INFOPLIST_FILE: Sources/Info.plist
     dependencies:
       - sdk: InputMethodKit.framework
