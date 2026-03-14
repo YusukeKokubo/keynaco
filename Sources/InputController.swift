@@ -89,7 +89,7 @@ class InputController: IMKInputController {
 
         // Shift が押されていれば英字を直接挿入（未確定があれば先に確定）
         // RomajiConverter が lowercased() するため modifier flags より文字変化で検出する
-        if chars != baseChars || modifiers.contains(.shift) {
+        if Self.isShiftInput(characters: chars, baseCharacters: baseChars) || modifiers.contains(.shift) {
             if !composingText.isEmpty { commitComposition(sender) }
             (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
             return true
@@ -216,6 +216,13 @@ class InputController: IMKInputController {
         updateMarkedText(client: client)
         candidateWindow.dismiss()
         return true
+    }
+
+    // MARK: - テスト用ヘルパー
+
+    /// Shift 入力の検出: characters と baseCharacters が異なれば Shift が押されている
+    static func isShiftInput(characters: String, baseCharacters: String) -> Bool {
+        characters != baseCharacters
     }
 }
 
