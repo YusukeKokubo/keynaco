@@ -29,3 +29,16 @@ targets:
     dependencies:
       - sdk: InputMethodKit.framework
       - sdk: libsqlite3.tbd
+
+  ykeyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: ykey

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		005B0D11332B5BF640607A7C /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 146884B9C7BA0172914C5E6E /* InputMethodKit.framework */; };
+		196081B0B5DCC39D88F4BE30 /* DatabaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C57988E8FB3F69734B1EEA1 /* DatabaseManagerTests.swift */; };
 		42D219A0DAFAEF4692836AF2 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E5DAA6B763B4C6760BC189 /* DatabaseManager.swift */; };
 		4D96EB15856B9581B69B3DF7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C67883B3619FFDADD18F97 /* AppDelegate.swift */; };
 		521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD356B30238B7065EE499D4B /* NSManualApplication.swift */; };
@@ -16,10 +17,21 @@
 		75BFBACA840D87C6EB3092E4 /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */; };
 		89680704C115BBC286071022 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1744963E612A90E6E63C9CF5 /* libsqlite3.tbd */; };
 		8E27E6F8B2698058CCA27CB0 /* SKK-JISYO-L.utf8 in Resources */ = {isa = PBXBuildFile; fileRef = ED17BB8D59C70BCE770F037F /* SKK-JISYO-L.utf8 */; };
+		94E44FB345E04F8C2BCF9857 /* RomajiConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA54F78185FD3614FB00DBF /* RomajiConverterTests.swift */; };
 		9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805D3A35A6C37A38445EF2F0 /* InputController.swift */; };
 		C8F4B74863C0D1F6F7DBD368 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317B125398998017C88935B9 /* main.swift */; };
 		E724B7690653FB1DE17236AB /* DictionaryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF414E600ACE1EB9860D6767 /* DictionaryImporter.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5B3FA287F163CC8EC0AD1C3C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B93775B007D5B9F722A251AD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3EBF27CCCA077FD6B004E3E8;
+			remoteInfo = ykey;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0001B7C6DF069A72FF35D736 /* ykey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ykey.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -28,9 +40,12 @@
 		2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
 		30E5DAA6B763B4C6760BC189 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
 		317B125398998017C88935B9 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		5EA54F78185FD3614FB00DBF /* RomajiConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverterTests.swift; sourceTree = "<group>"; };
+		7C57988E8FB3F69734B1EEA1 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
 		805D3A35A6C37A38445EF2F0 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		8E35CE6CB27B9F78A9E80F12 /* ykey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ykey.entitlements; sourceTree = "<group>"; };
 		979A7EC201CD395D75A33AE3 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		ACCF95EC01DC6342706E03CE /* ykeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ykeyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B989A9A94B827722E59AF1FC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BD356B30238B7065EE499D4B /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
 		C8C67883B3619FFDADD18F97 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -57,6 +72,7 @@
 			children = (
 				DE905ACEBEE5666C7039C41B /* Resources */,
 				DB87CE9A3E9742EA66EF0890 /* Sources */,
+				C1897EA65A0582D645E9DDF2 /* Tests */,
 				AE74355E8C13AF11CCBC2978 /* Frameworks */,
 				DC646D0D6B4B93A0147713EA /* Products */,
 			);
@@ -69,6 +85,15 @@
 				1744963E612A90E6E63C9CF5 /* libsqlite3.tbd */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C1897EA65A0582D645E9DDF2 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				7C57988E8FB3F69734B1EEA1 /* DatabaseManagerTests.swift */,
+				5EA54F78185FD3614FB00DBF /* RomajiConverterTests.swift */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		DB87CE9A3E9742EA66EF0890 /* Sources */ = {
@@ -93,6 +118,7 @@
 			isa = PBXGroup;
 			children = (
 				0001B7C6DF069A72FF35D736 /* ykey.app */,
+				ACCF95EC01DC6342706E03CE /* ykeyTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -127,6 +153,24 @@
 			productReference = 0001B7C6DF069A72FF35D736 /* ykey.app */;
 			productType = "com.apple.product-type.application";
 		};
+		E0C76E3AC5BB69D231517B30 /* ykeyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 55BA4342CD9306F42E520755 /* Build configuration list for PBXNativeTarget "ykeyTests" */;
+			buildPhases = (
+				549171E5275FA2134C5EFA12 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1733E002B24D84B003F7711B /* PBXTargetDependency */,
+			);
+			name = ykeyTests;
+			packageProductDependencies = (
+			);
+			productName = ykeyTests;
+			productReference = ACCF95EC01DC6342706E03CE /* ykeyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -157,6 +201,7 @@
 			projectRoot = "";
 			targets = (
 				3EBF27CCCA077FD6B004E3E8 /* ykey */,
+				E0C76E3AC5BB69D231517B30 /* ykeyTests */,
 			);
 		};
 /* End PBXProject section */
@@ -174,6 +219,15 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		549171E5275FA2134C5EFA12 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				196081B0B5DCC39D88F4BE30 /* DatabaseManagerTests.swift in Sources */,
+				94E44FB345E04F8C2BCF9857 /* RomajiConverterTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EBE5EEFAB9479C3DA01BA299 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -191,6 +245,14 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		1733E002B24D84B003F7711B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3EBF27CCCA077FD6B004E3E8 /* ykey */;
+			targetProxy = 5B3FA287F163CC8EC0AD1C3C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin PBXVariantGroup section */
 		DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */ = {
 			isa = PBXVariantGroup;
@@ -203,6 +265,25 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		0A062B36C58C9C1A214B9EB7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yusuke.ykeyTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ykey.app/Contents/MacOS/ykey";
+			};
+			name = Debug;
+		};
 		3122BA808C24E5B9B587059E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -364,9 +445,37 @@
 			};
 			name = Release;
 		};
+		B7B887E6E76EAAFF9AE424F9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yusuke.ykeyTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ykey.app/Contents/MacOS/ykey";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		55BA4342CD9306F42E520755 /* Build configuration list for PBXNativeTarget "ykeyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A062B36C58C9C1A214B9EB7 /* Debug */,
+				B7B887E6E76EAAFF9AE424F9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		9672B84087C490F45E3C9FB7 /* Build configuration list for PBXNativeTarget "ykey" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

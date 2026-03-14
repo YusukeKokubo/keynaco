@@ -12,6 +12,12 @@ final class DatabaseManager {
         DictionaryImporter.importIfNeeded(db: db)
     }
 
+    /// テスト用: インメモリ DB で初期化（辞書インポートなし）
+    init(inMemory: Bool) {
+        guard sqlite3_open(":memory:", &db) == SQLITE_OK else { return }
+        createTables()
+    }
+
     deinit {
         sqlite3_close(db)
     }
@@ -113,6 +119,18 @@ final class DatabaseManager {
         }
 
         return (Array(results.prefix(30)), historyCount)
+    }
+
+    /// テスト用: 辞書エントリを直接追加
+    func insertDict(reading: String, candidate: String, priority: Int = 0) {
+        let sql = "INSERT OR IGNORE INTO dictionary (reading, candidate, priority) VALUES (?, ?, ?)"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, reading, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 2, candidate, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_int(stmt, 3, Int32(priority))
+        sqlite3_step(stmt)
     }
 
     /// 辞書から読みの完全一致で候補を取得

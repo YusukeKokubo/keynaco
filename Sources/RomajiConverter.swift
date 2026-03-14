@@ -39,7 +39,7 @@ struct RomajiConverter {
         "wa": "わ", "wi": "ゐ", "we": "ゑ", "wo": "を",
 
         // ん
-        "nn": "ん", "xn": "ん",
+        "xn": "ん",
 
         // が行
         "ga": "が", "gi": "ぎ", "gu": "ぐ", "ge": "げ", "go": "ご",
@@ -125,8 +125,8 @@ struct RomajiConverter {
         "b", "c", "d", "f", "g", "h", "j", "k", "m", "p", "r", "s", "t", "v", "w", "z",
     ]
 
-    /// "n" の後に来ると「ん」にならない文字（母音 + y + n）
-    private static let nExceptions: Set<Character> = ["a", "i", "u", "e", "o", "y", "n"]
+    /// "n" の後に来ると「ん」にならない文字（母音 + y）
+    private static let nExceptions: Set<Character> = ["a", "i", "u", "e", "o", "y"]
 
     // MARK: - 変換
 
