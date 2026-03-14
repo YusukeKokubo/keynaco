@@ -85,15 +85,17 @@ class InputController: IMKInputController {
         // 印字可能文字のみ受け付ける
         guard let chars = event.characters, !chars.isEmpty,
               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
+        let baseChars = event.charactersIgnoringModifiers ?? chars
 
         // Shift が押されていれば英字を直接挿入（未確定があれば先に確定）
-        if modifiers.contains(.shift) {
+        // RomajiConverter が lowercased() するため modifier flags より文字変化で検出する
+        if chars != baseChars || modifiers.contains(.shift) {
             if !composingText.isEmpty { commitComposition(sender) }
             (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
             return true
         }
 
-        pendingRomaji += chars
+        pendingRomaji += baseChars
         let result = RomajiConverter.convert(pendingRomaji)
         composedHiragana += result.converted
         pendingRomaji = result.pending
