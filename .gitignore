@@ -3,4 +3,5 @@ build/
 *.xcworkspace/xcuserdata/
 DerivedData/
 .DS_Store
-.claude/
+.claude/*
+!.claude/commands/

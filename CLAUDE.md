@@ -26,9 +26,17 @@ macOS 26 では TIS がサードパーティ IME を認識するために Bundle
 
 `project.yml` に `info:` セクションを入れると xcodegen が Info.plist を上書きする。`INFOPLIST_FILE` 設定のみで参照すること。
 
-### inputText の modifiers は Int 型
+### inputText より handle(event:client:) を使う
 
-`IMKInputController.inputText(_:key:modifiers:client:)` の `modifiers` は `NSEvent.ModifierFlags` ではなく `Int`。間違えるとオーバーライドが認識されない。
+`inputText(_:key:modifiers:client:)` は矢印キー等の特殊キーを受け取れない。`handle(_ event: NSEvent!, client sender: Any!) -> Bool` をオーバーライドすること。
+
+### Swift クラスに @objc が必須
+
+InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInputController` サブクラスや `NSApplication` サブクラスには `@objc(ClassName)` を付けないと実行時に見つからない。Info.plist のクラス名もモジュールプレフィックスなしにする（`ykey.InputController` ではなく `InputController`）。
+
+### IMKCandidates は macOS 26 で使えない
+
+`IMKCandidates` の `selectCandidate(withIdentifier:)` が動作しない。候補ウィンドウは `NSWindow(.borderless, level: .popUpMenu)` + `NSTableView` で自作する。azooKey も同じアプローチ。
 
 ### Development 署名で spctl -a は "rejected" になる
 
