@@ -4,7 +4,8 @@ import InputMethodKit
 @objc(InputController)
 class InputController: IMKInputController {
 
-    private var buffer = ""
+    private var composedHiragana = ""
+    private var pendingRomaji = ""
     private var currentCandidates: [String] = []
 
     private static let candidateWindow = CandidateWindow(
@@ -13,6 +14,11 @@ class InputController: IMKInputController {
     )
 
     private var candidateWindow: CandidateWindow { Self.candidateWindow }
+
+    /// マークドテキストに表示する未確定文字列
+    private var composingText: String {
+        composedHiragana + pendingRomaji
+    }
 
     // MARK: - イベントハンドリング
 
@@ -69,10 +75,14 @@ class InputController: IMKInputController {
         guard let chars = event.characters, !chars.isEmpty,
               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
 
-        buffer += chars
+        pendingRomaji += chars
+        let result = RomajiConverter.convert(pendingRomaji)
+        composedHiragana += result.converted
+        pendingRomaji = result.pending
+
         updateMarkedText(client: sender)
 
-        if buffer.count >= 2 {
+        if composedHiragana.count >= 1 {
             refreshCandidates(client: sender)
         } else {
             candidateWindow.dismiss()
@@ -84,15 +94,16 @@ class InputController: IMKInputController {
     // MARK: - 確定
 
     override func commitComposition(_ sender: Any!) {
-        guard !buffer.isEmpty else { return }
-        DatabaseManager.shared.record(input: buffer, output: buffer)
-        commit(text: buffer, client: sender)
+        guard !composingText.isEmpty else { return }
+        let finalText = composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
+        DatabaseManager.shared.record(input: finalText, output: finalText)
+        commit(text: finalText, client: sender)
     }
 
     // MARK: - Private helpers
 
     private func refreshCandidates(client: Any?) {
-        currentCandidates = DatabaseManager.shared.fetchCandidates(prefix: buffer)
+        currentCandidates = DatabaseManager.shared.fetchCandidates(prefix: composedHiragana)
         if currentCandidates.isEmpty {
             candidateWindow.dismiss()
             return
@@ -107,9 +118,10 @@ class InputController: IMKInputController {
     }
 
     private func confirmSelection(client: Any?) -> Bool {
-        guard !buffer.isEmpty else { return false }
+        guard !composingText.isEmpty else { return false }
+        let inputKey = composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
         if let selected = candidateWindow.selectedText() {
-            DatabaseManager.shared.record(input: buffer, output: selected)
+            DatabaseManager.shared.record(input: inputKey, output: selected)
             commit(text: selected, client: client)
         } else {
             commitComposition(client)
@@ -121,7 +133,7 @@ class InputController: IMKInputController {
         if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
             return selected
         }
-        return buffer
+        return composingText
     }
 
     private func updateMarkedText(client: Any?) {
@@ -141,16 +153,21 @@ class InputController: IMKInputController {
     private func commit(text: String, client: Any?) {
         guard let c = client as? IMKTextInput else { return }
         c.insertText(text, replacementRange: .notFound)
-        buffer = ""
+        composedHiragana = ""
+        pendingRomaji = ""
         currentCandidates = []
         candidateWindow.dismiss()
     }
 
     private func handleBackspace(client: Any?) -> Bool {
-        guard !buffer.isEmpty else { return false }
-        buffer.removeLast()
+        guard !composingText.isEmpty else { return false }
+        if !pendingRomaji.isEmpty {
+            pendingRomaji.removeLast()
+        } else {
+            composedHiragana.removeLast()
+        }
         updateMarkedText(client: client)
-        if buffer.count >= 2 {
+        if composedHiragana.count >= 1 {
             refreshCandidates(client: client)
         } else {
             candidateWindow.dismiss()
@@ -159,14 +176,15 @@ class InputController: IMKInputController {
     }
 
     private func handleReturn(client: Any?) -> Bool {
-        guard !buffer.isEmpty else { return false }
+        guard !composingText.isEmpty else { return false }
         commitComposition(client)
         return true
     }
 
     private func handleEscape(client: Any?) -> Bool {
-        guard !buffer.isEmpty else { return false }
-        buffer = ""
+        guard !composingText.isEmpty else { return false }
+        composedHiragana = ""
+        pendingRomaji = ""
         currentCandidates = []
         updateMarkedText(client: client)
         candidateWindow.dismiss()

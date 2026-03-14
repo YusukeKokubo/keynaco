@@ -12,6 +12,7 @@
 		4D96EB15856B9581B69B3DF7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C67883B3619FFDADD18F97 /* AppDelegate.swift */; };
 		521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD356B30238B7065EE499D4B /* NSManualApplication.swift */; };
 		57C98264BB86D2D2A6555750 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */; };
+		73DE04D3E224CA0037B41437 /* RomajiConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A7749939F71C6542311C39 /* RomajiConverter.swift */; };
 		75BFBACA840D87C6EB3092E4 /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */; };
 		89680704C115BBC286071022 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1744963E612A90E6E63C9CF5 /* libsqlite3.tbd */; };
 		9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805D3A35A6C37A38445EF2F0 /* InputController.swift */; };
@@ -31,6 +32,7 @@
 		B989A9A94B827722E59AF1FC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BD356B30238B7065EE499D4B /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
 		C8C67883B3619FFDADD18F97 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		E6A7749939F71C6542311C39 /* RomajiConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +76,7 @@
 				805D3A35A6C37A38445EF2F0 /* InputController.swift */,
 				317B125398998017C88935B9 /* main.swift */,
 				BD356B30238B7065EE499D4B /* NSManualApplication.swift */,
+				E6A7749939F71C6542311C39 /* RomajiConverter.swift */,
 				8E35CE6CB27B9F78A9E80F12 /* ykey.entitlements */,
 				DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */,
 			);
@@ -165,6 +168,7 @@
 				42D219A0DAFAEF4692836AF2 /* DatabaseManager.swift in Sources */,
 				9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */,
 				521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */,
+				73DE04D3E224CA0037B41437 /* RomajiConverter.swift in Sources */,
 				C8F4B74863C0D1F6F7DBD368 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

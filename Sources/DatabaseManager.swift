@@ -54,9 +54,10 @@ final class DatabaseManager {
         guard sqlite3_step(stmt) == SQLITE_ROW, sqlite3_column_int(stmt, 0) == 0 else { return }
 
         let seeds = [
-            ("he", "hello"), ("he", "help"), ("he", "heart"),
-            ("th", "the"), ("th", "thanks"), ("th", "there"),
-            ("go", "good"), ("go", "google"), ("go", "goodbye"),
+            ("かい", "会議"), ("かい", "会社"), ("かい", "会員"),
+            ("あり", "ありがとう"), ("あり", "ありがとうございます"),
+            ("おね", "お願いします"), ("おは", "おはようございます"),
+            ("よろ", "よろしくお願いします"), ("すみ", "すみません"),
         ]
         for (input, output) in seeds {
             record(input: input, output: output)
