@@ -24,8 +24,12 @@ class InputController: IMKInputController {
         // 候補ウィンドウ表示中
         if candidateWindow.isVisible {
             switch keyCode {
-            case 48: // Tab
+            case 48, 125: // Tab, ↓
                 candidateWindow.selectNext()
+                updateMarkedText(client: sender)
+                return true
+            case 126: // ↑
+                candidateWindow.selectPrev()
                 updateMarkedText(client: sender)
                 return true
             case 36: // Return
