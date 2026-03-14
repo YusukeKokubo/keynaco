@@ -86,6 +86,13 @@ class InputController: IMKInputController {
         guard let chars = event.characters, !chars.isEmpty,
               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
 
+        // Shift が押されていれば英字を直接挿入（未確定があれば先に確定）
+        if modifiers.contains(.shift) {
+            if !composingText.isEmpty { commitComposition(sender) }
+            (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
+            return true
+        }
+
         pendingRomaji += chars
         let result = RomajiConverter.convert(pendingRomaji)
         composedHiragana += result.converted
