@@ -7,6 +7,8 @@ class InputController: IMKInputController {
     private var composedHiragana = ""
     private var pendingRomaji = ""
     private var currentCandidates: [String] = []
+    /// true のとき英字モード（全キー直接入力）
+    private var isAsciiMode = false
 
     private static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -38,7 +40,32 @@ class InputController: IMKInputController {
 
         let keyCode = event.keyCode
 
-        // 候補ウィンドウ表示中
+        // 英数キー → 英字モードへ（未確定があれば確定）
+        if keyCode == 102 {
+            if !composingText.isEmpty { commitComposition(sender) }
+            isAsciiMode = true
+            return true
+        }
+
+        // かなキー → 日本語モードへ
+        if keyCode == 104 {
+            isAsciiMode = false
+            return true
+        }
+
+        // 英字モード
+        if isAsciiMode {
+            // Escape → 日本語モードへ
+            if keyCode == 53 { isAsciiMode = false; return true }
+            let modifiers = event.modifierFlags
+            guard modifiers.intersection([.command, .control, .option]).isEmpty else { return false }
+            guard let chars = event.characters, !chars.isEmpty,
+                  chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
+            (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
+            return true
+        }
+
+        // 日本語モード: 候補ウィンドウ表示中
         if candidateWindow.isVisible {
             switch keyCode {
             case 48 where event.modifierFlags.contains(.shift): // Shift+Tab
@@ -87,11 +114,7 @@ class InputController: IMKInputController {
               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
         let baseChars = event.charactersIgnoringModifiers ?? chars
 
-        NSLog("ykey: keyCode=%d chars=%@ base=%@ modifiers=0x%lx shift=%d",
-              keyCode, chars, baseChars, modifiers.rawValue, modifiers.contains(.shift) ? 1 : 0)
-
         // Shift が押されていれば英字を直接挿入（未確定があれば先に確定）
-        // RomajiConverter が lowercased() するため modifier flags より文字変化で検出する
         if Self.isShiftInput(characters: chars, baseCharacters: baseChars) || modifiers.contains(.shift) {
             if !composingText.isEmpty { commitComposition(sender) }
             (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
