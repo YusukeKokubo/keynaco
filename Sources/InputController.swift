@@ -4,11 +4,8 @@ import InputMethodKit
 @objc(InputController)
 class InputController: IMKInputController {
 
-    private var composedHiragana = ""
-    private var pendingRomaji = ""
+    private var state = CompositionState()
     private var currentCandidates: [String] = []
-    /// true のとき英字モード（全キー直接入力）
-    private var isAsciiMode = false
 
     private static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -28,11 +25,6 @@ class InputController: IMKInputController {
         }
     }
 
-    /// マークドテキストに表示する未確定文字列
-    private var composingText: String {
-        composedHiragana + pendingRomaji
-    }
-
     // MARK: - イベントハンドリング
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
@@ -42,21 +34,21 @@ class InputController: IMKInputController {
 
         // 英数キー → 英字モードへ（未確定があれば確定）
         if keyCode == 102 {
-            if !composingText.isEmpty { commitComposition(sender) }
-            isAsciiMode = true
+            if !state.composingText.isEmpty { commitComposition(sender) }
+            state.isAsciiMode = true
             return true
         }
 
         // かなキー → 日本語モードへ
         if keyCode == 104 {
-            isAsciiMode = false
+            state.isAsciiMode = false
             return true
         }
 
         // 英字モード
-        if isAsciiMode {
+        if state.isAsciiMode {
             // Escape → 日本語モードへ
-            if keyCode == 53 { isAsciiMode = false; return true }
+            if keyCode == 53 { state.isAsciiMode = false; return true }
             let modifiers = event.modifierFlags
             guard modifiers.intersection([.command, .control, .option]).isEmpty else { return false }
             guard let chars = event.characters, !chars.isEmpty,
@@ -115,18 +107,14 @@ class InputController: IMKInputController {
         let baseChars = event.charactersIgnoringModifiers ?? chars
 
         // Shift が押されていれば英字を直接挿入（未確定があれば先に確定）
-        if Self.isShiftInput(characters: chars, baseCharacters: baseChars) || modifiers.contains(.shift) {
-            if !composingText.isEmpty { commitComposition(sender) }
+        if CompositionState.isShiftInput(characters: chars, baseCharacters: baseChars) || modifiers.contains(.shift) {
+            if !state.composingText.isEmpty { commitComposition(sender) }
             (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
             return true
         }
 
-        pendingRomaji += baseChars
-        let result = RomajiConverter.convert(pendingRomaji)
-        composedHiragana += result.converted
-        pendingRomaji = result.pending
-
-        if composedHiragana.count >= 2 {
+        let needsRefresh = state.addRomaji(baseChars)
+        if needsRefresh {
             refreshCandidates(client: sender)
         } else {
             candidateWindow.dismiss()
@@ -139,8 +127,8 @@ class InputController: IMKInputController {
     // MARK: - 確定
 
     override func commitComposition(_ sender: Any!) {
-        guard !composingText.isEmpty else { return }
-        let finalText = composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
+        guard !state.composingText.isEmpty else { return }
+        let finalText = state.finalizedText
         DatabaseManager.shared.record(input: finalText, output: finalText)
         commit(text: finalText, client: sender)
     }
@@ -148,12 +136,12 @@ class InputController: IMKInputController {
     // MARK: - Private helpers
 
     private func refreshCandidates(client: Any?) {
-        let result = DatabaseManager.shared.fetchCandidates(prefix: composedHiragana)
+        let result = DatabaseManager.shared.fetchCandidates(prefix: state.composedHiragana)
         var candidates = result.candidates
         // ひらがな自体を先頭候補として追加（重複除去）
-        let hadHiragana = candidates.contains(composedHiragana)
-        candidates.removeAll { $0 == composedHiragana }
-        candidates.insert(composedHiragana, at: 0)
+        let hadHiragana = candidates.contains(state.composedHiragana)
+        candidates.removeAll { $0 == state.composedHiragana }
+        candidates.insert(state.composedHiragana, at: 0)
         // ひらがな挿入分 + 履歴件数（ひらがなが履歴にあった場合は重複除去済みなのでそのまま）
         let historyEnd = 1 + (hadHiragana ? result.historyCount - 1 : result.historyCount)
         currentCandidates = candidates
@@ -171,8 +159,8 @@ class InputController: IMKInputController {
     }
 
     private func confirmSelection(client: Any?) -> Bool {
-        guard !composingText.isEmpty else { return false }
-        let inputKey = composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
+        guard !state.composingText.isEmpty else { return false }
+        let inputKey = state.finalizedText
         if let selected = candidateWindow.selectedText() {
             DatabaseManager.shared.record(input: inputKey, output: selected)
             commit(text: selected, client: client)
@@ -184,9 +172,9 @@ class InputController: IMKInputController {
 
     private func displayText() -> String {
         if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
-            return selected + pendingRomaji
+            return selected + state.pendingRomaji
         }
-        return composingText
+        return state.composingText
     }
 
     private func updateMarkedText(client: Any?) {
@@ -206,21 +194,16 @@ class InputController: IMKInputController {
     private func commit(text: String, client: Any?) {
         guard let c = client as? IMKTextInput else { return }
         c.insertText(text, replacementRange: .notFound)
-        composedHiragana = ""
-        pendingRomaji = ""
+        state = CompositionState()
         currentCandidates = []
         candidateWindow.dismiss()
     }
 
     private func handleBackspace(client: Any?) -> Bool {
-        guard !composingText.isEmpty else { return false }
-        if !pendingRomaji.isEmpty {
-            pendingRomaji.removeLast()
-        } else {
-            composedHiragana.removeLast()
-        }
+        let (handled, needsRefresh) = state.backspace()
+        guard handled else { return false }
         updateMarkedText(client: client)
-        if composedHiragana.count >= 2 {
+        if needsRefresh {
             refreshCandidates(client: client)
         } else {
             candidateWindow.dismiss()
@@ -229,26 +212,16 @@ class InputController: IMKInputController {
     }
 
     private func handleReturn(client: Any?) -> Bool {
-        guard !composingText.isEmpty else { return false }
+        guard !state.composingText.isEmpty else { return false }
         commitComposition(client)
         return true
     }
 
     private func handleEscape(client: Any?) -> Bool {
-        guard !composingText.isEmpty else { return false }
-        composedHiragana = ""
-        pendingRomaji = ""
-        currentCandidates = []
+        guard state.reset() else { return false }
         updateMarkedText(client: client)
         candidateWindow.dismiss()
         return true
-    }
-
-    // MARK: - テスト用ヘルパー
-
-    /// Shift 入力の検出: characters と baseCharacters が異なれば Shift が押されている
-    static func isShiftInput(characters: String, baseCharacters: String) -> Bool {
-        characters != baseCharacters
     }
 }
 

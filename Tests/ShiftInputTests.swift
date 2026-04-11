@@ -17,21 +17,21 @@ final class ShiftInputTests: XCTestCase {
 
     func testShiftDetectedForUppercaseLetter() {
         // Shift+A: characters="A", charactersIgnoringModifiers="a" → Shift あり
-        XCTAssertTrue(InputController.isShiftInput(characters: "A", baseCharacters: "a"))
+        XCTAssertTrue(CompositionState.isShiftInput(characters: "A", baseCharacters: "a"))
     }
 
     func testNoShiftForLowercaseLetter() {
         // a: characters="a", charactersIgnoringModifiers="a" → Shift なし
-        XCTAssertFalse(InputController.isShiftInput(characters: "a", baseCharacters: "a"))
+        XCTAssertFalse(CompositionState.isShiftInput(characters: "a", baseCharacters: "a"))
     }
 
     func testShiftDetectedForSymbol() {
         // Shift+1="!" vs "1" → Shift あり
-        XCTAssertTrue(InputController.isShiftInput(characters: "!", baseCharacters: "1"))
+        XCTAssertTrue(CompositionState.isShiftInput(characters: "!", baseCharacters: "1"))
     }
 
     func testNoShiftWhenCharsSame() {
         // 変化なし → Shift なし
-        XCTAssertFalse(InputController.isShiftInput(characters: "1", baseCharacters: "1"))
+        XCTAssertFalse(CompositionState.isShiftInput(characters: "1", baseCharacters: "1"))
     }
 }
