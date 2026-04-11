@@ -9,6 +9,7 @@ class InputController: IMKInputController {
 
     private var state = CompositionState()
     private var currentCandidates: [String] = []
+    private var ignoreNextModeSwitch = false
 
     private static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -30,9 +31,21 @@ class InputController: IMKInputController {
 
     // MARK: - ライフサイクル
 
+    override func recognizedEvents(_ sender: Any!) -> Int {
+        return Int(NSEvent.EventTypeMask.keyDown.rawValue)
+    }
+
+    override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
+        // ykey は内部で英字/日本語モードを管理する。
+        // super を呼ぶと IMK が未対応モードへの切替を試みてイベントルーティングが壊れる。
+    }
+
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
-        state.isAsciiMode = false
+        state = CompositionState()
+        currentCandidates = []
+        candidateWindow.dismiss()
+        ignoreNextModeSwitch = true
     }
 
     override func deactivateServer(_ sender: Any!) {
@@ -46,20 +59,24 @@ class InputController: IMKInputController {
         guard let event = event, event.type == .keyDown else { return false }
 
         let keyCode = event.keyCode
-        logger.debug("handle: keyCode=\(keyCode, privacy: .public) chars='\(event.characters ?? "", privacy: .public)' composing='\(self.state.composingText, privacy: .public)' ascii=\(self.state.isAsciiMode, privacy: .public)")
 
-        // 英数キー → 英字モードへ（未確定があれば確定）
-        if keyCode == 102 {
-            if !state.composingText.isEmpty { commitComposition(sender) }
-            state.isAsciiMode = true
+        // 英数キー / かなキー
+        // 入力ソース切替で押された英数/かなが handle にも届くため、
+        // activateServer 直後の1回目は無視する。
+        if keyCode == 102 || keyCode == 104 {
+            if ignoreNextModeSwitch {
+                ignoreNextModeSwitch = false
+                return true
+            }
+            if keyCode == 102 {
+                if !state.composingText.isEmpty { commitComposition(sender) }
+                state.isAsciiMode = true
+            } else {
+                state.isAsciiMode = false
+            }
             return true
         }
-
-        // かなキー → 日本語モードへ
-        if keyCode == 104 {
-            state.isAsciiMode = false
-            return true
-        }
+        ignoreNextModeSwitch = false
 
         // 英字モード
         if state.isAsciiMode {
@@ -122,7 +139,9 @@ class InputController: IMKInputController {
         let baseChars = event.charactersIgnoringModifiers ?? chars
 
         // Shift が押されていれば英字を直接挿入（未確定があれば先に確定）
-        if CompositionState.isShiftInput(characters: chars, baseCharacters: baseChars) || modifiers.contains(.shift) {
+        // .shift のみ判定。CapsLock は .capsLock であり .shift ではないため、
+        // CapsLock ON でも変換モードが維持される。
+        if modifiers.contains(.shift) {
             if !state.composingText.isEmpty { commitComposition(sender) }
             (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
             return true
