@@ -1,5 +1,8 @@
 import Cocoa
 import InputMethodKit
+import os
+
+private let logger = Logger(subsystem: "com.yusuke.inputmethod.ykey", category: "input")
 
 @objc(InputController)
 class InputController: IMKInputController {
@@ -25,12 +28,25 @@ class InputController: IMKInputController {
         }
     }
 
+    // MARK: - ライフサイクル
+
+    override func activateServer(_ sender: Any!) {
+        super.activateServer(sender)
+        state.isAsciiMode = false
+    }
+
+    override func deactivateServer(_ sender: Any!) {
+        commitComposition(sender)
+        super.deactivateServer(sender)
+    }
+
     // MARK: - イベントハンドリング
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event = event, event.type == .keyDown else { return false }
 
         let keyCode = event.keyCode
+        logger.debug("handle: keyCode=\(keyCode, privacy: .public) chars='\(event.characters ?? "", privacy: .public)' composing='\(self.state.composingText, privacy: .public)' ascii=\(self.state.isAsciiMode, privacy: .public)")
 
         // 英数キー → 英字モードへ（未確定があれば確定）
         if keyCode == 102 {
@@ -57,6 +73,9 @@ class InputController: IMKInputController {
             return true
         }
 
+        // Backspace: keyCode=51 または文字コード \u{08}
+        let isBackspace = keyCode == 51 || event.characters == "\u{08}"
+
         // 日本語モード: 候補ウィンドウ表示中
         if candidateWindow.isVisible {
             switch keyCode {
@@ -76,10 +95,8 @@ class InputController: IMKInputController {
                 return confirmSelection(client: sender)
             case 53: // Escape
                 return handleEscape(client: sender)
-            case 51: // Backspace
-                return handleBackspace(client: sender)
             default:
-                break
+                if isBackspace { return handleBackspace(client: sender) }
             }
         } else {
             switch keyCode {
@@ -87,10 +104,8 @@ class InputController: IMKInputController {
                 return handleReturn(client: sender)
             case 53:
                 return handleEscape(client: sender)
-            case 51:
-                return handleBackspace(client: sender)
             default:
-                break
+                if isBackspace { return handleBackspace(client: sender) }
             }
         }
 
@@ -180,15 +195,11 @@ class InputController: IMKInputController {
     private func updateMarkedText(client: Any?) {
         guard let c = client as? IMKTextInput else { return }
         let text = displayText()
-        if text.isEmpty {
-            c.insertText("", replacementRange: .notFound)
-        } else {
-            c.setMarkedText(
-                text,
-                selectionRange: NSRange(location: text.count, length: 0),
-                replacementRange: .notFound
-            )
-        }
+        c.setMarkedText(
+            text,
+            selectionRange: NSRange(location: text.count, length: 0),
+            replacementRange: .notFound
+        )
     }
 
     private func commit(text: String, client: Any?) {
@@ -201,13 +212,16 @@ class InputController: IMKInputController {
 
     private func handleBackspace(client: Any?) -> Bool {
         let (handled, needsRefresh) = state.backspace()
+        logger.debug("backspace: handled=\(handled, privacy: .public) needsRefresh=\(needsRefresh, privacy: .public) composing='\(self.state.composingText, privacy: .public)' hiragana='\(self.state.composedHiragana, privacy: .public)' pending='\(self.state.pendingRomaji, privacy: .public)'")
         guard handled else { return false }
-        updateMarkedText(client: client)
         if needsRefresh {
             refreshCandidates(client: client)
         } else {
             candidateWindow.dismiss()
         }
+        let text = displayText()
+        logger.debug("backspace displayText='\(text, privacy: .public)' candidateVisible=\(self.candidateWindow.isVisible, privacy: .public)")
+        updateMarkedText(client: client)
         return true
     }
 
@@ -219,8 +233,8 @@ class InputController: IMKInputController {
 
     private func handleEscape(client: Any?) -> Bool {
         guard state.reset() else { return false }
-        updateMarkedText(client: client)
         candidateWindow.dismiss()
+        updateMarkedText(client: client)
         return true
     }
 }
