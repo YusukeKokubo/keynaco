@@ -42,3 +42,28 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: ykey
+
+schemes:
+  ykey:
+    build:
+      targets:
+        ykey: all
+      postActions:
+        - script: |
+            DESTINATION="/Library/Input Methods"
+            APP_NAME="${FULL_PRODUCT_NAME}"
+            SOURCE_APP="${BUILT_PRODUCTS_DIR}/${APP_NAME}"
+            DEST_APP="${DESTINATION}/${APP_NAME}"
+            PROCESS_NAME="${EXECUTABLE_NAME}"
+
+            pkill -f "$PROCESS_NAME" || true
+            if [ ! -d "$DESTINATION" ]; then mkdir -p "$DESTINATION"; fi
+            rm -rf "$DEST_APP"
+            cp -R "$SOURCE_APP" "$DEST_APP"
+          name: Install to Input Methods
+          settingsTarget: ykey
+    run:
+      executable: ykey
+    test:
+      targets:
+        - ykeyTests

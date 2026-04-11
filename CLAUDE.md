@@ -6,15 +6,13 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 ```bash
 xcodegen generate
-xcodebuild archive -scheme ykey -archivePath /tmp/ykey.xcarchive -configuration Release CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=R2ZZ3ALJ36
-sudo rm -rf "/Library/Input Methods/ykey.app"
-sudo cp -R /tmp/ykey.xcarchive/Products/Applications/ykey.app "/Library/Input Methods/"
-sudo /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Library/Input Methods/ykey.app"
+xcodebuild build -scheme ykey -configuration Debug
 ```
 
-- `xcodebuild archive`（`build` ではない）で Release ビルドする
-- インストール先は `/Library/Input Methods/`（sudo 必要）。`~/Library/` ではない
-- インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
+- Build Post-action（`project.yml` の `schemes`）により `/Library/Input Methods/` への自動コピーとプロセス再起動が行われる
+- 初回セットアップ: `sudo chown -R $(whoami):staff "/Library/Input Methods"` が必要
+- `~/Library/Input Methods/` は使わない（入力ソースが重複登録される）
+- 初回インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
 
 ## macOS 26 IME の罠
 
