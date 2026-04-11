@@ -20,7 +20,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.yusuke.inputmethod.ykey
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
-        # App Sandbox 有効（azooKey に倣う）
+        # App Sandbox 有効
         ENABLE_APP_SANDBOX: YES
         CODE_SIGN_ENTITLEMENTS: Sources/ykey.entitlements
         CODE_SIGN_STYLE: Automatic

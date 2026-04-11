@@ -36,7 +36,7 @@ InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInp
 
 ### IMKCandidates は macOS 26 で使えない
 
-`IMKCandidates` の `selectCandidate(withIdentifier:)` が動作しない。候補ウィンドウは `NSWindow(.borderless, level: .popUpMenu)` + `NSTableView` で自作する。azooKey も同じアプローチ。
+`IMKCandidates` の `selectCandidate(withIdentifier:)` が動作しない。候補ウィンドウは `NSWindow(.borderless, level: .popUpMenu)` + `NSTableView` で自作する。
 
 ### Development 署名で spctl -a は "rejected" になる
 
