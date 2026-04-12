@@ -597,6 +597,97 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertFalse(handler.state.isSegmentMode)
     }
 
+    // MARK: - セグメント境界調整（Shift+矢印）
+
+    func testSegmentResizeExpandShiftRight() {
+        // 初期セグメント: ["わたし", "は", "がくせい"]
+        // Shift+Right で "わたし" → "わたしは"、"は" セグメントは消滅
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        XCTAssertTrue(handler.state.isSegmentMode)
+        XCTAssertEqual(handler.state.segmentState?.segments[0].reading, "わたし")
+
+        press(keyCode: 124, modifiers: .shift)  // Shift+Right
+        guard let ss = handler.state.segmentState else {
+            XCTFail("セグメントモードが維持されるはず"); return
+        }
+        XCTAssertEqual(ss.focusedIndex, 0)
+        // "は" (1文字) を奪ったので "わたしは" になり、"は" セグメントは消滅
+        XCTAssertEqual(ss.segments[0].reading, "わたしは", "フォーカスセグメントが1文字拡張されるはず")
+        XCTAssertEqual(ss.segments[1].reading, "がくせい", "1文字セグメントが消滅して次のセグメントが詰まるはず")
+        XCTAssertEqual(ss.segments.count, 2)
+    }
+
+    func testSegmentResizeShrinkShiftLeft() {
+        // "わたし"+"は"+"がくせい" → Shift+Left で "わたし" を "わた" に縮小
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        XCTAssertTrue(handler.state.isSegmentMode)
+
+        press(keyCode: 123, modifiers: .shift)  // Shift+Left
+        guard let ss = handler.state.segmentState else {
+            XCTFail("セグメントモードが維持されるはず"); return
+        }
+        XCTAssertEqual(ss.focusedIndex, 0)
+        XCTAssertEqual(ss.segments[0].reading, "わた", "フォーカスセグメントが1文字縮小されるはず")
+        XCTAssertEqual(ss.segments[1].reading, "しは", "次セグメントの先頭に末尾文字が渡されるはず")
+    }
+
+    func testSegmentResizeShrinkStopsAtOneChar() {
+        // 1文字セグメントはこれ以上縮小しない
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        // "は" セグメント（1文字）にフォーカスを移動
+        press(keyCode: 124)  // Right → "は"
+        guard let ss0 = handler.state.segmentState else { XCTFail(); return }
+        let prevCount = ss0.segments.count
+
+        press(keyCode: 123, modifiers: .shift)  // Shift+Left → 縮小不可
+        guard let ss = handler.state.segmentState else { XCTFail(); return }
+        XCTAssertEqual(ss.segments[ss.focusedIndex].reading, "は", "1文字セグメントは縮小されないはず")
+        XCTAssertEqual(ss.segments.count, prevCount)
+    }
+
+    func testSegmentResizeExpandMergesNextSegmentWhenEmpty() {
+        // 次セグメントが1文字のとき拡張するとそのセグメントが消滅する
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        press(keyCode: 124)  // Right → "は" にフォーカス
+        guard let ss0 = handler.state.segmentState else { XCTFail(); return }
+        let prevCount = ss0.segments.count
+
+        press(keyCode: 124, modifiers: .shift)  // Shift+Right: "は" → "はが" に拡張
+        guard let ss1 = handler.state.segmentState else { XCTFail(); return }
+        XCTAssertEqual(ss1.segments[ss1.focusedIndex].reading, "はが")
+
+        // さらに Shift+Right: "はが" → "はがく"
+        press(keyCode: 124, modifiers: .shift)
+        // もし "がくせい" が1文字ずつ消えていくならセグメント数が同じか減る
+        XCTAssertTrue(handler.state.isSegmentMode)
+    }
+
+    func testSegmentResizeConfirmAfterResize() {
+        // リサイズ後に Enter で確定できる
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+
+        press(keyCode: 124, modifiers: .shift)  // Shift+Right: "わたし" → "わたしは"
+        press(keyCode: 36)   // Enter → 確定
+        XCTAssertFalse(handler.state.isSegmentMode)
+        // 確定テキストにはリサイズ後の全セグメントが含まれるはず
+        XCTAssertFalse(client.inserted.isEmpty)
+    }
+
     // MARK: - commitComposition（deactivateServer 相当）
 
     func testCommitCompositionFinalizesHiragana() {

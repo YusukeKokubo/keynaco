@@ -388,6 +388,9 @@ struct InputHandler {
 
         switch keyCode {
         case KeyCode.leftArrow:
+            if modifiers.contains(.shift) {
+                return resizeFocusedSegment(expand: false, candidate: candidate, client: client)
+            }
             guard ss.focusedIndex > 0 else { return (true, .none) }
             syncFocusedSegmentSelection(from: candidate)
             state.segmentState!.focusedIndex -= 1
@@ -395,6 +398,9 @@ struct InputHandler {
             return (true, makeCandidateActionForFocusedSegment())
 
         case KeyCode.rightArrow:
+            if modifiers.contains(.shift) {
+                return resizeFocusedSegment(expand: true, candidate: candidate, client: client)
+            }
             guard ss.focusedIndex < ss.segments.count - 1 else { return (true, .none) }
             syncFocusedSegmentSelection(from: candidate)
             state.segmentState!.focusedIndex += 1
@@ -425,6 +431,67 @@ struct InputHandler {
             state.segmentState = nil
             return (false, .dismiss)
         }
+    }
+
+    /// Shift+右/左矢印でセグメント境界を1文字単位で調整する。
+    /// expand=true: フォーカスセグメントを右に1文字拡張（次セグメントの先頭1文字を奪う）
+    /// expand=false: フォーカスセグメントを左に1文字縮小（末尾1文字を次セグメントの先頭に渡す）
+    private mutating func resizeFocusedSegment(
+        expand: Bool,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        guard var ss = state.segmentState else { return (false, .none) }
+        syncFocusedSegmentSelection(from: candidate)
+        let i = ss.focusedIndex
+
+        if expand {
+            guard i + 1 < ss.segments.count else { return (true, .none) }
+            let nextReading = ss.segments[i + 1].reading
+            guard !nextReading.isEmpty else { return (true, .none) }
+            let newFocusedReading = ss.segments[i].reading + String(nextReading.first!)
+            let newNextReading = String(nextReading.dropFirst())
+            ss.segments[i] = buildSegmentCandidates(
+                reading: newFocusedReading,
+                dictCandidates: db.fetchDict(reading: newFocusedReading)
+            )
+            if newNextReading.isEmpty {
+                ss.segments.remove(at: i + 1)
+            } else {
+                ss.segments[i + 1] = buildSegmentCandidates(
+                    reading: newNextReading,
+                    dictCandidates: db.fetchDict(reading: newNextReading)
+                )
+            }
+        } else {
+            let focusedReading = ss.segments[i].reading
+            guard focusedReading.count >= 2 else { return (true, .none) }
+            let newFocusedReading = String(focusedReading.dropLast())
+            let removedChar = String(focusedReading.last!)
+            ss.segments[i] = buildSegmentCandidates(
+                reading: newFocusedReading,
+                dictCandidates: db.fetchDict(reading: newFocusedReading)
+            )
+            if i + 1 < ss.segments.count {
+                let newNextReading = removedChar + ss.segments[i + 1].reading
+                ss.segments[i + 1] = buildSegmentCandidates(
+                    reading: newNextReading,
+                    dictCandidates: db.fetchDict(reading: newNextReading)
+                )
+            } else {
+                ss.segments.insert(
+                    buildSegmentCandidates(
+                        reading: removedChar,
+                        dictCandidates: db.fetchDict(reading: removedChar)
+                    ),
+                    at: i + 1
+                )
+            }
+        }
+
+        state.segmentState = ss
+        applySegmentMarkedText(client: client)
+        return (true, makeCandidateActionForFocusedSegment())
     }
 
     private mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {
