@@ -3,7 +3,7 @@ import AppKit
 /// 候補ウィンドウに対する操作指示
 enum CandidateAction {
     case none
-    case show(candidates: [String], historyEnd: Int)
+    case show(candidates: [String], historyEnd: Int, initialRow: Int)
     case dismiss
     case selectNext
     case selectPrev
@@ -14,6 +14,8 @@ struct CandidateContext {
     var isVisible: Bool
     var selectedRow: Int
     var selectedText: String?
+    /// ユーザーが ↑↓ で明示的に候補を動かしたか（初期表示のまま = false）
+    var isExplicitlySelected: Bool = false
 
     static let hidden = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
 }
@@ -40,7 +42,7 @@ struct InputHandler {
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
 
-        let wasExplicitlySelected = candidate.isVisible && candidate.selectedRow > 0
+        let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
 
         // 英数キー (102) / かなキー (104)
         if keyCode == 102 || keyCode == 104 {
@@ -148,7 +150,7 @@ struct InputHandler {
     mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
         guard !state.composingText.isEmpty else { return }
         let inputKey = state.finalizedText
-        if candidate.isVisible, candidate.selectedRow > 0, let selected = candidate.selectedText {
+        if candidate.isVisible, let selected = candidate.selectedText {
             db.record(input: inputKey, output: selected)
             doCommit(text: selected, client: client)
         } else {
@@ -163,6 +165,7 @@ struct InputHandler {
     private mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         guard !state.composingText.isEmpty else { return .none }
         let inputKey = state.finalizedText
+        // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する
         if let selected = candidate.selectedText {
             db.record(input: inputKey, output: selected)
             doCommit(text: selected, client: client)
@@ -180,24 +183,34 @@ struct InputHandler {
     private mutating func doRefreshCandidates() -> CandidateAction {
         let result = db.fetchCandidates(prefix: state.composedHiragana)
         var candidates = result.candidates
-        var adjustedHistoryCount = result.historyCount
+        let historyCount = result.historyCount
 
-        let katakana = hiraganaToKatakana(state.composedHiragana)
+        let hiragana = state.composedHiragana
+        let katakana = hiraganaToKatakana(hiragana)
 
-        // ひらがな・カタカナを先頭固定位置に移動（履歴にあった場合はカウントを補正）
-        for fixed in [state.composedHiragana, katakana] {
-            if let idx = candidates.firstIndex(of: fixed), idx < adjustedHistoryCount {
-                adjustedHistoryCount -= 1
-            }
-            candidates.removeAll { $0 == fixed }
+        // 履歴にひらがな・カタカナが含まれるかを確認する
+        // 履歴にある場合 → 履歴エントリとして可視範囲に残す（固定位置に追加しない）
+        // 履歴にない場合 → スクロール範囲外の固定位置に追加し、↑ キーで到達できるようにする
+        let hiraganaInHistory = candidates.prefix(historyCount).contains(hiragana)
+        let katakanaInHistory = candidates.prefix(historyCount).contains(katakana)
+
+        var fixedCount = 0
+        if !katakanaInHistory {
+            candidates.removeAll { $0 == katakana }
+            candidates.insert(katakana, at: 0)
+            fixedCount += 1
+        }
+        if !hiraganaInHistory {
+            candidates.removeAll { $0 == hiragana }
+            candidates.insert(hiragana, at: 0)
+            fixedCount += 1
         }
 
-        candidates.insert(katakana, at: 0)
-        candidates.insert(state.composedHiragana, at: 0)
-
-        let historyEnd = 2 + adjustedHistoryCount
+        let historyEnd = fixedCount + historyCount
+        // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
+        let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
-        return .show(candidates: candidates, historyEnd: historyEnd)
+        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow)
     }
 
     private func hiraganaToKatakana(_ text: String) -> String {

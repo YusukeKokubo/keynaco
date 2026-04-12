@@ -84,7 +84,8 @@ class InputController: IMKInputController {
         let ctx = CandidateContext(
             isVisible: candidateWindow.isVisible,
             selectedRow: candidateWindow.selectedRow,
-            selectedText: candidateWindow.selectedText()
+            selectedText: candidateWindow.selectedText(),
+            isExplicitlySelected: candidateWindow.isExplicitlySelected
         )
         let adapter = IMKTextInputAdapter(sender)
 
@@ -100,8 +101,8 @@ class InputController: IMKInputController {
         switch action {
         case .none:
             break
-        case .show(let candidates, let historyEnd):
-            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, near: adapter.cursorRect())
+        case .show(let candidates, let historyEnd, let initialRow):
+            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, near: adapter.cursorRect())
         case .dismiss:
             candidateWindow.dismiss()
         case .selectNext:
@@ -122,7 +123,8 @@ class InputController: IMKInputController {
         let ctx = CandidateContext(
             isVisible: candidateWindow.isVisible,
             selectedRow: candidateWindow.selectedRow,
-            selectedText: candidateWindow.selectedText()
+            selectedText: candidateWindow.selectedText(),
+            isExplicitlySelected: candidateWindow.isExplicitlySelected
         )
         handler.commitComposition(client: adapter, candidate: ctx)
         candidateWindow.dismiss()

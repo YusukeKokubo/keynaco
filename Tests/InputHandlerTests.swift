@@ -49,9 +49,10 @@ final class InputHandlerTests: XCTestCase {
         modifiers: NSEvent.ModifierFlags = [],
         candidateVisible: Bool = false,
         selectedRow: Int = 0,
-        selectedText: String? = nil
+        selectedText: String? = nil,
+        isExplicitlySelected: Bool = false
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        let ctx = CandidateContext(isVisible: candidateVisible, selectedRow: selectedRow, selectedText: selectedText)
+        let ctx = CandidateContext(isVisible: candidateVisible, selectedRow: selectedRow, selectedText: selectedText, isExplicitlySelected: isExplicitlySelected)
         return handler.handle(keyCode: keyCode, characters: nil, baseCharacters: nil,
                                modifiers: modifiers, candidate: ctx, client: client)
     }
@@ -75,7 +76,7 @@ final class InputHandlerTests: XCTestCase {
         let (consumed, action) = type(chars: "i", base: "i")
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.markedText, "あい")
-        guard case .show(let candidates, _) = action else {
+        guard case .show(let candidates, _, _) = action else {
             XCTFail("2文字以上で .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("あい"))
@@ -99,8 +100,8 @@ final class InputHandlerTests: XCTestCase {
     func testReturnWithSelectedCandidateCommitsCandidate() {
         handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
         type(chars: "a", base: "a")
-        // row > 0 = 明示的に候補を選んだ状態
-        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿")
+        // isExplicitlySelected: true = ↑↓ で明示的に選んだ状態
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
         XCTAssertTrue(result.consumed)
         XCTAssertEqual(client.inserted, ["阿"])
         guard case .dismiss = result.candidateAction else {
@@ -154,7 +155,7 @@ final class InputHandlerTests: XCTestCase {
         type(chars: "a", base: "a")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _) = action else {
+        guard case .show(let candidates, _, _) = action else {
             XCTFail("スペースで .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("あ"))
@@ -167,7 +168,7 @@ final class InputHandlerTests: XCTestCase {
     func testKatakanaAppearsAtIndexOne() {
         type(chars: "a", base: "a")
         let (_, action) = type(chars: "i", base: "i")
-        guard case .show(let candidates, _) = action else {
+        guard case .show(let candidates, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates[0], "あい", "先頭はひらがなのはず")
@@ -178,7 +179,7 @@ final class InputHandlerTests: XCTestCase {
         type(chars: "a", base: "a")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _) = action else {
+        guard case .show(let candidates, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("ア"), "カタカナが候補に含まれるはず")
@@ -278,7 +279,7 @@ final class InputHandlerTests: XCTestCase {
     func testCommitCompositionWithExplicitCandidateCommitsCandidate() {
         handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
         type(chars: "a", base: "a")
-        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
         handler.commitComposition(client: client, candidate: ctx)
         XCTAssertEqual(client.inserted, ["阿"])
     }

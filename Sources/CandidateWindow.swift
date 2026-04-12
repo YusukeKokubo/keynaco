@@ -51,6 +51,10 @@ final class CandidateWindow: NSWindow {
     private let scrollView = NSScrollView()
     private(set) var candidates: [String] = []
     private(set) var selectedRow: Int = 0
+    /// ユーザーが ↑↓ で明示的に候補を動かしたか
+    private(set) var isExplicitlySelected: Bool = false
+    /// スクロール範囲外の固定行数（削除ボタンを非表示にする行数）
+    private var fixedRowCount: Int = 0
     /// 履歴セクションの末尾インデックス（この行の後にセパレータを描画）
     private var historySectionEnd: Int = 0
 
@@ -102,14 +106,19 @@ final class CandidateWindow: NSWindow {
 
     // MARK: - Public API
 
-    func show(candidates: [String], historySectionEnd: Int = 0, near rect: NSRect) {
+    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, near rect: NSRect) {
         self.candidates = candidates
         self.historySectionEnd = historySectionEnd
-        self.selectedRow = 0
+        self.selectedRow = candidates.isEmpty ? 0 : min(initialRow, candidates.count - 1)
+        self.isExplicitlySelected = false
+        self.fixedRowCount = initialRow
         tableView.reloadData()
 
-        let rowCount = min(candidates.count, 8)
-        let height = CGFloat(rowCount) * (tableView.rowHeight + tableView.intercellSpacing.height) + 8
+        // initialRow より前の行（ひらがな・カタカナ）はウィンドウ高さに含めず、
+        // スクロールで隠す。↑ キーで上スクロールすると現れる。
+        let rowHeight = tableView.rowHeight + tableView.intercellSpacing.height
+        let visibleCount = max(min(candidates.count - initialRow, 8), 1)
+        let height = CGFloat(visibleCount) * rowHeight + 8
         let width: CGFloat = 300
 
         var origin = NSPoint(x: rect.origin.x, y: rect.origin.y - height - 4)
@@ -119,8 +128,11 @@ final class CandidateWindow: NSWindow {
         }
 
         setFrame(NSRect(x: origin.x, y: origin.y, width: width, height: height), display: true)
-        tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-        tableView.scrollRowToVisible(0)
+        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
+        // initialRow の行がウィンドウ最上部に来るようスクロール位置を設定
+        let scrollPoint = NSPoint(x: 0, y: CGFloat(initialRow) * rowHeight)
+        scrollView.contentView.scroll(to: scrollPoint)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
         orderFront(nil)
     }
 
@@ -128,12 +140,15 @@ final class CandidateWindow: NSWindow {
         orderOut(nil)
         candidates = []
         selectedRow = 0
+        isExplicitlySelected = false
+        fixedRowCount = 0
         historySectionEnd = 0
     }
 
     func selectNext() {
         guard !candidates.isEmpty else { return }
         selectedRow = (selectedRow + 1) % candidates.count
+        isExplicitlySelected = true
         tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
         tableView.scrollRowToVisible(selectedRow)
     }
@@ -141,6 +156,7 @@ final class CandidateWindow: NSWindow {
     func selectPrev() {
         guard !candidates.isEmpty else { return }
         selectedRow = (selectedRow - 1 + candidates.count) % candidates.count
+        isExplicitlySelected = true
         tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
         tableView.scrollRowToVisible(selectedRow)
     }
@@ -195,7 +211,7 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
 
         rowView.label.stringValue = candidates[row]
         rowView.deleteButton.tag = row
-        rowView.deleteButton.isHidden = (row == 0)
+        rowView.deleteButton.isHidden = (row < fixedRowCount)
         let showSeparator = (row == historySectionEnd - 1) && historySectionEnd < candidates.count
         rowView.separator.isHidden = !showSeparator
 
