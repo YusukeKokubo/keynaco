@@ -245,12 +245,13 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.markedText, "あいk")
     }
 
-    func testSpaceDuringCandidatesReturnsSelectNext() {
+    func testSpaceDuringCandidatesFallsBackToShowForSingleSegment() {
+        // "あ" は1セグメント → doEnterSegmentMode からフォールバックして .show を返す
         type(chars: "a", base: "a")
         let result = press(keyCode: 49, candidateVisible: true, selectedRow: 0)
         XCTAssertTrue(result.consumed)
-        guard case .selectNext = result.candidateAction else {
-            XCTFail("候補表示中のスペースは .selectNext を返すはず"); return
+        guard case .show = result.candidateAction else {
+            XCTFail("単一セグメントのスペースは .show にフォールバックするはず: \(result.candidateAction)"); return
         }
     }
 
@@ -454,6 +455,132 @@ final class InputHandlerTests: XCTestCase {
                            modifiers: [], candidate: ctx, client: client)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "あ、")
+    }
+
+    // MARK: - セグメントモード
+
+    private func typeRomaji(_ s: String) {
+        for c in s { type(chars: String(c), base: String(c)) }
+    }
+
+    func testSpaceEntersSegmentModeWhenMultipleSegments() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        let (consumed, action) = press(keyCode: 49)  // Space
+        XCTAssertTrue(consumed)
+        XCTAssertTrue(handler.state.isSegmentMode)
+        guard case .show = action else {
+            XCTFail("2+セグメントで Space → .show を返すはず: \(action)"); return
+        }
+    }
+
+    func testSpaceFallsBackToNormalModeForSingleSegment() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        typeRomaji("watashi")
+        let (consumed, action) = press(keyCode: 49)  // Space
+        XCTAssertTrue(consumed)
+        XCTAssertFalse(handler.state.isSegmentMode, "1セグメントはセグメントモードに入らないはず")
+        guard case .show = action else {
+            XCTFail("1セグメントでも .show にフォールバックするはず: \(action)"); return
+        }
+    }
+
+    func testSegmentModeLeftRightMovesFocus() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        XCTAssertEqual(handler.state.segmentState?.focusedIndex, 0)
+
+        press(keyCode: 124)  // Right
+        XCTAssertEqual(handler.state.segmentState?.focusedIndex, 1)
+
+        press(keyCode: 124)  // Right
+        XCTAssertEqual(handler.state.segmentState?.focusedIndex, 2)
+
+        press(keyCode: 123)  // Left
+        XCTAssertEqual(handler.state.segmentState?.focusedIndex, 1)
+    }
+
+    func testSegmentModeEnterConfirmsAllSegments() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+
+        let (consumed, action) = press(keyCode: 36)  // Enter
+        XCTAssertTrue(consumed)
+        XCTAssertEqual(client.inserted.last, "私は学生")
+        XCTAssertFalse(handler.state.isSegmentMode)
+        guard case .dismiss = action else {
+            XCTFail("確定後は .dismiss を返すはず: \(action)"); return
+        }
+    }
+
+    func testSegmentModeEscapeRestoresComposing() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        XCTAssertTrue(handler.state.isSegmentMode)
+
+        let (consumed, action) = press(keyCode: 53)  // Escape
+        XCTAssertTrue(consumed)
+        XCTAssertFalse(handler.state.isSegmentMode)
+        XCTAssertEqual(handler.state.composedHiragana, "わたしはがくせい")
+        XCTAssertTrue(client.inserted.isEmpty)
+        guard case .dismiss = action else {
+            XCTFail("Escape は .dismiss を返すはず: \(action)"); return
+        }
+    }
+
+    func testSegmentModeBackspaceExits() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        XCTAssertTrue(handler.state.isSegmentMode)
+
+        let (consumed, action) = press(keyCode: 51)  // Backspace
+        XCTAssertTrue(consumed)
+        XCTAssertFalse(handler.state.isSegmentMode)
+        XCTAssertTrue(client.inserted.isEmpty)
+        guard case .dismiss = action else {
+            XCTFail("Backspace は .dismiss を返すはず: \(action)"); return
+        }
+    }
+
+    func testSegmentModeHistoryRecordedPerSegment() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        press(keyCode: 36)  // Enter → confirm all
+
+        let hist1 = handler.db.fetchCandidates(prefix: "わたし")
+        XCTAssertTrue(hist1.candidates.prefix(hist1.historyCount).contains("私"),
+                      "「わたし」→「私」が履歴に記録されるはず")
+
+        let hist2 = handler.db.fetchCandidates(prefix: "は")
+        XCTAssertTrue(hist2.candidates.prefix(hist2.historyCount).contains("は"),
+                      "「は」→「は」が履歴に記録されるはず")
+
+        let hist3 = handler.db.fetchCandidates(prefix: "がくせい")
+        XCTAssertTrue(hist3.candidates.prefix(hist3.historyCount).contains("学生"),
+                      "「がくせい」→「学生」が履歴に記録されるはず")
+    }
+
+    func testCommitCompositionInSegmentMode() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        XCTAssertTrue(handler.state.isSegmentMode)
+
+        handler.commitComposition(client: client)
+        XCTAssertEqual(client.inserted.last, "私は学生", "deactivateServer 相当の強制確定")
+        XCTAssertFalse(handler.state.isSegmentMode)
     }
 
     // MARK: - commitComposition（deactivateServer 相当）

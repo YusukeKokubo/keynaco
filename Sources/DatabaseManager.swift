@@ -133,6 +133,34 @@ final class DatabaseManager {
         return (Array(results.prefix(30)), historyCount)
     }
 
+    /// ひらがな文字列を辞書最長一致グリーディ法でセグメントに分割する。
+    /// 各セグメントの読みと辞書候補を返す。
+    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
+        var result: [(reading: String, candidates: [String])] = []
+        var remaining = hiragana
+        let maxSegmentLen = 8
+
+        while !remaining.isEmpty {
+            var matched = false
+            let tryLen = min(remaining.count, maxSegmentLen)
+            for length in stride(from: tryLen, through: 2, by: -1) {
+                let prefix = String(remaining.prefix(length))
+                let candidates = fetchDict(reading: prefix)
+                if !candidates.isEmpty {
+                    result.append((reading: prefix, candidates: candidates))
+                    remaining = String(remaining.dropFirst(length))
+                    matched = true
+                    break
+                }
+            }
+            if !matched {
+                let single = String(remaining.removeFirst())
+                result.append((reading: single, candidates: []))
+            }
+        }
+        return result
+    }
+
     /// テスト用: 辞書エントリを直接追加
     func insertDict(reading: String, candidate: String, priority: Int = 0) {
         let sql = "INSERT OR IGNORE INTO dictionary (reading, candidate, priority) VALUES (?, ?, ?)"
@@ -146,7 +174,7 @@ final class DatabaseManager {
     }
 
     /// 辞書から読みの完全一致で候補を取得
-    private func fetchDict(reading: String) -> [String] {
+    func fetchDict(reading: String) -> [String] {
         let sql = """
         SELECT candidate FROM dictionary
         WHERE reading = ?

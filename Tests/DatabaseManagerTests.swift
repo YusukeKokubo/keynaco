@@ -153,4 +153,36 @@ final class DatabaseManagerTests: XCTestCase {
         let result = db.fetchCandidates(prefix: "いく")
         XCTAssertTrue(result.candidates.contains("行く"), "いく → 行く")
     }
+
+    // MARK: - segmentize
+
+    func testSegmentizeSingleSegment() {
+        db.insertDict(reading: "かいぎ", candidate: "会議", priority: 0)
+        let segments = db.segmentize("かいぎ")
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0].reading, "かいぎ")
+        XCTAssertFalse(segments[0].candidates.isEmpty)
+    }
+
+    func testSegmentizeMultipleSegments() {
+        db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        // "は" は辞書なし → 1文字セグメント
+        let segments = db.segmentize("わたしはがくせい")
+        XCTAssertEqual(segments.count, 3)
+        XCTAssertEqual(segments[0].reading, "わたし")
+        XCTAssertEqual(segments[1].reading, "は")
+        XCTAssertEqual(segments[2].reading, "がくせい")
+        XCTAssertFalse(segments[0].candidates.isEmpty)
+        XCTAssertTrue(segments[1].candidates.isEmpty, "助詞「は」は辞書エントリなし")
+        XCTAssertFalse(segments[2].candidates.isEmpty)
+    }
+
+    func testSegmentizeParticle() {
+        // 辞書にない1文字が1セグメントになる
+        let segments = db.segmentize("は")
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0].reading, "は")
+        XCTAssertTrue(segments[0].candidates.isEmpty)
+    }
 }

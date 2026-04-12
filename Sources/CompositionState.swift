@@ -50,17 +50,49 @@ struct CompositionState {
         return (true, composedHiragana.count >= 2)
     }
 
+    var segmentState: SegmentState? = nil
+    var isSegmentMode: Bool { segmentState != nil }
+
     /// 全状態をリセットする。
-    /// - Returns: リセット前に未確定文字列があったか
+    /// - Returns: リセット前に未確定文字列またはセグメント状態があったか
     mutating func reset() -> Bool {
-        guard !composingText.isEmpty else { return false }
+        guard !composingText.isEmpty || segmentState != nil else { return false }
         composedHiragana = ""
         pendingRomaji = ""
+        segmentState = nil
         return true
     }
 
     /// Shift 入力の検出
     static func isShiftInput(characters: String, baseCharacters: String) -> Bool {
         characters != baseCharacters
+    }
+}
+
+// MARK: - セグメント変換
+
+struct Segment {
+    let reading: String
+    var candidates: [String]
+    var selectedIndex: Int
+    var historyEnd: Int
+
+    var selectedText: String {
+        guard !candidates.isEmpty else { return reading }
+        return candidates[selectedIndex]
+    }
+}
+
+struct SegmentState {
+    var segments: [Segment]
+    var focusedIndex: Int
+
+    var focusedSegment: Segment {
+        get { segments[focusedIndex] }
+        set { segments[focusedIndex] = newValue }
+    }
+
+    var allSelectedText: String {
+        segments.map(\.selectedText).joined()
     }
 }

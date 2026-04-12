@@ -5,5 +5,13 @@ import AppKit
 protocol TextInputClient: AnyObject {
     func insertText(_ text: String)
     func setMarkedText(_ text: String, selectionRange: NSRange)
+    func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange)
     func cursorRect() -> NSRect
+}
+
+extension TextInputClient {
+    /// NSAttributedString 版のデフォルト実装（文字列版にフォールバック）
+    func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange) {
+        setMarkedText(text.string, selectionRange: selectionRange)
+    }
 }

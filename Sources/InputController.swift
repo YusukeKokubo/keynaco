@@ -21,6 +21,10 @@ private final class IMKTextInputAdapter: TextInputClient {
         client?.setMarkedText(text, selectionRange: selectionRange, replacementRange: .notFound)
     }
 
+    func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange) {
+        client?.setMarkedText(text, selectionRange: selectionRange, replacementRange: .notFound)
+    }
+
     func cursorRect() -> NSRect {
         var rect = NSRect.zero
         client?.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
@@ -133,13 +137,33 @@ class InputController: IMKInputController {
     // MARK: - プライベートヘルパー
 
     private func updateMarkedText(client: TextInputClient) {
-        let text: String
-        if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
-            text = selected + handler.state.pendingRomaji
+        if let ss = handler.state.segmentState {
+            let str = buildSegmentAttributedString(ss: ss, overrideFocusedText: candidateWindow.selectedText())
+            client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
         } else {
-            text = handler.state.composingText
+            let text: String
+            if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
+                text = selected + handler.state.pendingRomaji
+            } else {
+                text = handler.state.composingText
+            }
+            client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
         }
-        client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+    }
+
+    /// セグメント全体の NSAttributedString を構築（focused=太い下線、他=細い下線）
+    private func buildSegmentAttributedString(ss: SegmentState, overrideFocusedText: String? = nil) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+        for (i, seg) in ss.segments.enumerated() {
+            let text = (i == ss.focusedIndex)
+                ? (overrideFocusedText ?? seg.selectedText)
+                : seg.selectedText
+            let style: Int = (i == ss.focusedIndex)
+                ? NSUnderlineStyle.thick.rawValue
+                : NSUnderlineStyle.single.rawValue
+            result.append(NSAttributedString(string: text, attributes: [.underlineStyle: style]))
+        }
+        return result
     }
 }
 

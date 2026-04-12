@@ -58,6 +58,11 @@ struct InputHandler {
 
         let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
 
+        // セグメントモード中は最優先でハンドリング
+        if state.isSegmentMode {
+            return handleSegmentModeKey(keyCode: keyCode, modifiers: modifiers, candidate: candidate, client: client)
+        }
+
         // 英数キー / かなキー
         if keyCode == KeyCode.eisu || keyCode == KeyCode.kana {
             if ignoreNextModeSwitch {
@@ -91,7 +96,16 @@ struct InputHandler {
             switch keyCode {
             case KeyCode.tab where modifiers.contains(.shift):  // Shift+Tab
                 return (true, .selectPrev)
-            case KeyCode.space:   // Space → 次の候補
+            case KeyCode.space:   // Space → セグメントモードへ（または次の候補）
+                if !state.composedHiragana.isEmpty {
+                    let action = doEnterSegmentMode()
+                    if state.isSegmentMode {
+                        applySegmentMarkedText(client: client)
+                    } else {
+                        applyMarkedText(candidateText: nil, client: client)
+                    }
+                    return (true, action)
+                }
                 return (true, .selectNext)
             case KeyCode.tab, KeyCode.downArrow:  // Tab, ↓
                 return (true, .selectNext)
@@ -121,8 +135,12 @@ struct InputHandler {
         // スペースキー（候補なし時）
         if keyCode == KeyCode.space {
             if !state.composedHiragana.isEmpty {
-                let action = doRefreshCandidates()
-                applyMarkedText(candidateText: nil, client: client)
+                let action = doEnterSegmentMode()
+                if state.isSegmentMode {
+                    applySegmentMarkedText(client: client)
+                } else {
+                    applyMarkedText(candidateText: nil, client: client)
+                }
                 return (true, action)
             }
             return (false, .none)
@@ -204,6 +222,18 @@ struct InputHandler {
     /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
     /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
     mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
+        // セグメントモード中の強制確定（アプリ切り替えなど）
+        if let ss = state.segmentState {
+            let selectedText = candidate.selectedText ?? ss.focusedSegment.selectedText
+            var confirmed = ""
+            for (i, seg) in ss.segments.enumerated() {
+                let text = (i == ss.focusedIndex) ? selectedText : seg.selectedText
+                db.record(input: seg.reading, output: text)
+                confirmed += text
+            }
+            doCommit(text: confirmed, client: client)
+            return
+        }
         guard !state.composingText.isEmpty else { return }
         let inputKey = state.finalizedText
         if candidate.isVisible, let selected = candidate.selectedText {
@@ -301,6 +331,139 @@ struct InputHandler {
         guard state.reset() else { return (false, .none) }
         applyMarkedText(candidateText: nil, client: client)
         return (true, .dismiss)
+    }
+
+    // MARK: - セグメントモード
+
+    private mutating func doEnterSegmentMode() -> CandidateAction {
+        if !state.pendingRomaji.isEmpty {
+            state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+            state.pendingRomaji = ""
+        }
+        let rawSegments = db.segmentize(state.composedHiragana)
+
+        // 1セグメントのみなら従来の候補ウィンドウにフォールバック
+        guard rawSegments.count >= 2 else {
+            return doRefreshCandidates()
+        }
+
+        let segments = rawSegments.map { buildSegmentCandidates(reading: $0.reading, dictCandidates: $0.candidates) }
+        state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
+        return makeCandidateActionForFocusedSegment()
+    }
+
+    private func buildSegmentCandidates(reading: String, dictCandidates: [String]) -> Segment {
+        let hiragana = reading
+        let katakana = hiraganaToKatakana(reading)
+        var candidates = dictCandidates
+        var fixedCount = 0
+        if !candidates.contains(katakana) {
+            candidates.removeAll { $0 == katakana }
+            candidates.insert(katakana, at: 0)
+            fixedCount += 1
+        }
+        if !candidates.contains(hiragana) {
+            candidates.removeAll { $0 == hiragana }
+            candidates.insert(hiragana, at: 0)
+            fixedCount += 1
+        }
+        let initialIndex = dictCandidates.isEmpty ? 0 : fixedCount
+        return Segment(reading: reading, candidates: candidates, selectedIndex: initialIndex, historyEnd: fixedCount)
+    }
+
+    private func makeCandidateActionForFocusedSegment() -> CandidateAction {
+        guard let ss = state.segmentState else { return .none }
+        let seg = ss.focusedSegment
+        guard !seg.candidates.isEmpty else { return .dismiss }
+        return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex)
+    }
+
+    private mutating func handleSegmentModeKey(
+        keyCode: UInt16,
+        modifiers: NSEvent.ModifierFlags,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        guard let ss = state.segmentState else { return (false, .none) }
+
+        switch keyCode {
+        case KeyCode.leftArrow:
+            guard ss.focusedIndex > 0 else { return (true, .none) }
+            syncFocusedSegmentSelection(from: candidate)
+            state.segmentState!.focusedIndex -= 1
+            applySegmentMarkedText(client: client)
+            return (true, makeCandidateActionForFocusedSegment())
+
+        case KeyCode.rightArrow:
+            guard ss.focusedIndex < ss.segments.count - 1 else { return (true, .none) }
+            syncFocusedSegmentSelection(from: candidate)
+            state.segmentState!.focusedIndex += 1
+            applySegmentMarkedText(client: client)
+            return (true, makeCandidateActionForFocusedSegment())
+
+        case KeyCode.space, KeyCode.tab, KeyCode.downArrow:
+            return (true, .selectNext)
+
+        case KeyCode.upArrow:
+            return (true, .selectPrev)
+
+        case KeyCode.enter:
+            return (true, doConfirmSegments(candidate: candidate, client: client))
+
+        case KeyCode.escape:
+            state.segmentState = nil
+            applyMarkedText(candidateText: nil, client: client)
+            return (true, .dismiss)
+
+        default:
+            if keyCode == KeyCode.backspace {
+                state.segmentState = nil
+                applyMarkedText(candidateText: nil, client: client)
+                return (true, .dismiss)
+            }
+            // その他のキー → セグメントモード解除してそのキーをスルー
+            state.segmentState = nil
+            return (false, .dismiss)
+        }
+    }
+
+    private mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {
+        guard let ss = state.segmentState, let selectedText = candidate.selectedText else { return }
+        if let idx = ss.focusedSegment.candidates.firstIndex(of: selectedText) {
+            state.segmentState!.segments[ss.focusedIndex].selectedIndex = idx
+        }
+    }
+
+    private mutating func doConfirmSegments(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
+        syncFocusedSegmentSelection(from: candidate)
+        guard let ss = state.segmentState else { return .none }
+        var confirmed = ""
+        for seg in ss.segments {
+            db.record(input: seg.reading, output: seg.selectedText)
+            confirmed += seg.selectedText
+        }
+        doCommit(text: confirmed, client: client)
+        return .dismiss
+    }
+
+    private func applySegmentMarkedText(client: TextInputClient) {
+        guard let ss = state.segmentState else { return }
+        let str = buildSegmentAttributedString(ss: ss)
+        client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
+    }
+
+    private func buildSegmentAttributedString(ss: SegmentState, overrideFocusedText: String? = nil) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+        for (i, seg) in ss.segments.enumerated() {
+            let text = (i == ss.focusedIndex)
+                ? (overrideFocusedText ?? seg.selectedText)
+                : seg.selectedText
+            let style: Int = (i == ss.focusedIndex)
+                ? NSUnderlineStyle.thick.rawValue
+                : NSUnderlineStyle.single.rawValue
+            result.append(NSAttributedString(string: text, attributes: [.underlineStyle: style]))
+        }
+        return result
     }
 
 }
