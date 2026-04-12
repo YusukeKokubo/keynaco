@@ -133,32 +133,80 @@ final class DatabaseManager {
         return (Array(results.prefix(30)), historyCount)
     }
 
-    /// ひらがな文字列を辞書最長一致グリーディ法でセグメントに分割する。
-    /// 各セグメントの読みと辞書候補を返す。
-    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
-        var result: [(reading: String, candidates: [String])] = []
-        var remaining = hiragana
-        let maxSegmentLen = 8
+    /// 指定の読みが過去にセグメントとして確定された合計回数を返す。
+    /// segmentize のスコアリングで使用。
+    func historyCount(reading: String) -> Int {
+        let sql = "SELECT COALESCE(SUM(count), 0) FROM history WHERE input = ?"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        bindText(stmt, 1, reading)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int(stmt, 0))
+    }
 
-        while !remaining.isEmpty {
-            var matched = false
-            let tryLen = min(remaining.count, maxSegmentLen)
-            for length in stride(from: tryLen, through: 2, by: -1) {
-                let prefix = String(remaining.prefix(length))
-                let candidates = fetchDict(reading: prefix)
-                if !candidates.isEmpty {
-                    result.append((reading: prefix, candidates: candidates))
-                    remaining = String(remaining.dropFirst(length))
-                    matched = true
-                    break
+    /// ひらがな文字列を DP + 履歴スコアリングで最適分割する。
+    /// score(seg) = (辞書マッチ長) + min(履歴使用回数, 4)
+    /// 辞書・履歴どちらにもない読みは単一文字フォールバックへ。
+    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
+        let chars = Array(hiragana)
+        let n = chars.count
+        guard n > 0 else { return [] }
+        let maxLen = 8
+
+        // DP フェーズとバックトラックで fetchDict / historyCount の重複呼び出しを防ぐキャッシュ
+        var dictCache: [String: [String]] = [:]
+        var histCache: [String: Int]      = [:]
+
+        // dp[i]: chars[0..<i] を分割したときの最大スコア（-1 = 未到達）
+        var dp     = [Int](repeating: -1, count: n + 1)
+        var segLen = [Int](repeating: 1,  count: n + 1)
+        dp[0] = 0
+
+        for i in 1...n {
+            // 単一文字フォールバック（スコア加算なし）
+            if dp[i - 1] >= 0 {
+                dp[i] = dp[i - 1]
+                segLen[i] = 1
+            }
+
+            // 辞書 or 履歴にある読み（2文字以上）
+            // ※ i=1 のとき 2...1 は ClosedRange がクラッシュするため stride を使う
+            for len in stride(from: 2, through: min(i, maxLen), by: 1) {
+                let j = i - len
+                guard dp[j] >= 0 else { continue }
+                let reading = String(chars[j..<i])
+                let dictCandidates = dictCache[reading] ?? {
+                    let c = fetchDict(reading: reading)
+                    dictCache[reading] = c
+                    return c
+                }()
+                let hist = histCache[reading] ?? {
+                    let h = historyCount(reading: reading)
+                    histCache[reading] = h
+                    return h
+                }()
+                let score = (!dictCandidates.isEmpty ? len : 0) + min(hist, 4)
+                guard score > 0 else { continue }
+                let candidate = dp[j] + score
+                if candidate > dp[i] {
+                    dp[i] = candidate
+                    segLen[i] = len
                 }
             }
-            if !matched {
-                let single = String(remaining.removeFirst())
-                result.append((reading: single, candidates: []))
-            }
         }
-        return result
+
+        // バックトラック（dictCache を再利用して fetchDict の2重呼び出しを回避）
+        var result: [(reading: String, candidates: [String])] = []
+        var i = n
+        while i > 0 {
+            let len = segLen[i]
+            let reading = String(chars[(i - len)..<i])
+            let candidates = dictCache[reading] ?? fetchDict(reading: reading)
+            result.append((reading: reading, candidates: candidates))
+            i -= len
+        }
+        return result.reversed()
     }
 
     /// テスト用: 辞書エントリを直接追加

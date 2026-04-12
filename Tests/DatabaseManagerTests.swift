@@ -185,4 +185,54 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(segments[0].reading, "は")
         XCTAssertTrue(segments[0].candidates.isEmpty)
     }
+
+    // MARK: - segmentize DP + 履歴スコアリング
+
+    func testSegmentizeDPPrefersMoreDictCoverage() {
+        // Greedy が失敗するケース: "はなみずき"
+        // 辞書に "はな"(花) と "みずき"(水木) がある（"はなみ" もある）
+        // Greedy: ["はなみ", "ず", "き"] / DP: ["はな", "みずき"]
+        db.insertDict(reading: "はな",  candidate: "花",  priority: 0)
+        db.insertDict(reading: "はなみ", candidate: "花見", priority: 0)
+        db.insertDict(reading: "みずき", candidate: "水木", priority: 0)
+
+        let segments = db.segmentize("はなみずき")
+        XCTAssertEqual(segments.map { $0.reading }, ["はな", "みずき"],
+                       "DP は辞書カバレッジが高い分割を選ぶ")
+    }
+
+    func testSegmentizeHistoryBoostsUnknownWord() {
+        // 辞書にない "タワー" を履歴に入れると正しく分割される
+        db.insertDict(reading: "とうきょう", candidate: "東京", priority: 0)
+        db.record(input: "タワー", output: "タワー")
+
+        let segments = db.segmentize("とうきょうタワー")
+        XCTAssertEqual(segments.map { $0.reading }, ["とうきょう", "タワー"],
+                       "履歴にある未知語が1セグメントとして切り出される")
+    }
+
+    func testSegmentizeHistoryBoostsPreferredSplit() {
+        // 辞書スコアが同等の候補を履歴スコアで逆転させる
+        // "うれしい" は辞書に2文字ずつ分割できる ("うれ" + "しい") が
+        // 履歴に "うれしい" があれば1セグメントになる
+        db.insertDict(reading: "うれ",   candidate: "憂",   priority: 0)
+        db.insertDict(reading: "しい",   candidate: "しい", priority: 0)
+        db.insertDict(reading: "うれしい", candidate: "嬉しい", priority: 0)
+        db.record(input: "うれしい", output: "嬉しい")
+        db.record(input: "うれしい", output: "嬉しい")
+
+        let segments = db.segmentize("うれしい")
+        XCTAssertEqual(segments.map { $0.reading }, ["うれしい"],
+                       "履歴スコアで4文字1セグメントが勝つ")
+    }
+
+    func testSegmentizeNoHistoryFallsBackToDict() {
+        // 履歴が空の場合、辞書スコアのみで分割される
+        db.insertDict(reading: "わたし",  candidate: "私",  priority: 0)
+        db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+
+        let segments = db.segmentize("わたしがくせい")
+        XCTAssertEqual(segments.map { $0.reading }, ["わたし", "がくせい"],
+                       "履歴なしでも辞書スコアで正しく分割される")
+    }
 }
