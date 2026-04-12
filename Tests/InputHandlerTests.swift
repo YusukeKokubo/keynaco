@@ -341,6 +341,50 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.inserted, ["あ", "B"])
     }
 
+    // MARK: - Shift+記号・非ASCII文字（全角記号など）
+
+    func testFullWidthSymbolInsertedDirectlyWhenEmpty() {
+        // 組成なしで全角記号 → 直接挿入
+        let result = type(chars: "！", base: "!")
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.inserted, ["！"])
+        XCTAssertEqual(client.markedText, "")
+    }
+
+    func testFullWidthSymbolAppendsToComposition() {
+        // 組成中に全角記号 → 組成に追加して確定しない（、。と同じ動作）
+        type(chars: "a", base: "a")
+        type(chars: "！", base: "!")
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ！")
+    }
+
+    func testFullWidthSymbolDoesNotConfirmCandidate() {
+        // 候補選択中に全角記号 → 候補を確定せず組成に追加
+        handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
+        type(chars: "a", base: "a")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
+        _ = handler.handle(keyCode: 0, characters: "！", baseCharacters: "!",
+                           modifiers: [], candidate: ctx, client: client)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ！")
+    }
+
+    func testShiftSymbolInsertedDirectlyWhenEmpty() {
+        // 組成なしで Shift+記号 → 直接挿入
+        let result = type(chars: "!", base: "1", modifiers: .shift)
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.inserted, ["!"])
+    }
+
+    func testShiftSymbolAppendsToComposition() {
+        // 組成中に Shift+記号 → 組成に追加して確定しない
+        type(chars: "a", base: "a")
+        type(chars: "!", base: "1", modifiers: .shift)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ!")
+    }
+
     // MARK: - 句読点変換（, → 、、. → 。）
 
     func testPeriodInsertsJapanesePeriod() {

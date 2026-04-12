@@ -134,9 +134,9 @@ struct InputHandler {
         // 修飾キー付きはスルー
         guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
 
-        // 印字可能文字のみ
+        // 印字可能文字のみ（ASCII および全角記号などの非ASCII文字を含む）
         guard let chars = characters, !chars.isEmpty,
-              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return (false, .none) }
+              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 }) else { return (false, .none) }
         let base = baseCharacters ?? chars
 
         // 句読点：かなモードで , → 、、. → 。に変換
@@ -156,7 +156,28 @@ struct InputHandler {
             return (true, .dismiss)
         }
 
-        // Shift → 英字を直接挿入
+        let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
+        let isAsciiLetter = !isNonAscii && chars.unicodeScalars.allSatisfy {
+            ($0.value >= 0x41 && $0.value <= 0x5A) || ($0.value >= 0x61 && $0.value <= 0x7A)
+        }
+
+        // Shift + 記号 または 非ASCII文字（全角記号など）
+        // → 組成中なら組成バッファに追加（確定しない）、空なら直接挿入（、。と同じ動作）
+        if (modifiers.contains(.shift) && !isAsciiLetter) || isNonAscii {
+            if state.composingText.isEmpty {
+                client.insertText(chars)
+            } else {
+                if !state.pendingRomaji.isEmpty {
+                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+                    state.pendingRomaji = ""
+                }
+                state.composedHiragana += chars
+                applyMarkedText(candidateText: nil, client: client)
+            }
+            return (true, .dismiss)
+        }
+
+        // Shift + ASCII 文字 → 英字を直接挿入
         if modifiers.contains(.shift) {
             if wasExplicitlySelected {
                 _ = doConfirmSelection(candidate: candidate, client: client)
@@ -164,6 +185,7 @@ struct InputHandler {
                 commitComposition(client: client)
             }
             client.insertText(chars)
+            applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         }
 
