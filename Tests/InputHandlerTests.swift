@@ -185,6 +185,66 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertTrue(candidates.contains("ア"), "カタカナが候補に含まれるはず")
     }
 
+    // MARK: - カタカナ変換・候補管理
+
+    func testInitialRowSkipsFixedCandidatesWhenDictExists() {
+        handler.db.insertDict(reading: "あい", candidate: "愛", priority: 0)
+        type(chars: "a", base: "a")
+        let (_, action) = type(chars: "i", base: "i")
+        guard case .show(_, _, let initialRow) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(initialRow, 2, "辞書候補がある場合 initialRow はひらがな・カタカナの後（2）")
+    }
+
+    func testHiraganaInHistoryAppearsAsHistoryCandidate() {
+        handler.db.record(input: "あい", output: "あい")
+        handler.db.insertDict(reading: "あい", candidate: "愛", priority: 0)
+        type(chars: "a", base: "a")
+        let (_, action) = type(chars: "i", base: "i")
+        guard case .show(let candidates, _, let initialRow) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        // ひらがなが履歴にある → 固定位置に追加せず履歴エントリとして可視範囲に表示
+        // candidates = [アイ(固定), あい(履歴), 愛(辞書)]
+        XCTAssertEqual(candidates[0], "アイ", "カタカナが固定位置0番")
+        XCTAssertEqual(candidates[1], "あい", "ひらがなが履歴エントリ（固定位置でなく）")
+        XCTAssertEqual(initialRow, 1, "固定候補はカタカナの1件のみ")
+    }
+
+    func testKatakanaInHistoryAppearsAsHistoryCandidate() {
+        handler.db.record(input: "あい", output: "アイ")
+        handler.db.insertDict(reading: "あい", candidate: "愛", priority: 0)
+        type(chars: "a", base: "a")
+        let (_, action) = type(chars: "i", base: "i")
+        guard case .show(let candidates, _, let initialRow) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        // カタカナが履歴にある → 固定位置に追加せず履歴エントリとして可視範囲に表示
+        // candidates = [あい(固定), アイ(履歴), 愛(辞書)]
+        XCTAssertEqual(candidates[0], "あい", "ひらがなが固定位置0番")
+        XCTAssertEqual(candidates[1], "アイ", "カタカナが履歴エントリ（固定位置でなく）")
+        XCTAssertEqual(initialRow, 1, "固定候補はひらがなの1件のみ")
+    }
+
+    func testReturnCommitsVisuallySelectedCandidateWithoutExplicitNav() {
+        handler.db.insertDict(reading: "あい", candidate: "愛", priority: 0)
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        // ↑↓ なし（isExplicitlySelected=false）でも Enter は選択中の候補を確定する
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 2, selectedText: "愛")
+        XCTAssertEqual(client.inserted, ["愛"], "Enter は視覚的に選択されている候補を確定する")
+    }
+
+    func testTypingDoesNotCommitWhenNotExplicitlySelected() {
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        // ↑↓ なし（isExplicitlySelected=false）で文字入力 → 候補を確定しない
+        type(chars: "k", base: "k", candidateVisible: true, selectedRow: 2, selectedText: "愛")
+        XCTAssertTrue(client.inserted.isEmpty, "↑↓ なしで文字入力しても候補を確定しない")
+        XCTAssertEqual(client.markedText, "あいk")
+    }
+
     func testSpaceDuringCandidatesReturnsSelectNext() {
         type(chars: "a", base: "a")
         let result = press(keyCode: 49, candidateVisible: true, selectedRow: 0)
