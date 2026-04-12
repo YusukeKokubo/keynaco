@@ -401,31 +401,41 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.markedText, "")
     }
 
-    func testPeriodAppendsToComposition() {
-        // 組成中に "." を入力 → "。" が組成バッファに追加されて確定しない
+    func testPeriodAppendsToCompositionAndOpensCandidates() {
+        // 組成中に "." → "。" を組成バッファに追加して候補ウィンドウを開く（変換モードへ）
         type(chars: "a", base: "a")
-        type(chars: ".", base: ".")
+        let result = type(chars: ".", base: ".")
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "あ。")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
-    func testCommaAppendsToComposition() {
+    func testCommaAppendsToCompositionAndOpensCandidates() {
+        // 組成中に "," → "、" を組成バッファに追加して候補ウィンドウを開く（変換モードへ）
         type(chars: "a", base: "a")
-        type(chars: ",", base: ",")
+        let result = type(chars: ",", base: ",")
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "あ、")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
     func testPeriodAfterPendingConsonantFlushesPending() {
-        // pending "k" がある状態で "." → "k" をフラッシュして "k。" が組成に入る
+        // pending "k" がある状態で "." → "k" をフラッシュして "k。" が組成に入り変換モードへ
         type(chars: "k", base: "k")
-        type(chars: ".", base: ".")
+        let result = type(chars: ".", base: ".")
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "k。")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
     func testPeriodDoesNotCommitSelectedCandidate() {
-        // 候補を ↑↓ で明示選択中に句読点を入力しても候補は確定しない
+        // 候補を ↑↓ で明示選択中に "." → 候補は確定せず "。" を組成バッファに追加
         handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
         type(chars: "a", base: "a")
         let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
@@ -436,6 +446,7 @@ final class InputHandlerTests: XCTestCase {
     }
 
     func testCommaDoesNotCommitSelectedCandidate() {
+        // 候補を ↑↓ で明示選択中に "," → 候補は確定せず "、" を組成バッファに追加
         handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
         type(chars: "a", base: "a")
         let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)

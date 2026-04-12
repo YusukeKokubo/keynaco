@@ -35,21 +35,21 @@
 
 	<!-- 入力モード定義 -->
 	<key>TISIntendedLanguage</key>
-	<string>en</string>
+	<string>ja</string>
 	<key>ComponentInputModeDict</key>
 	<dict>
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
-			<string>com.apple.inputmethod.Roman</string>
+			<string>com.yusuke.inputmethod.ykey.Hiragana</string>
 		</array>
 		<key>tsInputModeListKey</key>
 		<dict>
-			<key>com.apple.inputmethod.Roman</key>
+			<key>com.yusuke.inputmethod.ykey.Hiragana</key>
 			<dict>
 				<key>TISInputSourceID</key>
-				<string>com.yusuke.inputmethod.ykey.Roman</string>
+				<string>com.yusuke.inputmethod.ykey.Hiragana</string>
 				<key>tsInputModeScriptKey</key>
-				<string>smRoman</string>
+				<string>smJapanese</string>
 				<key>tsInputModePrimaryInScriptKey</key>
 				<true/>
 				<key>tsInputModeIsVisibleKey</key>
@@ -57,7 +57,7 @@
 				<key>tsInputModeDefaultStateKey</key>
 				<true/>
 				<key>TISIntendedLanguage</key>
-				<string>en</string>
+				<string>ja</string>
 				<key>TISIconIsTemplate</key>
 				<true/>
 			</dict>
@@ -66,6 +66,8 @@
 
 	<key>tsInputMethodCharacterRepertoireKey</key>
 	<array>
+		<string>Hrkt</string>
+		<string>Hani</string>
 		<string>Latn</string>
 	</array>
 </dict>

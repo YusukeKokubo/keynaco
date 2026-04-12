@@ -140,20 +140,23 @@ struct InputHandler {
         let base = baseCharacters ?? chars
 
         // 句読点：かなモードで , → 、、. → 。に変換
-        // 組成中なら組成バッファに追加（確定しない）、空なら直接挿入
+        // 組成中なら組成バッファに追加して変換モードへ（候補ウィンドウを開く）
+        // 組成なしなら直接挿入
         let punctuationMap: [String: String] = [",": "、", ".": "。"]
         if let mappedPunct = punctuationMap[base] {
             if state.composingText.isEmpty {
                 client.insertText(mappedPunct)
+                return (true, .dismiss)
             } else {
                 if !state.pendingRomaji.isEmpty {
                     state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
                     state.pendingRomaji = ""
                 }
                 state.composedHiragana += mappedPunct
+                let action = doRefreshCandidates()
                 applyMarkedText(candidateText: nil, client: client)
+                return (true, action)
             }
-            return (true, .dismiss)
         }
 
         let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
