@@ -341,27 +341,64 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.inserted, ["あ", "B"])
     }
 
-    // MARK: - 句読点入力（特別扱いなし）
+    // MARK: - 句読点変換（, → 、、. → 。）
 
-    func testPeriodBecomesMarkedText() {
-        type(chars: ".", base: ".")
-        XCTAssertEqual(client.markedText, ".")
-        XCTAssertTrue(client.inserted.isEmpty)
+    func testPeriodInsertsJapanesePeriod() {
+        let result = type(chars: ".", base: ".")
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.inserted, ["。"])
+        XCTAssertEqual(client.markedText, "")
     }
 
-    func testPeriodAppendedToComposition() {
+    func testCommaInsertsJapaneseComma() {
+        let result = type(chars: ",", base: ",")
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.inserted, ["、"])
+        XCTAssertEqual(client.markedText, "")
+    }
+
+    func testPeriodAppendsToComposition() {
+        // 組成中に "." を入力 → "。" が組成バッファに追加されて確定しない
         type(chars: "a", base: "a")
         type(chars: ".", base: ".")
-        XCTAssertEqual(client.markedText, "あ.")
         XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ。")
     }
 
-    func testPeriodAfterPendingConsonant() {
+    func testCommaAppendsToComposition() {
+        type(chars: "a", base: "a")
+        type(chars: ",", base: ",")
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ、")
+    }
+
+    func testPeriodAfterPendingConsonantFlushesPending() {
+        // pending "k" がある状態で "." → "k" をフラッシュして "k。" が組成に入る
         type(chars: "k", base: "k")
         type(chars: ".", base: ".")
-        // "k" がフラッシュされ "k." がマークドテキストになる
-        XCTAssertEqual(client.markedText, "k.")
         XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "k。")
+    }
+
+    func testPeriodDoesNotCommitSelectedCandidate() {
+        // 候補を ↑↓ で明示選択中に句読点を入力しても候補は確定しない
+        handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
+        type(chars: "a", base: "a")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
+        _ = handler.handle(keyCode: 0, characters: ".", baseCharacters: ".",
+                           modifiers: [], candidate: ctx, client: client)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ。")
+    }
+
+    func testCommaDoesNotCommitSelectedCandidate() {
+        handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
+        type(chars: "a", base: "a")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
+        _ = handler.handle(keyCode: 0, characters: ",", baseCharacters: ",",
+                           modifiers: [], candidate: ctx, client: client)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ、")
     }
 
     // MARK: - commitComposition（deactivateServer 相当）
