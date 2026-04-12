@@ -14,6 +14,21 @@ xcodebuild build -scheme ykey -configuration Debug
 - `~/Library/Input Methods/` は使わない（入力ソースが重複登録される）
 - 初回インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
 
+## テスト方針
+
+### XCUITest / CGEvent による E2E テストは採用しない
+
+IME はバックグラウンドエージェントとして動作するため、`XCUIElement.typeText()` はカスタム IME をバイパスする。`CGEvent` を用いた物理的なキー送信は Accessibility 権限に依存し CI で不安定になる。
+
+### InputHandler + TextInputClient モック（採用）
+
+`InputController` のロジックを `InputHandler`（純粋 Swift struct）に抽出し、テキスト操作の出力先を `TextInputClient` プロトコルで抽象化する。テストでは `MockTextClient` を渡して `insertText` / `setMarkedText` の呼び出しを検証する。
+
+- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）
+- `InputHandler` = 入力ロジック本体（テスト可能）
+- `DatabaseManager` は `InputHandler` のイニシャライザで DI する（テストは `inMemory: true`）
+- `CandidateWindow` は `InputController` 側で管理し `InputHandler` には渡さない
+
 ## macOS 26 IME の罠
 
 ### Bundle ID に "inputmethod" が必須

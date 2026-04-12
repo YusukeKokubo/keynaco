@@ -101,8 +101,9 @@ final class DatabaseManager {
         // 3. 分割変換（各パート2文字以上）
         //    前半: ひらがな or 辞書、後半: ひらがな or 辞書
         //    前半・後半いずれかが辞書にある場合のみ候補生成
+        // 分割変換（head >= 2文字, tail >= 2文字 なので prefix は 4文字以上が必要）
         let chars = Array(prefix)
-        for i in 2..<chars.count where chars.count - i >= 2 {
+        for i in stride(from: 2, to: chars.count, by: 1) where chars.count - i >= 2 {
             let head = String(chars[..<i])
             let tail = String(chars[i...])
             let headDictCandidates = fetchDict(reading: head)

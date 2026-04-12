@@ -4,12 +4,36 @@ import os
 
 private let logger = Logger(subsystem: "com.yusuke.inputmethod.ykey", category: "input")
 
+// MARK: - IMKTextInput → TextInputClient アダプタ
+
+private final class IMKTextInputAdapter: TextInputClient {
+    private let client: IMKTextInput?
+
+    init(_ sender: Any?) {
+        self.client = sender as? IMKTextInput
+    }
+
+    func insertText(_ text: String) {
+        client?.insertText(text, replacementRange: .notFound)
+    }
+
+    func setMarkedText(_ text: String, selectionRange: NSRange) {
+        client?.setMarkedText(text, selectionRange: selectionRange, replacementRange: .notFound)
+    }
+
+    func cursorRect() -> NSRect {
+        var rect = NSRect.zero
+        client?.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
+        return rect
+    }
+}
+
+// MARK: - InputController
+
 @objc(InputController)
 class InputController: IMKInputController {
 
-    private var state = CompositionState()
-    private var currentCandidates: [String] = []
-    private var ignoreNextModeSwitch = false
+    private lazy var handler: InputHandler = InputHandler()
 
     private static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -24,7 +48,7 @@ class InputController: IMKInputController {
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
         candidateWindow.onDelete = { [weak self] text, row in
-            DatabaseManager.shared.deleteHistory(output: text)
+            self?.handler.db.deleteHistory(output: text)
             self?.candidateWindow.removeCandidate(at: row)
         }
     }
@@ -42,10 +66,9 @@ class InputController: IMKInputController {
 
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
-        state = CompositionState()
-        currentCandidates = []
+        handler.state = CompositionState()
+        handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
-        ignoreNextModeSwitch = true
     }
 
     override func deactivateServer(_ sender: Any!) {
@@ -58,217 +81,58 @@ class InputController: IMKInputController {
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event = event, event.type == .keyDown else { return false }
 
-        let keyCode = event.keyCode
+        let ctx = CandidateContext(
+            isVisible: candidateWindow.isVisible,
+            selectedRow: candidateWindow.selectedRow,
+            selectedText: candidateWindow.selectedText()
+        )
+        let adapter = IMKTextInputAdapter(sender)
 
-        // 英数キー / かなキー
-        // 入力ソース切替で押された英数/かなが handle にも届くため、
-        // activateServer 直後の1回目は無視する。
-        if keyCode == 102 || keyCode == 104 {
-            if ignoreNextModeSwitch {
-                ignoreNextModeSwitch = false
-                return true
-            }
-            if keyCode == 102 {
-                if !state.composingText.isEmpty { commitComposition(sender) }
-                state.isAsciiMode = true
-            } else {
-                state.isAsciiMode = false
-            }
-            return true
-        }
-        ignoreNextModeSwitch = false
+        let (consumed, action) = handler.handle(
+            keyCode: event.keyCode,
+            characters: event.characters,
+            baseCharacters: event.charactersIgnoringModifiers,
+            modifiers: event.modifierFlags,
+            candidate: ctx,
+            client: adapter
+        )
 
-        // 英字モード
-        if state.isAsciiMode {
-            // Escape → 日本語モードへ
-            if keyCode == 53 { state.isAsciiMode = false; return true }
-            let modifiers = event.modifierFlags
-            guard modifiers.intersection([.command, .control, .option]).isEmpty else { return false }
-            guard let chars = event.characters, !chars.isEmpty,
-                  chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
-            (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
-            return true
-        }
-
-        // Backspace: keyCode=51 または文字コード \u{08}
-        let isBackspace = keyCode == 51 || event.characters == "\u{08}"
-
-        // 日本語モード: 候補ウィンドウ表示中
-        if candidateWindow.isVisible {
-            switch keyCode {
-            case 48 where event.modifierFlags.contains(.shift): // Shift+Tab
-                candidateWindow.selectPrev()
-                updateMarkedText(client: sender)
-                return true
-            case 49: // Space → 次の候補へ
-                candidateWindow.selectNext()
-                updateMarkedText(client: sender)
-                return true
-            case 48, 125: // Tab, ↓
-                candidateWindow.selectNext()
-                updateMarkedText(client: sender)
-                return true
-            case 126: // ↑
-                candidateWindow.selectPrev()
-                updateMarkedText(client: sender)
-                return true
-            case 36: // Return
-                return confirmSelection(client: sender)
-            case 53: // Escape
-                return handleEscape(client: sender)
-            default:
-                if isBackspace { return handleBackspace(client: sender) }
-            }
-        } else {
-            switch keyCode {
-            case 36:
-                return handleReturn(client: sender)
-            case 53:
-                return handleEscape(client: sender)
-            default:
-                if isBackspace { return handleBackspace(client: sender) }
-            }
-        }
-
-        // スペースキー
-        if keyCode == 49 {
-            if !state.composedHiragana.isEmpty {
-                refreshCandidates(client: sender)
-                updateMarkedText(client: sender)
-                return true
-            }
-            return false // 未確定なし → アプリにスペースを渡す
-        }
-
-        // 矢印キー等の特殊キーはスルー
-        if keyCode >= 123 && keyCode <= 126 { return false }
-
-        // 修飾キー付きはスルー
-        let modifiers = event.modifierFlags
-        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return false }
-
-        // 印字可能文字のみ受け付ける
-        guard let chars = event.characters, !chars.isEmpty,
-              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return false }
-        let baseChars = event.charactersIgnoringModifiers ?? chars
-
-        // Shift が押されていれば英字を直接挿入（未確定があれば先に確定）
-        // .shift のみ判定。CapsLock は .capsLock であり .shift ではないため、
-        // CapsLock ON でも変換モードが維持される。
-        if modifiers.contains(.shift) {
-            if !state.composingText.isEmpty { commitComposition(sender) }
-            (sender as? IMKTextInput)?.insertText(chars, replacementRange: .notFound)
-            return true
-        }
-
-        let needsRefresh = state.addRomaji(baseChars)
-        if needsRefresh {
-            refreshCandidates(client: sender)
-        } else {
+        switch action {
+        case .none:
+            break
+        case .show(let candidates, let historyEnd):
+            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, near: adapter.cursorRect())
+        case .dismiss:
             candidateWindow.dismiss()
+        case .selectNext:
+            candidateWindow.selectNext()
+            updateMarkedText(client: adapter)
+        case .selectPrev:
+            candidateWindow.selectPrev()
+            updateMarkedText(client: adapter)
         }
 
-        updateMarkedText(client: sender)
-        return true
+        return consumed
     }
 
     // MARK: - 確定
 
     override func commitComposition(_ sender: Any!) {
-        guard !state.composingText.isEmpty else { return }
-        let finalText = state.finalizedText
-        DatabaseManager.shared.record(input: finalText, output: finalText)
-        commit(text: finalText, client: sender)
+        let adapter = IMKTextInputAdapter(sender)
+        handler.commitComposition(client: adapter)
+        candidateWindow.dismiss()
     }
 
-    // MARK: - Private helpers
+    // MARK: - プライベートヘルパー
 
-    private func refreshCandidates(client: Any?) {
-        let result = DatabaseManager.shared.fetchCandidates(prefix: state.composedHiragana)
-        var candidates = result.candidates
-        // ひらがな自体を先頭候補として追加（重複除去）
-        let hadHiragana = candidates.contains(state.composedHiragana)
-        candidates.removeAll { $0 == state.composedHiragana }
-        candidates.insert(state.composedHiragana, at: 0)
-        // ひらがな挿入分 + 履歴件数（ひらがなが履歴にあった場合は重複除去済みなのでそのまま）
-        let historyEnd = 1 + (hadHiragana ? result.historyCount - 1 : result.historyCount)
-        currentCandidates = candidates
-        if currentCandidates.isEmpty {
-            candidateWindow.dismiss()
-            return
-        }
-
-        // カーソル位置を取得
-        var cursorRect = NSRect.zero
-        if let c = client as? IMKTextInput {
-            c.attributes(forCharacterIndex: 0, lineHeightRectangle: &cursorRect)
-        }
-        candidateWindow.show(candidates: currentCandidates, historySectionEnd: historyEnd, near: cursorRect)
-    }
-
-    private func confirmSelection(client: Any?) -> Bool {
-        guard !state.composingText.isEmpty else { return false }
-        let inputKey = state.finalizedText
-        if let selected = candidateWindow.selectedText() {
-            DatabaseManager.shared.record(input: inputKey, output: selected)
-            commit(text: selected, client: client)
-        } else {
-            commitComposition(client)
-        }
-        return true
-    }
-
-    private func displayText() -> String {
+    private func updateMarkedText(client: TextInputClient) {
+        let text: String
         if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
-            return selected + state.pendingRomaji
-        }
-        return state.composingText
-    }
-
-    private func updateMarkedText(client: Any?) {
-        guard let c = client as? IMKTextInput else { return }
-        let text = displayText()
-        c.setMarkedText(
-            text,
-            selectionRange: NSRange(location: text.count, length: 0),
-            replacementRange: .notFound
-        )
-    }
-
-    private func commit(text: String, client: Any?) {
-        guard let c = client as? IMKTextInput else { return }
-        c.insertText(text, replacementRange: .notFound)
-        state = CompositionState()
-        currentCandidates = []
-        candidateWindow.dismiss()
-    }
-
-    private func handleBackspace(client: Any?) -> Bool {
-        let (handled, needsRefresh) = state.backspace()
-        logger.debug("backspace: handled=\(handled, privacy: .public) needsRefresh=\(needsRefresh, privacy: .public) composing='\(self.state.composingText, privacy: .public)' hiragana='\(self.state.composedHiragana, privacy: .public)' pending='\(self.state.pendingRomaji, privacy: .public)'")
-        guard handled else { return false }
-        if needsRefresh {
-            refreshCandidates(client: client)
+            text = selected + handler.state.pendingRomaji
         } else {
-            candidateWindow.dismiss()
+            text = handler.state.composingText
         }
-        let text = displayText()
-        logger.debug("backspace displayText='\(text, privacy: .public)' candidateVisible=\(self.candidateWindow.isVisible, privacy: .public)")
-        updateMarkedText(client: client)
-        return true
-    }
-
-    private func handleReturn(client: Any?) -> Bool {
-        guard !state.composingText.isEmpty else { return false }
-        commitComposition(client)
-        return true
-    }
-
-    private func handleEscape(client: Any?) -> Bool {
-        guard state.reset() else { return false }
-        candidateWindow.dismiss()
-        updateMarkedText(client: client)
-        return true
+        client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
 }
 
