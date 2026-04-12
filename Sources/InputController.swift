@@ -119,7 +119,12 @@ class InputController: IMKInputController {
 
     override func commitComposition(_ sender: Any!) {
         let adapter = IMKTextInputAdapter(sender)
-        handler.commitComposition(client: adapter)
+        let ctx = CandidateContext(
+            isVisible: candidateWindow.isVisible,
+            selectedRow: candidateWindow.selectedRow,
+            selectedText: candidateWindow.selectedText()
+        )
+        handler.commitComposition(client: adapter, candidate: ctx)
         candidateWindow.dismiss()
     }
 

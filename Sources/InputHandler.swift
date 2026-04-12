@@ -123,17 +123,6 @@ struct InputHandler {
               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return (false, .none) }
         let base = baseCharacters ?? chars
 
-        // 句読点・記号
-        if let mapped = RomajiConverter.punctuationMap[chars] {
-            if wasExplicitlySelected {
-                _ = doConfirmSelection(candidate: candidate, client: client)
-            } else if !state.composingText.isEmpty {
-                commitTopCandidate(client: client)
-            }
-            client.insertText(mapped)
-            return (true, .dismiss)
-        }
-
         // Shift → 英字を直接挿入
         if modifiers.contains(.shift) {
             if wasExplicitlySelected {
@@ -154,12 +143,18 @@ struct InputHandler {
         return (true, candidateAction)
     }
 
-    /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定
-    mutating func commitComposition(client: TextInputClient) {
+    /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
+    /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
+    mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
         guard !state.composingText.isEmpty else { return }
-        let finalText = state.finalizedText
-        db.record(input: finalText, output: finalText)
-        doCommit(text: finalText, client: client)
+        let inputKey = state.finalizedText
+        if candidate.isVisible, candidate.selectedRow > 0, let selected = candidate.selectedText {
+            db.record(input: inputKey, output: selected)
+            doCommit(text: selected, client: client)
+        } else {
+            db.record(input: inputKey, output: inputKey)
+            doCommit(text: inputKey, client: client)
+        }
     }
 
     // MARK: - プライベートヘルパー

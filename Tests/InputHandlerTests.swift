@@ -210,23 +210,27 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.inserted, ["あ", "B"])
     }
 
-    // MARK: - 句読点入力
+    // MARK: - 句読点入力（特別扱いなし）
 
-    func testPeriodInsertsJapanesePeriod() {
-        let (consumed, _) = type(chars: ".", base: ".")
-        XCTAssertTrue(consumed)
-        XCTAssertEqual(client.inserted, ["。"])
+    func testPeriodBecomesMarkedText() {
+        type(chars: ".", base: ".")
+        XCTAssertEqual(client.markedText, ".")
+        XCTAssertTrue(client.inserted.isEmpty)
     }
 
-    func testPeriodCommitsComposingFirst() {
+    func testPeriodAppendedToComposition() {
         type(chars: "a", base: "a")
         type(chars: ".", base: ".")
-        XCTAssertEqual(client.inserted, ["あ", "。"])
+        XCTAssertEqual(client.markedText, "あ.")
+        XCTAssertTrue(client.inserted.isEmpty)
     }
 
-    func testCommaInsertsJapaneseComma() {
-        type(chars: ",", base: ",")
-        XCTAssertEqual(client.inserted, ["、"])
+    func testPeriodAfterPendingConsonant() {
+        type(chars: "k", base: "k")
+        type(chars: ".", base: ".")
+        // "k" がフラッシュされ "k." がマークドテキストになる
+        XCTAssertEqual(client.markedText, "k.")
+        XCTAssertTrue(client.inserted.isEmpty)
     }
 
     // MARK: - commitComposition（deactivateServer 相当）
@@ -249,5 +253,20 @@ final class InputHandlerTests: XCTestCase {
     func testCommitCompositionWhenEmptyDoesNothing() {
         handler.commitComposition(client: client)
         XCTAssertTrue(client.inserted.isEmpty)
+    }
+
+    func testCommitCompositionWithExplicitCandidateCommitsCandidate() {
+        handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
+        type(chars: "a", base: "a")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿")
+        handler.commitComposition(client: client, candidate: ctx)
+        XCTAssertEqual(client.inserted, ["阿"])
+    }
+
+    func testCommitCompositionWithRowZeroCommitsHiragana() {
+        type(chars: "a", base: "a")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: "あ")
+        handler.commitComposition(client: client, candidate: ctx)
+        XCTAssertEqual(client.inserted, ["あ"])
     }
 }

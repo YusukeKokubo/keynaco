@@ -21,6 +21,15 @@ struct CompositionState {
     /// ローマ字を追加してひらがなに変換する。
     /// - Returns: 候補リフレッシュが必要かどうか
     mutating func addRomaji(_ chars: String) -> Bool {
+        // 非ローマ字文字（a-z・"-" 以外）が来たら pending をフラッシュしてから処理。
+        // 例: "k" pending 中に "." を打つと "k." が詰まるのを防ぐ。
+        let isRomajiChar = chars.unicodeScalars.allSatisfy {
+            ($0.value >= 0x61 && $0.value <= 0x7A) || $0.value == 0x2D  // a-z or "-"
+        }
+        if !isRomajiChar && !pendingRomaji.isEmpty {
+            composedHiragana += RomajiConverter.forceFinalize(pendingRomaji)
+            pendingRomaji = ""
+        }
         pendingRomaji += chars
         let result = RomajiConverter.convert(pendingRomaji)
         composedHiragana += result.converted

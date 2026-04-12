@@ -109,15 +109,6 @@ struct RomajiConverter {
         "-": "ー",
     ]
 
-    /// 句読点・記号の変換マップ（ローマ字変換より先に適用）
-    static let punctuationMap: [String: String] = [
-        ",": "、",
-        ".": "。",
-        "[": "「",
-        "]": "」",
-        "/": "・",
-    ]
-
     /// テーブルのキーの prefix になりうる文字列を事前計算
     private static let prefixes: Set<String> = {
         var set = Set<String>()

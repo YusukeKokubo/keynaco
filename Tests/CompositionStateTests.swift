@@ -53,6 +53,25 @@ final class CompositionStateTests: XCTestCase {
         XCTAssertEqual(s.composedHiragana, "っか")
     }
 
+    func testAddRomajiYouon() {
+        var s = CompositionState()
+        _ = s.addRomaji("k")
+        _ = s.addRomaji("y")
+        _ = s.addRomaji("o")
+        _ = s.addRomaji("u")
+        XCTAssertEqual(s.composedHiragana, "きょう")
+        XCTAssertEqual(s.pendingRomaji, "")
+    }
+
+    func testAddRomajiNonRomajiCharFlushesConsonant() {
+        var s = CompositionState()
+        _ = s.addRomaji("k")
+        _ = s.addRomaji(".")
+        // "k" は forceFinalize でそのまま出力、"." も追加される
+        XCTAssertEqual(s.composedHiragana, "k.")
+        XCTAssertEqual(s.pendingRomaji, "")
+    }
+
     // MARK: - backspace
 
     func testBackspaceRemovesPendingFirst() {
