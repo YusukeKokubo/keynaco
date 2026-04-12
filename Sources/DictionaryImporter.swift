@@ -3,8 +3,8 @@ import SQLite3
 
 enum DictionaryImporter {
 
-    /// 辞書インポートのバージョン。okuri-ari 対応で 2 に上げる。
-    private static let currentVersion = 3
+    /// 辞書インポートのバージョン。形容詞補完辞書追加で 4 に上げる。
+    private static let currentVersion = 4
 
     /// 子音文字 → ひらがな行（五段動詞・形容詞の活用形展開用）
     private static let consonantToKana: [Character: [Character]] = [
@@ -105,6 +105,26 @@ enum DictionaryImporter {
                         insert(stmt: stmt, reading: fullReading, candidate: fullCandidate, priority: Int32(priority))
                         count += 1
                     }
+                }
+            }
+        }
+
+        // 補完辞書（形容詞など SKK-JISYO-L の抜け漏れを補う）
+        if let supUrl = Bundle.main.url(forResource: "adjective-supplement", withExtension: "utf8"),
+           let supText = try? String(contentsOf: supUrl, encoding: .utf8) {
+            for line in supText.components(separatedBy: "\n") {
+                if line.hasPrefix(";") || line.isEmpty { continue }
+                guard let spaceIdx = line.firstIndex(of: " ") else { continue }
+                let reading = String(line[line.startIndex..<spaceIdx])
+                let rest = String(line[line.index(after: spaceIdx)...])
+                let candidates = rest.split(separator: "/").map { part -> String in
+                    let s = String(part)
+                    if let semiIdx = s.firstIndex(of: ";") { return String(s[s.startIndex..<semiIdx]) }
+                    return s
+                }.filter { !$0.isEmpty }
+                for (priority, candidate) in candidates.enumerated() {
+                    insert(stmt: stmt, reading: reading, candidate: candidate, priority: Int32(priority))
+                    count += 1
                 }
             }
         }
