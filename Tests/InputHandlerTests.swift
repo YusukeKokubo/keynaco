@@ -164,6 +164,26 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertFalse(press(keyCode: 49).consumed)
     }
 
+    func testKatakanaAppearsAtIndexOne() {
+        type(chars: "a", base: "a")
+        let (_, action) = type(chars: "i", base: "i")
+        guard case .show(let candidates, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(candidates[0], "あい", "先頭はひらがなのはず")
+        XCTAssertEqual(candidates[1], "アイ", "2番目はカタカナのはず")
+    }
+
+    func testKatakanaInCandidatesWhenSpacePressed() {
+        type(chars: "a", base: "a")
+        let (consumed, action) = press(keyCode: 49)
+        XCTAssertTrue(consumed)
+        guard case .show(let candidates, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertTrue(candidates.contains("ア"), "カタカナが候補に含まれるはず")
+    }
+
     func testSpaceDuringCandidatesReturnsSelectNext() {
         type(chars: "a", base: "a")
         let result = press(keyCode: 49, candidateVisible: true, selectedRow: 0)

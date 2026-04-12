@@ -180,12 +180,34 @@ struct InputHandler {
     private mutating func doRefreshCandidates() -> CandidateAction {
         let result = db.fetchCandidates(prefix: state.composedHiragana)
         var candidates = result.candidates
-        let hadHiragana = candidates.contains(state.composedHiragana)
-        candidates.removeAll { $0 == state.composedHiragana }
+        var adjustedHistoryCount = result.historyCount
+
+        let katakana = hiraganaToKatakana(state.composedHiragana)
+
+        // ひらがな・カタカナを先頭固定位置に移動（履歴にあった場合はカウントを補正）
+        for fixed in [state.composedHiragana, katakana] {
+            if let idx = candidates.firstIndex(of: fixed), idx < adjustedHistoryCount {
+                adjustedHistoryCount -= 1
+            }
+            candidates.removeAll { $0 == fixed }
+        }
+
+        candidates.insert(katakana, at: 0)
         candidates.insert(state.composedHiragana, at: 0)
-        let historyEnd = 1 + (hadHiragana ? result.historyCount - 1 : result.historyCount)
+
+        let historyEnd = 2 + adjustedHistoryCount
         guard !candidates.isEmpty else { return .dismiss }
         return .show(candidates: candidates, historyEnd: historyEnd)
+    }
+
+    private func hiraganaToKatakana(_ text: String) -> String {
+        String(text.unicodeScalars.map { scalar in
+            // ひらがな: U+3041〜U+3096 → カタカナ: U+30A1〜U+30F6 (offset +0x60)
+            if scalar.value >= 0x3041 && scalar.value <= 0x3096 {
+                return Character(UnicodeScalar(scalar.value + 0x60)!)
+            }
+            return Character(scalar)
+        })
     }
 
     private func applyMarkedText(candidateText: String?, client: TextInputClient) {
