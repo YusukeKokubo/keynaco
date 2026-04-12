@@ -34,8 +34,13 @@ IME はバックグラウンドエージェントとして動作するため、`
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）
 - `InputHandler` = 入力ロジック本体（テスト可能）
+- `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包
+- `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
+- `DictionaryImporter` = SKK-JISYO-L.utf8 形式の辞書を SQLite へインポート
 - `DatabaseManager` は `InputHandler` のイニシャライザで DI する（テストは `inMemory: true`）
 - `CandidateWindow` は `InputController` 側で管理し `InputHandler` には渡さない
+
+辞書フォーマットは SKK（Simple Kana to Kanji）形式。バンドルリソース `SKK-JISYO-L.utf8` を初回起動時に SQLite へインポートする。
 
 ## macOS 26 IME の罠
 
