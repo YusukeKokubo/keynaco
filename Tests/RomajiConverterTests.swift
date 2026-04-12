@@ -108,6 +108,13 @@ final class RomajiConverterTests: XCTestCase {
 
     // MARK: - エッジケース
 
+    func testSpacePassesThrough() {
+        // スペースはローマ字テーブルに存在しないため converted にそのまま出力される。
+        // InputController はスペースを addRomaji に渡す前に捕捉しなければならない。
+        // （渡すと composedHiragana にスペースが混入する）
+        assertConvert(" ", converted: " ", pending: "")
+    }
+
     func testLongSentence() {
         assertConvert("konnichiwa", converted: "こんにちわ", pending: "")
     }

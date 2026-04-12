@@ -100,6 +100,10 @@ class InputController: IMKInputController {
                 candidateWindow.selectPrev()
                 updateMarkedText(client: sender)
                 return true
+            case 49: // Space → 次の候補へ
+                candidateWindow.selectNext()
+                updateMarkedText(client: sender)
+                return true
             case 48, 125: // Tab, ↓
                 candidateWindow.selectNext()
                 updateMarkedText(client: sender)
@@ -124,6 +128,16 @@ class InputController: IMKInputController {
             default:
                 if isBackspace { return handleBackspace(client: sender) }
             }
+        }
+
+        // スペースキー
+        if keyCode == 49 {
+            if !state.composedHiragana.isEmpty {
+                refreshCandidates(client: sender)
+                updateMarkedText(client: sender)
+                return true
+            }
+            return false // 未確定なし → アプリにスペースを渡す
         }
 
         // 矢印キー等の特殊キーはスルー
