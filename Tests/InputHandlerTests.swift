@@ -185,6 +185,20 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertTrue(candidates.contains("ア"), "カタカナが候補に含まれるはず")
     }
 
+    // MARK: - 漢字変換（辞書引き）
+
+    func testTanoshiiConvertsToKanji() {
+        handler.db.insertDict(reading: "たのしい", candidate: "楽しい", priority: 0)
+        typeRomaji("tanoshii")
+        XCTAssertEqual(client.markedText, "たのしい")
+        let (consumed, action) = press(keyCode: 49)  // Space
+        XCTAssertTrue(consumed)
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail("Space で .show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains("楽しい"), "「楽しい」が候補に含まれるはず: \(candidates)")
+    }
+
     // MARK: - カタカナ変換・候補管理
 
     func testInitialRowSkipsFixedCandidatesWhenDictExists() {

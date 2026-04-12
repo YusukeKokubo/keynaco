@@ -4,7 +4,7 @@ import SQLite3
 enum DictionaryImporter {
 
     /// 辞書インポートのバージョン。okuri-ari 対応で 2 に上げる。
-    private static let currentVersion = 2
+    private static let currentVersion = 3
 
     /// 子音文字 → ひらがな行（五段動詞・形容詞の活用形展開用）
     private static let consonantToKana: [Character: [Character]] = [
