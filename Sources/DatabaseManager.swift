@@ -60,6 +60,12 @@ final class DatabaseManager {
         sqlite3_exec(db, sql, nil, nil, nil)
     }
 
+    // MARK: - SQLite ヘルパー
+
+    private func bindText(_ stmt: OpaquePointer?, _ index: Int32, _ value: String) {
+        sqlite3_bind_text(stmt, index, value, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+    }
+
     // MARK: - 検索
 
     /// 履歴 + 辞書から候補を返す（履歴優先、重複除去）
@@ -77,7 +83,7 @@ final class DatabaseManager {
         """
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, histSQL, -1, &stmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(stmt, 1, prefix, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            bindText(stmt, 1, prefix)
             while sqlite3_step(stmt) == SQLITE_ROW {
                 if let ptr = sqlite3_column_text(stmt, 0) {
                     let s = String(cString: ptr)
@@ -133,8 +139,8 @@ final class DatabaseManager {
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, reading, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-        sqlite3_bind_text(stmt, 2, candidate, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        bindText(stmt, 1, reading)
+        bindText(stmt, 2, candidate)
         sqlite3_bind_int(stmt, 3, Int32(priority))
         sqlite3_step(stmt)
     }
@@ -150,7 +156,7 @@ final class DatabaseManager {
         var stmt: OpaquePointer?
         var results: [String] = []
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(stmt, 1, reading, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            bindText(stmt, 1, reading)
             while sqlite3_step(stmt) == SQLITE_ROW {
                 if let ptr = sqlite3_column_text(stmt, 0) {
                     results.append(String(cString: ptr))
@@ -169,7 +175,7 @@ final class DatabaseManager {
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, output, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        bindText(stmt, 1, output)
         sqlite3_step(stmt)
     }
 
@@ -189,8 +195,8 @@ final class DatabaseManager {
         defer { sqlite3_finalize(stmt) }
 
         let t = Int64(Date().timeIntervalSince1970)
-        sqlite3_bind_text(stmt, 1, input,  -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-        sqlite3_bind_text(stmt, 2, output, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        bindText(stmt, 1, input)
+        bindText(stmt, 2, output)
         sqlite3_bind_int64(stmt, 3, t)
         sqlite3_step(stmt)
     }

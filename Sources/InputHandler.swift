@@ -20,6 +20,20 @@ struct CandidateContext {
     static let hidden = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
 }
 
+private enum KeyCode {
+    static let eisu:      UInt16 = 102
+    static let kana:      UInt16 = 104
+    static let backspace: UInt16 = 51
+    static let space:     UInt16 = 49
+    static let enter:     UInt16 = 36
+    static let escape:    UInt16 = 53
+    static let tab:       UInt16 = 48
+    static let downArrow: UInt16 = 125
+    static let upArrow:   UInt16 = 126
+    static let leftArrow: UInt16 = 123
+    static let rightArrow: UInt16 = 124
+}
+
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
 struct InputHandler {
 
@@ -44,13 +58,13 @@ struct InputHandler {
 
         let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
 
-        // 英数キー (102) / かなキー (104)
-        if keyCode == 102 || keyCode == 104 {
+        // 英数キー / かなキー
+        if keyCode == KeyCode.eisu || keyCode == KeyCode.kana {
             if ignoreNextModeSwitch {
                 ignoreNextModeSwitch = false
                 return (true, .none)
             }
-            if keyCode == 102 {
+            if keyCode == KeyCode.eisu {
                 if !state.composingText.isEmpty { commitComposition(client: client) }
                 state.isAsciiMode = true
             } else {
@@ -62,7 +76,7 @@ struct InputHandler {
 
         // 英字モード
         if state.isAsciiMode {
-            if keyCode == 53 { state.isAsciiMode = false; return (true, .none) }
+            if keyCode == KeyCode.escape { state.isAsciiMode = false; return (true, .none) }
             guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
             guard let chars = characters, !chars.isEmpty,
                   chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return (false, .none) }
@@ -70,34 +84,34 @@ struct InputHandler {
             return (true, .none)
         }
 
-        let isBackspace = keyCode == 51 || characters == "\u{08}"
+        let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
 
         // 候補ウィンドウ表示中
         if candidate.isVisible {
             switch keyCode {
-            case 48 where modifiers.contains(.shift):  // Shift+Tab
+            case KeyCode.tab where modifiers.contains(.shift):  // Shift+Tab
                 return (true, .selectPrev)
-            case 49:   // Space → 次の候補
+            case KeyCode.space:   // Space → 次の候補
                 return (true, .selectNext)
-            case 48, 125:  // Tab, ↓
+            case KeyCode.tab, KeyCode.downArrow:  // Tab, ↓
                 return (true, .selectNext)
-            case 126:  // ↑
+            case KeyCode.upArrow:  // ↑
                 return (true, .selectPrev)
-            case 36:   // Return
+            case KeyCode.enter:   // Return
                 let action = doConfirmSelection(candidate: candidate, client: client)
                 return (true, action)
-            case 53:   // Escape
+            case KeyCode.escape:  // Escape
                 return doEscape(client: client)
             default:
                 if isBackspace { return doBackspace(client: client) }
             }
         } else {
             switch keyCode {
-            case 36:   // Return
+            case KeyCode.enter:   // Return
                 guard !state.composingText.isEmpty else { return (false, .none) }
                 commitComposition(client: client)
                 return (true, .none)
-            case 53:   // Escape
+            case KeyCode.escape:  // Escape
                 return doEscape(client: client)
             default:
                 if isBackspace { return doBackspace(client: client) }
@@ -105,7 +119,7 @@ struct InputHandler {
         }
 
         // スペースキー（候補なし時）
-        if keyCode == 49 {
+        if keyCode == KeyCode.space {
             if !state.composedHiragana.isEmpty {
                 let action = doRefreshCandidates()
                 applyMarkedText(candidateText: nil, client: client)
@@ -115,7 +129,7 @@ struct InputHandler {
         }
 
         // 矢印キー等の特殊キー
-        if keyCode >= 123 && keyCode <= 126 { return (false, .none) }
+        if keyCode >= KeyCode.leftArrow && keyCode <= KeyCode.upArrow { return (false, .none) }
 
         // 修飾キー付きはスルー
         guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
@@ -247,15 +261,4 @@ struct InputHandler {
         return (true, .dismiss)
     }
 
-    private mutating func commitTopCandidate(client: TextInputClient) {
-        let inputKey = state.finalizedText
-        if !state.composedHiragana.isEmpty {
-            let result = db.fetchCandidates(prefix: state.composedHiragana)
-            let top = result.candidates.first ?? inputKey
-            db.record(input: inputKey, output: top)
-            doCommit(text: top, client: client)
-        } else {
-            commitComposition(client: client)
-        }
-    }
 }

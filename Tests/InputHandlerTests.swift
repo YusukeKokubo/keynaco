@@ -254,6 +254,56 @@ final class InputHandlerTests: XCTestCase {
         }
     }
 
+    // MARK: - 候補ウィンドウ中のキーナビゲーション
+
+    func testDownArrowSelectsNext() {
+        type(chars: "a", base: "a")
+        let result = press(keyCode: 125, candidateVisible: true)
+        XCTAssertTrue(result.consumed)
+        guard case .selectNext = result.candidateAction else {
+            XCTFail("↓ キーは .selectNext を返すはず"); return
+        }
+    }
+
+    func testUpArrowSelectsPrev() {
+        type(chars: "a", base: "a")
+        let result = press(keyCode: 126, candidateVisible: true)
+        XCTAssertTrue(result.consumed)
+        guard case .selectPrev = result.candidateAction else {
+            XCTFail("↑ キーは .selectPrev を返すはず"); return
+        }
+    }
+
+    func testTabSelectsNext() {
+        type(chars: "a", base: "a")
+        let result = press(keyCode: 48, candidateVisible: true)
+        XCTAssertTrue(result.consumed)
+        guard case .selectNext = result.candidateAction else {
+            XCTFail("Tab キーは .selectNext を返すはず"); return
+        }
+    }
+
+    func testShiftTabSelectsPrev() {
+        type(chars: "a", base: "a")
+        let result = press(keyCode: 48, modifiers: .shift, candidateVisible: true)
+        XCTAssertTrue(result.consumed)
+        guard case .selectPrev = result.candidateAction else {
+            XCTFail("Shift+Tab は .selectPrev を返すはず"); return
+        }
+    }
+
+    func testDownArrowPassesThroughWithoutCandidates() {
+        type(chars: "a", base: "a")
+        let result = press(keyCode: 125, candidateVisible: false)
+        XCTAssertFalse(result.consumed, "候補なし時の ↓ はスルーするはず")
+    }
+
+    func testUpArrowPassesThroughWithoutCandidates() {
+        type(chars: "a", base: "a")
+        let result = press(keyCode: 126, candidateVisible: false)
+        XCTAssertFalse(result.consumed, "候補なし時の ↑ はスルーするはず")
+    }
+
     // MARK: - ASCII モード（英数キー）
 
     func testAsciiModeInsertsDirectly() {
