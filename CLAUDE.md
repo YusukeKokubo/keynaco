@@ -2,6 +2,22 @@
 
 macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
+## ディレクトリ構成
+
+| パス | 内容 |
+|------|------|
+| `Sources/` | アプリ本体（Swift ソース + Info.plist + entitlements） |
+| `Tests/` | ユニットテスト（XCTest） |
+| `Resources/` | SKK-JISYO-L.utf8（辞書ファイル） |
+| `plans/` | 設計・調査メモ |
+| `project.yml` | XcodeGen 設定 |
+
+### 起動チェーン（IMK ブートストラップ）
+
+`main.swift` → `NSManualApplication`（`NSApplication` サブクラス）→ `AppDelegate` →
+`IMKServer` を生成し `InputController`（`IMKInputController` サブクラス）を登録。
+`@objc(ClassName)` アノテーションが必須（後述）。
+
 ## ビルド・インストール
 
 ```bash
@@ -34,6 +50,7 @@ IME はバックグラウンドエージェントとして動作するため、`
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）
 - `InputHandler` = 入力ロジック本体（テスト可能）
+- `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
 - `DictionaryImporter` = SKK-JISYO-L.utf8 形式の辞書を SQLite へインポート
