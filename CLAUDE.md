@@ -13,6 +13,14 @@ xcodebuild build -scheme ykey -configuration Debug
 - 初回セットアップ: `sudo chmod -R +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_child,delete,read,write,execute" "/Library/Input Methods"` が必要（所有者を root のまま ACL で自分にだけ権限を付与）
 - `~/Library/Input Methods/` は使わない（入力ソースが重複登録される）
 - 初回インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
+- `install.sh` は古いスクリプト（`~/Library/` を使っており非推奨）。Build Post-action が自動でインストールするため不要
+- `/deploy` スキル（Claude Code 内）: ビルドからインストールまでを一括実行する
+
+## テスト実行
+
+```bash
+xcodebuild test -scheme ykey -destination "platform=macOS"
+```
 
 ## テスト方針
 
