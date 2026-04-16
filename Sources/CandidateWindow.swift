@@ -45,7 +45,7 @@ private class CandidateRowView: NSView {
 
 // MARK: - 候補ウィンドウ
 
-final class CandidateWindow: NSWindow {
+final class CandidateWindow: NSPanel {
 
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
@@ -64,12 +64,13 @@ final class CandidateWindow: NSWindow {
 
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask,
                   backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
-        super.init(contentRect: contentRect, styleMask: [.borderless],
+        super.init(contentRect: contentRect, styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: true)
         self.level = .popUpMenu
         self.isOpaque = false
         self.backgroundColor = .clear
         self.hasShadow = true
+        self.collectionBehavior = [.canJoinAllSpaces]
         setupViews()
     }
 
