@@ -135,6 +135,27 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertLessThan(idxHiragana, idxDict, "ひらがな後半が辞書後半より先")
     }
 
+    func testCompoundPureKanjiHeadWithHiraganaTailBlocked() {
+        // 純漢字の前半候補 + 未変換ひらがな後半 の組み合わせはスキップされる
+        // 例: "同"(純漢字) + "いうこと"(未変換) → "同いうこと" は不正な日本語
+        db.insertDict(reading: "どう", candidate: "同", priority: 0)
+        db.insertDict(reading: "いうこと", candidate: "言う事", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "どういうこと")
+        XCTAssertFalse(result.candidates.contains("同いうこと"), "純漢字 + ひらがなは不正なのでスキップ")
+        XCTAssertTrue(result.candidates.contains("どう言う事"), "ひらがな前半 + 辞書後半は有効")
+    }
+
+    func testCompoundKanjiWithOkuriganaHeadAllowed() {
+        // 送り仮名つき漢字（ひらがなを含む）は未変換ひらがな後半と組み合わせてよい
+        // 例: "良さ"(ひらがな「さ」を含む) + "そう" → "良さそう" は有効
+        db.insertDict(reading: "よさ", candidate: "良さ", priority: 0)
+        db.insertDict(reading: "そう", candidate: "層", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "よさそう")
+        XCTAssertTrue(result.candidates.contains("良さそう"), "okurigana付き漢字 + ひらがなは有効")
+    }
+
     // MARK: - 動詞活用（okuri-ari 展開）
 
     func testVerbMasuForm() {

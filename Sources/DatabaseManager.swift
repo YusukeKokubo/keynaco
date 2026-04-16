@@ -128,6 +128,14 @@ final class DatabaseManager {
             // 後半を外側にして、ひらがな後半の候補を先に出す
             for t in tails.prefix(5) {
                 for h in heads.prefix(10) {
+                    // 純漢字 h + 未変換ひらがな t の組み合わせは不正な日本語になりやすいためスキップ
+                    // 例: "同"(純漢字) + "いうこと"(未変換) → "同いうこと" は不正
+                    // ただし "帰って"(ひらがなを含む) + "来た"(辞書変換) は通す
+                    let headIsPureKanji = !h.unicodeScalars.contains {
+                        ($0.value >= 0x3040 && $0.value <= 0x309F) // ひらがな
+                        || ($0.value >= 0x30A0 && $0.value <= 0x30FF) // カタカナ
+                    }
+                    if headIsPureKanji && t == tail { continue }
                     let compound = h + t
                     if compound == prefix { continue } // 元のひらがなと同じならスキップ
                     if seen.insert(compound).inserted {
