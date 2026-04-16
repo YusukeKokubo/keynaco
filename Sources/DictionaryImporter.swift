@@ -3,8 +3,8 @@ import SQLite3
 
 enum DictionaryImporter {
 
-    /// 辞書インポートのバージョン。て形・た形展開追加で 5 に上げる。
-    private static let currentVersion = 5
+    /// 辞書インポートのバージョン。重複子音エントリの basic expansion 抑制で 6 に上げる。
+    private static let currentVersion = 6
 
     /// 子音文字 → ひらがな行（五段動詞・形容詞の活用形展開用）
     private static let consonantToKana: [Character: [Character]] = [
@@ -66,6 +66,38 @@ enum DictionaryImporter {
         NSLog("ykey: 辞書インポート開始")
         let start = CFAbsoluteTimeGetCurrent()
 
+        let lines = text.components(separatedBy: "\n")
+
+        // Phase 1: okuri-ari 事前スキャン
+        // 同一 (幹, 候補) ペアに複数の子音エントリがある場合、basic expansion する子音を決定する。
+        // ら行五段動詞（知る, 散るなど）が誤って "t" 行エントリも持つケースで、
+        // "r" 行を優先し "t" 行 basic expansion を抑制することで "知た" 等の無効形を除外する。
+        var primaryConsonants: [String: Character] = [:]
+        var scanInOkuriAri = false
+        for line in lines {
+            if line.hasPrefix(";; okuri-ari entries.") { scanInOkuriAri = true; continue }
+            if line.hasPrefix(";; okuri-nasi entries.") { break }
+            guard scanInOkuriAri, !line.hasPrefix(";;"), !line.isEmpty else { continue }
+            guard let spaceIdx = line.firstIndex(of: " ") else { continue }
+            let reading = String(line[line.startIndex..<spaceIdx])
+            guard let consonant = reading.last, consonant.asciiValue != nil else { continue }
+            let stem = String(reading.dropLast())
+            guard !stem.isEmpty,
+                  stem.unicodeScalars.allSatisfy({ $0.value >= 0x3040 && $0.value <= 0x309F }),
+                  consonantToKana[consonant] != nil else { continue }
+            let rest = String(line[line.index(after: spaceIdx)...])
+            for part in rest.split(separator: "/") {
+                let s = String(part)
+                let base = s.firstIndex(of: ";").map { String(s[s.startIndex..<$0]) } ?? s
+                guard !base.isEmpty else { continue }
+                let key = stem + "|" + base
+                // r 行が最優先。未登録なら現在の子音を仮登録。
+                if primaryConsonants[key] == nil || consonant == "r" {
+                    primaryConsonants[key] = consonant
+                }
+            }
+        }
+
         sqlite3_exec(db, "BEGIN", nil, nil, nil)
 
         let sql = "INSERT OR IGNORE INTO dictionary (reading, candidate, priority) VALUES (?, ?, ?)"
@@ -80,7 +112,7 @@ enum DictionaryImporter {
         var inOkuriNasi = false
         var count = 0
 
-        for line in text.components(separatedBy: "\n") {
+        for line in lines {
             if line.hasPrefix(";; okuri-ari entries.") { inOkuriAri = true; continue }
             if line.hasPrefix(";; okuri-nasi entries.") { inOkuriAri = false; inOkuriNasi = true; continue }
             if line.hasPrefix(";;") || line.isEmpty { continue }
@@ -112,11 +144,16 @@ enum DictionaryImporter {
                 guard !stem.isEmpty, stem.unicodeScalars.allSatisfy({ $0.value >= 0x3040 && $0.value <= 0x309F }) else { continue }
                 guard let kanaRow = consonantToKana[consonant] else { continue }
                 for (priority, candidate) in candidates.enumerated() {
-                    for kana in kanaRow {
-                        let fullReading = stem + String(kana)
-                        let fullCandidate = candidate + String(kana)
-                        insert(stmt: stmt, reading: fullReading, candidate: fullCandidate, priority: Int32(priority))
-                        count += 1
+                    // 同一 (幹, 候補) に複数の子音エントリがある場合、primary 子音のみ basic expansion を行う。
+                    // これにより "しt /知/" の basic expansion が抑制され "知た" 等の無効形を排除する。
+                    let key = stem + "|" + candidate
+                    if primaryConsonants[key] == consonant {
+                        for kana in kanaRow {
+                            let fullReading = stem + String(kana)
+                            let fullCandidate = candidate + String(kana)
+                            insert(stmt: stmt, reading: fullReading, candidate: fullCandidate, priority: Int32(priority))
+                            count += 1
+                        }
                     }
                     if let (te, ta) = teFormSuffix[consonant] {
                         insert(stmt: stmt, reading: stem + te, candidate: candidate + te, priority: Int32(priority))

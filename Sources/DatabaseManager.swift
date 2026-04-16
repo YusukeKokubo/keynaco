@@ -18,6 +18,13 @@ final class DatabaseManager {
         createTables()
     }
 
+    /// テスト用: インメモリ DB で辞書インポートまで実行
+    init(inMemoryWithDictionary: Bool) {
+        guard sqlite3_open(":memory:", &db) == SQLITE_OK else { return }
+        createTables()
+        DictionaryImporter.importIfNeeded(db: db)
+    }
+
     deinit {
         sqlite3_close(db)
     }

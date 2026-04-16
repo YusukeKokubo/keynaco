@@ -235,4 +235,31 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(segments.map { $0.reading }, ["わたし", "がくせい"],
                        "履歴なしでも辞書スコアで正しく分割される")
     }
+
+    // MARK: - DictionaryImporter: 重複子音エントリの basic expansion 抑制
+
+    func testOkuriAriInvalidFormExcluded() {
+        // "しt /知/" の basic expansion で生成される "知た" は無効な日本語形。
+        // 同じ (幹=し, 候補=知) に "しr /知/" (ら行五段) があるため "t" 行は抑制される。
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        let candidates = dictDB.fetchCandidates(prefix: "した").candidates
+        XCTAssertFalse(candidates.contains("知た"), "知た は無効形なので候補に出ないこと")
+        XCTAssertFalse(candidates.contains("散た"), "散た は無効形なので候補に出ないこと")
+    }
+
+    func testOkuriAriValidRRowFormsPreserved() {
+        // "しr /知/" の basic expansion による ら行 活用形は保持される
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "しる").candidates.contains("知る"))
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "しら").candidates.contains("知ら"))
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "しった").candidates.contains("知った"))
+    }
+
+    func testOkuriAriTaRowVerbFormsPreserved() {
+        // 勝つ (た行五段) は "かt" エントリのみ → basic expansion は抑制されず全形保持
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かつ").candidates.contains("勝つ"))
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かち").candidates.contains("勝ち"))
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かった").candidates.contains("勝った"))
+    }
 }
