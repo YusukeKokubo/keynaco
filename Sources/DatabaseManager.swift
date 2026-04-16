@@ -128,18 +128,22 @@ final class DatabaseManager {
             // 後半を外側にして、ひらがな後半の候補を先に出す
             for t in tails.prefix(5) {
                 for h in heads.prefix(10) {
-                    // 純漢字 h + (未変換ひらがな or ひらがなで終わる辞書候補) t はスキップ
-                    // 例: "同"(純漢字) + "いうこと"(未変換) → "同いうこと" は不正
-                    //     "堂"(純漢字) + "擦る"(辞書候補) → "堂擦る" は不正
-                    // ただし "帰って"(ひらがなを含む)・"東京"(純漢字) + "駅"(純漢字) は通す
                     let headIsPureKanji = !h.unicodeScalars.contains {
-                        ($0.value >= 0x3040 && $0.value <= 0x309F) // ひらがな
-                        || ($0.value >= 0x30A0 && $0.value <= 0x30FF) // カタカナ
+                        ($0.value >= 0x3040 && $0.value <= 0x309F)
+                        || ($0.value >= 0x30A0 && $0.value <= 0x30FF)
                     }
-                    let tailEndsInHiragana = t.unicodeScalars.last.map {
+                    let headEndsInHiragana = h.unicodeScalars.last.map {
                         $0.value >= 0x3040 && $0.value <= 0x309F
                     } ?? false
-                    if headIsPureKanji && (t == tail || tailEndsInHiragana) { continue }
+                    let tailContainsHiragana = t.unicodeScalars.contains { $0.value >= 0x3040 && $0.value <= 0x309F }
+                    let tailIsPureKanji = !tailContainsHiragana && !t.unicodeScalars.contains {
+                        $0.value >= 0x30A0 && $0.value <= 0x30FF
+                    }
+                    // 純漢字 head + ひらがなを含む tail → 不正（"同言う事"・"堂擦る" 等）
+                    if headIsPureKanji && tailContainsHiragana { continue }
+                    // 辞書変換済み okurigana head（末尾がひらがな）+ 純漢字 tail → 不正（"良さ会議" 等）
+                    // h == head（未変換ひらがな）の場合は除外しない（"いい漢字" は有効）
+                    if h != head && headEndsInHiragana && tailIsPureKanji { continue }
                     let compound = h + t
                     if compound == prefix { continue } // 元のひらがなと同じならスキップ
                     if seen.insert(compound).inserted {
