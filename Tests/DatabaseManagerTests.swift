@@ -304,4 +304,71 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(dictDB.fetchCandidates(prefix: "かち").candidates.contains("勝ち"))
         XCTAssertTrue(dictDB.fetchCandidates(prefix: "かった").candidates.contains("勝った"))
     }
+
+    func testOkuriAriKaeru() {
+        // 帰る (かえr + かえt) → r行が優先, t行 basic expansion は抑制
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かえる").candidates.contains("帰る"))
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かえって").candidates.contains("帰って"))
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かえった").candidates.contains("帰った"))
+        XCTAssertFalse(dictDB.fetchCandidates(prefix: "かえた").candidates.contains("帰た"),
+                       "帰た は無効形")
+    }
+
+    func testOkuriAriHairu() {
+        // 入る (はいr + はいt) → r行が優先
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "はいる").candidates.contains("入る"))
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "はいった").candidates.contains("入った"))
+        XCTAssertFalse(dictDB.fetchCandidates(prefix: "はいた").candidates.contains("入た"),
+                       "入た は無効形")
+    }
+
+    func testOkuriAriHashiru() {
+        // 走る (はしr + はしt) → r行が優先
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "はしる").candidates.contains("走る"))
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "はしった").candidates.contains("走った"))
+        XCTAssertFalse(dictDB.fetchCandidates(prefix: "はした").candidates.contains("走た"),
+                       "走た は無効形")
+    }
+
+    // MARK: - Compound: 有効なケースが保持されること
+
+    func testCompoundVerbTeFormWithVerbTaFormAllowed() {
+        // 動詞て形 + 動詞た形 の組み合わせは有効
+        // 例: "かいてきた" → "書いて来た" は有効
+        db.insertDict(reading: "かいて", candidate: "書いて", priority: 0)
+        db.insertDict(reading: "きた", candidate: "来た", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "かいてきた")
+        XCTAssertTrue(result.candidates.contains("書いて来た"), "動詞て形 + 動詞た形は有効")
+    }
+
+    // MARK: - Compound: 既知の問題（未修正）
+
+    func testKnownIssue_PureKanjiHeadWithMidHiraganaTailNotBlocked() {
+        // 純漢字 head + 内部にひらがなを含む辞書候補（末尾は漢字）はまだフィルタされない
+        // 例: "そういうこと" → "層言う事"（層=純漢字, 言う事=末尾は「事」で漢字）
+        // tailEndsInHiragana が false になるため現行フィルタをすり抜ける
+        db.insertDict(reading: "そう", candidate: "層", priority: 0)
+        db.insertDict(reading: "いうこと", candidate: "言う事", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "そういうこと")
+        XCTExpectFailure("既知の問題: 純漢字 head + 末尾が漢字の混合 tail は未フィルタ")
+        XCTAssertFalse(result.candidates.contains("層言う事"),
+                       "純漢字 + 内部にひらがなを含む候補は不正")
+    }
+
+    func testKnownIssue_OkuriganaHeadWithPureKanjiTailNotBlocked() {
+        // okurigana付き head（末尾がひらがな） + 純漢字 tail はまだフィルタされない
+        // 例: "よさかいぎ" → "良さ会議"（良さ=末尾「さ」がひらがな, 会議=純漢字）
+        db.insertDict(reading: "よさ", candidate: "良さ", priority: 0)
+        db.insertDict(reading: "かいぎ", candidate: "会議", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "よさかいぎ")
+        XCTExpectFailure("既知の問題: okurigana付き head + 純漢字 tail は未フィルタ")
+        XCTAssertFalse(result.candidates.contains("良さ会議"),
+                       "okurigana付き前半 + 純漢字後半は不正")
+    }
 }
