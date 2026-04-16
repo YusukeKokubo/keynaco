@@ -3,8 +3,8 @@ import SQLite3
 
 enum DictionaryImporter {
 
-    /// 辞書インポートのバージョン。形容詞補完辞書追加で 4 に上げる。
-    private static let currentVersion = 4
+    /// 辞書インポートのバージョン。て形・た形展開追加で 5 に上げる。
+    private static let currentVersion = 5
 
     /// 子音文字 → ひらがな行（五段動詞・形容詞の活用形展開用）
     private static let consonantToKana: [Character: [Character]] = [
@@ -25,6 +25,19 @@ enum DictionaryImporter {
         "a": ["あ"],
         "e": ["え"],
         "o": ["お"],
+    ]
+
+    /// 子音文字 → (て形語尾, た形語尾)（五段動詞のて形・た形展開用）
+    private static let teFormSuffix: [Character: (te: String, ta: String)] = [
+        "k": ("いて", "いた"),  // 書く → 書いて
+        "g": ("いで", "いだ"),  // 泳ぐ → 泳いで
+        "s": ("して", "した"),  // 消す → 消して
+        "t": ("って", "った"),  // 勝つ → 勝って
+        "n": ("んで", "んだ"),  // 死ぬ → 死んで
+        "b": ("んで", "んだ"),  // 遊ぶ → 遊んで
+        "m": ("んで", "んだ"),  // 飲む → 飲んで
+        "r": ("って", "った"),  // 帰る → 帰って (五段)
+        "w": ("って", "った"),  // 買う → 買って
     ]
 
     /// SKK-JISYO.L をバンドルから読み込み、dictionary テーブルに一括挿入する。
@@ -104,6 +117,11 @@ enum DictionaryImporter {
                         let fullCandidate = candidate + String(kana)
                         insert(stmt: stmt, reading: fullReading, candidate: fullCandidate, priority: Int32(priority))
                         count += 1
+                    }
+                    if let (te, ta) = teFormSuffix[consonant] {
+                        insert(stmt: stmt, reading: stem + te, candidate: candidate + te, priority: Int32(priority))
+                        insert(stmt: stmt, reading: stem + ta, candidate: candidate + ta, priority: Int32(priority))
+                        count += 2
                     }
                 }
             }
