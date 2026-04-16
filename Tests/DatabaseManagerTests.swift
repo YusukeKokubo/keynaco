@@ -156,6 +156,27 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(result.candidates.contains("良さそう"), "okurigana付き漢字 + ひらがなは有効")
     }
 
+    func testCompoundPureKanjiHeadWithOkuriganaedTailBlocked() {
+        // 純漢字の前半候補 + ひらがなで終わる辞書候補 の組み合わせはスキップされる
+        // 例: "堂"(純漢字) + "擦る"(辞書候補、"る"で終わる) → "堂擦る" は不正
+        db.insertDict(reading: "どう", candidate: "堂", priority: 0)
+        db.insertDict(reading: "する", candidate: "擦る", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "どうする")
+        XCTAssertFalse(result.candidates.contains("堂擦る"), "純漢字 + ひらがなで終わる辞書候補は不正")
+        XCTAssertFalse(result.candidates.contains("堂する"), "純漢字 + 未変換ひらがなも不正")
+    }
+
+    func testCompoundPureKanjiHeadWithPureKanjiTailAllowed() {
+        // 純漢字 + 純漢字（ひらがななし）の組み合わせは有効
+        // 例: "東京"(純漢字) + "駅"(純漢字) → "東京駅" は有効
+        db.insertDict(reading: "とうきょう", candidate: "東京", priority: 0)
+        db.insertDict(reading: "えき", candidate: "駅", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "とうきょうえき")
+        XCTAssertTrue(result.candidates.contains("東京駅"), "純漢字 + 純漢字は有効")
+    }
+
     // MARK: - 動詞活用（okuri-ari 展開）
 
     func testVerbMasuForm() {
