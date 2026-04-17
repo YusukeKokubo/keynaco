@@ -334,6 +334,43 @@ final class DatabaseManagerTests: XCTestCase {
                        "走た は無効形")
     }
 
+    // MARK: - DictionaryImporter: z行一段動詞の活用形展開
+
+    func testZRowIchidanKanjiru() {
+        // かんz /感/ → かんじる → 感じる（一段動詞終止形）
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かんじる").candidates.contains("感じる"),
+                      "かんじる → 感じる が候補に出ること")
+    }
+
+    func testZRowIchidanKanjite() {
+        // かんz /感/ → かんじて → 感じて（一段動詞て形）
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かんじて").candidates.contains("感じて"),
+                      "かんじて → 感じて が候補に出ること")
+    }
+
+    func testZRowIchidanKanjita() {
+        // かんz /感/ → かんじた → 感じた（一段動詞た形）
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かんじた").candidates.contains("感じた"),
+                      "かんじた → 感じた が候補に出ること")
+    }
+
+    func testZRowIchidanRonjiru() {
+        // ろんz /論/ → ろんじる → 論じる（同系統動詞にも適用）
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "ろんじる").candidates.contains("論じる"),
+                      "ろんじる → 論じる が候補に出ること")
+    }
+
+    func testZRowIchidanOujiru() {
+        // おうz /応/ → おうじる → 応じる
+        let dictDB = DatabaseManager(inMemoryWithDictionary: true)
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "おうじる").candidates.contains("応じる"),
+                      "おうじる → 応じる が候補に出ること")
+    }
+
     // MARK: - Compound: 有効なケースが保持されること
 
     func testCompoundVerbTeFormWithVerbTaFormAllowed() {

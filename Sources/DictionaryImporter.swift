@@ -3,8 +3,8 @@ import SQLite3
 
 enum DictionaryImporter {
 
-    /// 辞書インポートのバージョン。重複子音エントリの basic expansion 抑制で 6 に上げる。
-    private static let currentVersion = 6
+    /// 辞書インポートのバージョン。z行一段動詞（感じる等）の活用形追加で 7 に上げる。
+    private static let currentVersion = 7
 
     /// 子音文字 → ひらがな行（五段動詞・形容詞の活用形展開用）
     private static let consonantToKana: [Character: [Character]] = [
@@ -153,6 +153,14 @@ enum DictionaryImporter {
                             let fullCandidate = candidate + String(kana)
                             insert(stmt: stmt, reading: fullReading, candidate: fullCandidate, priority: Int32(priority))
                             count += 1
+                        }
+                        if consonant == "z" {
+                            let jiStem = stem + "じ"
+                            let jiCand = candidate + "じ"
+                            insert(stmt: stmt, reading: jiStem + "る", candidate: jiCand + "る", priority: Int32(priority))
+                            insert(stmt: stmt, reading: jiStem + "て", candidate: jiCand + "て", priority: Int32(priority))
+                            insert(stmt: stmt, reading: jiStem + "た", candidate: jiCand + "た", priority: Int32(priority))
+                            count += 3
                         }
                     }
                     if let (te, ta) = teFormSuffix[consonant] {
