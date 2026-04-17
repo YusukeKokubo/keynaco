@@ -147,6 +147,9 @@ final class DatabaseManager {
                     // head が「ん」で終わる場合、tail は「で」「だ」で始まらないと不正
                     // 例: "噛ん" + "がえてみて" → 不正、"飲ん" + "で" → 有効
                     if h.last == "ん" && !t.hasPrefix("で") && !t.hasPrefix("だ") { continue }
+                    // 純カタカナ head + ひらがなを含む tail → 不正（"カンガえてみて" 等）
+                    let headIsPureKatakana = h.unicodeScalars.allSatisfy { $0.value >= 0x30A0 && $0.value <= 0x30FF }
+                    if headIsPureKatakana && tailContainsHiragana { continue }
                     let compound = h + t
                     if compound == prefix { continue } // 元のひらがなと同じならスキップ
                     if seen.insert(compound).inserted {

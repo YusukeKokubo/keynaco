@@ -199,6 +199,15 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(result.candidates.contains("考えて見て"), "「考えて見て」が候補に含まれるはず")
     }
 
+    func testCompoundPureKatakanaHeadWithHiraganaTailBlocked() {
+        // 純カタカナ head + ひらがな tail → 不正（"カンガえてみて" 等）
+        db.insertDict(reading: "かんが", candidate: "カンガ", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "かんがえてみて")
+        XCTAssertFalse(result.candidates.contains { $0.hasPrefix("カンガ") && $0.contains("え") },
+                       "純カタカナ head + ひらがな tail は不正")
+    }
+
     // MARK: - 動詞活用（okuri-ari 展開）
 
     func testVerbMasuForm() {
