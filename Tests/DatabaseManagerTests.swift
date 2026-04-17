@@ -300,10 +300,7 @@ final class DatabaseManagerTests: XCTestCase {
     func testMozcGodanVerb() {
         let dictDB = DatabaseManager(inMemoryWithDictionary: true)
         XCTAssertTrue(dictDB.fetchCandidates(prefix: "かえる").candidates.contains("帰る"))
-        // 活用形は mozc に明示エントリがない場合は落ちる → Phase 2 で対応
-        XCTExpectFailure("Phase 2 未実装: mozc に書いた の明示エントリがない場合は落ちる") {
-            XCTAssertTrue(dictDB.fetchCandidates(prefix: "かいた").candidates.contains("書いた"))
-        }
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かいた").candidates.contains("書いた"))
     }
 
     func testMozcCostOrdering() {
@@ -325,19 +322,13 @@ final class DatabaseManagerTests: XCTestCase {
     }
 
     func testRegressionKanjite() {
-        // mozc に感じて の明示エントリがない場合は落ちる → Phase 2 で suffix.txt 展開を追加する
         let dictDB = DatabaseManager(inMemoryWithDictionary: true)
-        XCTExpectFailure("Phase 2 未実装: mozc に感じて の明示エントリがない場合は落ちる") {
-            XCTAssertTrue(dictDB.fetchCandidates(prefix: "かんじて").candidates.contains("感じて"))
-        }
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かんじて").candidates.contains("感じて"))
     }
 
     func testRegressionKanjita() {
-        // mozc に感じた の明示エントリがない場合は落ちる → Phase 2 で suffix.txt 展開を追加する
         let dictDB = DatabaseManager(inMemoryWithDictionary: true)
-        XCTExpectFailure("Phase 2 未実装: mozc に感じた の明示エントリがない場合は落ちる") {
-            XCTAssertTrue(dictDB.fetchCandidates(prefix: "かんじた").candidates.contains("感じた"))
-        }
+        XCTAssertTrue(dictDB.fetchCandidates(prefix: "かんじた").candidates.contains("感じた"))
     }
 
     // MARK: - Compound: 有効なケースが保持されること
