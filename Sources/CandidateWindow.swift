@@ -2,10 +2,23 @@ import Cocoa
 
 // MARK: - セル用のカスタムビュー
 
+private class FirstMouseButton: NSButton {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 private class CandidateRowView: NSView {
     let label = NSTextField(labelWithString: "")
-    let deleteButton = NSButton(title: "\u{2715}", target: nil, action: nil)
-    let separator = NSBox()
+    let deleteButton = FirstMouseButton(title: "\u{2715}", target: nil, action: nil)
+    let sectionDivider = NSView()
+
+    var isHistory: Bool = false {
+        didSet {
+            wantsLayer = true
+            layer?.backgroundColor = isHistory
+                ? NSColor.controlAccentColor.withAlphaComponent(0.08).cgColor
+                : NSColor.clear.cgColor
+        }
+    }
 
     init(deleteTarget: AnyObject, deleteAction: Selector) {
         super.init(frame: .zero)
@@ -24,9 +37,10 @@ private class CandidateRowView: NSView {
         deleteButton.setContentHuggingPriority(.required, for: .horizontal)
         addSubview(deleteButton)
 
-        separator.boxType = .separator
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(separator)
+        sectionDivider.wantsLayer = true
+        sectionDivider.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.4).cgColor
+        sectionDivider.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(sectionDivider)
 
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
@@ -34,9 +48,10 @@ private class CandidateRowView: NSView {
             deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             label.trailingAnchor.constraint(lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -4),
-            separator.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            separator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
-            separator.bottomAnchor.constraint(equalTo: bottomAnchor),
+            sectionDivider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            sectionDivider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            sectionDivider.bottomAnchor.constraint(equalTo: bottomAnchor),
+            sectionDivider.heightAnchor.constraint(equalToConstant: 1.5),
         ])
     }
 
@@ -213,8 +228,9 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
         rowView.label.stringValue = candidates[row]
         rowView.deleteButton.tag = row
         rowView.deleteButton.isHidden = (row < fixedRowCount)
-        let showSeparator = (row == historySectionEnd - 1) && historySectionEnd < candidates.count
-        rowView.separator.isHidden = !showSeparator
+        rowView.isHistory = historySectionEnd > 0 && row < historySectionEnd
+        let showDivider = row == historySectionEnd - 1 && historySectionEnd < candidates.count
+        rowView.sectionDivider.isHidden = !showDivider
 
         return rowView
     }
