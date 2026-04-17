@@ -178,6 +178,27 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(result.candidates.contains("東京駅"), "純漢字 + 純漢字は有効")
     }
 
+    func testCompoundNEndingHeadBlocked() {
+        // 「ん」で終わる活用形 head + ひらがな tail は不正
+        // 例: "かん" → 噛ん（活用形）+ "がえてみて" → "噛んがえてみて" は不正な日本語
+        db.insertDict(reading: "かん", candidate: "噛ん", priority: 0)
+        db.insertDict(reading: "がえてみて", candidate: "替えてみて", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "かんがえてみて")
+        XCTAssertFalse(result.candidates.contains("噛んがえてみて"), "「ん」終わり + ひらがな tail は不正")
+        XCTAssertFalse(result.candidates.contains("噛ん替えてみて"), "「ん」終わり head + 辞書 tail も不正")
+    }
+
+    func testCompoundKangaeteGeneratesCorrectCompound() {
+        // "かんがえてみて" → "考えてみて" / "考えて見て" が生成される
+        db.insertDict(reading: "かんがえて", candidate: "考えて", priority: 0)
+        db.insertDict(reading: "みて", candidate: "見て", priority: 0)
+
+        let result = db.fetchCandidates(prefix: "かんがえてみて")
+        XCTAssertTrue(result.candidates.contains("考えてみて"), "「考えてみて」が候補に含まれるはず")
+        XCTAssertTrue(result.candidates.contains("考えて見て"), "「考えて見て」が候補に含まれるはず")
+    }
+
     // MARK: - 動詞活用（okuri-ari 展開）
 
     func testVerbMasuForm() {
@@ -277,6 +298,30 @@ final class DatabaseManagerTests: XCTestCase {
         let segments = db.segmentize("わたしがくせい")
         XCTAssertEqual(segments.map { $0.reading }, ["わたし", "がくせい"],
                        "履歴なしでも辞書スコアで正しく分割される")
+    }
+
+    func testSegmentizeKangaeteMinagara() {
+        // 「かんがえてみて」は「かんがえて」+「みて」に分割されるべき
+        // >=修正前: スコア同点で「かん」+「がえ」+...になるケース
+        db.insertDict(reading: "かんがえ",  candidate: "考え",  priority: 0)
+        db.insertDict(reading: "かんがえて", candidate: "考えて", priority: 0)
+        db.insertDict(reading: "みて",      candidate: "見て",   priority: 0)
+
+        let segments = db.segmentize("かんがえてみて")
+        XCTAssertEqual(segments.map { $0.reading }, ["かんがえて", "みて"],
+                       "長いマッチ「かんがえて」が短いマッチより優先される")
+    }
+
+    func testSegmentizeLongerMatchWinsOnTie() {
+        // スコア同点のとき長いセグメントが勝つ（>=修正の確認）
+        // "かんがえ"(4文字)と"かん"(2)+"がえ"(2)がスコア4で同点
+        db.insertDict(reading: "かん",    candidate: "勘",  priority: 0)
+        db.insertDict(reading: "がえ",    candidate: "替え", priority: 0)
+        db.insertDict(reading: "かんがえ", candidate: "考え", priority: 0)
+
+        let segments = db.segmentize("かんがえ")
+        XCTAssertEqual(segments.map { $0.reading }, ["かんがえ"],
+                       "同スコアなら長い1セグメントが優先される")
     }
 
     // MARK: - DictionaryImporter: mozc 辞書

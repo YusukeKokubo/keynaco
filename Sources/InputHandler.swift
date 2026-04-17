@@ -367,20 +367,29 @@ struct InputHandler {
     private func buildSegmentCandidates(reading: String, dictCandidates: [String]) -> Segment {
         let hiragana = reading
         let katakana = hiraganaToKatakana(reading)
-        var candidates = dictCandidates
+        let historyCandidates = db.fetchHistoryExact(reading: reading)
+
+        var candidates: [String] = []
+        var seen = Set<String>()
+
+        let hiraganaInHistory = historyCandidates.contains(hiragana)
+        let katakanaInHistory = historyCandidates.contains(katakana)
         var fixedCount = 0
-        if !candidates.contains(katakana) {
-            candidates.removeAll { $0 == katakana }
-            candidates.insert(katakana, at: 0)
-            fixedCount += 1
+        if !katakanaInHistory {
+            candidates.insert(katakana, at: 0); seen.insert(katakana); fixedCount += 1
         }
-        if !candidates.contains(hiragana) {
-            candidates.removeAll { $0 == hiragana }
-            candidates.insert(hiragana, at: 0)
-            fixedCount += 1
+        if !hiraganaInHistory {
+            candidates.insert(hiragana, at: 0); seen.insert(hiragana); fixedCount += 1
         }
-        let initialIndex = dictCandidates.isEmpty ? 0 : fixedCount
-        return Segment(reading: reading, candidates: candidates, selectedIndex: initialIndex, historyEnd: fixedCount)
+
+        for h in historyCandidates where seen.insert(h).inserted { candidates.append(h) }
+        let historyEnd = fixedCount + historyCandidates.count
+
+        for d in dictCandidates where seen.insert(d).inserted { candidates.append(d) }
+
+        // 履歴あり → 最初の履歴候補を選択、なし → 辞書先頭候補を選択（従来通り）
+        let initialIndex = fixedCount
+        return Segment(reading: reading, candidates: candidates, selectedIndex: initialIndex, historyEnd: historyEnd)
     }
 
     private func makeCandidateActionForFocusedSegment() -> CandidateAction {

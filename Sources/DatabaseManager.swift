@@ -144,6 +144,9 @@ final class DatabaseManager {
                     // 辞書変換済み okurigana head（末尾がひらがな）+ 純漢字 tail → 不正（"良さ会議" 等）
                     // h == head（未変換ひらがな）の場合は除外しない（"いい漢字" は有効）
                     if h != head && headEndsInHiragana && tailIsPureKanji { continue }
+                    // head が「ん」で終わる場合、tail は「で」「だ」で始まらないと不正
+                    // 例: "噛ん" + "がえてみて" → 不正、"飲ん" + "で" → 有効
+                    if h.last == "ん" && !t.hasPrefix("で") && !t.hasPrefix("だ") { continue }
                     let compound = h + t
                     if compound == prefix { continue } // 元のひらがなと同じならスキップ
                     if seen.insert(compound).inserted {
@@ -154,6 +157,20 @@ final class DatabaseManager {
         }
 
         return (Array(results.prefix(30)), historyCount)
+    }
+
+    /// 読みに完全一致する履歴候補を使用頻度順で返す。
+    func fetchHistoryExact(reading: String) -> [String] {
+        let sql = "SELECT output FROM history WHERE input = ? ORDER BY count DESC, used_at DESC LIMIT 10"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        bindText(stmt, 1, reading)
+        var results: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        }
+        return results
     }
 
     /// 指定の読みが過去にセグメントとして確定された合計回数を返す。
@@ -212,7 +229,7 @@ final class DatabaseManager {
                 let score = (!dictCandidates.isEmpty ? len : 0) + min(hist, 4)
                 guard score > 0 else { continue }
                 let candidate = dp[j] + score
-                if candidate > dp[i] {
+                if candidate >= dp[i] {
                     dp[i] = candidate
                     segLen[i] = len
                 }
