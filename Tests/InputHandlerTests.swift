@@ -71,13 +71,26 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.markedText, "あ")
     }
 
-    func testTypingTwoVowelsShowsCandidates() {
+    func testTypingTwoVowelsDoesNotAutoShowWithoutHistory() {
+        // 履歴なし・辞書のみ → タイピング中は候補を出さない
+        type(chars: "a", base: "a")
+        let (consumed, action) = type(chars: "i", base: "i")
+        XCTAssertTrue(consumed)
+        XCTAssertEqual(client.markedText, "あい")
+        guard case .dismiss = action else {
+            XCTFail("履歴なし・辞書のみではタイピング中に候補を出さないはず: \(action)"); return
+        }
+    }
+
+    func testTypingShowsCandidatesWhenHistoryExists() {
+        // 履歴あり → タイピング中も自動表示
+        handler.db.record(input: "あい", output: "愛")
         type(chars: "a", base: "a")
         let (consumed, action) = type(chars: "i", base: "i")
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.markedText, "あい")
         guard case .show(let candidates, _, _) = action else {
-            XCTFail("2文字以上で .show を返すはず: \(action)"); return
+            XCTFail("履歴ありなら自動表示するはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("あい"))
     }
@@ -165,9 +178,12 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertFalse(press(keyCode: 49).consumed)
     }
 
-    func testKatakanaAppearsAtIndexOne() {
+    func testKatakanaAppearsAtIndexOneOnSpace() {
+        // dict に登録することで segmentize が1セグメントを返し、候補ウィンドウが開く
+        handler.db.insertDict(reading: "あい", candidate: "愛", priority: 0)
         type(chars: "a", base: "a")
-        let (_, action) = type(chars: "i", base: "i")
+        type(chars: "i", base: "i")
+        let (_, action) = press(keyCode: 49)  // Space で明示的に候補表示
         guard case .show(let candidates, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
@@ -204,7 +220,8 @@ final class InputHandlerTests: XCTestCase {
     func testInitialRowSkipsFixedCandidatesWhenDictExists() {
         handler.db.insertDict(reading: "あい", candidate: "愛", priority: 0)
         type(chars: "a", base: "a")
-        let (_, action) = type(chars: "i", base: "i")
+        type(chars: "i", base: "i")
+        let (_, action) = press(keyCode: 49)  // Space で明示的に候補表示
         guard case .show(_, _, let initialRow) = action else {
             XCTFail(".show を返すはず"); return
         }

@@ -222,7 +222,7 @@ struct InputHandler {
             _ = doConfirmSelection(candidate: candidate, client: client)
         }
         let needsRefresh = state.addRomaji(base)
-        let candidateAction: CandidateAction = needsRefresh ? doRefreshCandidates() : .dismiss
+        let candidateAction: CandidateAction = needsRefresh ? doRefreshCandidates(autoShow: true) : .dismiss
         applyMarkedText(candidateText: nil, client: client)
         return (true, candidateAction)
     }
@@ -274,10 +274,14 @@ struct InputHandler {
         state = CompositionState()
     }
 
-    private mutating func doRefreshCandidates() -> CandidateAction {
+    /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
+    ///   autoShow=true のとき履歴候補がなければ表示しない（タイピング中の割り込みを抑制する）。
+    private mutating func doRefreshCandidates(autoShow: Bool = false) -> CandidateAction {
         let result = db.fetchCandidates(prefix: state.composedHiragana)
         var candidates = result.candidates
         let historyCount = result.historyCount
+
+        if autoShow && historyCount == 0 { return .dismiss }
 
         let hiragana = state.composedHiragana
         let katakana = hiraganaToKatakana(hiragana)
