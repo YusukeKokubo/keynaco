@@ -3,8 +3,8 @@ import SQLite3
 
 enum DictionaryImporter {
 
-    /// 辞書インポートのバージョン。SKK → mozc システム辞書に切り替えで 8 に上げる。
-    private static let currentVersion = 8
+    /// 辞書インポートのバージョン。Phase 2 活用形展開（て形・た形・ない形）追加で 9 に上げる。
+    private static let currentVersion = 9
 
     /// mozc-dict.sqlite をバンドルから ATTACH し、dictionary テーブルに一括転送する。
     static func importIfNeeded(db: OpaquePointer?) {
