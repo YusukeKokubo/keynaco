@@ -688,6 +688,121 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertFalse(client.inserted.isEmpty)
     }
 
+    // MARK: - 候補ウィンドウ中のバックスペース・Escape
+
+    func testBackspaceDuringCandidateDisplayDismissesWhenSingleCharRemains() {
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        // "あい" 表示中にバックスペース → "あ" (1文字) → 候補ウィンドウを閉じる
+        let result = press(keyCode: 51, candidateVisible: true)
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.markedText, "あ")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("1文字になったら .dismiss するはず: \(result.candidateAction)"); return
+        }
+    }
+
+    func testBackspaceDuringCandidateDisplayRefreshesWhenMultipleCharsRemain() {
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        type(chars: "u", base: "u")
+        // "あいう" 表示中にバックスペース → "あい" (2文字以上) → 候補リフレッシュ
+        let result = press(keyCode: 51, candidateVisible: true)
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.markedText, "あい")
+        guard case .show = result.candidateAction else {
+            XCTFail("2文字以上残るなら .show を返すはず: \(result.candidateAction)"); return
+        }
+    }
+
+    func testEscapeDuringCandidateDisplayClearsComposition() {
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        let result = press(keyCode: 53, candidateVisible: true)
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.markedText, "")
+        XCTAssertTrue(client.inserted.isEmpty)
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("候補表示中の Escape は .dismiss を返すはず"); return
+        }
+    }
+
+    // MARK: - 変換確定と履歴記録
+
+    func testHistoryRecordedAfterEnterConfirmation() {
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        press(keyCode: 36)  // Enter → 確定
+        let result = handler.db.fetchCandidates(prefix: "あい")
+        XCTAssertTrue(result.candidates.prefix(result.historyCount).contains("あい"),
+                      "Enter 確定後にひらがなが履歴として記録されるはず")
+    }
+
+    func testHistoryRecordedAfterCandidateSelectionAndEnter() {
+        handler.db.insertDict(reading: "あ", candidate: "阿", priority: 0)
+        type(chars: "a", base: "a")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 2, selectedText: "阿")
+        let result = handler.db.fetchCandidates(prefix: "あ")
+        XCTAssertTrue(result.candidates.prefix(result.historyCount).contains("阿"),
+                      "候補選択→Enter 確定後に変換結果が履歴として記録されるはず")
+    }
+
+    func testConversionHistoryBoostsNextConversion() {
+        // 1回目に選んだ候補が2回目の変換で履歴として先頭に来る
+        handler.db.insertDict(reading: "たのしい", candidate: "楽しい", priority: 0)
+        typeRomaji("tanoshii")
+        press(keyCode: 36, candidateVisible: true, selectedText: "楽しい")  // 楽しい を確定
+        typeRomaji("tanoshii")  // 2回目
+        let (_, action) = press(keyCode: 49)  // Space
+        guard case .show(let candidates, let historyEnd, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertTrue(candidates.prefix(historyEnd).contains("楽しい"),
+                      "前回確定した「楽しい」が次回変換で履歴候補として現れるはず")
+    }
+
+    // MARK: - 確定後の再入力
+
+    func testTypingAfterConfirmationStartsFreshComposition() {
+        type(chars: "a", base: "a")
+        press(keyCode: 36)  // Enter → "あ" 確定
+        XCTAssertEqual(client.inserted, ["あ"])
+        type(chars: "i", base: "i")
+        XCTAssertEqual(client.markedText, "い", "確定後は新しい組成が始まるはず")
+        XCTAssertEqual(client.inserted, ["あ"], "追加挿入はないはず")
+    }
+
+    // MARK: - 長音符（ー）
+
+    func testLongVowelMarkAppendsToComposition() {
+        type(chars: "r", base: "r")
+        type(chars: "a", base: "a")
+        type(chars: "-", base: "-")
+        XCTAssertEqual(client.markedText, "らー", "ハイフンが長音符「ー」に変換されるはず")
+    }
+
+    // MARK: - かなキー
+
+    func testKanaKeyExitsAsciiMode() {
+        press(keyCode: 102)  // 英数
+        XCTAssertTrue(handler.state.isAsciiMode)
+        press(keyCode: 104)  // かな
+        XCTAssertFalse(handler.state.isAsciiMode)
+        type(chars: "a", base: "a")
+        XCTAssertEqual(client.markedText, "あ")
+        XCTAssertTrue(client.inserted.isEmpty)
+    }
+
+    // MARK: - composedHiragana が空のときのスペース
+
+    func testSpacePassesThroughWithOnlyPendingRomaji() {
+        type(chars: "k", base: "k")
+        XCTAssertEqual(client.markedText, "k")
+        let result = press(keyCode: 49)  // Space
+        XCTAssertFalse(result.consumed, "composedHiragana が空 (pending のみ) のときスペースはスルーするはず")
+        XCTAssertEqual(client.markedText, "k", "組成は変化しないはず")
+    }
+
     // MARK: - commitComposition（deactivateServer 相当）
 
     func testCommitCompositionFinalizesHiragana() {
@@ -723,5 +838,172 @@ final class InputHandlerTests: XCTestCase {
         let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: "あ")
         handler.commitComposition(client: client, candidate: ctx)
         XCTAssertEqual(client.inserted, ["あ"])
+    }
+
+    // MARK: - 自然な日本語入力シナリオ
+
+    // っ（促音）の変換
+    func testSokuonProducesSmallTsu() {
+        typeRomaji("kka")
+        XCTAssertEqual(client.markedText, "っか")
+    }
+
+    func testSokuonMidWord() {
+        typeRomaji("zasshi")
+        XCTAssertEqual(client.markedText, "ざっし", "「ざっし」（雑誌）が正しく変換されるはず")
+    }
+
+    // ん の自動確定
+    func testNAutoFinalizedBeforeConsonant() {
+        typeRomaji("kanji")
+        XCTAssertEqual(client.markedText, "かんじ", "子音前の n が自動的に「ん」になるはず")
+    }
+
+    func testNNPendingNRemainsAfterDoubleN() {
+        // "nn" → ん確定 + trailing n は pending のまま（"kanna"→"かんな" のために必要な設計）
+        typeRomaji("nn")
+        XCTAssertEqual(client.markedText, "んn")
+    }
+
+    func testNNThenVowelFinalizesN() {
+        // "nn" の後に母音を打つと trailing pending n がひらがなになる
+        typeRomaji("nna")
+        XCTAssertEqual(client.markedText, "んな")
+    }
+
+    func testNBeforeVowelDoesNotProduceN() {
+        typeRomaji("na")
+        XCTAssertEqual(client.markedText, "な", "na は「な」であり「んa」ではないはず")
+    }
+
+    // 拗音
+    func testYouonKyo() {
+        typeRomaji("kyo")
+        XCTAssertEqual(client.markedText, "きょ")
+    }
+
+    func testYouonSha() {
+        typeRomaji("sha")
+        XCTAssertEqual(client.markedText, "しゃ")
+    }
+
+    func testYouonChi() {
+        typeRomaji("chi")
+        XCTAssertEqual(client.markedText, "ち")
+    }
+
+    func testYouonTsu() {
+        typeRomaji("tsu")
+        XCTAssertEqual(client.markedText, "つ")
+    }
+
+    // ↓ で候補を選択して Enter で確定
+    func testSelectCandidateWithDownArrowThenEnter() {
+        handler.db.insertDict(reading: "あい", candidate: "愛", priority: 0)
+        typeRomaji("ai")
+        press(keyCode: 49)  // Space → 候補表示
+
+        // ↓ で明示選択して Enter → 「愛」が確定される
+        let result = press(keyCode: 36, candidateVisible: true, selectedText: "愛", isExplicitlySelected: true)
+        XCTAssertEqual(client.inserted, ["愛"])
+        guard case .dismiss = result.candidateAction else {
+            XCTFail(".dismiss を返すはず"); return
+        }
+    }
+
+    // カタカナを候補から選択して確定
+    func testSelectKatakanaCandidate() {
+        typeRomaji("ai")
+        // 「アイ」を明示選択して Enter
+        press(keyCode: 36, candidateVisible: true, selectedText: "アイ", isExplicitlySelected: true)
+        XCTAssertEqual(client.inserted, ["アイ"], "カタカナ候補を確定できるはず")
+    }
+
+    // 変換候補なし（辞書未登録）でもひらがな・カタカナが候補に出る
+    func testSpaceWithUnknownReadingShowsHiraganaAndKatakana() {
+        // 1文字なら必ず単一セグメント → 候補は入力ひらがな全体で表示される
+        type(chars: "u", base: "u")
+        let (consumed, action) = press(keyCode: 49)  // Space
+        XCTAssertTrue(consumed)
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertTrue(candidates.contains("う"), "ひらがなが候補に含まれるはず: \(candidates)")
+        XCTAssertTrue(candidates.contains("ウ"), "カタカナが候補に含まれるはず: \(candidates)")
+    }
+
+    // 確定後すぐ続けて別の単語を入力
+    func testContinuousInputAfterConfirmation() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        typeRomaji("watashi")
+        press(keyCode: 36, candidateVisible: true, selectedText: "私", isExplicitlySelected: true)
+        XCTAssertEqual(client.inserted, ["私"])
+
+        // 続けて入力
+        typeRomaji("ha")
+        XCTAssertEqual(client.markedText, "は")
+        XCTAssertEqual(client.inserted, ["私"], "新しい組成が始まり、追加挿入はないはず")
+    }
+
+    // 組成中の Backspace で hiragana を一文字ずつ削除
+    func testBackspaceOneByOneFromComposition() {
+        typeRomaji("uta")
+        XCTAssertEqual(client.markedText, "うた")
+        press(keyCode: 51)
+        XCTAssertEqual(client.markedText, "う")
+        press(keyCode: 51)
+        XCTAssertEqual(client.markedText, "")
+    }
+
+    // 動詞活用形の変換（送り仮名付き）
+    func testVerbOkuriganaConversion() {
+        handler.db.insertDict(reading: "かき", candidate: "書き", priority: 0)
+        typeRomaji("kaki")
+        XCTAssertEqual(client.markedText, "かき")
+        let (_, action) = press(keyCode: 49)  // Space
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertTrue(candidates.contains("書き"), "「書き」が候補に含まれるはず: \(candidates)")
+    }
+
+    // 複数候補の中から2番目以降の候補を選択して確定
+    func testSelectSecondCandidateFromMultiple() {
+        handler.db.insertDict(reading: "かいぎ", candidate: "会議", priority: 0)
+        handler.db.insertDict(reading: "かいぎ", candidate: "懐疑", priority: 1)
+        typeRomaji("kaigi")
+        press(keyCode: 49)  // Space → 候補表示
+
+        // 「懐疑」を明示的に選んで確定
+        press(keyCode: 36, candidateVisible: true, selectedText: "懐疑", isExplicitlySelected: true)
+        XCTAssertEqual(client.inserted, ["懐疑"])
+    }
+
+    // セグメントモードで特定セグメントの候補を変更して確定
+    func testSegmentModeCandidateChangePerSegment() {
+        handler.db.insertDict(reading: "とうきょう", candidate: "東京", priority: 0)
+        handler.db.insertDict(reading: "えき", candidate: "駅", priority: 0)
+        typeRomaji("toukyoueki")
+        press(keyCode: 49)  // Space → セグメントモード
+        guard handler.state.isSegmentMode else {
+            XCTFail("セグメントモードに入るはず"); return
+        }
+
+        // 2つ目のセグメント（えき）にフォーカスを移動
+        press(keyCode: 124)  // Right
+        // 「駅」を明示選択して Enter
+        press(keyCode: 36, candidateVisible: true, selectedText: "駅", isExplicitlySelected: true)
+        XCTAssertFalse(handler.state.isSegmentMode)
+        XCTAssertEqual(client.inserted.last, "東京駅")
+    }
+
+    // 一文を通しで入力して変換
+    func testFullSentenceConversion() {
+        handler.db.insertDict(reading: "わたし", candidate: "私", priority: 0)
+        handler.db.insertDict(reading: "がくせい", candidate: "学生", priority: 0)
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → セグメントモード
+        press(keyCode: 36)  // Enter → 全確定
+        XCTAssertEqual(client.inserted.last, "私は学生")
     }
 }
