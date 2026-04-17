@@ -13,7 +13,7 @@ targets:
     platform: macOS
     sources:
       - path: Sources
-      - path: Resources/SKK-JISYO-L.utf8
+      - path: Resources/mozc-dict.sqlite
         buildPhase: resources
     settings:
       base:
