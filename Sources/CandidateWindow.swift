@@ -71,7 +71,7 @@ final class CandidateWindow: NSPanel {
     /// スクロール範囲外の固定行数（削除ボタンを非表示にする行数）
     private var fixedRowCount: Int = 0
     /// 履歴セクションの末尾インデックス（この行の後にセパレータを描画）
-    private var historySectionEnd: Int = 0
+    private(set) var historySectionEnd: Int = 0
 
     var onSelect: ((String) -> Void)?
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
@@ -227,7 +227,7 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
 
         rowView.label.stringValue = candidates[row]
         rowView.deleteButton.tag = row
-        rowView.deleteButton.isHidden = (row < fixedRowCount)
+        rowView.deleteButton.isHidden = row < fixedRowCount || row >= historySectionEnd
         rowView.isHistory = historySectionEnd > 0 && row < historySectionEnd
         let showDivider = row == historySectionEnd - 1 && historySectionEnd < candidates.count
         rowView.sectionDivider.isHidden = !showDivider

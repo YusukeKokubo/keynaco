@@ -7,6 +7,7 @@ enum CandidateAction {
     case dismiss
     case selectNext
     case selectPrev
+    case deleteSelected
 }
 
 /// 候補ウィンドウの現在状態スナップショット（読み取り専用）
@@ -16,6 +17,8 @@ struct CandidateContext {
     var selectedText: String?
     /// ユーザーが ↑↓ で明示的に候補を動かしたか（初期表示のまま = false）
     var isExplicitlySelected: Bool = false
+    /// 履歴セクションの末尾インデックス（これ未満の行が履歴）
+    var historyEnd: Int = 0
 
     static let hidden = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
 }
@@ -116,6 +119,11 @@ struct InputHandler {
                 return (true, action)
             case KeyCode.escape:  // Escape
                 return doEscape(client: client)
+            case KeyCode.backspace where modifiers.contains(.shift):  // Shift+Delete: 履歴から削除
+                if candidate.selectedRow < candidate.historyEnd {
+                    return (true, .deleteSelected)
+                }
+                return (true, .none)
             default:
                 if isBackspace { return doBackspace(client: client) }
             }

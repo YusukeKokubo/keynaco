@@ -89,7 +89,8 @@ class InputController: IMKInputController {
             isVisible: candidateWindow.isVisible,
             selectedRow: candidateWindow.selectedRow,
             selectedText: candidateWindow.selectedText(),
-            isExplicitlySelected: candidateWindow.isExplicitlySelected
+            isExplicitlySelected: candidateWindow.isExplicitlySelected,
+            historyEnd: candidateWindow.historySectionEnd
         )
         let adapter = IMKTextInputAdapter(sender)
 
@@ -115,6 +116,12 @@ class InputController: IMKInputController {
         case .selectPrev:
             candidateWindow.selectPrev()
             updateMarkedText(client: adapter)
+        case .deleteSelected:
+            let row = candidateWindow.selectedRow
+            if let text = candidateWindow.selectedText() {
+                handler.db.deleteHistory(output: text)
+                candidateWindow.removeCandidate(at: row)
+            }
         }
 
         return consumed
@@ -128,7 +135,8 @@ class InputController: IMKInputController {
             isVisible: candidateWindow.isVisible,
             selectedRow: candidateWindow.selectedRow,
             selectedText: candidateWindow.selectedText(),
-            isExplicitlySelected: candidateWindow.isExplicitlySelected
+            isExplicitlySelected: candidateWindow.isExplicitlySelected,
+            historyEnd: candidateWindow.historySectionEnd
         )
         handler.commitComposition(client: adapter, candidate: ctx)
         candidateWindow.dismiss()
