@@ -29,14 +29,28 @@ xcodebuild build -scheme ykey -configuration Debug
 - 初回セットアップ: `sudo chmod -R +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_child,delete,read,write,execute" "/Library/Input Methods"` が必要（所有者を root のまま ACL で自分にだけ権限を付与）
 - `~/Library/Input Methods/` は使わない（入力ソースが重複登録される）
 - 初回インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
-- `install.sh` は古いスクリプト（`~/Library/` を使っており非推奨）。Build Post-action が自動でインストールするため不要
 - `/deploy` スキル（Claude Code 内）: ビルドからインストールまでを一括実行する
 
 ## テスト実行
 
 ```bash
+xcodegen generate  # .xcodeproj がない場合のみ
 xcodebuild test -scheme ykey -destination "platform=macOS"
 ```
+
+## コンポーネント構成
+
+- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` もここで管理
+- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須
+- `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
+- `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包
+  - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
+- `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
+- `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/ykey/` に保存）
+- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）
+- `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（履歴セクションの末尾インデックス）が重要
+
+変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 
 ## テスト方針
 
@@ -47,19 +61,6 @@ IME はバックグラウンドエージェントとして動作するため、`
 ### InputHandler + TextInputClient モック（採用）
 
 `InputController` のロジックを `InputHandler`（純粋 Swift struct）に抽出し、テキスト操作の出力先を `TextInputClient` プロトコルで抽象化する。テストでは `MockTextClient` を渡して `insertText` / `setMarkedText` の呼び出しを検証する。
-
-- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）
-- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須
-- `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
-- `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包
-  - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
-- `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
-- `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/ykey/` に保存）
-- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）
-- `CandidateWindow` は `InputController` 側で管理し `InputHandler` には渡さない
-- `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（履歴セクションの末尾インデックス）が重要
-
-変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 
 ### Shift キー入力の挙動
 
@@ -96,4 +97,4 @@ InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInp
 
 ### flagsChanged で Caps Lock を検知する
 
-ASCII モードの Caps Lock トグルは `handle(event:client:)` で `.flagsChanged` イベントを受け取る。`NSEvent.ModifierFlags.capsLock` で ON/OFF を判定。`inputText` では flagsChanged を受け取れない。
+Caps Lock トグルは未実装。実装時は `handle(event:client:)` で `.flagsChanged` イベントを受け取り、`NSEvent.ModifierFlags.capsLock` で ON/OFF を判定する。`inputText` では flagsChanged を受け取れない。
