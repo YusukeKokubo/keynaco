@@ -35,6 +35,7 @@ private final class IMKTextInputAdapter: TextInputClient {
 // MARK: - InputController
 
 @objc(InputController)
+@MainActor
 class InputController: IMKInputController {
 
     private lazy var handler: InputHandler = InputHandler()

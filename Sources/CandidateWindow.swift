@@ -60,6 +60,7 @@ private class CandidateRowView: NSView {
 
 // MARK: - 候補ウィンドウ
 
+@MainActor
 final class CandidateWindow: NSPanel {
 
     private let tableView = NSTableView()

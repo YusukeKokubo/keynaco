@@ -1,8 +1,9 @@
 import Cocoa
 import InputMethodKit
 
-var gServer: IMKServer?
+nonisolated(unsafe) var gServer: IMKServer?
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard

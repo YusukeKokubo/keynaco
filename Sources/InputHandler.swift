@@ -43,9 +43,11 @@ struct InputHandler {
     var state = CompositionState()
     var ignoreNextModeSwitch = false
     let db: DatabaseManager
+    let azooKeyConverter: AzooKeyConverter
 
     init(db: DatabaseManager = .shared) {
         self.db = db
+        self.azooKeyConverter = AzooKeyConverter()
     }
 
     // MARK: - 公開インターフェース
@@ -132,7 +134,7 @@ struct InputHandler {
             case KeyCode.enter:   // Return
                 guard !state.composingText.isEmpty else { return (false, .none) }
                 commitComposition(client: client)
-                return (true, .none)
+                return (true, .dismiss)
             case KeyCode.escape:  // Escape
                 return doEscape(client: client)
             default:
@@ -237,6 +239,7 @@ struct InputHandler {
             for (i, seg) in ss.segments.enumerated() {
                 let text = (i == ss.focusedIndex) ? selectedText : seg.selectedText
                 db.record(input: seg.reading, output: text)
+                azooKeyConverter.commit(reading: seg.reading, text: text)
                 confirmed += text
             }
             doCommit(text: confirmed, client: client)
@@ -246,6 +249,7 @@ struct InputHandler {
         let inputKey = state.finalizedText
         if candidate.isVisible, let selected = candidate.selectedText {
             db.record(input: inputKey, output: selected)
+            azooKeyConverter.commit(reading: inputKey, text: selected)
             doCommit(text: selected, client: client)
         } else {
             db.record(input: inputKey, output: inputKey)
@@ -262,6 +266,7 @@ struct InputHandler {
         // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する
         if let selected = candidate.selectedText {
             db.record(input: inputKey, output: selected)
+            azooKeyConverter.commit(reading: inputKey, text: selected)
             doCommit(text: selected, client: client)
         } else {
             commitComposition(client: client)
@@ -277,9 +282,10 @@ struct InputHandler {
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴候補がなければ表示しない（タイピング中の割り込みを抑制する）。
     private mutating func doRefreshCandidates(autoShow: Bool = false) -> CandidateAction {
-        let result = db.fetchCandidates(prefix: state.composedHiragana)
-        var candidates = result.candidates
-        let historyCount = result.historyCount
+        let azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: state.composedHiragana)
+        let historyCandidates = db.fetchHistoryExact(reading: state.composedHiragana)
+        let historyCount = historyCandidates.count
+        var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
 
         if autoShow && historyCount == 0 { return .dismiss }
 
@@ -352,7 +358,7 @@ struct InputHandler {
             state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
             state.pendingRomaji = ""
         }
-        let rawSegments = db.segmentize(state.composedHiragana)
+        let rawSegments = azooKeyConverter.segmentize(state.composedHiragana)
 
         // 1セグメントのみなら従来の候補ウィンドウにフォールバック
         guard rawSegments.count >= 2 else {
@@ -474,14 +480,14 @@ struct InputHandler {
             let newNextReading = String(nextReading.dropFirst())
             ss.segments[i] = buildSegmentCandidates(
                 reading: newFocusedReading,
-                dictCandidates: db.fetchDict(reading: newFocusedReading)
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
             )
             if newNextReading.isEmpty {
                 ss.segments.remove(at: i + 1)
             } else {
                 ss.segments[i + 1] = buildSegmentCandidates(
                     reading: newNextReading,
-                    dictCandidates: db.fetchDict(reading: newNextReading)
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading:newNextReading)
                 )
             }
         } else {
@@ -491,19 +497,19 @@ struct InputHandler {
             let removedChar = String(focusedReading.last!)
             ss.segments[i] = buildSegmentCandidates(
                 reading: newFocusedReading,
-                dictCandidates: db.fetchDict(reading: newFocusedReading)
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
             )
             if i + 1 < ss.segments.count {
                 let newNextReading = removedChar + ss.segments[i + 1].reading
                 ss.segments[i + 1] = buildSegmentCandidates(
                     reading: newNextReading,
-                    dictCandidates: db.fetchDict(reading: newNextReading)
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading:newNextReading)
                 )
             } else {
                 ss.segments.insert(
                     buildSegmentCandidates(
                         reading: removedChar,
-                        dictCandidates: db.fetchDict(reading: removedChar)
+                        dictCandidates: azooKeyConverter.candidatesForSegment(reading:removedChar)
                     ),
                     at: i + 1
                 )
@@ -528,6 +534,7 @@ struct InputHandler {
         var confirmed = ""
         for seg in ss.segments {
             db.record(input: seg.reading, output: seg.selectedText)
+            azooKeyConverter.commit(reading: seg.reading, text: seg.selectedText)
             confirmed += seg.selectedText
         }
         doCommit(text: confirmed, client: client)
