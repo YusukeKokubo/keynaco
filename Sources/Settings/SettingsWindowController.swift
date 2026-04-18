@@ -32,8 +32,8 @@ final class SettingsWindowController: NSWindowController {
     func showSettings() {
         if window?.isVisible == false { window?.center() }
         window?.level = .floating
-        window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
     }
 }
 
