@@ -8,7 +8,8 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 |------|------|
 | `Sources/` | アプリ本体（Swift ソース + Info.plist + entitlements） |
 | `Tests/` | ユニットテスト（XCTest） |
-| `Resources/` | SKK-JISYO-L.utf8（辞書ファイル） |
+| `Resources/` | SKK-JISYO-L.utf8 等（辞書ファイル） |
+| `Packages/AzooKeyKanaKanjiConverter` | ローカル Swift Package（変換エンジン） |
 | `plans/` | 設計・調査メモ |
 | `project.yml` | XcodeGen 設定 |
 
@@ -49,15 +50,16 @@ IME はバックグラウンドエージェントとして動作するため、`
 `InputController` のロジックを `InputHandler`（純粋 Swift struct）に抽出し、テキスト操作の出力先を `TextInputClient` プロトコルで抽象化する。テストでは `MockTextClient` を渡して `insertText` / `setMarkedText` の呼び出しを検証する。
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）
-- `InputHandler` = 入力ロジック本体（テスト可能）
+- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
-- `DictionaryImporter` = SKK-JISYO-L.utf8 形式の辞書を SQLite へインポート
-- `DatabaseManager` は `InputHandler` のイニシャライザで DI する（テストは `inMemory: true`）
+- `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/ykey/` に保存）
+- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）
 - `CandidateWindow` は `InputController` 側で管理し `InputHandler` には渡さない
+- `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット
 
-辞書フォーマットは SKK（Simple Kana to Kanji）形式。バンドルリソース `SKK-JISYO-L.utf8` を初回起動時に SQLite へインポートする。
+変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 
 ## macOS 26 IME の罠
 
