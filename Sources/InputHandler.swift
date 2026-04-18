@@ -174,7 +174,7 @@ struct InputHandler {
         // 組成中なら組成バッファに追加して変換モードへ（候補ウィンドウを開く）
         // 組成なしなら直接挿入
         let punctuationMap: [String: String] = [",": "、", ".": "。"]
-        if let mappedPunct = punctuationMap[base] {
+        if let mappedPunct = punctuationMap[base], !modifiers.contains(.shift) {
             if state.composingText.isEmpty {
                 client.insertText(mappedPunct)
                 return (true, .dismiss)

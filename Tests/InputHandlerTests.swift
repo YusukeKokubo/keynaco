@@ -7,7 +7,7 @@ final class MockTextClient: TextInputClient {
     private(set) var inserted: [String] = []
     private(set) var markedText: String = ""
 
-    func insertText(_ text: String) { inserted.append(text) }
+    func insertText(_ text: String) { inserted.append(text); markedText = "" }
     func setMarkedText(_ text: String, selectionRange: NSRange) { markedText = text }
     func cursorRect() -> NSRect { .zero }
 }
@@ -462,6 +462,52 @@ final class InputHandlerTests: XCTestCase {
                            modifiers: [], candidate: ctx, client: client)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "あ、")
+    }
+
+    // MARK: - Shift+句読点キー → 角括弧入力
+
+    func testShiftCommaInputsLessThan() {
+        // Shift+, → "<" が組成バッファへ（"、"にならない）
+        type(chars: "<", base: ",", modifiers: .shift)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "<")
+    }
+
+    func testShiftPeriodInputsGreaterThan() {
+        // Shift+. → ">" が組成バッファへ（"。"にならない）
+        type(chars: ">", base: ".", modifiers: .shift)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, ">")
+    }
+
+    func testAngleBracketsCanBeConfirmedWithEnter() {
+        // "<>" と入力して Enter で確定できる
+        type(chars: "<", base: ",", modifiers: .shift)
+        type(chars: ">", base: ".", modifiers: .shift)
+        XCTAssertEqual(client.markedText, "<>")
+        press(keyCode: 36)  // Enter
+        XCTAssertEqual(client.inserted, ["<>"])
+        XCTAssertEqual(client.markedText, "")
+    }
+
+    func testShiftCommaAppendsToJapaneseComposition() {
+        // 日本語組成中に Shift+, → "<" が末尾に追加される
+        type(chars: "a", base: "a")
+        type(chars: "<", base: ",", modifiers: .shift)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ<")
+    }
+
+    func testCommaStillMapsToJapaneseCommaWithoutShift() {
+        // Shift なし "," → "、" は従来通り
+        type(chars: ",", base: ",")
+        XCTAssertEqual(client.inserted, ["、"])
+    }
+
+    func testPeriodStillMapsToJapanesePeriodWithoutShift() {
+        // Shift なし "." → "。" は従来通り
+        type(chars: ".", base: ".")
+        XCTAssertEqual(client.inserted, ["。"])
     }
 
     // MARK: - セグメントモード
