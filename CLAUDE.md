@@ -8,7 +8,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 |------|------|
 | `Sources/` | アプリ本体（Swift ソース + Info.plist + entitlements） |
 | `Tests/` | ユニットテスト（XCTest） |
-| `Resources/` | SKK-JISYO-L.utf8 等（辞書ファイル） |
 | `Packages/AzooKeyKanaKanjiConverter` | ローカル Swift Package（変換エンジン） |
 | `plans/` | 設計・調査メモ |
 | `project.yml` | XcodeGen 設定 |
@@ -50,7 +49,7 @@ IME はバックグラウンドエージェントとして動作するため、`
 `InputController` のロジックを `InputHandler`（純粋 Swift struct）に抽出し、テキスト操作の出力先を `TextInputClient` プロトコルで抽象化する。テストでは `MockTextClient` を渡して `insertText` / `setMarkedText` の呼び出しを検証する。
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）
-- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency
+- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
@@ -86,3 +85,7 @@ InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInp
 ### Development 署名で spctl -a は "rejected" になる
 
 正常動作する。Gatekeeper の仕様であり問題ない。
+
+### flagsChanged で Caps Lock を検知する
+
+ASCII モードの Caps Lock トグルは `handle(event:client:)` で `.flagsChanged` イベントを受け取る。`NSEvent.ModifierFlags.capsLock` で ON/OFF を判定。`inputText` では flagsChanged を受け取れない。
