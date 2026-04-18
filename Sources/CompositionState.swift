@@ -6,7 +6,6 @@ struct CompositionState {
 
     var composedHiragana = ""
     var pendingRomaji = ""
-    var isAsciiMode = false
 
     /// マークドテキストに表示する未確定文字列
     var composingText: String {

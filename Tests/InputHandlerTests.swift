@@ -21,6 +21,7 @@ final class InputHandlerTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        InputHandler.isAsciiMode = false
         handler = InputHandler(db: DatabaseManager(inMemory: true))
         client = MockTextClient()
     }
@@ -695,9 +696,9 @@ final class InputHandlerTests: XCTestCase {
 
     func testKanaKeyExitsAsciiMode() {
         press(keyCode: 102)
-        XCTAssertTrue(handler.state.isAsciiMode)
+        XCTAssertTrue(InputHandler.isAsciiMode)
         press(keyCode: 104)
-        XCTAssertFalse(handler.state.isAsciiMode)
+        XCTAssertFalse(InputHandler.isAsciiMode)
         type(chars: "a", base: "a")
         XCTAssertEqual(client.markedText, "あ")
         XCTAssertTrue(client.inserted.isEmpty)

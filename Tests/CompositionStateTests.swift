@@ -144,21 +144,6 @@ final class CompositionStateTests: XCTestCase {
         XCTAssertEqual(s.finalizedText, "あ")
     }
 
-    // MARK: - ASCII モード
-
-    func testAsciiModeDefaultsToFalse() {
-        let s = CompositionState()
-        XCTAssertFalse(s.isAsciiMode)
-    }
-
-    func testAsciiModeToggle() {
-        var s = CompositionState()
-        s.isAsciiMode = true
-        XCTAssertTrue(s.isAsciiMode)
-        s.isAsciiMode = false
-        XCTAssertFalse(s.isAsciiMode)
-    }
-
     // MARK: - isShiftInput
 
     func testIsShiftInput() {

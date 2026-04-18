@@ -61,7 +61,8 @@ class InputController: IMKInputController {
     // MARK: - ライフサイクル
 
     override func recognizedEvents(_ sender: Any!) -> Int {
-        return Int(NSEvent.EventTypeMask.keyDown.rawValue)
+        let mask: NSEvent.EventTypeMask = [.keyDown, .flagsChanged]
+        return Int(mask.rawValue)
     }
 
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
@@ -84,7 +85,15 @@ class InputController: IMKInputController {
     // MARK: - イベントハンドリング
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
-        guard let event = event, event.type == .keyDown else { return false }
+        guard let event = event else { return false }
+
+        // Caps Lock でモード切替（LED ON = 英字モード、LED OFF = 日本語モード）
+        if event.type == .flagsChanged && event.keyCode == 57 {
+            InputHandler.isAsciiMode = event.modifierFlags.contains(.capsLock)
+            return false
+        }
+
+        guard event.type == .keyDown else { return false }
 
         let ctx = CandidateContext(
             isVisible: candidateWindow.isVisible,

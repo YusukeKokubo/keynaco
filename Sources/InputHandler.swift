@@ -40,6 +40,9 @@ private enum KeyCode {
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
 struct InputHandler {
 
+    // 全InputControllerインスタンスで共有するモード（アプリ切替後も保持）
+    nonisolated(unsafe) static var isAsciiMode = false
+
     var state = CompositionState()
     var ignoreNextModeSwitch = false
     let db: DatabaseManager
@@ -76,17 +79,17 @@ struct InputHandler {
             }
             if keyCode == KeyCode.eisu {
                 if !state.composingText.isEmpty { commitComposition(client: client) }
-                state.isAsciiMode = true
+                InputHandler.isAsciiMode = true
             } else {
-                state.isAsciiMode = false
+                InputHandler.isAsciiMode = false
             }
             return (true, .none)
         }
         ignoreNextModeSwitch = false
 
         // 英字モード
-        if state.isAsciiMode {
-            if keyCode == KeyCode.escape { state.isAsciiMode = false; return (true, .none) }
+        if InputHandler.isAsciiMode {
+            if keyCode == KeyCode.escape { InputHandler.isAsciiMode = false; return (true, .none) }
             guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
             guard let chars = characters, !chars.isEmpty,
                   chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return (false, .none) }
