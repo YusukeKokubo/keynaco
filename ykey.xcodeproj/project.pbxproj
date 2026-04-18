@@ -10,12 +10,14 @@
 		005B0D11332B5BF640607A7C /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 146884B9C7BA0172914C5E6E /* InputMethodKit.framework */; };
 		196081B0B5DCC39D88F4BE30 /* DatabaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C57988E8FB3F69734B1EEA1 /* DatabaseManagerTests.swift */; };
 		2F148C26A0B22290137E72D8 /* InputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328D239CA1D063F92D1915F6 /* InputHandler.swift */; };
+		3135DA02FC3130EB5BE35B14 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B85D24F01D8973BBD26DE196 /* HistoryViewController.swift */; };
 		324C8B9DB1CFE33E2040EB10 /* TextInputClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7661A2CF01DC1EE6C3AF575 /* TextInputClient.swift */; };
 		3CA51F27C5DD22E87B153667 /* KanaKanjiConverterModuleWithDefaultDictionary in Frameworks */ = {isa = PBXBuildFile; productRef = A92519EC57734972081E890B /* KanaKanjiConverterModuleWithDefaultDictionary */; };
 		42D219A0DAFAEF4692836AF2 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E5DAA6B763B4C6760BC189 /* DatabaseManager.swift */; };
 		4D96EB15856B9581B69B3DF7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C67883B3619FFDADD18F97 /* AppDelegate.swift */; };
 		521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD356B30238B7065EE499D4B /* NSManualApplication.swift */; };
 		57C98264BB86D2D2A6555750 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */; };
+		5CF5FA063785779F56F1529E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36ABC8B83B39FCD794071993 /* SettingsWindowController.swift */; };
 		73DE04D3E224CA0037B41437 /* RomajiConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A7749939F71C6542311C39 /* RomajiConverter.swift */; };
 		75BFBACA840D87C6EB3092E4 /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC6E38DE35902C20727DDF6 /* CandidateWindow.swift */; };
 		79D0FE39D01F1A0E38AEC8E0 /* AzooKeyConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E3218B2946D43929E05102 /* AzooKeyConverter.swift */; };
@@ -25,6 +27,7 @@
 		9C1B64679BBF35521E3A4777 /* InputHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E956924C13064D14A8FF75E /* InputHandlerTests.swift */; };
 		C8F4B74863C0D1F6F7DBD368 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317B125398998017C88935B9 /* main.swift */; };
 		CDC94B18A747BE34221672AC /* CompositionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 837622E610F5DED991BBE943 /* CompositionStateTests.swift */; };
+		D54E7F8C78D6DFA5545647BF /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9856AD4EA038F6D329A19A76 /* BigramViewController.swift */; };
 		ECFF3691D3A3C5338DF20DCD /* ShiftInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5017043AE827963C527518 /* ShiftInputTests.swift */; };
 		F644758D787C87F90925A6E0 /* CompositionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0BA4825560B612FE9689EFB /* CompositionState.swift */; };
 /* End PBXBuildFile section */
@@ -49,6 +52,7 @@
 		30E5DAA6B763B4C6760BC189 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
 		317B125398998017C88935B9 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		328D239CA1D063F92D1915F6 /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
+		36ABC8B83B39FCD794071993 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		43952090540CC3D2FB105144 /* AzooKeyKanaKanjiConverter */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AzooKeyKanaKanjiConverter; path = Packages/AzooKeyKanaKanjiConverter; sourceTree = SOURCE_ROOT; };
 		5EA54F78185FD3614FB00DBF /* RomajiConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverterTests.swift; sourceTree = "<group>"; };
 		7C57988E8FB3F69734B1EEA1 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
@@ -56,7 +60,9 @@
 		837622E610F5DED991BBE943 /* CompositionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionStateTests.swift; sourceTree = "<group>"; };
 		8E35CE6CB27B9F78A9E80F12 /* ykey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ykey.entitlements; sourceTree = "<group>"; };
 		979A7EC201CD395D75A33AE3 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		9856AD4EA038F6D329A19A76 /* BigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigramViewController.swift; sourceTree = "<group>"; };
 		ACCF95EC01DC6342706E03CE /* ykeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ykeyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B85D24F01D8973BBD26DE196 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
 		B989A9A94B827722E59AF1FC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BD356B30238B7065EE499D4B /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
 		C7661A2CF01DC1EE6C3AF575 /* TextInputClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInputClient.swift; sourceTree = "<group>"; };
@@ -89,6 +95,16 @@
 				AE74355E8C13AF11CCBC2978 /* Frameworks */,
 				DC646D0D6B4B93A0147713EA /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		905A15F213412D791F34937C /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				9856AD4EA038F6D329A19A76 /* BigramViewController.swift */,
+				B85D24F01D8973BBD26DE196 /* HistoryViewController.swift */,
+				36ABC8B83B39FCD794071993 /* SettingsWindowController.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		AE74355E8C13AF11CCBC2978 /* Frameworks */ = {
@@ -137,6 +153,7 @@
 				C7661A2CF01DC1EE6C3AF575 /* TextInputClient.swift */,
 				8E35CE6CB27B9F78A9E80F12 /* ykey.entitlements */,
 				DF18E77A3EA317E78E0578C4 /* InfoPlist.strings */,
+				905A15F213412D791F34937C /* Settings */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -259,13 +276,16 @@
 			files = (
 				4D96EB15856B9581B69B3DF7 /* AppDelegate.swift in Sources */,
 				79D0FE39D01F1A0E38AEC8E0 /* AzooKeyConverter.swift in Sources */,
+				D54E7F8C78D6DFA5545647BF /* BigramViewController.swift in Sources */,
 				75BFBACA840D87C6EB3092E4 /* CandidateWindow.swift in Sources */,
 				F644758D787C87F90925A6E0 /* CompositionState.swift in Sources */,
 				42D219A0DAFAEF4692836AF2 /* DatabaseManager.swift in Sources */,
+				3135DA02FC3130EB5BE35B14 /* HistoryViewController.swift in Sources */,
 				9548A76A04B7F35DC06F94BC /* InputController.swift in Sources */,
 				2F148C26A0B22290137E72D8 /* InputHandler.swift in Sources */,
 				521884438AB8678C05EE87EA /* NSManualApplication.swift in Sources */,
 				73DE04D3E224CA0037B41437 /* RomajiConverter.swift in Sources */,
+				5CF5FA063785779F56F1529E /* SettingsWindowController.swift in Sources */,
 				324C8B9DB1CFE33E2040EB10 /* TextInputClient.swift in Sources */,
 				C8F4B74863C0D1F6F7DBD368 /* main.swift in Sources */,
 			);

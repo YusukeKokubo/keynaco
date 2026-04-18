@@ -65,6 +65,20 @@ class InputController: IMKInputController {
         return Int(mask.rawValue)
     }
 
+    override func menu() -> NSMenu! {
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "設定...", action: #selector(openSettings), keyEquivalent: ","))
+        return menu
+    }
+
+    @objc private func openSettings() {
+        SettingsWindowController.shared.showSettings()
+    }
+
+    override func showPreferences(_ sender: Any!) {
+        SettingsWindowController.shared.showSettings()
+    }
+
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
         // ykey は内部で英字/日本語モードを管理する。
         // super を呼ぶと IMK が未対応モードへの切替を試みてイベントルーティングが壊れる。

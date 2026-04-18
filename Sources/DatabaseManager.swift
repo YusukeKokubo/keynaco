@@ -99,6 +99,74 @@ final class DatabaseManager: @unchecked Sendable {
         return results
     }
 
+    // MARK: - 設定画面用
+
+    struct BigramEntry {
+        let prev: String
+        let input: String
+        let output: String
+        let count: Int
+    }
+
+    struct HistoryEntry {
+        let input: String
+        let output: String
+        let count: Int
+    }
+
+    func fetchAllBigram() -> [BigramEntry] {
+        let sql = "SELECT prev, input, output, count FROM bigram ORDER BY count DESC, used_at DESC LIMIT 1000"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        var results: [BigramEntry] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let p = sqlite3_column_text(stmt, 0),
+                  let i = sqlite3_column_text(stmt, 1),
+                  let o = sqlite3_column_text(stmt, 2) else { continue }
+            results.append(BigramEntry(
+                prev: String(cString: p), input: String(cString: i),
+                output: String(cString: o), count: Int(sqlite3_column_int(stmt, 3))
+            ))
+        }
+        return results
+    }
+
+    func deleteBigram(prev: String, input: String, output: String) {
+        let sql = "DELETE FROM bigram WHERE prev = ? AND input = ? AND output = ?"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, prev); bindText(stmt, 2, input); bindText(stmt, 3, output)
+        sqlite3_step(stmt)
+    }
+
+    func fetchAllHistory() -> [HistoryEntry] {
+        let sql = "SELECT input, output, count FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        var results: [HistoryEntry] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let i = sqlite3_column_text(stmt, 0),
+                  let o = sqlite3_column_text(stmt, 1) else { continue }
+            results.append(HistoryEntry(
+                input: String(cString: i), output: String(cString: o),
+                count: Int(sqlite3_column_int(stmt, 2))
+            ))
+        }
+        return results
+    }
+
+    func deleteHistoryEntry(input: String, output: String) {
+        let sql = "DELETE FROM history WHERE input = ? AND output = ?"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, input); bindText(stmt, 2, output)
+        sqlite3_step(stmt)
+    }
+
     // MARK: - Bi-gram
 
     func recordBigram(prev: String, input: String, output: String) {
