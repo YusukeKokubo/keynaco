@@ -35,6 +35,11 @@ private enum KeyCode {
     static let upArrow:   UInt16 = 126
     static let leftArrow: UInt16 = 123
     static let rightArrow: UInt16 = 124
+    static let f6:  UInt16 = 97
+    static let f7:  UInt16 = 98
+    static let f8:  UInt16 = 100
+    static let f9:  UInt16 = 101
+    static let f10: UInt16 = 109
 }
 
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
@@ -65,6 +70,13 @@ struct InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
 
         let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
+
+        // F6–F10 変換キー（組成中のみ動作）
+        if !InputHandler.isAsciiMode,
+           [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) {
+            let consumed = handleFunctionKey(keyCode: keyCode, client: client)
+            return (consumed, consumed ? .dismiss : .none)
+        }
 
         // セグメントモード中は最優先でハンドリング
         if state.isSegmentMode {
@@ -280,7 +292,7 @@ struct InputHandler {
     }
 
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
-    ///   autoShow=true のとき履歴候補がなければ表示しない（タイピング中の割り込みを抑制する）。
+    ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     private mutating func doRefreshCandidates(autoShow: Bool = false) -> CandidateAction {
         let azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: state.composedHiragana)
         let exactCandidates = db.fetchHistoryExact(reading: state.composedHiragana)
@@ -289,7 +301,7 @@ struct InputHandler {
         let historyCount = historyCandidates.count
         var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
 
-        if autoShow && historyCount == 0 { return .dismiss }
+        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty { return .dismiss }
 
         let hiragana = state.composedHiragana
         let katakana = hiraganaToKatakana(hiragana)
@@ -328,6 +340,67 @@ struct InputHandler {
             }
             return Character(scalar)
         })
+    }
+
+    private func hiraganaToHankakuKatakana(_ text: String) -> String {
+        let map: [Character: String] = [
+            "ぁ": "ｧ", "あ": "ｱ", "ぃ": "ｨ", "い": "ｲ", "ぅ": "ｩ", "う": "ｳ",
+            "ぇ": "ｪ", "え": "ｴ", "ぉ": "ｫ", "お": "ｵ",
+            "か": "ｶ", "が": "ｶﾞ", "き": "ｷ", "ぎ": "ｷﾞ", "く": "ｸ", "ぐ": "ｸﾞ",
+            "け": "ｹ", "げ": "ｹﾞ", "こ": "ｺ", "ご": "ｺﾞ",
+            "さ": "ｻ", "ざ": "ｻﾞ", "し": "ｼ", "じ": "ｼﾞ", "す": "ｽ", "ず": "ｽﾞ",
+            "せ": "ｾ", "ぜ": "ｾﾞ", "そ": "ｿ", "ぞ": "ｿﾞ",
+            "た": "ﾀ", "だ": "ﾀﾞ", "ち": "ﾁ", "ぢ": "ﾁﾞ", "っ": "ｯ", "つ": "ﾂ", "づ": "ﾂﾞ",
+            "て": "ﾃ", "で": "ﾃﾞ", "と": "ﾄ", "ど": "ﾄﾞ",
+            "な": "ﾅ", "に": "ﾆ", "ぬ": "ﾇ", "ね": "ﾈ", "の": "ﾉ",
+            "は": "ﾊ", "ば": "ﾊﾞ", "ぱ": "ﾊﾟ", "ひ": "ﾋ", "び": "ﾋﾞ", "ぴ": "ﾋﾟ",
+            "ふ": "ﾌ", "ぶ": "ﾌﾞ", "ぷ": "ﾌﾟ", "へ": "ﾍ", "べ": "ﾍﾞ", "ぺ": "ﾍﾟ",
+            "ほ": "ﾎ", "ぼ": "ﾎﾞ", "ぽ": "ﾎﾟ",
+            "ま": "ﾏ", "み": "ﾐ", "む": "ﾑ", "め": "ﾒ", "も": "ﾓ",
+            "ゃ": "ｬ", "や": "ﾔ", "ゅ": "ｭ", "ゆ": "ﾕ", "ょ": "ｮ", "よ": "ﾖ",
+            "ら": "ﾗ", "り": "ﾘ", "る": "ﾙ", "れ": "ﾚ", "ろ": "ﾛ",
+            "わ": "ﾜ", "ゐ": "ｲ", "ゑ": "ｴ", "を": "ｦ",
+            "ん": "ﾝ", "ー": "ｰ",
+            "。": "｡", "「": "｢", "」": "｣", "、": "､", "・": "･",
+        ]
+        return text.map { map[$0] ?? String($0) }.joined()
+    }
+
+    private func toZenkakuAscii(_ text: String) -> String {
+        String(text.unicodeScalars.map { scalar in
+            if scalar.value == 0x20 {
+                return Character(UnicodeScalar(0x3000)!)
+            } else if scalar.value >= 0x21 && scalar.value <= 0x7E {
+                return Character(UnicodeScalar(scalar.value + 0xFEE0)!)
+            }
+            return Character(scalar)
+        })
+    }
+
+    /// F6–F10 の変換確定。composingText が空なら false を返す。
+    private mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
+        if state.isSegmentMode, let ss = state.segmentState {
+            state.composedHiragana = ss.segments.map(\.reading).joined()
+            state.segmentState = nil
+        }
+        guard !state.composingText.isEmpty else { return false }
+        if !state.pendingRomaji.isEmpty {
+            state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+            state.pendingRomaji = ""
+        }
+        let hiragana = state.composedHiragana
+        let text: String
+        switch keyCode {
+        case KeyCode.f6:  text = hiragana
+        case KeyCode.f7:  text = hiraganaToKatakana(hiragana)
+        case KeyCode.f8:  text = hiraganaToHankakuKatakana(hiragana)
+        case KeyCode.f9:  text = toZenkakuAscii(RomajiConverter.hiraganaToRomaji(hiragana))
+        case KeyCode.f10: text = RomajiConverter.hiraganaToRomaji(hiragana)
+        default: return false
+        }
+        db.record(input: hiragana, output: text)
+        doCommit(text: text, client: client)
+        return true
     }
 
     private func applyMarkedText(candidateText: String?, client: TextInputClient) {

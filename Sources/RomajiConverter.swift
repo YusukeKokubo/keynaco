@@ -194,6 +194,87 @@ struct RomajiConverter {
         return (converted, "")
     }
 
+    /// ひらがな文字列をローマ字（半角ASCII）に変換する。F9/F10 確定で使用。
+    static func hiraganaToRomaji(_ text: String) -> String {
+        let compound: [String: String] = [
+            "きゃ": "kya", "きぃ": "kyi", "きゅ": "kyu", "きぇ": "kye", "きょ": "kyo",
+            "しゃ": "sha", "しぃ": "syi", "しゅ": "shu", "しぇ": "she", "しょ": "sho",
+            "ちゃ": "cha", "ちぃ": "tyi", "ちゅ": "chu", "ちぇ": "che", "ちょ": "cho",
+            "にゃ": "nya", "にぃ": "nyi", "にゅ": "nyu", "にぇ": "nye", "にょ": "nyo",
+            "ひゃ": "hya", "ひぃ": "hyi", "ひゅ": "hyu", "ひぇ": "hye", "ひょ": "hyo",
+            "みゃ": "mya", "みぃ": "myi", "みゅ": "myu", "みぇ": "mye", "みょ": "myo",
+            "りゃ": "rya", "りぃ": "ryi", "りゅ": "ryu", "りぇ": "rye", "りょ": "ryo",
+            "ぎゃ": "gya", "ぎぃ": "gyi", "ぎゅ": "gyu", "ぎぇ": "gye", "ぎょ": "gyo",
+            "じゃ": "ja",  "じぃ": "jyi", "じゅ": "ju",  "じぇ": "je",  "じょ": "jo",
+            "びゃ": "bya", "びぃ": "byi", "びゅ": "byu", "びぇ": "bye", "びょ": "byo",
+            "ぴゃ": "pya", "ぴぃ": "pyi", "ぴゅ": "pyu", "ぴぇ": "pye", "ぴょ": "pyo",
+            "ふぁ": "fa",  "ふぃ": "fi",  "ふぇ": "fe",  "ふぉ": "fo",
+            "ぢゃ": "dya", "ぢぃ": "dyi", "ぢゅ": "dyu", "ぢぇ": "dye", "ぢょ": "dyo",
+        ]
+        let single: [Character: String] = [
+            "あ": "a",   "い": "i",   "う": "u",   "え": "e",   "お": "o",
+            "か": "ka",  "き": "ki",  "く": "ku",  "け": "ke",  "こ": "ko",
+            "さ": "sa",  "し": "shi", "す": "su",  "せ": "se",  "そ": "so",
+            "た": "ta",  "ち": "chi", "つ": "tsu", "て": "te",  "と": "to",
+            "な": "na",  "に": "ni",  "ぬ": "nu",  "ね": "ne",  "の": "no",
+            "は": "ha",  "ひ": "hi",  "ふ": "fu",  "へ": "he",  "ほ": "ho",
+            "ま": "ma",  "み": "mi",  "む": "mu",  "め": "me",  "も": "mo",
+            "や": "ya",  "ゆ": "yu",  "よ": "yo",
+            "ら": "ra",  "り": "ri",  "る": "ru",  "れ": "re",  "ろ": "ro",
+            "わ": "wa",  "ゐ": "wi",  "ゑ": "we",  "を": "wo",  "ん": "n",
+            "が": "ga",  "ぎ": "gi",  "ぐ": "gu",  "げ": "ge",  "ご": "go",
+            "ざ": "za",  "じ": "ji",  "ず": "zu",  "ぜ": "ze",  "ぞ": "zo",
+            "だ": "da",  "ぢ": "di",  "づ": "du",  "で": "de",  "ど": "do",
+            "ば": "ba",  "び": "bi",  "ぶ": "bu",  "べ": "be",  "ぼ": "bo",
+            "ぱ": "pa",  "ぴ": "pi",  "ぷ": "pu",  "ぺ": "pe",  "ぽ": "po",
+            "ぁ": "xa",  "ぃ": "xi",  "ぅ": "xu",  "ぇ": "xe",  "ぉ": "xo",
+            "ゃ": "xya", "ゅ": "xyu", "ょ": "xyo", "っ": "xtu",
+            "ー": "-",
+        ]
+        let vowels: Set<Character> = ["a", "i", "u", "e", "o"]
+        var result = ""
+        let chars = Array(text)
+        var i = 0
+        while i < chars.count {
+            let c = chars[i]
+            // っ: 次の子音を重ねる
+            if c == "っ" {
+                let nextIdx = i + 1
+                if nextIdx < chars.count {
+                    let nextRomaji: String
+                    if nextIdx + 1 < chars.count,
+                       let comp = compound[String([chars[nextIdx], chars[nextIdx + 1]])] {
+                        nextRomaji = comp
+                    } else {
+                        nextRomaji = single[chars[nextIdx]] ?? String(chars[nextIdx])
+                    }
+                    if let first = nextRomaji.first, !vowels.contains(first) {
+                        result += String(first); i += 1; continue
+                    }
+                }
+                result += "xtu"; i += 1; continue
+            }
+            // ん: 次が母音なら nn
+            if c == "ん" {
+                let nextIdx = i + 1
+                if nextIdx < chars.count {
+                    let nextRomaji = single[chars[nextIdx]] ?? String(chars[nextIdx])
+                    if let first = nextRomaji.first, vowels.contains(first) {
+                        result += "nn"; i += 1; continue
+                    }
+                }
+                result += "n"; i += 1; continue
+            }
+            // 2文字複合（拗音等）
+            if i + 1 < chars.count, let comp = compound[String([c, chars[i + 1]])] {
+                result += comp; i += 2; continue
+            }
+            // 単体
+            result += single[c] ?? String(c); i += 1
+        }
+        return result
+    }
+
     /// 確定時に pending のローマ字を強制変換する。"n" → "ん" 等。
     static func forceFinalize(_ pending: String) -> String {
         if pending.isEmpty { return "" }

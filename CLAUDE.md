@@ -102,3 +102,11 @@ InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInp
 ### flagsChanged で Caps Lock を検知する
 
 Caps Lock トグルは未実装。実装時は `handle(event:client:)` で `.flagsChanged` イベントを受け取り、`NSEvent.ModifierFlags.capsLock` で ON/OFF を判定する。`inputText` では flagsChanged を受け取れない。
+
+## 不採用の機能
+
+### 数字キー（1–9）による候補直接確定
+
+候補ウィンドウ表示中に 1–9 を押すと対応する候補を確定するアイデアは採用しない。
+
+理由: 候補ウィンドウが履歴ヒットで自動表示される仕様のため、数字の連続入力（"123" など）で 3 文字目が候補選択として誤作動する。ASCII 組成中は無効にする回避策も試みたが、体験が悪いと判断して廃止。

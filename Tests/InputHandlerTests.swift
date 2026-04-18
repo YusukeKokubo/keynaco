@@ -74,14 +74,15 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.markedText, "あ")
     }
 
-    func testTypingTwoVowelsDoesNotAutoShowWithoutHistory() {
+    func testTypingTwoVowelsAutoShowsDictionaryCandidates() {
         type(chars: "a", base: "a")
         let (consumed, action) = type(chars: "i", base: "i")
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.markedText, "あい")
-        guard case .dismiss = action else {
-            XCTFail("履歴なしではタイピング中に候補を出さないはず: \(action)"); return
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail("辞書候補があればタイピング中も自動表示するはず: \(action)"); return
         }
+        XCTAssertFalse(candidates.isEmpty)
     }
 
     func testTypingShowsCandidatesWhenHistoryExists() {
