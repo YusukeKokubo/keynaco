@@ -191,13 +191,22 @@ struct InputHandler {
         }
 
         let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
-        let isAsciiLetter = !isNonAscii && chars.unicodeScalars.allSatisfy {
-            ($0.value >= 0x41 && $0.value <= 0x5A) || ($0.value >= 0x61 && $0.value <= 0x7A)
+
+        // Shift + ASCII → 組成バッファに英字として貯める（Enter で確定）
+        if modifiers.contains(.shift) && !isNonAscii {
+            if wasExplicitlySelected {
+                _ = doConfirmSelection(candidate: candidate, client: client)
+            } else if !state.pendingRomaji.isEmpty {
+                state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+                state.pendingRomaji = ""
+            }
+            state.composedHiragana += chars
+            applyMarkedText(candidateText: nil, client: client)
+            return (true, .dismiss)
         }
 
-        // Shift + 記号 または 非ASCII文字（全角記号など）
-        // → 組成中なら組成バッファに追加（確定しない）、空なら直接挿入（、。と同じ動作）
-        if (modifiers.contains(.shift) && !isAsciiLetter) || isNonAscii {
+        // 非ASCII文字（全角記号など）→ 組成中なら組成バッファに追加、空なら直接挿入
+        if isNonAscii {
             if state.composingText.isEmpty {
                 client.insertText(chars)
             } else {
@@ -208,18 +217,6 @@ struct InputHandler {
                 state.composedHiragana += chars
                 applyMarkedText(candidateText: nil, client: client)
             }
-            return (true, .dismiss)
-        }
-
-        // Shift + ASCII 文字 → 英字を直接挿入
-        if modifiers.contains(.shift) {
-            if wasExplicitlySelected {
-                _ = doConfirmSelection(candidate: candidate, client: client)
-            } else if !state.composingText.isEmpty {
-                commitComposition(client: client)
-            }
-            client.insertText(chars)
-            applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         }
 
@@ -307,7 +304,8 @@ struct InputHandler {
             candidates.insert(katakana, at: 0)
             fixedCount += 1
         }
-        if !hiraganaInHistory {
+        // hiragana == katakana（非ひらがな文字）の場合は重複挿入しない
+        if !hiraganaInHistory && hiragana != katakana {
             candidates.removeAll { $0 == hiragana }
             candidates.insert(hiragana, at: 0)
             fixedCount += 1
@@ -387,7 +385,8 @@ struct InputHandler {
         if !katakanaInHistory {
             candidates.insert(katakana, at: 0); seen.insert(katakana); fixedCount += 1
         }
-        if !hiraganaInHistory {
+        // hiragana == katakana（非ひらがな文字）の場合は重複挿入しない
+        if !hiraganaInHistory && hiragana != katakana {
             candidates.insert(hiragana, at: 0); seen.insert(hiragana); fixedCount += 1
         }
 
@@ -396,8 +395,7 @@ struct InputHandler {
 
         for d in dictCandidates where seen.insert(d).inserted { candidates.append(d) }
 
-        // 履歴あり → 最初の履歴候補を選択、なし → 辞書先頭候補を選択（従来通り）
-        let initialIndex = fixedCount
+        let initialIndex = candidates.count > fixedCount ? fixedCount : 0
         return Segment(reading: reading, candidates: candidates, selectedIndex: initialIndex, historyEnd: historyEnd)
     }
 

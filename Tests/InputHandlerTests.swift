@@ -346,17 +346,19 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertTrue(client.inserted.isEmpty)
     }
 
-    // MARK: - Shift + 文字 → 英字を直接挿入
+    // MARK: - Shift + 文字 → 組成バッファに英字として貯める
 
     func testShiftLetterInsertsDirectly() {
         type(chars: "A", base: "a", modifiers: .shift)
-        XCTAssertEqual(client.inserted, ["A"])
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "A")
     }
 
     func testShiftLetterCommitsComposingFirst() {
         type(chars: "a", base: "a")
         type(chars: "B", base: "b", modifiers: .shift)
-        XCTAssertEqual(client.inserted, ["あ", "B"])
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あB")
     }
 
     // MARK: - Shift+記号・非ASCII文字
@@ -387,7 +389,8 @@ final class InputHandlerTests: XCTestCase {
     func testShiftSymbolInsertedDirectlyWhenEmpty() {
         let result = type(chars: "!", base: "1", modifiers: .shift)
         XCTAssertTrue(result.consumed)
-        XCTAssertEqual(client.inserted, ["!"])
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "!")
     }
 
     func testShiftSymbolAppendsToComposition() {
