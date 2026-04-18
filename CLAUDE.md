@@ -9,7 +9,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `Sources/` | アプリ本体（Swift ソース + Info.plist + entitlements） |
 | `Tests/` | ユニットテスト（XCTest） |
 | `Packages/AzooKeyKanaKanjiConverter` | ローカル Swift Package（変換エンジン） |
-| `plans/` | 設計・調査メモ |
+| `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` 形式） |
 | `project.yml` | XcodeGen 設定 |
 
 ### 起動チェーン（IMK ブートストラップ）
@@ -51,6 +51,7 @@ xcodebuild test -scheme ykey -destination "platform=macOS"
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（履歴セクションの末尾インデックス）が重要
 
 変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
+カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 
 ## テスト方針
 
@@ -64,6 +65,9 @@ IME はバックグラウンドエージェントとして動作するため、`
 
 ### Shift キー入力の挙動
 
+- **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
+- **かなキー（keyCode 104）**: 日本語モードに戻る
+- **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。`punctuationMap`は`baseCharacters`で照合するため Shift+`,`/`.` が `<`/`>` になる
 - **Shift+ASCII 文字（日本語モード中）**: 組成バッファに英字として蓄積される（`pendingRomaji` 経由ではなく直接 `composedHiragana` に追加）。Enter で確定。
 - **Shift+句読点**: `,` → `<`、`.` → `>`（`punctuationMap` は Shift なし時のみ `、` / `。` に変換）。
 - **Shift+Delete（候補選択中）**: 選択中の候補を変換履歴 DB から削除。
