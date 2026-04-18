@@ -74,6 +74,21 @@ final class DatabaseManager: @unchecked Sendable {
         return results
     }
 
+    /// 読みが前方一致する履歴候補を使用頻度順で返す（完全一致は除外）。
+    func fetchHistoryPrefix(reading: String) -> [String] {
+        let sql = "SELECT output FROM history WHERE input LIKE ? AND input != ? ORDER BY count DESC, used_at DESC LIMIT 10"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        bindText(stmt, 1, reading + "%")
+        bindText(stmt, 2, reading)
+        var results: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        }
+        return results
+    }
+
     // MARK: - 削除
 
     /// 履歴から指定の output を持つエントリを削除

@@ -283,7 +283,9 @@ struct InputHandler {
     ///   autoShow=true のとき履歴候補がなければ表示しない（タイピング中の割り込みを抑制する）。
     private mutating func doRefreshCandidates(autoShow: Bool = false) -> CandidateAction {
         let azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: state.composedHiragana)
-        let historyCandidates = db.fetchHistoryExact(reading: state.composedHiragana)
+        let exactCandidates = db.fetchHistoryExact(reading: state.composedHiragana)
+        let prefixCandidates = db.fetchHistoryPrefix(reading: state.composedHiragana)
+        let historyCandidates = exactCandidates + prefixCandidates.filter { !exactCandidates.contains($0) }
         let historyCount = historyCandidates.count
         var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
 
