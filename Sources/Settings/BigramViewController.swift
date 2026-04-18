@@ -1,8 +1,18 @@
 import AppKit
+import UniformTypeIdentifiers
+
+private struct BigramTransfer: Codable {
+    let prev: String
+    let input: String
+    let output: String
+    let count: Int
+}
 
 final class BigramViewController: NSViewController {
     private let tableView = DeletableTableView()
     private let deleteButton = NSButton(title: "選択を削除", target: nil, action: nil)
+    private let exportButton = NSButton(title: "書き出し", target: nil, action: nil)
+    private let importButton = NSButton(title: "読み込み", target: nil, action: nil)
     private var data: [DatabaseManager.BigramEntry] = []
 
     override func loadView() {
@@ -56,6 +66,16 @@ final class BigramViewController: NSViewController {
         let bar = NSView()
         bar.translatesAutoresizingMaskIntoConstraints = false
 
+        exportButton.translatesAutoresizingMaskIntoConstraints = false
+        exportButton.target = self
+        exportButton.action = #selector(exportBigram)
+        bar.addSubview(exportButton)
+
+        importButton.translatesAutoresizingMaskIntoConstraints = false
+        importButton.target = self
+        importButton.action = #selector(importBigram)
+        bar.addSubview(importButton)
+
         deleteButton.translatesAutoresizingMaskIntoConstraints = false
         deleteButton.target = self
         deleteButton.action = #selector(deleteSelected)
@@ -67,6 +87,10 @@ final class BigramViewController: NSViewController {
         bar.addSubview(refreshButton)
 
         NSLayoutConstraint.activate([
+            exportButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            exportButton.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 12),
+            importButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            importButton.leadingAnchor.constraint(equalTo: exportButton.trailingAnchor, constant: 8),
             deleteButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             deleteButton.trailingAnchor.constraint(equalTo: refreshButton.leadingAnchor, constant: -8),
             refreshButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
@@ -94,6 +118,61 @@ final class BigramViewController: NSViewController {
         data.remove(at: row)
         tableView.removeRows(at: IndexSet(integer: row), withAnimation: .effectFade)
         deleteButton.isEnabled = tableView.selectedRow >= 0
+    }
+
+    @objc private func exportBigram() {
+        let entries = DatabaseManager.shared.fetchAllBigram()
+        let payload = entries.map { BigramTransfer(prev: $0.prev, input: $0.input, output: $0.output, count: $0.count) }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(payload) else { return }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "ykey-bigram-\(yyyyMMdd()).json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try data.write(to: url, options: .atomic) }
+        catch { showAlert("書き出しに失敗しました", detail: error.localizedDescription) }
+    }
+
+    @objc private func importBigram() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let decoded = try JSONDecoder().decode([BigramTransfer].self, from: Data(contentsOf: url))
+            let entries = decoded.map {
+                DatabaseManager.BigramEntry(prev: $0.prev, input: $0.input, output: $0.output, count: $0.count)
+            }
+            let current = DatabaseManager.shared.fetchAllBigram().count
+            let alert = NSAlert()
+            alert.messageText = "Bi-gram を置き換えますか？"
+            alert.informativeText = "現在 \(current) 件のデータをすべて削除し、インポートデータ \(entries.count) 件で置き換えます。この操作は元に戻せません。"
+            alert.addButton(withTitle: "置き換える")
+            alert.addButton(withTitle: "キャンセル")
+            alert.alertStyle = .warning
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            DatabaseManager.shared.replaceBigram(entries)
+            reload()
+        } catch { showAlert("読み込みに失敗しました", detail: error.localizedDescription) }
+    }
+
+    private func yyyyMMdd() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyyMMdd"
+        return f.string(from: Date())
+    }
+
+    private func showAlert(_ message: String, detail: String) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.informativeText = detail
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 }
 

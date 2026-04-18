@@ -167,6 +167,27 @@ final class DatabaseManager: @unchecked Sendable {
         sqlite3_step(stmt)
     }
 
+    /// 既存の bi-gram を全削除してからインポートデータで置き換える。
+    func replaceBigram(_ entries: [BigramEntry]) {
+        sqlite3_exec(db, "DELETE FROM bigram", nil, nil, nil)
+        let sql = """
+        INSERT INTO bigram (prev, input, output, count, used_at)
+        VALUES (?, ?, ?, ?, ?)
+        """
+        let t = Int64(Date().timeIntervalSince1970)
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        for entry in entries {
+            bindText(stmt, 1, entry.prev); bindText(stmt, 2, entry.input)
+            bindText(stmt, 3, entry.output)
+            sqlite3_bind_int64(stmt, 4, Int64(entry.count))
+            sqlite3_bind_int64(stmt, 5, t)
+            sqlite3_step(stmt)
+            sqlite3_reset(stmt)
+        }
+    }
+
     // MARK: - Bi-gram
 
     func recordBigram(prev: String, input: String, output: String) {

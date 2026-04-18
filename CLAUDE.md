@@ -47,11 +47,23 @@ xcodebuild test -scheme ykey -destination "platform=macOS"
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
 - `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/ykey/` に保存）
-- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）
+- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` と `bigram` の2テーブルを持つ
+- `SettingsWindowController` / `BigramViewController` / `HistoryViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（履歴セクションの末尾インデックス）が重要
 
 変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
+
+### 候補表示の優先順位
+
+`doRefreshCandidates()` が組み立てる候補リスト（上が高優先）:
+
+1. ひらがな / カタカナ固定候補（`fixedCount` 件、スクロール外の先頭に挿入）
+2. bi-gram 候補（`lastCommittedOutput` × 現在の読みで検索、重複除去後に固定候補の直後に挿入）
+3. 履歴 exact（入力に完全一致）+ prefix（前方一致、完全一致を除外）
+4. AzooKey 辞書候補
+
+`autoShow=true`（文字入力中の自動表示）のとき、履歴・辞書・bi-gram が0件なら表示しない。
 
 ## テスト方針
 
@@ -72,6 +84,7 @@ IME はバックグラウンドエージェントとして動作するため、`
 - **Shift+句読点**: `,` → `<`、`.` → `>`（`punctuationMap` は Shift なし時のみ `、` / `。` に変換）。
 - **Shift+Delete（候補選択中）**: 選択中の候補を変換履歴 DB から削除。
 - **Shift+Tab / Shift+矢印（セグメントモード中）**: セグメント境界を1文字単位で調整。
+- **F6–F10（組成中のみ）**: F6=ひらがな、F7=全角カタカナ、F8=半角カタカナ、F9=全角ASCII、F10=半角ASCII で即時確定。`handleFunctionKey()` 参照。
 
 ## macOS 26 IME の罠
 
