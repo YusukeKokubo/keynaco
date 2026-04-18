@@ -73,6 +73,7 @@ class InputController: IMKInputController {
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         handler.state = CompositionState()
+        handler.lastCommittedOutput = nil
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
     }

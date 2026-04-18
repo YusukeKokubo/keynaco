@@ -48,6 +48,16 @@ final class DatabaseManager: @unchecked Sendable {
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
+        CREATE TABLE IF NOT EXISTS bigram (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            prev    TEXT    NOT NULL,
+            input   TEXT    NOT NULL,
+            output  TEXT    NOT NULL,
+            count   INTEGER NOT NULL DEFAULT 1,
+            used_at INTEGER NOT NULL,
+            UNIQUE(prev, input, output)
+        );
+        CREATE INDEX IF NOT EXISTS idx_bigram ON bigram(prev, input);
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }
@@ -82,6 +92,41 @@ final class DatabaseManager: @unchecked Sendable {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         bindText(stmt, 1, reading + "%")
         bindText(stmt, 2, reading)
+        var results: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        }
+        return results
+    }
+
+    // MARK: - Bi-gram
+
+    func recordBigram(prev: String, input: String, output: String) {
+        let sql = """
+        INSERT INTO bigram (prev, input, output, count, used_at)
+        VALUES (?, ?, ?, 1, ?)
+        ON CONFLICT(prev, input, output) DO UPDATE SET
+            count   = count + 1,
+            used_at = excluded.used_at;
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        let t = Int64(Date().timeIntervalSince1970)
+        bindText(stmt, 1, prev)
+        bindText(stmt, 2, input)
+        bindText(stmt, 3, output)
+        sqlite3_bind_int64(stmt, 4, t)
+        sqlite3_step(stmt)
+    }
+
+    func fetchBigram(prev: String, reading: String) -> [String] {
+        let sql = "SELECT output FROM bigram WHERE prev = ? AND input LIKE ? ORDER BY count DESC, used_at DESC LIMIT 10"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        bindText(stmt, 1, prev)
+        bindText(stmt, 2, reading + "%")
         var results: [String] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }

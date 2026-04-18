@@ -50,6 +50,7 @@ struct InputHandler {
 
     var state = CompositionState()
     var ignoreNextModeSwitch = false
+    var lastCommittedOutput: String? = nil
     let db: DatabaseManager
     let azooKeyConverter: AzooKeyConverter
 
@@ -236,7 +237,8 @@ struct InputHandler {
             _ = doConfirmSelection(candidate: candidate, client: client)
         }
         let needsRefresh = state.addRomaji(base)
-        let candidateAction: CandidateAction = needsRefresh ? doRefreshCandidates(autoShow: true) : .dismiss
+        let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
+        let candidateAction: CandidateAction = (needsRefresh || hasBigramContext) ? doRefreshCandidates(autoShow: true) : .dismiss
         applyMarkedText(candidateText: nil, client: client)
         return (true, candidateAction)
     }
@@ -287,6 +289,10 @@ struct InputHandler {
     }
 
     private mutating func doCommit(text: String, client: TextInputClient) {
+        if let prev = lastCommittedOutput, !state.composingText.isEmpty {
+            db.recordBigram(prev: prev, input: state.finalizedText, output: text)
+        }
+        lastCommittedOutput = text
         client.insertText(text)
         state = CompositionState()
     }
@@ -299,9 +305,14 @@ struct InputHandler {
         let prefixCandidates = db.fetchHistoryPrefix(reading: state.composedHiragana)
         let historyCandidates = exactCandidates + prefixCandidates.filter { !exactCandidates.contains($0) }
         let historyCount = historyCandidates.count
-        var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
 
-        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty { return .dismiss }
+        let bigramRaw = lastCommittedOutput.map { db.fetchBigram(prev: $0, reading: state.composedHiragana) } ?? []
+        var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
+        let uniqueBigrams = bigramRaw.filter { !candidates.contains($0) }
+        candidates.insert(contentsOf: uniqueBigrams, at: 0)
+        let bigramCount = uniqueBigrams.count
+
+        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && bigramCount == 0 { return .dismiss }
 
         let hiragana = state.composedHiragana
         let katakana = hiraganaToKatakana(hiragana)
@@ -309,8 +320,8 @@ struct InputHandler {
         // 履歴にひらがな・カタカナが含まれるかを確認する
         // 履歴にある場合 → 履歴エントリとして可視範囲に残す（固定位置に追加しない）
         // 履歴にない場合 → スクロール範囲外の固定位置に追加し、↑ キーで到達できるようにする
-        let hiraganaInHistory = candidates.prefix(historyCount).contains(hiragana)
-        let katakanaInHistory = candidates.prefix(historyCount).contains(katakana)
+        let hiraganaInHistory = candidates.prefix(bigramCount + historyCount).contains(hiragana)
+        let katakanaInHistory = candidates.prefix(bigramCount + historyCount).contains(katakana)
 
         var fixedCount = 0
         if !katakanaInHistory {
@@ -325,7 +336,7 @@ struct InputHandler {
             fixedCount += 1
         }
 
-        let historyEnd = fixedCount + historyCount
+        let historyEnd = fixedCount + bigramCount + historyCount
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
