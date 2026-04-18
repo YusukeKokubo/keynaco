@@ -88,6 +88,7 @@ class InputController: IMKInputController {
         super.activateServer(sender)
         handler.state = CompositionState()
         handler.lastCommittedOutput = nil
+        handler.isParticleMode = false
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
     }
@@ -137,10 +138,10 @@ class InputController: IMKInputController {
             candidateWindow.dismiss()
         case .selectNext:
             candidateWindow.selectNext()
-            updateMarkedText(client: adapter)
+            if !handler.isParticleMode { updateMarkedText(client: adapter) }
         case .selectPrev:
             candidateWindow.selectPrev()
-            updateMarkedText(client: adapter)
+            if !handler.isParticleMode { updateMarkedText(client: adapter) }
         case .deleteSelected:
             let row = candidateWindow.selectedRow
             if let text = candidateWindow.selectedText() {
@@ -155,6 +156,11 @@ class InputController: IMKInputController {
     // MARK: - 確定
 
     override func commitComposition(_ sender: Any!) {
+        // パーティクルモード中で組成がない場合は system-triggered commit をスキップ
+        // (insertText の副作用で system が commitComposition を呼ぶことがある)
+        if handler.isParticleMode && handler.state.composingText.isEmpty && !handler.state.isSegmentMode {
+            return
+        }
         let adapter = IMKTextInputAdapter(sender)
         let ctx = CandidateContext(
             isVisible: candidateWindow.isVisible,
@@ -164,6 +170,7 @@ class InputController: IMKInputController {
             historyEnd: candidateWindow.historySectionEnd
         )
         handler.commitComposition(client: adapter, candidate: ctx)
+        handler.isParticleMode = false
         candidateWindow.dismiss()
     }
 

@@ -48,8 +48,11 @@ struct InputHandler {
     // 全InputControllerインスタンスで共有するモード（アプリ切替後も保持）
     nonisolated(unsafe) static var isAsciiMode = false
 
+    static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
+
     var state = CompositionState()
     var ignoreNextModeSwitch = false
+    var isParticleMode = false
     var lastCommittedOutput: String? = nil
     let db: DatabaseManager
     let azooKeyConverter: AzooKeyConverter
@@ -70,13 +73,18 @@ struct InputHandler {
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
 
+        if isParticleMode {
+            return handleParticleMode(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+                                      modifiers: modifiers, candidate: candidate, client: client)
+        }
+
         let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
 
         // F6–F10 変換キー（組成中のみ動作）
         if !InputHandler.isAsciiMode,
            [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) {
             let consumed = handleFunctionKey(keyCode: keyCode, client: client)
-            return (consumed, consumed ? .dismiss : .none)
+            return (consumed, consumed ? doSuggestParticles() : .none)
         }
 
         // セグメントモード中は最優先でハンドリング
@@ -150,7 +158,7 @@ struct InputHandler {
             case KeyCode.enter:   // Return
                 guard !state.composingText.isEmpty else { return (false, .none) }
                 commitComposition(client: client)
-                return (true, .dismiss)
+                return (true, doSuggestParticles())
             case KeyCode.escape:  // Escape
                 return doEscape(client: client)
             default:
@@ -285,7 +293,7 @@ struct InputHandler {
         } else {
             commitComposition(client: client)
         }
-        return .dismiss
+        return doSuggestParticles()
     }
 
     private mutating func doCommit(text: String, client: TextInputClient) {
@@ -295,6 +303,82 @@ struct InputHandler {
         lastCommittedOutput = text
         client.insertText(text)
         state = CompositionState()
+    }
+
+    // 頭文字（ローマ字1文字）→ 格助詞リスト（複数ある場合は使用頻度の高い順）
+    private static let particleRomajiMap: [String: [String]] = [
+        "g": ["が"],
+        "w": ["を"],
+        "n": ["に", "の"],
+        "d": ["で"],
+        "h": ["は", "へ"],
+        "t": ["と"],
+        "k": ["から"],
+        "m": ["も", "まで"],
+        "y": ["より"],
+    ]
+
+    private mutating func doSuggestParticles() -> CandidateAction {
+        // 直前の確定が格助詞自身なら再表示しない
+        if let last = lastCommittedOutput, InputHandler.particles.contains(last) {
+            isParticleMode = false
+            return .dismiss
+        }
+        isParticleMode = true
+        let fromBigram = lastCommittedOutput.map { db.fetchBigramInList(prev: $0, list: InputHandler.particles) } ?? []
+        let rest = InputHandler.particles.filter { !fromBigram.contains($0) }
+        return .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0)
+    }
+
+    private mutating func confirmParticle(_ particle: String, client: TextInputClient) {
+        isParticleMode = false
+        if let prev = lastCommittedOutput { db.recordBigram(prev: prev, input: particle, output: particle) }
+        db.record(input: particle, output: particle)
+        lastCommittedOutput = particle
+        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
+        client.insertText(particle)
+    }
+
+    private mutating func handleParticleMode(
+        keyCode: UInt16,
+        characters: String?,
+        baseCharacters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        switch keyCode {
+        case KeyCode.space, KeyCode.enter:
+            guard let selected = candidate.selectedText else { isParticleMode = false; return (true, .dismiss) }
+            confirmParticle(selected, client: client)
+            return (true, .dismiss)
+        case KeyCode.downArrow, KeyCode.tab:
+            return (true, .selectNext)
+        case KeyCode.upArrow:
+            return (true, .selectPrev)
+        case KeyCode.escape, KeyCode.backspace:
+            isParticleMode = false
+            return (true, .dismiss)
+        default:
+            // 頭文字1打で格助詞を絞り込み・即確定
+            let char = (baseCharacters ?? characters ?? "").lowercased()
+            if char.count == 1, let c = char.first, c.isLetter, c.isASCII {
+                let matched = InputHandler.particleRomajiMap[char] ?? []
+                if matched.count == 1 {
+                    confirmParticle(matched[0], client: client)
+                    return (true, .dismiss)
+                } else if matched.count > 1 {
+                    // 複数マッチ → bi-gram頻度順で絞り込み表示
+                    let fromBigram = lastCommittedOutput.map { db.fetchBigramInList(prev: $0, list: matched) } ?? []
+                    let rest = matched.filter { !fromBigram.contains($0) }
+                    return (true, .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0))
+                }
+            }
+            // 対応なし → パーティクルモード解除して通常処理
+            isParticleMode = false
+            return handle(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+                          modifiers: modifiers, candidate: .hidden, client: client)
+        }
     }
 
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
@@ -625,7 +709,7 @@ struct InputHandler {
             confirmed += seg.selectedText
         }
         doCommit(text: confirmed, client: client)
-        return .dismiss
+        return doSuggestParticles()
     }
 
     private func applySegmentMarkedText(client: TextInputClient) {

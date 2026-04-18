@@ -223,6 +223,23 @@ final class DatabaseManager: @unchecked Sendable {
         return results
     }
 
+    /// list 内の候補を bi-gram 頻度順で返す（未登録分は除外）。
+    func fetchBigramInList(prev: String, list: [String]) -> [String] {
+        guard !list.isEmpty else { return [] }
+        let placeholders = list.map { _ in "?" }.joined(separator: ",")
+        let sql = "SELECT output FROM bigram WHERE prev = ? AND output IN (\(placeholders)) ORDER BY count DESC, used_at DESC"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        bindText(stmt, 1, prev)
+        for (i, item) in list.enumerated() { bindText(stmt, Int32(i + 2), item) }
+        var results: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        }
+        return results
+    }
+
     // MARK: - 削除
 
     /// 履歴から指定の output を持つエントリを削除
