@@ -328,6 +328,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/keynaco.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 0;
 				DEVELOPMENT_TEAM = R2ZZ3ALJ36;
 				ENABLE_APP_SANDBOX = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
@@ -336,6 +337,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yusuke.inputmethod.keynaco;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
@@ -368,6 +370,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/keynaco.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 0;
 				DEVELOPMENT_TEAM = R2ZZ3ALJ36;
 				ENABLE_APP_SANDBOX = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
@@ -376,6 +379,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yusuke.inputmethod.keynaco;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
