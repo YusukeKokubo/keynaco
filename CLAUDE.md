@@ -2,6 +2,14 @@
 
 macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
+## ドメイン知識
+
+| ドキュメント | 内容 |
+|-------------|------|
+| [`docs/domain/glossary.md`](docs/domain/glossary.md) | 用語定義・不変条件 |
+| [`docs/domain/states.md`](docs/domain/states.md) | 状態遷移図・状態別キー動作 |
+| [`docs/domain/scenarios.md`](docs/domain/scenarios.md) | 具体的な入力トレース例 |
+
 ## ディレクトリ構成
 
 | パス | 内容 |
