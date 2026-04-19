@@ -324,6 +324,25 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertFalse(result.consumed, "候補なし時の ↑ はスルーするはず")
     }
 
+    func testRightArrowDuringCandidateCommitsHiragana() {
+        // "か" を組成して候補ウィンドウに漢字候補「花」が選択されている状態
+        typeRomaji("ka")
+        let result = press(keyCode: 124, candidateVisible: true, selectedText: "花")
+        XCTAssertTrue(result.consumed)
+        // 漢字ではなくひらがなが確定される
+        XCTAssertEqual(client.inserted, ["か"])
+        XCTAssertTrue(handler.state.composingText.isEmpty, "確定後は組成バッファが空になるはず")
+    }
+
+    func testRightArrowDuringCandidateIgnoresSelectedCandidate() {
+        // 候補が明示的に選択されていても右矢印はひらがなを確定する
+        typeRomaji("nihon")
+        let result = press(keyCode: 124, candidateVisible: true,
+                           selectedRow: 2, selectedText: "日本", isExplicitlySelected: true)
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.inserted, ["にほん"])
+    }
+
     // MARK: - ASCII モード（英数キー）
 
     func testAsciiModeInsertsDirectly() {

@@ -146,9 +146,9 @@ struct InputHandler {
                 return (true, action)
             case KeyCode.escape:  // Escape
                 return doEscape(client: client)
-            case KeyCode.rightArrow:  // →: 変換確定
-                let action = doConfirmSelection(candidate: candidate, client: client)
-                return (true, action)
+            case KeyCode.rightArrow:  // →: ひらがなのまま確定
+                commitComposition(client: client)
+                return (true, doSuggestParticles())
             case KeyCode.backspace where modifiers.contains(.shift):  // Shift+Delete: 履歴から削除
                 if candidate.selectedRow < candidate.historyEnd {
                     return (true, .deleteSelected)
