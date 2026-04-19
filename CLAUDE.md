@@ -54,6 +54,14 @@ xcodebuild test -scheme ykey -destination "platform=macOS"
 変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 
+### 格助詞モード（isParticleMode / particleFirstChar）
+
+確定直後に `doSuggestParticles()` が格助詞候補ウィンドウを自動表示する。
+
+- `particleFirstChar`: 頭文字1打目（例: "g" → が候補）をバッファリング。2打目が格助詞に対応しないキーなら、1打目を通常入力として `handle()` に流してからモード解除する。
+- 格助詞モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
+- 格助詞自身を確定した直後は再表示しない（無限ループ防止）。
+
 ### 候補表示の優先順位
 
 `doRefreshCandidates()` が組み立てる候補リスト（上が高優先）:
@@ -111,6 +119,10 @@ InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInp
 ### Development 署名で spctl -a は "rejected" になる
 
 正常動作する。Gatekeeper の仕様であり問題ない。
+
+### Electron 系アプリで Enter が届かない
+
+`setMarkedText("")`（空文字）のまま候補を表示すると、Electron は「IME が非アクティブ」と判断し Enter をアプリ側で処理する。格助詞モード等で候補選択中は実テキストを marked text に設定すること。
 
 ### flagsChanged で Caps Lock を検知する
 
