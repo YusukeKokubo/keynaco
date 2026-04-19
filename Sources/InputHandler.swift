@@ -362,7 +362,7 @@ struct InputHandler {
             return (true, .selectNext)
         case KeyCode.upArrow:
             return (true, .selectPrev)
-        case KeyCode.escape, KeyCode.backspace:
+        case KeyCode.escape, KeyCode.backspace, KeyCode.rightArrow:
             isParticleMode = false; particleFirstChar = nil
             client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
             return (true, .dismiss)
