@@ -914,8 +914,8 @@ final class InputHandlerTests: XCTestCase {
 
     func testParticleModeActivatesAfterCommit() {
         typeRomaji("tokyo")
-        let result = press(keyCode: 36)  // Enter で確定
-        XCTAssertTrue(handler.isParticleMode, "確定後はパーティクルモードになるはず")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isParticleMode, "漢字確定後はパーティクルモードになるはず")
         guard case .show(let candidates, _, _) = result.candidateAction else {
             XCTFail("格助詞リストを表示するはず: \(result.candidateAction)"); return
         }
@@ -924,7 +924,7 @@ final class InputHandlerTests: XCTestCase {
 
     func testParticleModeSpaceConfirmsParticle() {
         typeRomaji("tokyo")
-        press(keyCode: 36)  // 確定 → パーティクルモード
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isParticleMode)
         // Space で先頭の格助詞を確定
         let firstParticle = InputHandler.particles[0]  // "が"
@@ -936,7 +936,7 @@ final class InputHandlerTests: XCTestCase {
 
     func testParticleModeEscapeDismisses() {
         typeRomaji("tokyo")
-        press(keyCode: 36)
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isParticleMode)
         let result = press(keyCode: 53)  // Escape
         XCTAssertTrue(result.consumed)
@@ -948,7 +948,7 @@ final class InputHandlerTests: XCTestCase {
 
     func testParticleModeRomajiExitsAndComposesNormally() {
         typeRomaji("tokyo")
-        press(keyCode: 36)
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isParticleMode)
         // "s" は格助詞マッチなし → パーティクルモード解除して通常組成
         let result = type(chars: "s", base: "s")
@@ -959,7 +959,7 @@ final class InputHandlerTests: XCTestCase {
 
     func testParticleModeNotRetriggeredAfterParticleConfirm() {
         typeRomaji("tokyo")
-        press(keyCode: 36)  // 確定 → パーティクルモード
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let firstParticle = InputHandler.particles[0]
         press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: firstParticle)
         // 格助詞確定後はパーティクルモードが再トリガーされない
@@ -968,7 +968,7 @@ final class InputHandlerTests: XCTestCase {
 
     func testParticleModeArrowNavigates() {
         typeRomaji("tokyo")
-        press(keyCode: 36)
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isParticleMode)
         let result = press(keyCode: 125, candidateVisible: true, selectedRow: 0, selectedText: "が")  // ↓
         guard case .selectNext = result.candidateAction else {
@@ -976,23 +976,30 @@ final class InputHandlerTests: XCTestCase {
         }
     }
 
-    func testParticleModeRomajiUniqueConfirmsImmediately() {
+    func testParticleModeRomajiUniqueFiltersAndConfirmWithSpace() {
         typeRomaji("tokyo")
-        press(keyCode: 36)  // 確定 → パーティクルモード
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isParticleMode)
-        // "g" → が（唯一マッチ）→ 即確定
-        let result = type(chars: "g", base: "g", candidateVisible: true, selectedRow: 0, selectedText: "が")
-        XCTAssertTrue(result.consumed)
+        // "g" → が（唯一マッチ）→ フィルタリング表示（まだ確定しない）
+        let filterResult = type(chars: "g", base: "g")
+        XCTAssertTrue(filterResult.consumed)
+        XCTAssertTrue(handler.isParticleMode, "フィルタリング中はパーティクルモードを維持するはず")
+        guard case .show(let candidates, _, _) = filterResult.candidateAction else {
+            XCTFail("絞り込み後は .show を返すはず: \(filterResult.candidateAction)"); return
+        }
+        XCTAssertEqual(candidates, ["が"], "「が」のみが候補に含まれるはず")
+        // Space で確定
+        let confirmResult = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "が")
         XCTAssertFalse(handler.isParticleMode, "確定後はパーティクルモードを抜けるはず")
         XCTAssertTrue(client.inserted.contains("が"), "「が」が挿入されるはず")
-        guard case .dismiss = result.candidateAction else {
-            XCTFail("即確定後は .dismiss を返すはず: \(result.candidateAction)"); return
+        guard case .dismiss = confirmResult.candidateAction else {
+            XCTFail("確定後は .dismiss を返すはず: \(confirmResult.candidateAction)"); return
         }
     }
 
     func testParticleModeRomajiAmbiguousFilters() {
         typeRomaji("tokyo")
-        press(keyCode: 36)  // 確定 → パーティクルモード
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isParticleMode)
         // "n" → に・の（複数マッチ）→ 絞り込み表示
         let result = type(chars: "n", base: "n", candidateVisible: true, selectedRow: 0, selectedText: "が")
@@ -1007,11 +1014,67 @@ final class InputHandlerTests: XCTestCase {
 
     func testParticleModeUnmatchedKeyExitsMode() {
         typeRomaji("tokyo")
-        press(keyCode: 36)
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isParticleMode)
         // "a" → 格助詞マッチなし → パーティクルモード解除して通常入力
         let result = type(chars: "a", base: "a")
         XCTAssertFalse(handler.isParticleMode, "マッチなしキーでパーティクルモードを抜けるはず")
         XCTAssertEqual(client.markedText, "あ", "通常の組成になるはず")
+    }
+
+    // MARK: - 格助詞：名詞フィルタリング
+
+    func testParticleModeActivatesAfterKanji() {
+        typeRomaji("tokyo")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isParticleMode, "漢字末尾の確定後は格助詞モードになるはず")
+        guard case .show = result.candidateAction else {
+            XCTFail(".show を返すはず: \(result.candidateAction)"); return
+        }
+    }
+
+    func testParticleModeActivatesAfterKatakana() {
+        typeRomaji("koohii")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "コーヒー")
+        XCTAssertTrue(handler.isParticleMode, "カタカナ末尾の確定後は格助詞モードになるはず")
+        guard case .show = result.candidateAction else {
+            XCTFail(".show を返すはず: \(result.candidateAction)"); return
+        }
+    }
+
+    func testParticleModeNotActivatedAfterHiragana() {
+        typeRomaji("ta")  // → "た"（ひらがな確定）
+        let result = press(keyCode: 36)
+        XCTAssertFalse(handler.isParticleMode, "ひらがな末尾の確定後は格助詞モードにならないはず")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
+        }
+    }
+
+    func testParticleModeNotActivatedAfterSymbol() {
+        typeRomaji("a")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "？")
+        XCTAssertFalse(handler.isParticleMode, "記号確定後は格助詞モードにならないはず")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
+        }
+    }
+
+    func testParticleModeNotActivatedAfterASCII() {
+        typeRomaji("a")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "Hello")
+        XCTAssertFalse(handler.isParticleMode, "ASCII確定後は格助詞モードにならないはず")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
+        }
+    }
+
+    func testParticleModeNotActivatedAfterJapanesePunctuation() {
+        typeRomaji("a")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "！")
+        XCTAssertFalse(handler.isParticleMode, "日本語感嘆符確定後は格助詞モードにならないはず")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
+        }
     }
 }

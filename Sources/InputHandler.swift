@@ -322,9 +322,23 @@ struct InputHandler {
         "y": ["より"],
     ]
 
+    // 漢字またはカタカナで終わる語（名詞らしい）かどうか
+    private func isNounLike(_ text: String) -> Bool {
+        guard let last = text.unicodeScalars.last else { return false }
+        let v = last.value
+        let isKanji = (v >= 0x4E00 && v <= 0x9FFF) || (v >= 0x3400 && v <= 0x4DBF) || (v >= 0xF900 && v <= 0xFAFF)
+        let isKatakana = v >= 0x30A0 && v <= 0x30FF
+        return isKanji || isKatakana
+    }
+
     private mutating func doSuggestParticles() -> CandidateAction {
         // 直前の確定が格助詞自身なら再表示しない
         if let last = lastCommittedOutput, InputHandler.particles.contains(last) {
+            isParticleMode = false; particleFirstChar = nil
+            return .dismiss
+        }
+        // 名詞らしい語（漢字・カタカナ末尾）のみ表示
+        guard let last = lastCommittedOutput, isNounLike(last) else {
             isParticleMode = false; particleFirstChar = nil
             return .dismiss
         }
