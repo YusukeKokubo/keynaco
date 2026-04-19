@@ -38,14 +38,14 @@
 	<dict>
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
-			<string>com.yusuke.inputmethod.ykey.Hiragana</string>
+			<string>com.yusuke.inputmethod.keynaco.Hiragana</string>
 		</array>
 		<key>tsInputModeListKey</key>
 		<dict>
-			<key>com.yusuke.inputmethod.ykey.Hiragana</key>
+			<key>com.yusuke.inputmethod.keynaco.Hiragana</key>
 			<dict>
 				<key>TISInputSourceID</key>
-				<string>com.yusuke.inputmethod.ykey.Hiragana</string>
+				<string>com.yusuke.inputmethod.keynaco.Hiragana</string>
 				<key>tsInputModeScriptKey</key>
 				<string>smJapanese</string>
 				<key>tsInputModePrimaryInScriptKey</key>
@@ -58,6 +58,8 @@
 				<string>ja</string>
 				<key>TISIconIsTemplate</key>
 				<true/>
+				<key>TISIconImageFile</key>
+				<string>InputSource.png</string>
 			</dict>
 		</dict>
 	</dict>

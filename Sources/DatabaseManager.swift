@@ -26,15 +26,15 @@ final class DatabaseManager: @unchecked Sendable {
     private func openDatabase() {
         let dir = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ykey", isDirectory: true)
+            .appendingPathComponent("keynaco", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         let path = dir.appendingPathComponent("history.db").path
         guard sqlite3_open(path, &db) == SQLITE_OK else {
-            NSLog("ykey: DB を開けませんでした: \(path)")
+            NSLog("keynaco: DB を開けませんでした: \(path)")
             return
         }
-        NSLog("ykey: DB パス = \(path)")
+        NSLog("keynaco: DB パス = \(path)")
     }
 
     private func createTables() {

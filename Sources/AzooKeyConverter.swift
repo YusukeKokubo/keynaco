@@ -9,7 +9,7 @@ final class AzooKeyConverter: @unchecked Sendable {
     init() {
         let memoryURL = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first!.appendingPathComponent("ykey")
+            .first!.appendingPathComponent("keynaco")
         try? FileManager.default.createDirectory(at: memoryURL, withIntermediateDirectories: true)
         options = ConvertRequestOptions(
             N_best: 10,

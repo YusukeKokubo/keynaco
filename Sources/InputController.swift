@@ -2,7 +2,7 @@ import Cocoa
 import InputMethodKit
 import os
 
-private let logger = Logger(subsystem: "com.yusuke.inputmethod.ykey", category: "input")
+private let logger = Logger(subsystem: "com.yusuke.inputmethod.keynaco", category: "input")
 
 // MARK: - IMKTextInput → TextInputClient アダプタ
 
@@ -80,7 +80,7 @@ class InputController: IMKInputController {
     }
 
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
-        // ykey は内部で英字/日本語モードを管理する。
+        // keynaco は内部で英字/日本語モードを管理する。
         // super を呼ぶと IMK が未対応モードへの切替を試みてイベントルーティングが壊れる。
     }
 

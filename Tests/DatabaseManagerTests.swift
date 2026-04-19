@@ -1,5 +1,5 @@
 import XCTest
-@testable import ykey
+@testable import keynaco
 
 final class DatabaseManagerTests: XCTestCase {
 

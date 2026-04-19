@@ -15,10 +15,10 @@
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"
-                     BlueprintIdentifier = "3EBF27CCCA077FD6B004E3E8"
-                     BuildableName = "ykey.app"
-                     BlueprintName = "ykey"
-                     ReferencedContainer = "container:ykey.xcodeproj">
+                     BlueprintIdentifier = "3FC4825010CF50950EE0DF10"
+                     BuildableName = "keynaco.app"
+                     BlueprintName = "keynaco"
+                     ReferencedContainer = "container:keynaco.xcodeproj">
                   </BuildableReference>
                </EnvironmentBuildable>
             </ActionContent>
@@ -33,10 +33,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "3EBF27CCCA077FD6B004E3E8"
-               BuildableName = "ykey.app"
-               BlueprintName = "ykey"
-               ReferencedContainer = "container:ykey.xcodeproj">
+               BlueprintIdentifier = "3FC4825010CF50950EE0DF10"
+               BuildableName = "keynaco.app"
+               BlueprintName = "keynaco"
+               ReferencedContainer = "container:keynaco.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -50,10 +50,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3EBF27CCCA077FD6B004E3E8"
-            BuildableName = "ykey.app"
-            BlueprintName = "ykey"
-            ReferencedContainer = "container:ykey.xcodeproj">
+            BlueprintIdentifier = "3FC4825010CF50950EE0DF10"
+            BuildableName = "keynaco.app"
+            BlueprintName = "keynaco"
+            ReferencedContainer = "container:keynaco.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -62,10 +62,10 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "E0C76E3AC5BB69D231517B30"
-               BuildableName = "ykeyTests.xctest"
-               BlueprintName = "ykeyTests"
-               ReferencedContainer = "container:ykey.xcodeproj">
+               BlueprintIdentifier = "D4438994D0C1BCBE71A747DA"
+               BuildableName = "keynacoTests.xctest"
+               BlueprintName = "keynacoTests"
+               ReferencedContainer = "container:keynaco.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -86,10 +86,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3EBF27CCCA077FD6B004E3E8"
-            BuildableName = "ykey.app"
-            BlueprintName = "ykey"
-            ReferencedContainer = "container:ykey.xcodeproj">
+            BlueprintIdentifier = "3FC4825010CF50950EE0DF10"
+            BuildableName = "keynaco.app"
+            BlueprintName = "keynaco"
+            ReferencedContainer = "container:keynaco.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -105,10 +105,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3EBF27CCCA077FD6B004E3E8"
-            BuildableName = "ykey.app"
-            BlueprintName = "ykey"
-            ReferencedContainer = "container:ykey.xcodeproj">
+            BlueprintIdentifier = "3FC4825010CF50950EE0DF10"
+            BuildableName = "keynaco.app"
+            BlueprintName = "keynaco"
+            ReferencedContainer = "container:keynaco.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

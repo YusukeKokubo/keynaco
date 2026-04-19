@@ -10,7 +10,7 @@ final class SettingsWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "ykey 設定"
+        window.title = "keynaco 設定"
         window.isReleasedWhenClosed = false
 
         let tabVC = NSTabViewController()

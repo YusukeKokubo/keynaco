@@ -1,4 +1,4 @@
-ykey をビルドしてインストールする。
+keynaco をビルドしてインストールする。
 
 Build Post-action により `/Library/Input Methods/` への自動コピーとプロセス再起動が行われる。
 
@@ -8,5 +8,5 @@ Build Post-action により `/Library/Input Methods/` への自動コピーと�
 
 ```bash
 xcodegen generate
-xcodebuild build -scheme ykey -configuration Debug
+xcodebuild build -scheme keynaco -configuration Debug
 ```

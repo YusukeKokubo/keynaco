@@ -1,4 +1,4 @@
-name: ykey
+name: keynaco
 
 options:
   bundleIdPrefix: com.yusuke
@@ -12,29 +12,30 @@ packages:
     path: Packages/AzooKeyKanaKanjiConverter
 
 targets:
-  ykey:
+  keynaco:
     type: application
     platform: macOS
     sources:
       - path: Sources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.yusuke.inputmethod.ykey
+        PRODUCT_BUNDLE_IDENTIFIER: com.yusuke.inputmethod.keynaco
         SWIFT_VERSION: "6.0"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         # App Sandbox 有効
         ENABLE_APP_SANDBOX: YES
-        CODE_SIGN_ENTITLEMENTS: Sources/ykey.entitlements
+        CODE_SIGN_ENTITLEMENTS: Sources/keynaco.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R2ZZ3ALJ36
         INFOPLIST_FILE: Sources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - sdk: InputMethodKit.framework
       - sdk: libsqlite3.tbd
       - package: AzooKeyKanaKanjiConverter
         product: KanaKanjiConverterModuleWithDefaultDictionary
 
-  ykeyTests:
+  keynacoTests:
     type: bundle.unit-test
     platform: macOS
     sources:
@@ -45,13 +46,13 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
-      - target: ykey
+      - target: keynaco
 
 schemes:
-  ykey:
+  keynaco:
     build:
       targets:
-        ykey: all
+        keynaco: all
       postActions:
         - script: |
             DESTINATION="/Library/Input Methods"
@@ -65,9 +66,9 @@ schemes:
             rm -rf "$DEST_APP"
             cp -R "$SOURCE_APP" "$DEST_APP"
           name: Install to Input Methods
-          settingsTarget: ykey
+          settingsTarget: keynaco
     run:
-      executable: ykey
+      executable: keynaco
     test:
       targets:
-        - ykeyTests
+        - keynacoTests

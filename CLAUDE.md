@@ -1,4 +1,4 @@
-# ykey
+# keynaco
 
 macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
@@ -22,7 +22,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 ```bash
 xcodegen generate
-xcodebuild build -scheme ykey -configuration Debug
+xcodebuild build -scheme keynaco -configuration Debug
 ```
 
 - Build Post-action（`project.yml` の `schemes`）により `/Library/Input Methods/` への自動コピーとプロセス再起動が行われる
@@ -35,7 +35,7 @@ xcodebuild build -scheme ykey -configuration Debug
 
 ```bash
 xcodegen generate  # .xcodeproj がない場合のみ
-xcodebuild test -scheme ykey -destination "platform=macOS"
+xcodebuild test -scheme keynaco -destination "platform=macOS"
 ```
 
 ## コンポーネント構成
@@ -46,7 +46,7 @@ xcodebuild test -scheme ykey -destination "platform=macOS"
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
-- `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/ykey/` に保存）
+- `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/keynaco/` に保存）
 - `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` と `bigram` の2テーブルを持つ
 - `SettingsWindowController` / `BigramViewController` / `HistoryViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（履歴セクションの末尾インデックス）が重要
@@ -110,7 +110,7 @@ macOS 26 では TIS がサードパーティ IME を認識するために Bundle
 
 ### Swift クラスに @objc が必須
 
-InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInputController` サブクラスや `NSApplication` サブクラスには `@objc(ClassName)` を付けないと実行時に見つからない。Info.plist のクラス名もモジュールプレフィックスなしにする（`ykey.InputController` ではなく `InputController`）。
+InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInputController` サブクラスや `NSApplication` サブクラスには `@objc(ClassName)` を付けないと実行時に見つからない。Info.plist のクラス名もモジュールプレフィックスなしにする（`keynaco.InputController` ではなく `InputController`）。
 
 ### IMKCandidates は macOS 26 で使えない
 

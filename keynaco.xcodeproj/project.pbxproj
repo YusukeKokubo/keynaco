@@ -1,0 +1,570 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		014E93622F1E490E3CADC108 /* CompositionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B2777B55743611F1112961 /* CompositionStateTests.swift */; };
+		0521D725A698985598C0AEF1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = EB4429C5180AA3C30E50DD09 /* InfoPlist.strings */; };
+		087D83DB5E5BD1979F0BA0A5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558C3E35C47661D5D98A0A57 /* AppDelegate.swift */; };
+		25A7798A7237BDF2124782E0 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54631F84EB0B2E3208C05023 /* SettingsWindowController.swift */; };
+		2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */; };
+		32AA887B33A030356BA62078 /* DatabaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */; };
+		417423818A8C02627A56F0D9 /* KanaKanjiConverterModuleWithDefaultDictionary in Frameworks */ = {isa = PBXBuildFile; productRef = 4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */; };
+		449322D03ACDF2D3EDBE3EEF /* TextInputClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A60998D2E36F9EBDF51923 /* TextInputClient.swift */; };
+		4D2A168DE48D8E47E75049BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */; };
+		4EE90AF2E1605DEEEA8214D6 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */; };
+		7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */; };
+		840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34144C2DA730A7CFDC7B4149 /* InputHandler.swift */; };
+		97506D2D83D03ABF9DF72361 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FECEC3CBD864BE0FA7202F3 /* main.swift */; };
+		9816A2BE911D5EA8F440EB0D /* InputHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781BA31568827C4C7ABA5758 /* InputHandlerTests.swift */; };
+		A1CA0C0EB56C14AAB5A87BDA /* CompositionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A63EA4E6329AB0A60E30A8 /* CompositionState.swift */; };
+		B6A394F4C8CEFE7B98992E12 /* AzooKeyConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */; };
+		BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */; };
+		CA9DA0E228B3736FED19A8C7 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8870F701310164C98A33E /* BigramViewController.swift */; };
+		CCAFA4CFB86584E8385625F2 /* InputSource.png in Resources */ = {isa = PBXBuildFile; fileRef = 30417076AD2C2828F84F56D7 /* InputSource.png */; };
+		CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01349F1120E395B87FF8E96B /* DatabaseManager.swift */; };
+		E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EA5A03205A3A4B861980E8 /* InputController.swift */; };
+		E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */; };
+		F317D8234DE824CA1056CE5C /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD350111182091DBDE4ECE9B /* CandidateWindow.swift */; };
+		F7C6F412438DD4540CD3E396 /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */; };
+		FC361366E3DE4C6B91491F28 /* RomajiConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AAAFA11447C5C11FF90CA702 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3FEED810192B114AE18B9B26 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3FC4825010CF50950EE0DF10;
+			remoteInfo = keynaco;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		01349F1120E395B87FF8E96B /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
+		0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
+		0DF633BBF3C756509E09F05A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		15033BFDFA6A888F753B0666 /* keynacoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = keynacoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		21A8870F701310164C98A33E /* BigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigramViewController.swift; sourceTree = "<group>"; };
+		30417076AD2C2828F84F56D7 /* InputSource.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = InputSource.png; sourceTree = "<group>"; };
+		32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverter.swift; sourceTree = "<group>"; };
+		34144C2DA730A7CFDC7B4149 /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
+		36A60998D2E36F9EBDF51923 /* TextInputClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInputClient.swift; sourceTree = "<group>"; };
+		47A63EA4E6329AB0A60E30A8 /* CompositionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionState.swift; sourceTree = "<group>"; };
+		52B2777B55743611F1112961 /* CompositionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionStateTests.swift; sourceTree = "<group>"; };
+		54631F84EB0B2E3208C05023 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		558C3E35C47661D5D98A0A57 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		59721E10162EA851CA8CB8B2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = System/Library/Frameworks/InputMethodKit.framework; sourceTree = SDKROOT; };
+		781BA31568827C4C7ABA5758 /* InputHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerTests.swift; sourceTree = "<group>"; };
+		7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverterTests.swift; sourceTree = "<group>"; };
+		832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
+		8FECEC3CBD864BE0FA7202F3 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A7EA5A03205A3A4B861980E8 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
+		AD350111182091DBDE4ECE9B /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
+		B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BDF5EF0A3290FC2C445D94D9 /* AzooKeyKanaKanjiConverter */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AzooKeyKanaKanjiConverter; path = Packages/AzooKeyKanaKanjiConverter; sourceTree = SOURCE_ROOT; };
+		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftInputTests.swift; sourceTree = "<group>"; };
+		D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
+		F2289452FE1578194147B535 /* keynaco.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = keynaco.entitlements; sourceTree = "<group>"; };
+		FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyConverter.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		795165C71CF0078861B6A292 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7C6F412438DD4540CD3E396 /* InputMethodKit.framework in Frameworks */,
+				2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */,
+				417423818A8C02627A56F0D9 /* KanaKanjiConverterModuleWithDefaultDictionary in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		03365134EADD8BD7F46416E0 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				52B2777B55743611F1112961 /* CompositionStateTests.swift */,
+				D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */,
+				781BA31568827C4C7ABA5758 /* InputHandlerTests.swift */,
+				7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */,
+				BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		08E47E3184641C5C9BFF3C25 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */,
+				832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		19422AF3A704E8AFB28E5035 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BE0A2E0B99A6B19E0BB84417 /* keynaco.app */,
+				15033BFDFA6A888F753B0666 /* keynacoTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		57A482A0166D4F5605EB6818 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				21A8870F701310164C98A33E /* BigramViewController.swift */,
+				0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */,
+				54631F84EB0B2E3208C05023 /* SettingsWindowController.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		7EB62827918E304BBCA11F6E = {
+			isa = PBXGroup;
+			children = (
+				8AC41BA96975158A122F0EE2 /* Packages */,
+				D6BCE65CF99E4CE014C96720 /* Sources */,
+				03365134EADD8BD7F46416E0 /* Tests */,
+				08E47E3184641C5C9BFF3C25 /* Frameworks */,
+				19422AF3A704E8AFB28E5035 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		8AC41BA96975158A122F0EE2 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				BDF5EF0A3290FC2C445D94D9 /* AzooKeyKanaKanjiConverter */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		D6BCE65CF99E4CE014C96720 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				558C3E35C47661D5D98A0A57 /* AppDelegate.swift */,
+				B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */,
+				FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */,
+				AD350111182091DBDE4ECE9B /* CandidateWindow.swift */,
+				47A63EA4E6329AB0A60E30A8 /* CompositionState.swift */,
+				01349F1120E395B87FF8E96B /* DatabaseManager.swift */,
+				59721E10162EA851CA8CB8B2 /* Info.plist */,
+				A7EA5A03205A3A4B861980E8 /* InputController.swift */,
+				34144C2DA730A7CFDC7B4149 /* InputHandler.swift */,
+				30417076AD2C2828F84F56D7 /* InputSource.png */,
+				F2289452FE1578194147B535 /* keynaco.entitlements */,
+				8FECEC3CBD864BE0FA7202F3 /* main.swift */,
+				86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */,
+				32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */,
+				36A60998D2E36F9EBDF51923 /* TextInputClient.swift */,
+				EB4429C5180AA3C30E50DD09 /* InfoPlist.strings */,
+				57A482A0166D4F5605EB6818 /* Settings */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3FC4825010CF50950EE0DF10 /* keynaco */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4B6BA52F1CDAA41FC17C8F98 /* Build configuration list for PBXNativeTarget "keynaco" */;
+			buildPhases = (
+				C7E716F1735DCDD8A13E94CC /* Sources */,
+				9679BB47B285B2F5EE416E64 /* Resources */,
+				795165C71CF0078861B6A292 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = keynaco;
+			packageProductDependencies = (
+				4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */,
+			);
+			productName = keynaco;
+			productReference = BE0A2E0B99A6B19E0BB84417 /* keynaco.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D4438994D0C1BCBE71A747DA /* keynacoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3466442A37A3939A4541E0C5 /* Build configuration list for PBXNativeTarget "keynacoTests" */;
+			buildPhases = (
+				A76FCF1E924645393E82DB67 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0802947159C6512D031CC28B /* PBXTargetDependency */,
+			);
+			name = keynacoTests;
+			packageProductDependencies = (
+			);
+			productName = keynacoTests;
+			productReference = 15033BFDFA6A888F753B0666 /* keynacoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3FEED810192B114AE18B9B26 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					3FC4825010CF50950EE0DF10 = {
+						DevelopmentTeam = R2ZZ3ALJ36;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = B325677B66F5AD7A09EE4203 /* Build configuration list for PBXProject "keynaco" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7EB62827918E304BBCA11F6E;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F7CFEF30DF98BA3C8D42390D /* XCLocalSwiftPackageReference "Packages/AzooKeyKanaKanjiConverter" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 19422AF3A704E8AFB28E5035 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3FC4825010CF50950EE0DF10 /* keynaco */,
+				D4438994D0C1BCBE71A747DA /* keynacoTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9679BB47B285B2F5EE416E64 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D2A168DE48D8E47E75049BE /* Assets.xcassets in Resources */,
+				0521D725A698985598C0AEF1 /* InfoPlist.strings in Resources */,
+				CCAFA4CFB86584E8385625F2 /* InputSource.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A76FCF1E924645393E82DB67 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				014E93622F1E490E3CADC108 /* CompositionStateTests.swift in Sources */,
+				32AA887B33A030356BA62078 /* DatabaseManagerTests.swift in Sources */,
+				9816A2BE911D5EA8F440EB0D /* InputHandlerTests.swift in Sources */,
+				7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */,
+				E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C7E716F1735DCDD8A13E94CC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				087D83DB5E5BD1979F0BA0A5 /* AppDelegate.swift in Sources */,
+				B6A394F4C8CEFE7B98992E12 /* AzooKeyConverter.swift in Sources */,
+				CA9DA0E228B3736FED19A8C7 /* BigramViewController.swift in Sources */,
+				F317D8234DE824CA1056CE5C /* CandidateWindow.swift in Sources */,
+				A1CA0C0EB56C14AAB5A87BDA /* CompositionState.swift in Sources */,
+				CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */,
+				4EE90AF2E1605DEEEA8214D6 /* HistoryViewController.swift in Sources */,
+				E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */,
+				840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */,
+				BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */,
+				FC361366E3DE4C6B91491F28 /* RomajiConverter.swift in Sources */,
+				25A7798A7237BDF2124782E0 /* SettingsWindowController.swift in Sources */,
+				449322D03ACDF2D3EDBE3EEF /* TextInputClient.swift in Sources */,
+				97506D2D83D03ABF9DF72361 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0802947159C6512D031CC28B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3FC4825010CF50950EE0DF10 /* keynaco */;
+			targetProxy = AAAFA11447C5C11FF90CA702 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		EB4429C5180AA3C30E50DD09 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				0DF633BBF3C756509E09F05A /* en */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		3C17ADC4F6F67C481937D07D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/keynaco.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = R2ZZ3ALJ36;
+				ENABLE_APP_SANDBOX = YES;
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yusuke.inputmethod.keynaco;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		63ED0CB3A61D89D96396E319 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yusuke.keynacoTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/keynaco.app/Contents/MacOS/keynaco";
+			};
+			name = Debug;
+		};
+		9BADFABB2F74B6204C9BAB7F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/keynaco.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = R2ZZ3ALJ36;
+				ENABLE_APP_SANDBOX = YES;
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yusuke.inputmethod.keynaco;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		C2865A44B44E3C08AD663AB4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		E8DA88A0B9BF8E45BB7EDAC0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yusuke.keynacoTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/keynaco.app/Contents/MacOS/keynaco";
+			};
+			name = Release;
+		};
+		F90BE372C426B0E76B1482FD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3466442A37A3939A4541E0C5 /* Build configuration list for PBXNativeTarget "keynacoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				63ED0CB3A61D89D96396E319 /* Debug */,
+				E8DA88A0B9BF8E45BB7EDAC0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4B6BA52F1CDAA41FC17C8F98 /* Build configuration list for PBXNativeTarget "keynaco" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9BADFABB2F74B6204C9BAB7F /* Debug */,
+				3C17ADC4F6F67C481937D07D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B325677B66F5AD7A09EE4203 /* Build configuration list for PBXProject "keynaco" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2865A44B44E3C08AD663AB4 /* Debug */,
+				F90BE372C426B0E76B1482FD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		F7CFEF30DF98BA3C8D42390D /* XCLocalSwiftPackageReference "Packages/AzooKeyKanaKanjiConverter" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AzooKeyKanaKanjiConverter;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KanaKanjiConverterModuleWithDefaultDictionary;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 3FEED810192B114AE18B9B26 /* Project object */;
+}

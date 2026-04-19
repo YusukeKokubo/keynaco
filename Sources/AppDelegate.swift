@@ -10,11 +10,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let connectionName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String,
             let bundleID = Bundle.main.bundleIdentifier
         else {
-            NSLog("ykey: InputMethodConnectionName not found")
+            NSLog("keynaco: InputMethodConnectionName not found")
             return
         }
         gServer = IMKServer(name: connectionName, bundleIdentifier: bundleID)
-        NSLog("ykey: IMKServer started connection=\(connectionName) bundle=\(bundleID)")
+        NSLog("keynaco: IMKServer started connection=\(connectionName) bundle=\(bundleID)")
         setupMainMenu()
     }
 

@@ -249,7 +249,7 @@ final class BigramViewController: NSViewController {
     private func applyImport(from text: String) throws {
         let json = extractJSON(from: text)
         guard let jsonData = json.data(using: .utf8) else {
-            throw NSError(domain: "ykey", code: 0,
+            throw NSError(domain: "keynaco", code: 0,
                           userInfo: [NSLocalizedDescriptionKey: "テキストを変換できませんでした"])
         }
         let decoded = try JSONDecoder().decode([BigramTransfer].self, from: jsonData)
