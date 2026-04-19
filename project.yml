@@ -70,6 +70,8 @@ schemes:
             BUILD=$(git -C "$SRCROOT" rev-list HEAD --count 2>/dev/null || echo "0")
             /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"
+            SIGN_ID=$(security find-identity -v -p codesigning | awk '/Apple Development/{print $2; exit}')
+            codesign --force --deep --sign "${SIGN_ID:-$EXPANDED_CODE_SIGN_IDENTITY}" "$SOURCE_APP"
 
             pkill -f "$PROCESS_NAME" || true
             if [ ! -d "$DESTINATION" ]; then mkdir -p "$DESTINATION"; fi

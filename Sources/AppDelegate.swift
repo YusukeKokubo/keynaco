@@ -1,11 +1,14 @@
 import Cocoa
 import InputMethodKit
+import Carbon
 
 nonisolated(unsafe) var gServer: IMKServer?
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
+
         guard
             let connectionName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String,
             let bundleID = Bundle.main.bundleIdentifier

@@ -146,6 +146,9 @@ struct InputHandler {
                 return (true, action)
             case KeyCode.escape:  // Escape
                 return doEscape(client: client)
+            case KeyCode.rightArrow:  // →: 変換キャンセル（ひらがな組成に戻す）
+                applyMarkedText(candidateText: nil, client: client)
+                return (true, .dismiss)
             case KeyCode.backspace where modifiers.contains(.shift):  // Shift+Delete: 履歴から削除
                 if candidate.selectedRow < candidate.historyEnd {
                     return (true, .deleteSelected)
