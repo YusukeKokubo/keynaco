@@ -53,6 +53,7 @@ struct InputHandler {
     var state = CompositionState()
     var ignoreNextModeSwitch = false
     var isParticleMode = false
+    var particleFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
     var lastCommittedOutput: String? = nil
     let db: DatabaseManager
     let azooKeyConverter: AzooKeyConverter
@@ -321,17 +322,18 @@ struct InputHandler {
     private mutating func doSuggestParticles() -> CandidateAction {
         // 直前の確定が格助詞自身なら再表示しない
         if let last = lastCommittedOutput, InputHandler.particles.contains(last) {
-            isParticleMode = false
+            isParticleMode = false; particleFirstChar = nil
             return .dismiss
         }
         isParticleMode = true
+        particleFirstChar = nil
         let fromBigram = lastCommittedOutput.map { db.fetchBigramInList(prev: $0, list: InputHandler.particles) } ?? []
         let rest = InputHandler.particles.filter { !fromBigram.contains($0) }
         return .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0)
     }
 
     private mutating func confirmParticle(_ particle: String, client: TextInputClient) {
-        isParticleMode = false
+        isParticleMode = false; particleFirstChar = nil
         if let prev = lastCommittedOutput { db.recordBigram(prev: prev, input: particle, output: particle) }
         db.record(input: particle, output: particle)
         lastCommittedOutput = particle
@@ -349,7 +351,11 @@ struct InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         switch keyCode {
         case KeyCode.space, KeyCode.enter:
-            guard let selected = candidate.selectedText else { isParticleMode = false; return (true, .dismiss) }
+            guard let selected = candidate.selectedText else {
+                isParticleMode = false; particleFirstChar = nil
+                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
+                return (true, .dismiss)
+            }
             confirmParticle(selected, client: client)
             return (true, .dismiss)
         case KeyCode.downArrow, KeyCode.tab:
@@ -357,25 +363,28 @@ struct InputHandler {
         case KeyCode.upArrow:
             return (true, .selectPrev)
         case KeyCode.escape, KeyCode.backspace:
-            isParticleMode = false
+            isParticleMode = false; particleFirstChar = nil
+            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
             return (true, .dismiss)
         default:
-            // 頭文字1打で格助詞を絞り込み・即確定
             let char = (baseCharacters ?? characters ?? "").lowercased()
             if char.count == 1, let c = char.first, c.isLetter, c.isASCII {
                 let matched = InputHandler.particleRomajiMap[char] ?? []
-                if matched.count == 1 {
-                    confirmParticle(matched[0], client: client)
-                    return (true, .dismiss)
-                } else if matched.count > 1 {
-                    // 複数マッチ → bi-gram頻度順で絞り込み表示
+                if !matched.isEmpty {
+                    // 格助詞プレフィックス → バッファを更新してフィルタリング表示
+                    particleFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
                     let fromBigram = lastCommittedOutput.map { db.fetchBigramInList(prev: $0, list: matched) } ?? []
                     let rest = matched.filter { !fromBigram.contains($0) }
                     return (true, .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0))
                 }
             }
-            // 対応なし → パーティクルモード解除して通常処理
-            isParticleMode = false
+            // 格助詞プレフィックス以外 → モード解除、バッファがあれば先に通常入力に流す
+            let first = particleFirstChar
+            isParticleMode = false; particleFirstChar = nil
+            if let first {
+                _ = handle(keyCode: first.keyCode, characters: first.characters, baseCharacters: first.baseCharacters,
+                           modifiers: modifiers, candidate: .hidden, client: client)
+            }
             return handle(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
                           modifiers: modifiers, candidate: .hidden, client: client)
         }

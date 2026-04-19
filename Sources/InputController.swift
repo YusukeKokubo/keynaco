@@ -89,6 +89,7 @@ class InputController: IMKInputController {
         handler.state = CompositionState()
         handler.lastCommittedOutput = nil
         handler.isParticleMode = false
+        handler.particleFirstChar = nil
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
     }
@@ -134,14 +135,31 @@ class InputController: IMKInputController {
             break
         case .show(let candidates, let historyEnd, let initialRow):
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, near: adapter.cursorRect())
+            if handler.isParticleMode {
+                // 格助詞を選択候補としてマークドテキストに設定する。
+                // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
+                // Enter を IME に転送するようになる。
+                let markedText = candidates.isEmpty ? "" : candidates[min(initialRow, candidates.count - 1)]
+                adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
+            }
         case .dismiss:
             candidateWindow.dismiss()
         case .selectNext:
             candidateWindow.selectNext()
-            if !handler.isParticleMode { updateMarkedText(client: adapter) }
+            if handler.isParticleMode {
+                let text = candidateWindow.selectedText() ?? ""
+                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            } else {
+                updateMarkedText(client: adapter)
+            }
         case .selectPrev:
             candidateWindow.selectPrev()
-            if !handler.isParticleMode { updateMarkedText(client: adapter) }
+            if handler.isParticleMode {
+                let text = candidateWindow.selectedText() ?? ""
+                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            } else {
+                updateMarkedText(client: adapter)
+            }
         case .deleteSelected:
             let row = candidateWindow.selectedRow
             if let text = candidateWindow.selectedText() {
@@ -171,6 +189,7 @@ class InputController: IMKInputController {
         )
         handler.commitComposition(client: adapter, candidate: ctx)
         handler.isParticleMode = false
+        handler.particleFirstChar = nil
         candidateWindow.dismiss()
     }
 
