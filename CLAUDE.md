@@ -101,9 +101,9 @@ IME はバックグラウンドエージェントとして動作するため、`
 
 ## macOS 26 IME の罠
 
-### Bundle ID に "inputmethod" が必須
+### Bundle ID に "inputmethod" が必須（InputMethodKit 全般の仕様）
 
-macOS 26 では TIS がサードパーティ IME を認識するために Bundle ID に `inputmethod` の文字列が必要。これがないと `TISRegisterInputSource` は成功を返すが `TISCreateInputSourceList` に現れない。サイレントに失敗するため原因特定が極めて困難。
+TIS がサードパーティ IME を認識するために Bundle ID に `inputmethod` の文字列が必要（macOS 26 固有ではなく InputMethodKit 長年の仕様）。これがないと `TISRegisterInputSource` は成功を返すが `TISCreateInputSourceList` に現れない。サイレントに失敗するため原因特定が極めて困難。
 
 ### Info.plist は xcodegen に上書きさせない
 
@@ -117,9 +117,9 @@ macOS 26 では TIS がサードパーティ IME を認識するために Bundle
 
 InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInputController` サブクラスや `NSApplication` サブクラスには `@objc(ClassName)` を付けないと実行時に見つからない。Info.plist のクラス名もモジュールプレフィックスなしにする（`keynaco.InputController` ではなく `InputController`）。
 
-### IMKCandidates は macOS 26 で使えない
+### IMKCandidates は macOS 26 で動作しない（実体験）
 
-`IMKCandidates` の `selectCandidate(withIdentifier:)` が動作しない。候補ウィンドウは `NSWindow(.borderless, level: .popUpMenu)` + `NSTableView` で自作する。
+`IMKCandidates` の `selectCandidate(withIdentifier:)` が macOS 26 環境で動作しなかった（Apple 公式の明示的なバグ報告はないが、歴史的に描画不安定の報告が多い）。候補ウィンドウは `NSWindow(.borderless, level: .popUpMenu)` + `NSTableView` で自作する。
 
 ### Development 署名で spctl -a は "rejected" になる
 
