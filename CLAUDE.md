@@ -8,7 +8,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 |------|------|
 | `Sources/` | アプリ本体（Swift ソース + Info.plist + entitlements） |
 | `Tests/` | ユニットテスト（XCTest） |
-| `Packages/AzooKeyKanaKanjiConverter` | ローカル Swift Package（変換エンジン）。SPM リモート依存（https://github.com/azooKey/AzooKeyKanaKanjiConverter）として `project.yml` で管理 |
 | `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` 形式） |
 | `project.yml` | XcodeGen 設定 |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
@@ -32,6 +31,7 @@ xcodebuild build -scheme keynaco -configuration Debug
 - 初回セットアップ: `sudo chmod -R +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_child,delete,read,write,execute" "/Library/Input Methods"` が必要（所有者を root のまま ACL で自分にだけ権限を付与）
 - `~/Library/Input Methods/` は使わない（入力ソースが重複登録される）
 - 初回インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
+- 起動のたびに `TISRegisterInputSource` を呼んで入力ソースを自動登録する。初回のみログアウト→ログインが必要（TIS がキャッシュを更新するため）
 - `/deploy` スキル（Claude Code 内）: ビルドからインストールまでを一括実行する
 
 ## テスト実行
