@@ -68,7 +68,6 @@
 		A7EA5A03205A3A4B861980E8 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		AD350111182091DBDE4ECE9B /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
 		B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		BDF5EF0A3290FC2C445D94D9 /* AzooKeyKanaKanjiConverter */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AzooKeyKanaKanjiConverter; path = Packages/AzooKeyKanaKanjiConverter; sourceTree = SOURCE_ROOT; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftInputTests.swift; sourceTree = "<group>"; };
 		D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
@@ -133,20 +132,11 @@
 		7EB62827918E304BBCA11F6E = {
 			isa = PBXGroup;
 			children = (
-				8AC41BA96975158A122F0EE2 /* Packages */,
 				D6BCE65CF99E4CE014C96720 /* Sources */,
 				03365134EADD8BD7F46416E0 /* Tests */,
 				08E47E3184641C5C9BFF3C25 /* Frameworks */,
 				19422AF3A704E8AFB28E5035 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		8AC41BA96975158A122F0EE2 /* Packages */ = {
-			isa = PBXGroup;
-			children = (
-				BDF5EF0A3290FC2C445D94D9 /* AzooKeyKanaKanjiConverter */,
-			);
-			path = Packages;
 			sourceTree = "<group>";
 		};
 		D6BCE65CF99E4CE014C96720 /* Sources */ = {
@@ -239,7 +229,7 @@
 			mainGroup = 7EB62827918E304BBCA11F6E;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				F7CFEF30DF98BA3C8D42390D /* XCLocalSwiftPackageReference "Packages/AzooKeyKanaKanjiConverter" */,
+				5E49C22D98DE121021DD64B7 /* XCRemoteSwiftPackageReference "AzooKeyKanaKanjiConverter" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 19422AF3A704E8AFB28E5035 /* Products */;
@@ -556,16 +546,21 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		F7CFEF30DF98BA3C8D42390D /* XCLocalSwiftPackageReference "Packages/AzooKeyKanaKanjiConverter" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/AzooKeyKanaKanjiConverter;
+/* Begin XCRemoteSwiftPackageReference section */
+		5E49C22D98DE121021DD64B7 /* XCRemoteSwiftPackageReference "AzooKeyKanaKanjiConverter" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/azooKey/AzooKeyKanaKanjiConverter";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.11.1;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 5E49C22D98DE121021DD64B7 /* XCRemoteSwiftPackageReference "AzooKeyKanaKanjiConverter" */;
 			productName = KanaKanjiConverterModuleWithDefaultDictionary;
 		};
 /* End XCSwiftPackageProductDependency section */

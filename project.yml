@@ -9,7 +9,8 @@ options:
 
 packages:
   AzooKeyKanaKanjiConverter:
-    path: Packages/AzooKeyKanaKanjiConverter
+    url: https://github.com/azooKey/AzooKeyKanaKanjiConverter
+    from: "0.11.1"
 
 targets:
   keynaco:

@@ -1,6 +1,15 @@
 {
-  "originHash" : "b6cd2f5257446db5455753c3b816b7ba03ec03abd6abd7d3551d8da8b0601aa2",
+  "originHash" : "f6b69cb9805202d71c0ac72358f133cb700b50e13debaefca476acf4ec189cac",
   "pins" : [
+    {
+      "identity" : "azookeykanakanjiconverter",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/azooKey/AzooKeyKanaKanjiConverter",
+      "state" : {
+        "revision" : "80b8204f1cdfb364bb2ed355cf52c7ebb2519a0c",
+        "version" : "0.11.2"
+      }
+    },
     {
       "identity" : "jinja",
       "kind" : "remoteSourceControl",
@@ -17,15 +26,6 @@
       "state" : {
         "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
         "version" : "1.2.1"
-      }
-    },
-    {
-      "identity" : "swift-argument-parser",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-argument-parser",
-      "state" : {
-        "revision" : "626b5b7b2f45e1b0b1c6f4a309296d1d21d7311b",
-        "version" : "1.7.1"
       }
     },
     {
