@@ -88,8 +88,8 @@ class InputController: IMKInputController {
         super.activateServer(sender)
         handler.state = CompositionState()
         handler.lastCommittedOutput = nil
-        handler.isParticleMode = false
-        handler.particleFirstChar = nil
+        handler.isSuccessorMode = false
+        handler.successorFirstChar = nil
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
     }
@@ -135,7 +135,7 @@ class InputController: IMKInputController {
             break
         case .show(let candidates, let historyEnd, let initialRow):
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, near: adapter.cursorRect())
-            if handler.isParticleMode {
+            if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。
                 // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
                 // Enter を IME に転送するようになる。
@@ -146,7 +146,7 @@ class InputController: IMKInputController {
             candidateWindow.dismiss()
         case .selectNext:
             candidateWindow.selectNext()
-            if handler.isParticleMode {
+            if handler.isSuccessorMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
             } else {
@@ -154,7 +154,7 @@ class InputController: IMKInputController {
             }
         case .selectPrev:
             candidateWindow.selectPrev()
-            if handler.isParticleMode {
+            if handler.isSuccessorMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
             } else {
@@ -174,9 +174,9 @@ class InputController: IMKInputController {
     // MARK: - 確定
 
     override func commitComposition(_ sender: Any!) {
-        // パーティクルモード中で組成がない場合は system-triggered commit をスキップ
+        // Successor モード中で組成がない場合は system-triggered commit をスキップ
         // (insertText の副作用で system が commitComposition を呼ぶことがある)
-        if handler.isParticleMode && handler.state.composingText.isEmpty && !handler.state.isSegmentMode {
+        if handler.isSuccessorMode && handler.state.composingText.isEmpty && !handler.state.isSegmentMode {
             return
         }
         let adapter = IMKTextInputAdapter(sender)
@@ -188,8 +188,8 @@ class InputController: IMKInputController {
             historyEnd: candidateWindow.historySectionEnd
         )
         handler.commitComposition(client: adapter, candidate: ctx)
-        handler.isParticleMode = false
-        handler.particleFirstChar = nil
+        handler.isSuccessorMode = false
+        handler.successorFirstChar = nil
         candidateWindow.dismiss()
     }
 

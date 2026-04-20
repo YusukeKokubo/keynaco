@@ -52,8 +52,8 @@ struct InputHandler {
 
     var state = CompositionState()
     var ignoreNextModeSwitch = false
-    var isParticleMode = false
-    var particleFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
+    var isSuccessorMode = false
+    var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
     var lastCommittedOutput: String? = nil
     let db: DatabaseManager
     let azooKeyConverter: AzooKeyConverter
@@ -74,8 +74,8 @@ struct InputHandler {
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
 
-        if isParticleMode {
-            return handleParticleMode(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+        if isSuccessorMode {
+            return handleSuccessorMode(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
                                       modifiers: modifiers, candidate: candidate, client: client)
         }
 
@@ -85,7 +85,7 @@ struct InputHandler {
         if !InputHandler.isAsciiMode,
            [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) {
             let consumed = handleFunctionKey(keyCode: keyCode, client: client)
-            return (consumed, consumed ? doSuggestParticles() : .none)
+            return (consumed, consumed ? doSuggestSuccessors() : .none)
         }
 
         // セグメントモード中は最優先でハンドリング
@@ -148,7 +148,7 @@ struct InputHandler {
                 return doEscape(client: client)
             case KeyCode.rightArrow:  // →: ひらがなのまま確定
                 commitComposition(client: client)
-                return (true, doSuggestParticles())
+                return (true, doSuggestSuccessors())
             case KeyCode.backspace where modifiers.contains(.shift):  // Shift+Delete: 履歴から削除
                 if candidate.selectedRow < candidate.historyEnd {
                     return (true, .deleteSelected)
@@ -162,7 +162,7 @@ struct InputHandler {
             case KeyCode.enter:   // Return
                 guard !state.composingText.isEmpty else { return (false, .none) }
                 commitComposition(client: client)
-                return (true, doSuggestParticles())
+                return (true, doSuggestSuccessors())
             case KeyCode.escape:  // Escape
                 return doEscape(client: client)
             default:
@@ -297,7 +297,7 @@ struct InputHandler {
         } else {
             commitComposition(client: client)
         }
-        return doSuggestParticles()
+        return doSuggestSuccessors()
     }
 
     private mutating func doCommit(text: String, client: TextInputClient) {
@@ -331,26 +331,26 @@ struct InputHandler {
         return isKanji || isKatakana
     }
 
-    private mutating func doSuggestParticles() -> CandidateAction {
+    private mutating func doSuggestSuccessors() -> CandidateAction {
         // 直前の確定が格助詞自身なら再表示しない
         if let last = lastCommittedOutput, InputHandler.particles.contains(last) {
-            isParticleMode = false; particleFirstChar = nil
+            isSuccessorMode = false; successorFirstChar = nil
             return .dismiss
         }
         // 名詞らしい語（漢字・カタカナ末尾）のみ表示
         guard let last = lastCommittedOutput, isNounLike(last) else {
-            isParticleMode = false; particleFirstChar = nil
+            isSuccessorMode = false; successorFirstChar = nil
             return .dismiss
         }
-        isParticleMode = true
-        particleFirstChar = nil
+        isSuccessorMode = true
+        successorFirstChar = nil
         let fromBigram = lastCommittedOutput.map { db.fetchBigramInList(prev: $0, list: InputHandler.particles) } ?? []
         let rest = InputHandler.particles.filter { !fromBigram.contains($0) }
         return .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0)
     }
 
-    private mutating func confirmParticle(_ particle: String, client: TextInputClient) {
-        isParticleMode = false; particleFirstChar = nil
+    private mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
+        isSuccessorMode = false; successorFirstChar = nil
         if let prev = lastCommittedOutput { db.recordBigram(prev: prev, input: particle, output: particle) }
         db.record(input: particle, output: particle)
         lastCommittedOutput = particle
@@ -358,7 +358,7 @@ struct InputHandler {
         client.insertText(particle)
     }
 
-    private mutating func handleParticleMode(
+    private mutating func handleSuccessorMode(
         keyCode: UInt16,
         characters: String?,
         baseCharacters: String?,
@@ -369,18 +369,18 @@ struct InputHandler {
         switch keyCode {
         case KeyCode.space, KeyCode.enter:
             guard let selected = candidate.selectedText else {
-                isParticleMode = false; particleFirstChar = nil
+                isSuccessorMode = false; successorFirstChar = nil
                 client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
                 return (true, .dismiss)
             }
-            confirmParticle(selected, client: client)
+            confirmSuccessor(selected, client: client)
             return (true, .dismiss)
         case KeyCode.downArrow, KeyCode.tab:
             return (true, .selectNext)
         case KeyCode.upArrow:
             return (true, .selectPrev)
         case KeyCode.escape, KeyCode.backspace, KeyCode.rightArrow:
-            isParticleMode = false; particleFirstChar = nil
+            isSuccessorMode = false; successorFirstChar = nil
             client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
             return (true, .dismiss)
         default:
@@ -389,15 +389,15 @@ struct InputHandler {
                 let matched = InputHandler.particleRomajiMap[char] ?? []
                 if !matched.isEmpty {
                     // 格助詞プレフィックス → バッファを更新してフィルタリング表示
-                    particleFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
+                    successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
                     let fromBigram = lastCommittedOutput.map { db.fetchBigramInList(prev: $0, list: matched) } ?? []
                     let rest = matched.filter { !fromBigram.contains($0) }
                     return (true, .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0))
                 }
             }
             // 格助詞プレフィックス以外 → モード解除、バッファがあれば先に通常入力に流す
-            let first = particleFirstChar
-            isParticleMode = false; particleFirstChar = nil
+            let first = successorFirstChar
+            isSuccessorMode = false; successorFirstChar = nil
             if let first {
                 _ = handle(keyCode: first.keyCode, characters: first.characters, baseCharacters: first.baseCharacters,
                            modifiers: modifiers, candidate: .hidden, client: client)
@@ -735,7 +735,7 @@ struct InputHandler {
             confirmed += seg.selectedText
         }
         doCommit(text: confirmed, client: client)
-        return doSuggestParticles()
+        return doSuggestSuccessors()
     }
 
     private func applySegmentMarkedText(client: TextInputClient) {
