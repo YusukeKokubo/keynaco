@@ -223,6 +223,28 @@ final class DatabaseManager: @unchecked Sendable {
         return results
     }
 
+    /// prev に続く bi-gram 上位候補を返す（input に依らず output を集約）。
+    /// 同じ output が複数 input で学習されている場合は count の合計でソートする。
+    func fetchBigramTop(prev: String, limit: Int = 20) -> [String] {
+        let sql = """
+        SELECT output FROM bigram
+        WHERE prev = ?
+        GROUP BY output
+        ORDER BY SUM(count) DESC, MAX(used_at) DESC
+        LIMIT ?
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        bindText(stmt, 1, prev)
+        sqlite3_bind_int(stmt, 2, Int32(limit))
+        var results: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        }
+        return results
+    }
+
     /// list 内の候補を bi-gram 頻度順で返す（未登録分は除外）。
     func fetchBigramInList(prev: String, list: [String]) -> [String] {
         guard !list.isEmpty else { return [] }

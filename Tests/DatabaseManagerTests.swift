@@ -58,4 +58,50 @@ final class DatabaseManagerTests: XCTestCase {
         let idxSou = results.firstIndex(of: "相")!
         XCTAssertLessThan(idxAi, idxSou, "使用頻度の高い候補が先頭")
     }
+
+    // MARK: - fetchBigramTop
+
+    func testFetchBigramTopEmptyDBReturnsEmpty() {
+        let results = db.fetchBigramTop(prev: "東京")
+        XCTAssertTrue(results.isEmpty, "学習ゼロなら空配列を返す")
+    }
+
+    func testFetchBigramTopSinglePrevReturnsLimited() {
+        db.recordBigram(prev: "東京", input: "で", output: "で")
+        db.recordBigram(prev: "東京", input: "に", output: "に")
+        db.recordBigram(prev: "東京", input: "から", output: "から")
+        let results = db.fetchBigramTop(prev: "東京", limit: 2)
+        XCTAssertEqual(results.count, 2, "limit で切られる")
+    }
+
+    func testFetchBigramTopAggregatesByOutput() {
+        // 同じ output ("が") が 2 つの input で学習されている
+        db.recordBigram(prev: "東京", input: "が", output: "が")
+        db.recordBigram(prev: "東京", input: "がね", output: "が")
+        db.recordBigram(prev: "東京", input: "に", output: "に")
+        let results = db.fetchBigramTop(prev: "東京")
+        let gaCount = results.filter { $0 == "が" }.count
+        XCTAssertEqual(gaCount, 1, "同じ output は 1 件に集約される")
+        XCTAssertTrue(results.contains("に"))
+    }
+
+    func testFetchBigramTopOrderedByCountDesc() {
+        // "で" を 3 回、"に" を 1 回学習
+        db.recordBigram(prev: "東京", input: "で", output: "で")
+        db.recordBigram(prev: "東京", input: "で", output: "で")
+        db.recordBigram(prev: "東京", input: "で", output: "で")
+        db.recordBigram(prev: "東京", input: "に", output: "に")
+        let results = db.fetchBigramTop(prev: "東京")
+        let idxDe = results.firstIndex(of: "で")!
+        let idxNi = results.firstIndex(of: "に")!
+        XCTAssertLessThan(idxDe, idxNi, "count が多い output が先頭")
+    }
+
+    func testFetchBigramTopIgnoresOtherPrev() {
+        db.recordBigram(prev: "東京", input: "で", output: "で")
+        db.recordBigram(prev: "京都", input: "に", output: "に")
+        let results = db.fetchBigramTop(prev: "東京")
+        XCTAssertTrue(results.contains("で"))
+        XCTAssertFalse(results.contains("に"), "別の prev のエントリは混ざらない")
+    }
 }
