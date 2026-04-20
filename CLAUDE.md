@@ -66,14 +66,19 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 
-### 格助詞モード（isParticleMode / particleFirstChar）
+### Successor モード（isSuccessorMode / successorFirstChar）
 
-確定直後に `doSuggestParticles()` が格助詞候補ウィンドウを自動表示する。
+確定直後に `doSuggestSuccessors()` が後続語候補ウィンドウを自動表示する。候補は以下の順：
 
-- `particleFirstChar`: 頭文字1打目（例: "g" → が候補）をバッファリング。2打目が格助詞に対応しないキーなら、1打目を通常入力として `handle()` に流してからモード解除する。
-- 格助詞モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
+1. `db.fetchBigramTop(prev: lastCommittedOutput)` の上位（prev だけで引く、output 集約）
+2. `isNounLike(last)` が真のときのみ、格助詞固定リスト（`InputHandler.particles`）を tail に fallback として並べる
+
+bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。
+
+- `successorFirstChar`: 頭文字 1 打目のバッファリング。`particleRomajiMap` による格助詞 fast-path が効くのは `isNounLike` のときのみ。非名詞末尾では 1 打目で即座に通常組成へフォールスルーする。
+- Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
 - 格助詞自身を確定した直後は再表示しない（無限ループ防止）。
-- 格助詞モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。
+- Successor モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。
 
 ### 候補表示の優先順位
 
@@ -135,7 +140,7 @@ InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInp
 
 ### Electron 系アプリで Enter が届かない
 
-`setMarkedText("")`（空文字）のまま候補を表示すると、Electron は「IME が非アクティブ」と判断し Enter をアプリ側で処理する。格助詞モード等で候補選択中は実テキストを marked text に設定すること。
+`setMarkedText("")`（空文字）のまま候補を表示すると、Electron は「IME が非アクティブ」と判断し Enter をアプリ側で処理する。Successor モード等で候補選択中は実テキストを marked text に設定すること。
 
 ### flagsChanged で Caps Lock を検知する
 

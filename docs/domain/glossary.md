@@ -64,14 +64,19 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 
 ---
 
-## 格助詞モード（ParticleMode）
+## Successor モード（SuccessorMode）
 
-### isParticleMode
-確定直後に漢字・カタカナ末尾の語であることを検出し、格助詞候補を自動表示する状態。
+### isSuccessorMode
+確定直後に bi-gram 学習済みの後続語候補を自動表示する状態。  
+候補は `DatabaseManager.fetchBigramTop(prev:)` で直前の確定語から引く。  
+漢字・カタカナ末尾（`isNounLike`）のときのみ、固定格助詞リスト（`InputHandler.particles`）を
+tail に fallback として並べる。ひらがな末尾の語では格助詞 fallback は出さず、bi-gram にある候補だけ表示する。
 
-### particleFirstChar
-格助詞の頭文字 1 打目をバッファリングするフィールド。  
-**不変条件**: 2 打目が格助詞に対応しなければ 1 打目を通常入力として流してからモード解除。
+### successorFirstChar
+Successor モード中の 1 打目をバッファリングするフィールド。  
+**不変条件**: 1 打目が格助詞 fast-path（`particleRomajiMap`）に対応し、かつ直前確定語が `isNounLike`
+を満たすときのみバッファリング。2 打目が格助詞サブセットにマッチしなければ 1 打目を通常入力として
+流してからモード解除する。非名詞末尾では fast-path を使わず即座に通常組成へフォールスルー。
 
 ---
 

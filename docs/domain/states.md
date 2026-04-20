@@ -9,7 +9,7 @@
 | **組成中** | `composedHiragana` または `pendingRomaji` が非空 |
 | **候補選択中** | 組成中 + `isExplicitlySelected = true`（↑↓ 操作済み）|
 | **セグメントモード** | `isSegmentMode = true` |
-| **格助詞モード** | `isParticleMode = true` |
+| **Successor モード** | `isSuccessorMode = true` |
 
 ---
 
@@ -41,11 +41,11 @@ stateDiagram-v2
     セグメントモード --> 待機 : Enter（確定）
     セグメントモード --> 組成中 : Escape（組成に戻す）
 
-    待機 --> 格助詞モード : 漢字・カタカナ末尾で確定した直後
-    格助詞モード --> 待機 : 格助詞確定
-    格助詞モード --> 組成中 : →（キャンセル）
-    格助詞モード --> 待機 : Escape
-    格助詞モード --> 待機 : Enter
+    待機 --> Successorモード : 確定直後に bi-gram 候補 or 格助詞 fallback が存在
+    Successorモード --> 待機 : 候補確定
+    Successorモード --> 組成中 : →（キャンセル）
+    Successorモード --> 待機 : Escape
+    Successorモード --> 待機 : Enter
 ```
 
 ---
@@ -75,19 +75,23 @@ stateDiagram-v2
 | Escape | 組成クリア → 待機 |
 | Shift+Delete | 選択中の候補を履歴 DB から削除 |
 
-### 格助詞モード
+### Successor モード
 
 | キー | 動作 |
 |------|------|
-| 格助詞 2 打目 | 格助詞を確定 → 待機 |
-| 非対応キー（1 打目） | 1 打目を通常入力として流す → モード解除 |
+| Space / Enter | 選択候補（先頭 or ↑↓ で選択中）を確定 → 待機 |
+| ↑↓ | 候補を移動 |
+| Tab | 次候補へ |
+| ローマ字 1 文字（格助詞 fast-path, 名詞末尾時のみ） | `particleRomajiMap` で格助詞サブセットに絞り込み |
+| 非対応キー（1 打目） | バッファがあれば流す → モード解除 → 通常組成へ |
 | → | モードキャンセル → 組成中（1 打目があれば組成に追加） |
-| Escape / Enter | モード解除 → 待機 |
+| Escape / Backspace | モード解除 → 待機 |
 
 ---
 
 ## 補足
 
-- **格助詞モードの再帰防止**: 格助詞自身を確定した直後は再表示しない
+- **Successor モードの再帰防止**: 確定が格助詞自身（`InputHandler.particles` に含まれる）の直後は再表示しない
+- **fallback の条件**: `isNounLike(last)` が真のとき限定で、bi-gram 候補の後ろに格助詞固定リストを並べる
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
