@@ -332,21 +332,31 @@ struct InputHandler {
     }
 
     private mutating func doSuggestSuccessors() -> CandidateAction {
-        // 直前の確定が格助詞自身なら再表示しない
-        if let last = lastCommittedOutput, InputHandler.particles.contains(last) {
+        guard let last = lastCommittedOutput else {
             isSuccessorMode = false; successorFirstChar = nil
             return .dismiss
         }
-        // 名詞らしい語（漢字・カタカナ末尾）のみ表示
-        guard let last = lastCommittedOutput, isNounLike(last) else {
+        // 直前の確定が格助詞自身なら再表示しない（無限ループ防止）
+        if InputHandler.particles.contains(last) {
             isSuccessorMode = false; successorFirstChar = nil
             return .dismiss
         }
+
+        let bigramTop = db.fetchBigramTop(prev: last)
+        // 名詞末尾のとき限定で格助詞 fallback を tail に追加
+        let particlesFallback = isNounLike(last)
+            ? InputHandler.particles.filter { !bigramTop.contains($0) }
+            : []
+        let candidates = bigramTop + particlesFallback
+
+        guard !candidates.isEmpty else {
+            isSuccessorMode = false; successorFirstChar = nil
+            return .dismiss
+        }
+
         isSuccessorMode = true
         successorFirstChar = nil
-        let fromBigram = lastCommittedOutput.map { db.fetchBigramInList(prev: $0, list: InputHandler.particles) } ?? []
-        let rest = InputHandler.particles.filter { !fromBigram.contains($0) }
-        return .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0)
+        return .show(candidates: candidates, historyEnd: 0, initialRow: 0)
     }
 
     private mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
@@ -384,18 +394,20 @@ struct InputHandler {
             client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
             return (true, .dismiss)
         default:
+            // 格助詞 fast-path: 名詞末尾の確定後は候補に格助詞 fallback が必ず含まれる。
+            // このときはローマ字 1 打で「が/を/に…」に絞り込める既存挙動を維持する。
             let char = (baseCharacters ?? characters ?? "").lowercased()
-            if char.count == 1, let c = char.first, c.isLetter, c.isASCII {
+            if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
+               let last = lastCommittedOutput, isNounLike(last) {
                 let matched = InputHandler.particleRomajiMap[char] ?? []
                 if !matched.isEmpty {
-                    // 格助詞プレフィックス → バッファを更新してフィルタリング表示
                     successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                    let fromBigram = lastCommittedOutput.map { db.fetchBigramInList(prev: $0, list: matched) } ?? []
+                    let fromBigram = db.fetchBigramInList(prev: last, list: matched)
                     let rest = matched.filter { !fromBigram.contains($0) }
                     return (true, .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0))
                 }
             }
-            // 格助詞プレフィックス以外 → モード解除、バッファがあれば先に通常入力に流す
+            // fast-path 非該当 → モード解除、バッファがあれば先に通常入力に流す
             let first = successorFirstChar
             isSuccessorMode = false; successorFirstChar = nil
             if let first {

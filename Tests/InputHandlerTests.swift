@@ -1077,4 +1077,57 @@ final class InputHandlerTests: XCTestCase {
             XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
         }
     }
+
+    // MARK: - Successor モード：bi-gram 一般化
+
+    func testSuccessorModeShowsBigramTopAfterHiraganaCommit() {
+        // 事前に「おつかれ → です」を学習させる
+        handler.db.recordBigram(prev: "おつかれ", input: "です", output: "です")
+        typeRomaji("otsukare")
+        let result = press(keyCode: 36)  // Enter でひらがな確定
+        XCTAssertTrue(handler.isSuccessorMode, "ひらがな末尾でも bi-gram があれば Successor モードになる")
+        guard case .show(let candidates, _, _) = result.candidateAction else {
+            XCTFail(".show を返すはず: \(result.candidateAction)"); return
+        }
+        XCTAssertEqual(candidates, ["です"], "bi-gram 学習済みの output のみ表示（格助詞 fallback なし）")
+    }
+
+    func testSuccessorModeBigramOrderedByFrequency() {
+        // 「東京 → で」を 3 回、「東京 → に」を 1 回 学習
+        for _ in 0..<3 { handler.db.recordBigram(prev: "東京", input: "で", output: "で") }
+        handler.db.recordBigram(prev: "東京", input: "に", output: "に")
+        typeRomaji("tokyo")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        guard case .show(let candidates, _, _) = result.candidateAction else {
+            XCTFail(".show を返すはず: \(result.candidateAction)"); return
+        }
+        let idxDe = candidates.firstIndex(of: "で")!
+        let idxNi = candidates.firstIndex(of: "に")!
+        XCTAssertLessThan(idxDe, idxNi, "頻度の高い bi-gram 候補が先頭")
+        // 名詞末尾なので格助詞 fallback も tail に並ぶ
+        XCTAssertTrue(InputHandler.particles.allSatisfy { candidates.contains($0) }, "格助詞 fallback も表示")
+    }
+
+    func testSuccessorModeNonParticleBigramFallsThroughOn1stKey() {
+        // ひらがな末尾「おつかれ」の後に非格助詞 bi-gram「です」を学習
+        handler.db.recordBigram(prev: "おつかれ", input: "です", output: "です")
+        typeRomaji("otsukare")
+        press(keyCode: 36)  // 「おつかれ」確定 → Successor モードへ
+        XCTAssertTrue(handler.isSuccessorMode)
+        // 「k」打鍵 → 名詞末尾ではないので fast-path が効かず、通常組成へ
+        let result = type(chars: "k", base: "k")
+        XCTAssertFalse(handler.isSuccessorMode, "非名詞末尾で 1 打目は fast-path を使わず通常組成へ")
+        XCTAssertEqual(client.markedText, "k", "通常の組成が始まる")
+        XCTAssertTrue(result.consumed)
+    }
+
+    func testSuccessorModeParticleFallbackOnlyWhenNounLike() {
+        // 学習なしの状態で「た」（ひらがな末尾）を確定
+        typeRomaji("ta")
+        let result = press(keyCode: 36)
+        XCTAssertFalse(handler.isSuccessorMode, "ひらがな末尾 + 学習なしなら Successor モードは起動しない")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
+        }
+    }
 }
