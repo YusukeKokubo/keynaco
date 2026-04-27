@@ -60,7 +60,7 @@
 
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
-2. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結）
+2. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWord` × 現読みで skip-bigram を引き、trigram・bigram にない候補を末尾に追加）
 3. 履歴 exact → 履歴 prefix
 4. AzooKey 辞書候補
 
@@ -106,15 +106,25 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。
 
 ### DatabaseManager
-変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）の 3 テーブルを持つ SQLite ストア。  
-`InputHandler` のイニシャライザで DI。テストは `inMemory: true`。
+変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）の **4 テーブル**を持つ SQLite ストア。  
+`InputHandler` のイニシャライザで DI。テストは `inMemory: true`。  
+**`clock` var** でエポック秒を注入可能（テスト用）。全 record/fetch で `nowEpoch()` を使うことで時系列が一貫する。
 
 #### recordPrefixes
-読みが5文字以上のひらがなを確定するとき、N-1/N-2/N-3 の前方一致パターンも同時に `history` に記録する。  
-例: 「とうきょう」（5文字）を確定 → `とうきょう`/`とうきょ`/`とうき`/`とう` の4エントリを記録。  
-「とう」と打つだけで「東京」が履歴候補に出るようになる。ASCII のみの読み（`github` など）は prefix 記録しない。
+読みが **3 文字以上**のひらがなを確定するとき、len=2 から N-1 までの前方一致パターンも同時に `history` に記録する。  
+例: 「おはよう」（4文字）を確定 → `おはよう`/`おはよ`/`おは` の3エントリを記録。  
+「おは」と打つだけで「おはよう」が履歴候補に出るようになる。ASCII のみの読み（`github` など）は prefix 記録しない。
 
-*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`*
+#### recency / 時間減衰
+全 fetch SQL は `score = count / (1 + age_days / τ)` でソートする（τ = 30日）。  
+古い高頻度語より直近の語が優先されやすくなり、今日のタスクに合った語が上位に出やすい。  
+テストでは `db.clock = { fixedEpoch }` で時刻を固定して検証する。
+
+#### skip-bigram
+助詞（`InputHandler.particles`）が直前に確定されたとき、`mostRecentContentWord`（直近の非助詞語）と現在の確定語のペアを `skip_bigram` テーブルに記録する。  
+`今日 → を → 行く` `今日 → が → 走る` のように助詞でバラけたペアが「今日 → 行く/走る」として統合される。
+
+*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/SkipBigramTests.swift`*
 
 ---
 

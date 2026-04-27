@@ -64,7 +64,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
 - `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/keynaco/` に保存）
-- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` の3テーブルを持つ。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約
+- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` / `skip_bigram` の **4 テーブル**を持つ。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）
 - `SettingsWindowController` / `BigramViewController` / `HistoryViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+予測+履歴セクションの末尾インデックス。これ未満の候補は Shift+Delete で削除可能、以降は AzooKey 専用候補）が重要
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
@@ -79,7 +79,8 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 
 1. `db.fetchTrigramTop(prev2:prev1:)` の上位（2語前コンテキスト優先）
 2. `db.fetchBigramTop(prev:)` の上位（tri-gram に含まれないもの）
-3. `isNounLike(last)` が真のときのみ、格助詞固定リスト（`InputHandler.particles`）を tail に fallback として並べる
+3. `db.fetchSkipBigramTop(prev:)` の上位（`mostRecentContentWord` を prev として、tri-gram・bi-gram にない候補を追加）
+4. `isNounLike(last)` が真のときのみ、格助詞固定リスト（`InputHandler.particles`）を tail に fallback として並べる
 
 bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。
 
