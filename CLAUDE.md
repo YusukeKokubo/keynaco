@@ -16,6 +16,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 |------|------|
 | `Sources/` | アプリ本体（Swift ソース + Info.plist + entitlements） |
 | `Tests/` | ユニットテスト（XCTest） |
+| `docs/domain/` | ドメイン知識ドキュメント（用語・状態遷移・シナリオ） |
 | `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` 形式） |
 | `project.yml` | XcodeGen 設定 |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
@@ -60,7 +61,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 - `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/keynaco/` に保存）
 - `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` の3テーブルを持つ。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約
 - `SettingsWindowController` / `BigramViewController` / `HistoryViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応
-- `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（履歴セクションの末尾インデックス）が重要
+- `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+予測+履歴セクションの末尾インデックス。これ未満の候補は Shift+Delete で削除可能、以降は AzooKey 専用候補）が重要
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
 
 変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
@@ -83,7 +84,7 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 
 ### 候補表示の優先順位
 
-`doRefreshCandidates()` が組み立てる候補リスト（上が高優先）:
+`buildCandidateList()` が組み立てる候補リスト（上が高優先）:
 
 1. ひらがな / カタカナ固定候補（`fixedCount` 件、スクロール外の先頭に挿入）
 2. tri-gram → bi-gram 候補（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先、重複除去後に固定候補の直後に挿入）
