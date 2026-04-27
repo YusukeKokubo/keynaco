@@ -66,6 +66,8 @@ stateDiagram-v2
 | 英数キー | 組成を確定してから ASCII モードへ |
 | F6–F10 | ひらがな/カタカナ/ASCII 各形式で即時確定 |
 
+*Tests: `Tests/InputHandlerCompositionTests.swift`*
+
 ### 候補選択中
 
 | キー | 動作 |
@@ -76,6 +78,8 @@ stateDiagram-v2
 | → | 組成テキストをひらがなのまま確定 → 待機（選択候補は無視） |
 | Escape | 組成クリア → 待機 |
 | Shift+Delete | 選択中の候補を履歴 DB から削除 |
+
+*Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### Successor モード
 
@@ -89,6 +93,8 @@ stateDiagram-v2
 | → | モードキャンセル → 待機（successorFirstChar は破棄） |
 | Escape / Backspace | モード解除 → 待機 |
 
+*Tests: `Tests/InputHandlerSuccessorTests.swift`*
+
 ---
 
 ## 補足
@@ -98,3 +104,5 @@ stateDiagram-v2
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
+- **セグメントモードのテスト**: `Tests/InputHandlerSegmentTests.swift`
+- **ASCII モードのテスト**: `Tests/InputHandlerAsciiTests.swift`

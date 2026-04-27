@@ -10,6 +10,8 @@
 `InputHandler.isAsciiMode = true` の状態。キー入力をそのまま挿入する。IME としての処理をバイパス。  
 **不変条件**: `static` フィールドのためアプリをまたいで共有される。テストの `setUp` でリセット必須。
 
+*Tests: `Tests/InputHandlerAsciiTests.swift`*
+
 ### 日本語モード
 `isAsciiMode = false`。ローマ字入力をひらがなに変換し、変換候補を提示する。
 
@@ -38,10 +40,14 @@
 ### fixedCount
 候補リスト index 0 から始まる固定枠数（ひらがな・カタカナ）。初期選択行は `fixedCount` から始まるため、↑ キーで遡らないと見えない位置に置かれる。
 
+*Tests: `Tests/InputHandlerCandidatesTests.swift`*
+
 ### historyEnd
 候補リスト内の「固定候補 + 予測候補 + 履歴候補」セクションの末尾インデックス。
 `historyEnd = fixedCount + predictCount + historyCount`。
 これ未満の候補は Shift+Delete で履歴 DB から削除可能。これ以降は AzooKey 専用候補（削除不可）。
+
+*Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### isExplicitlySelected
 ↑↓ キーでユーザーが能動的に候補を選んだかどうかのフラグ。  
@@ -49,6 +55,8 @@
 
 ### autoShow
 文字入力中に候補ウィンドウを自動表示するかどうか。履歴・辞書・予測候補（tri-gram + bi-gram）がすべて 0 件なら表示しない。
+
+*Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
@@ -64,6 +72,8 @@
 Space 押下時に AzooKey の変換結果をセグメント（文節）分割して遷移した状態。  
 Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 
+*Tests: `Tests/InputHandlerSegmentTests.swift`*
+
 ---
 
 ## Successor モード（SuccessorMode）
@@ -76,6 +86,8 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 tail に fallback として並べる。ひらがな末尾の語では格助詞 fallback は出さず、予測候補のみ表示する。
 確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば
 連鎖表示を継続する（格助詞チェックは廃止。候補空なら自然に `.dismiss`）。
+
+*Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。  
@@ -96,6 +108,8 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 ### DatabaseManager
 変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）の 3 テーブルを持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。
+
+*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`*
 
 ---
 

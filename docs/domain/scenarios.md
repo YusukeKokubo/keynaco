@@ -21,6 +21,8 @@
 
 **確定後**: `漢字` が挿入される。末尾が漢字（`isNounLike` 真）なので Successor モードへ自動遷移。
 
+*Tests: `Tests/InputHandlerCompositionTests.swift`*
+
 ---
 
 ## S-02: 候補選択（↑↓）と右矢印確定
@@ -36,6 +38,8 @@
 
 → キーは `commitComposition` を呼び、選択候補を無視して組成テキスト（ひらがな）をそのまま `insertText` で確定する。Enter（選択候補を確定）とは異なる。
 
+*Tests: `Tests/InputHandlerCandidatesTests.swift`*
+
 ---
 
 ## S-03: Successor モードの 1 打目バッファリング（格助詞 fast-path）
@@ -50,6 +54,8 @@
 
 2b のケースでは、1 打目 `g` が組成バッファに入り直し、`gz` の途中状態から通常の組成処理が続く。
 **注意**: この fast-path は `isNounLike(last)` を満たすとき限定。ひらがな末尾の語の後は 1 打目で即座に通常組成へフォールスルーする。
+
+*Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
 ---
 
@@ -67,6 +73,8 @@
 
 trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismiss` が返り Successor モードには入らない。
 
+*Tests: `Tests/InputHandlerSuccessorTests.swift`*
+
 ---
 
 ## S-03c: Successor チェーン（格助詞を経由した連鎖）
@@ -79,6 +87,8 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 | 1 | Space | Successor モード | 「が」確定 → `suggestSuccessors()` → candidates: `["好き"]` |
 | 2 | Space | 待機 | 「好き」確定 → bigram なし → `.dismiss` |
 
+*Tests: `Tests/InputHandlerSuccessorTests.swift`*
+
 ---
 
 ## S-04: Shift+文字（日本語モードで英字組成）
@@ -90,6 +100,8 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 - Enter → `tOKyo` 相当の文字列を確定
 
 **ポイント**: 日本語モード中の Shift+ASCII 文字は pendingRomaji 経由ではなく `composedHiragana` に直接追加される。
+
+*Tests: `Tests/InputHandlerAsciiTests.swift`*
 
 ---
 
@@ -104,6 +116,8 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 - ヒット例（bigram のみ）: `に` → 候補: `に` / `は` / `の`（東京の後によく続く助詞）
 - 候補リスト優先順位: ひらがな・カタカナ固定 → **予測（trigram + bigram）** → 履歴 → 辞書
 
+*Tests: `Tests/InputHandlerSuccessorTests.swift`*
+
 ---
 
 ## S-06: Shift+Delete で履歴削除
@@ -114,6 +128,8 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 - 候補ウィンドウをリフレッシュ（削除した候補が消える）
 
 **制約**: 辞書候補（`index >= historyEnd`）に対しては無効。
+
+*Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ---
 
@@ -128,3 +144,5 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 | F8 | `ﾄｳｷｮｳ` | 半角カタカナ |
 | F9 | `ｔｏｕｋｙｏｕ` | ひらがな→ローマ字→全角ASCII（`toZenkakuAscii(hiraganaToRomaji(h))`） |
 | F10 | `toukyou` | ひらがな→ローマ字（半角ASCII）（`hiraganaToRomaji(h)`） |
+
+*Tests: `Tests/InputHandlerCompositionTests.swift`*
