@@ -1347,4 +1347,112 @@ final class InputHandlerTests: XCTestCase {
         let result = handler.db.fetchHistoryExact(reading: "とうきょ")
         XCTAssertEqual(result, ["東京"], "確定後、prefix でも履歴ヒットするはず")
     }
+
+    // MARK: - F6〜F10 変換確定
+
+    func testF6ConfirmsHiragana() {
+        typeRomaji("ka")
+        let (consumed, _) = press(keyCode: KeyCode.f6)
+        XCTAssertTrue(consumed)
+        XCTAssertEqual(client.inserted.last, "か")
+        XCTAssertTrue(handler.state.composingText.isEmpty)
+    }
+
+    func testF7ConfirmsKatakana() {
+        typeRomaji("ka")
+        let (consumed, _) = press(keyCode: KeyCode.f7)
+        XCTAssertTrue(consumed)
+        XCTAssertEqual(client.inserted.last, "カ")
+        XCTAssertTrue(handler.state.composingText.isEmpty)
+    }
+
+    func testF8ConfirmsHankakuKatakana() {
+        typeRomaji("ka")
+        let (consumed, _) = press(keyCode: KeyCode.f8)
+        XCTAssertTrue(consumed)
+        XCTAssertEqual(client.inserted.last, "ｶ")
+        XCTAssertTrue(handler.state.composingText.isEmpty)
+    }
+
+    func testF9ConfirmsZenkakuAscii() {
+        typeRomaji("nihon")
+        let (consumed, _) = press(keyCode: KeyCode.f9)
+        XCTAssertTrue(consumed)
+        XCTAssertEqual(client.inserted.last, "ｎｉｈｏｎ")
+        XCTAssertTrue(handler.state.composingText.isEmpty)
+    }
+
+    func testF10ConfirmsHankakuAscii() {
+        typeRomaji("nihon")
+        let (consumed, _) = press(keyCode: KeyCode.f10)
+        XCTAssertTrue(consumed)
+        XCTAssertEqual(client.inserted.last, "nihon")
+        XCTAssertTrue(handler.state.composingText.isEmpty)
+    }
+
+    func testFunctionKeyForceFinalizesPendingRomaji() {
+        // pendingRomaji="n" の状態で F7 → forceFinalize("n")="ん" → "ン" で確定
+        type(chars: "n", base: "n")
+        XCTAssertEqual(handler.state.pendingRomaji, "n")
+        let (consumed, _) = press(keyCode: KeyCode.f7)
+        XCTAssertTrue(consumed)
+        XCTAssertEqual(client.inserted.last, "ン")
+    }
+
+    func testFunctionKeyIgnoredWhenCompositionEmpty() {
+        // 組成テキストが空なら F7 は消費しない
+        let (consumed, action) = press(keyCode: KeyCode.f7)
+        XCTAssertFalse(consumed)
+        guard case .none = action else {
+            XCTFail("組成空で F7 は .none を返すはず: \(action)"); return
+        }
+    }
+
+    func testFunctionKeyIgnoredInAsciiMode() {
+        // ASCII モードでは F6〜F10 は無効（組成テキストがないため consumed=false）
+        InputHandler.isAsciiMode = true
+        let (consumed, action) = press(keyCode: KeyCode.f7)
+        XCTAssertFalse(consumed)
+        guard case .none = action else {
+            XCTFail("ASCII モードで F7 は .none を返すはず: \(action)"); return
+        }
+    }
+
+    // MARK: - autoShow: 候補ゼロ時は表示しない
+
+    func testAutoShowDismissesWhenNoCandidates() {
+        // ASCII 組成（履歴ゼロ・辞書スキップ）で文字入力 → buildCandidateList(autoShow:true) は .dismiss
+        let (consumed, action) = type(chars: "X", base: "x", modifiers: .shift)
+        XCTAssertTrue(consumed)
+        guard case .dismiss = action else {
+            XCTFail("履歴・辞書・予測候補がゼロなら autoShow は .dismiss を返すはず: \(action)"); return
+        }
+    }
+
+    // MARK: - historyEnd 境界: Shift+Delete の削除可否
+
+    func testShiftDeleteInsideHistoryEndDeletesCandidate() {
+        // selectedRow < historyEnd → .deleteSelected を返す
+        typeRomaji("ka")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: nil,
+                                   isExplicitlySelected: true, historyEnd: 2)
+        let (_, action) = handler.handle(keyCode: KeyCode.backspace, characters: nil, baseCharacters: nil,
+                                          modifiers: .shift, candidate: ctx, client: client)
+        guard case .deleteSelected = action else {
+            XCTFail("historyEnd 未満の Shift+Delete は .deleteSelected を返すはず: \(action)"); return
+        }
+    }
+
+    func testShiftDeleteOutsideHistoryEndDoesNothing() {
+        // selectedRow >= historyEnd → .none を返す（AzooKey 専用候補は削除不可）
+        typeRomaji("ka")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 5, selectedText: nil,
+                                   isExplicitlySelected: true, historyEnd: 2)
+        let (_, action) = handler.handle(keyCode: KeyCode.backspace, characters: nil, baseCharacters: nil,
+                                          modifiers: .shift, candidate: ctx, client: client)
+        guard case .none = action else {
+            XCTFail("historyEnd 以降の Shift+Delete は .none を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(client.inserted.isEmpty, "削除不可なので確定テキストは挿入されないはず")
+    }
 }
