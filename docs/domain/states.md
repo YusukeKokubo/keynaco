@@ -92,6 +92,7 @@ stateDiagram-v2
 ## 補足
 
 - **Successor モードの再帰防止**: 確定が格助詞自身（`InputHandler.particles` に含まれる）の直後は再表示しない
-- **fallback の条件**: `isNounLike(last)` が真のとき限定で、bi-gram 候補の後ろに格助詞固定リストを並べる
+- **候補取得の優先順位**: `prev2Output`（2語前）× `lastCommittedOutput`（1語前）で trigram を引き、なければ `lastCommittedOutput` だけで bigram をフォールバック
+- **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須

@@ -50,7 +50,7 @@
 
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
-2. bi-gram 候補（`lastCommittedOutput` × 現在の読み）
+2. 予測候補（`prev2Output` × `lastCommittedOutput` で trigram 検索、なければ `lastCommittedOutput` で bigram フォールバック）
 3. 履歴 exact → 履歴 prefix
 4. AzooKey 辞書候補
 
@@ -67,10 +67,11 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 ## Successor モード（SuccessorMode）
 
 ### isSuccessorMode
-確定直後に bi-gram 学習済みの後続語候補を自動表示する状態。  
-候補は `DatabaseManager.fetchBigramTop(prev:)` で直前の確定語から引く。  
+確定直後に学習済みの後続語候補を自動表示する状態。  
+候補は `fetchTrigramTop(prev2:prev1:)` + `fetchBigramTop(prev:)` の組み合わせで引く。
+2語前文脈（trigram）を優先し、trigram にない候補を bigram で補完する。  
 漢字・カタカナ末尾（`isNounLike`）のときのみ、固定格助詞リスト（`InputHandler.particles`）を
-tail に fallback として並べる。ひらがな末尾の語では格助詞 fallback は出さず、bi-gram にある候補だけ表示する。
+tail に fallback として並べる。ひらがな末尾の語では格助詞 fallback は出さず、予測候補のみ表示する。
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。  
@@ -83,10 +84,13 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 ## 学習・履歴
 
 ### lastCommittedOutput
-直前に確定した変換結果。bi-gram 候補の検索キーとして使う。
+直前に確定した変換結果。trigram の prev1 および bigram の prev として使う。
+
+### prev2Output
+2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。
 
 ### DatabaseManager
-変換履歴（`history`）と bi-gram（`bigram`）の 2 テーブルを持つ SQLite ストア。  
+変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）の 3 テーブルを持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。
 
 ---

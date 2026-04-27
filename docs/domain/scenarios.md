@@ -53,17 +53,19 @@
 
 ---
 
-## S-03b: Successor モードの bi-gram 予測（一般化後）
+## S-03b: Successor モードの後続語予測（trigram + bigram）
 
-**前提**: `おつかれ`（ひらがな末尾）を確定。事前に bi-gram `(おつかれ, です, です)` を学習済み。
+**前提**: `おつかれ`（ひらがな末尾）を確定。事前に bigram `(おつかれ, です, です)` を学習済み。  
+さらに 2 語前に `今日` を確定済みなら trigram `(今日, おつかれ, *, さまです)` があれば trigram が優先される。
 
 | ステップ | キー | 状態 | candidates | 動作 |
 |---------|------|------|-----------|------|
-| 0 | — | Successor モード | `["です"]` | 格助詞 fallback なし（`isNounLike` 偽） |
-| 1a | Space | 待機 | — | `です` を確定（先頭候補） |
+| 0a | — | Successor モード | `["さまです", "です"]` | trigram あり → trigram 優先、bigram で補完 |
+| 0b | — | Successor モード | `["です"]` | trigram なし → bigram のみ。格助詞 fallback なし（`isNounLike` 偽） |
+| 1a | Space | 待機 | — | 先頭候補を確定 |
 | 1b | `k` | 組成中 | — | fast-path 非該当 → 通常組成、`k` が pendingRomaji へ |
 
-bi-gram が空で `isNounLike` も偽なら、確定直後に `.dismiss` が返り Successor モードには入らない。
+trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismiss` が返り Successor モードには入らない。
 
 ---
 
@@ -79,15 +81,16 @@ bi-gram が空で `isNounLike` も偽なら、確定直後に `.dismiss` が返�
 
 ---
 
-## S-05: bi-gram 候補の表示
+## S-05: 予測候補の表示（trigram + bigram）
 
-**前提**: 前回の確定テキストが `東京` (`lastCommittedOutput = "東京"`)
+**前提**: `lastCommittedOutput = "東京"`、`prev2Output = "行った"` とする。
 
 **入力**: `ni` (「に」組成中)
 
-- `bigram` テーブルを `東京 × に*` で検索
-- ヒット例: `に` → bi-gram 候補: `に` / `は` / `の`（東京の後によく続く助詞）
-- 候補リスト優先順位: ひらがな・カタカナ固定 → **bi-gram** → 履歴 → 辞書
+- まず `trigram` テーブルを `(行った, 東京) × に*` で検索 → ヒットがあれば優先
+- 次に `bigram` テーブルを `東京 × に*` で検索して trigram にない候補を補完
+- ヒット例（bigram のみ）: `に` → 候補: `に` / `は` / `の`（東京の後によく続く助詞）
+- 候補リスト優先順位: ひらがな・カタカナ固定 → **予測（trigram + bigram）** → 履歴 → 辞書
 
 ---
 
