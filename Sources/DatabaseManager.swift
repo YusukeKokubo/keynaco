@@ -83,7 +83,7 @@ final class DatabaseManager: @unchecked Sendable {
 
     /// 読みに完全一致する履歴候補を使用頻度順で返す。
     func fetchHistoryExact(reading: String) -> [String] {
-        let sql = "SELECT output FROM history WHERE input = ? ORDER BY count DESC, used_at DESC LIMIT 10"
+        let sql = "SELECT output FROM history WHERE input = ? COLLATE NOCASE ORDER BY count DESC, used_at DESC LIMIT 10"
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }

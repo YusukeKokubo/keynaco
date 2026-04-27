@@ -1169,4 +1169,51 @@ final class InputHandlerTests: XCTestCase {
             XCTFail("行った が候補に含まれていない: \(candidates)")
         }
     }
+
+    // MARK: - ASCII 英字学習（案4）
+
+    func testAsciiInputHistoryStoredLowercase() {
+        // Shift+A, P, I → composedHiragana = "API" → Enter で確定
+        type(chars: "A", base: "a", modifiers: .shift)
+        type(chars: "P", base: "p", modifiers: .shift)
+        type(chars: "I", base: "i", modifiers: .shift)
+        press(keyCode: 36)  // Enter
+
+        // input キーが小文字 "api" で記録されること
+        let results = handler.db.fetchHistoryExact(reading: "api")
+        XCTAssertEqual(results, ["API"], "ASCII 入力は小文字キーで記録される")
+
+        // 大文字で引いても COLLATE NOCASE により取得できること
+        let upperResults = handler.db.fetchHistoryExact(reading: "API")
+        XCTAssertEqual(upperResults, ["API"])
+    }
+
+    func testAsciiInputPrefixMatchReturnsUppercaseOutput() {
+        // Shift+G, I, T, H, U, B → "GITHUB" を確定（input:"github" で記録）
+        for (ch, base) in [("G","g"),("I","i"),("T","t"),("H","h"),("U","u"),("B","b")] {
+            type(chars: ch, base: base, modifiers: .shift)
+        }
+        press(keyCode: 36)  // Enter
+
+        // GITHUB は g-i-t-h-u-b: prefix "gi" で絞り込める
+        let results = handler.db.fetchHistoryPrefix(reading: "gi")
+        XCTAssertTrue(results.contains("GITHUB"), "prefix 'gi' で GITHUB が候補に出る: \(results)")
+
+        // さらに短い prefix "g" でも引ける（Shift+G 1打で GITHUB が候補に出ること）
+        let resultsG = handler.db.fetchHistoryPrefix(reading: "g")
+        XCTAssertTrue(resultsG.contains("GITHUB"), "prefix 'g' で GITHUB が候補に出る: \(resultsG)")
+    }
+
+    func testMixedHiraganaAndAsciiNotNormalized() {
+        // ひらがな混在の input は小文字化されない（記録はそのまま "あAPI"）
+        typeRomaji("a")  // → composedHiragana = "あ"
+        type(chars: "A", base: "a", modifiers: .shift)
+        type(chars: "P", base: "p", modifiers: .shift)
+        type(chars: "I", base: "i", modifiers: .shift)
+        press(keyCode: 36)  // Enter → input:"あAPI", output:"あAPI"
+
+        // 元のキーで取得できる
+        let original = handler.db.fetchHistoryExact(reading: "あAPI")
+        XCTAssertEqual(original, ["あAPI"])
+    }
 }

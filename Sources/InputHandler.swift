@@ -234,8 +234,9 @@ struct InputHandler {
                 state.pendingRomaji = ""
             }
             state.composedHiragana += chars
+            let action = doRefreshCandidates(autoShow: true)
             applyMarkedText(candidateText: nil, client: client)
-            return (true, .dismiss)
+            return (true, action)
         }
 
         // 非ASCII文字（全角記号など）→ 組成中なら組成バッファに追加、空なら直接挿入
@@ -281,12 +282,13 @@ struct InputHandler {
         }
         guard !state.composingText.isEmpty else { return }
         let inputKey = state.finalizedText
+        let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         if candidate.isVisible, let selected = candidate.selectedText {
-            db.record(input: inputKey, output: selected)
+            db.record(input: normalizedInput, output: selected)
             azooKeyConverter.commit(reading: inputKey, text: selected)
             doCommit(text: selected, client: client)
         } else {
-            db.record(input: inputKey, output: inputKey)
+            db.record(input: normalizedInput, output: inputKey)
             doCommit(text: inputKey, client: client)
         }
     }
@@ -297,9 +299,10 @@ struct InputHandler {
     private mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         guard !state.composingText.isEmpty else { return .none }
         let inputKey = state.finalizedText
+        let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する
         if let selected = candidate.selectedText {
-            db.record(input: inputKey, output: selected)
+            db.record(input: normalizedInput, output: selected)
             azooKeyConverter.commit(reading: inputKey, text: selected)
             doCommit(text: selected, client: client)
         } else {
@@ -447,8 +450,10 @@ struct InputHandler {
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     private mutating func doRefreshCandidates(autoShow: Bool = false) -> CandidateAction {
         let azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: state.composedHiragana)
-        let exactCandidates = db.fetchHistoryExact(reading: state.composedHiragana)
-        let prefixCandidates = db.fetchHistoryPrefix(reading: state.composedHiragana)
+        let h = state.composedHiragana
+        let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
+        let exactCandidates = db.fetchHistoryExact(reading: historyKey)
+        let prefixCandidates = db.fetchHistoryPrefix(reading: historyKey)
         let historyCandidates = exactCandidates + prefixCandidates.filter { !exactCandidates.contains($0) }
         let historyCount = historyCandidates.count
 
