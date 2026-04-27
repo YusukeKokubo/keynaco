@@ -11,6 +11,8 @@ private final class IMKTextInputAdapter: TextInputClient {
     }
 
     func insertText(_ text: String) {
+        // insertText は常に @MainActor の InputController 経由で呼ばれる
+        MainActor.assumeIsolated { EventViewerWindow.shared.addCommit(text) }
         client?.insertText(text, replacementRange: .notFound)
     }
 
@@ -109,6 +111,14 @@ class InputController: IMKInputController {
 
         guard event.type == .keyDown else { return false }
 
+        let chars = event.characters ?? ""
+        let baseChars = event.charactersIgnoringModifiers ?? ""
+        let mods = event.modifierFlags
+        EventViewerWindow.shared.addEvent(
+            keyCode: event.keyCode, chars: chars, baseChars: baseChars,
+            mods: mods, bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        )
+
         let ctx = CandidateContext(
             isVisible: candidateWindow.isVisible,
             selectedRow: candidateWindow.selectedRow,
@@ -127,10 +137,14 @@ class InputController: IMKInputController {
             client: adapter
         )
 
+        let actionName = "\(action)".split(separator: "(").first.map(String.init) ?? "\(action)"
+        EventViewerWindow.shared.updateResult(consumed: consumed, action: actionName)
+
         switch action {
         case .none:
             break
         case .show(let candidates, let historyEnd, let initialRow):
+            EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, near: adapter.cursorRect())
             if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。

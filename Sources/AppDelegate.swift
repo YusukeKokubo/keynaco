@@ -6,6 +6,8 @@ nonisolated(unsafe) var gServer: IMKServer?
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusItem: NSStatusItem?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
 
@@ -19,6 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         gServer = IMKServer(name: connectionName, bundleIdentifier: bundleID)
         NSLog("keynaco: IMKServer started connection=\(connectionName) bundle=\(bundleID)")
         setupMainMenu()
+        setupStatusItem()
     }
 
     // アクセサリアプリはデフォルトでメインメニューを持たず Cmd+V/A 等が無視される。
@@ -44,5 +47,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(editItem)
 
         NSApp.mainMenu = mainMenu
+    }
+
+    private func setupStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem?.button?.title = "⌨"
+
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+
+        let viewerItem = NSMenuItem(title: "イベントビューアー", action: #selector(openEventViewer), keyEquivalent: "")
+        viewerItem.isEnabled = true
+        menu.addItem(viewerItem)
+
+        statusItem?.menu = menu
+    }
+
+    @objc private func openEventViewer() {
+        EventViewerWindow.shared.show()
     }
 }
