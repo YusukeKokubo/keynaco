@@ -74,6 +74,16 @@ final class DatabaseManager: @unchecked Sendable {
             UNIQUE(prev2, prev1, input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_trigram ON trigram(prev2, prev1, input);
+        CREATE TABLE IF NOT EXISTS skip_bigram (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            prev    TEXT    NOT NULL,
+            input   TEXT    NOT NULL,
+            output  TEXT    NOT NULL,
+            count   INTEGER NOT NULL DEFAULT 1,
+            used_at INTEGER NOT NULL,
+            UNIQUE(prev, input, output)
+        );
+        CREATE INDEX IF NOT EXISTS idx_skip_bigram ON skip_bigram(prev, input);
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }
@@ -348,6 +358,52 @@ final class DatabaseManager: @unchecked Sendable {
             for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 3), item) }
             sqlite3_bind_int64($0, Int32(list.count + 3), now)
             sqlite3_bind_double($0, Int32(list.count + 4), Self.recencyTauSeconds)
+        }
+    }
+
+    // MARK: - Skip-Bigram
+
+    func recordSkipBigram(prev: String, input: String, output: String) {
+        let t = nowEpoch()
+        execute("""
+        INSERT INTO skip_bigram (prev, input, output, count, used_at)
+        VALUES (?, ?, ?, 1, ?)
+        ON CONFLICT(prev, input, output) DO UPDATE SET
+            count   = count + 1,
+            used_at = excluded.used_at;
+        """) {
+            self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+            sqlite3_bind_int64($0, 4, t)
+        }
+    }
+
+    func fetchSkipBigram(prev: String, reading: String) -> [String] {
+        let now = nowEpoch()
+        return queryStrings("""
+        SELECT output FROM skip_bigram
+        WHERE prev = ? AND input LIKE ?
+        ORDER BY (count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, used_at DESC
+        LIMIT 10
+        """) {
+            self.bindText($0, 1, prev); self.bindText($0, 2, reading + "%")
+            sqlite3_bind_int64($0, 3, now)
+            sqlite3_bind_double($0, 4, Self.recencyTauSeconds)
+        }
+    }
+
+    func fetchSkipBigramTop(prev: String, limit: Int = 20) -> [String] {
+        let now = nowEpoch()
+        return queryStrings("""
+        SELECT output FROM skip_bigram
+        WHERE prev = ?
+        GROUP BY output
+        ORDER BY SUM(count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, MAX(used_at) DESC
+        LIMIT ?
+        """) {
+            self.bindText($0, 1, prev)
+            sqlite3_bind_int64($0, 2, now)
+            sqlite3_bind_double($0, 3, Self.recencyTauSeconds)
+            sqlite3_bind_int($0, 4, Int32(limit))
         }
     }
 

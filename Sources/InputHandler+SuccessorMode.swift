@@ -16,7 +16,9 @@ extension InputHandler {
         }
         let bigramTop = db.fetchBigramTop(prev: last)
         let trigramTop: [String] = prev2Output.map { db.fetchTrigramTop(prev2: $0, prev1: last) } ?? []
+        let skipBigramTop = mostRecentContentWord().map { db.fetchSkipBigramTop(prev: $0) } ?? []
         let predictTop = trigramTop + bigramTop.filter { !trigramTop.contains($0) }
+            + skipBigramTop.filter { !trigramTop.contains($0) && !bigramTop.contains($0) }
         // 名詞末尾のとき限定で格助詞 fallback を tail に追加
         let particlesFallback = isNounLike(last)
             ? InputHandler.particles.filter { !predictTop.contains($0) }

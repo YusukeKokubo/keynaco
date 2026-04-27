@@ -179,7 +179,9 @@ extension InputHandler {
             guard let p1 = lastCommittedOutput, let p2 = prev2Output else { return [] }
             return db.fetchTrigram(prev2: p2, prev1: p1, reading: state.composedHiragana)
         }()
+        let skipBigramRaw = mostRecentContentWord().map { db.fetchSkipBigram(prev: $0, reading: state.composedHiragana) } ?? []
         let predictRaw = trigramRaw + bigramRaw.filter { !trigramRaw.contains($0) }
+            + skipBigramRaw.filter { !trigramRaw.contains($0) && !bigramRaw.contains($0) }
         var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
         let uniquePredictions = predictRaw.filter { !candidates.contains($0) }
         candidates.insert(contentsOf: uniquePredictions, at: 0)

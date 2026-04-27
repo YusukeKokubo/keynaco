@@ -67,7 +67,15 @@ struct InputHandler {
     }
     mutating func pushCommitted(_ text: String) {
         committedHistory.append(text)
-        if committedHistory.count > 2 { committedHistory.removeFirst() }
+        if committedHistory.count > 5 { committedHistory.removeFirst() }
+    }
+
+    func mostRecentContentWord() -> String? {
+        guard committedHistory.count >= 2 else { return nil }
+        for i in stride(from: committedHistory.count - 2, through: 0, by: -1) {
+            if !InputHandler.particles.contains(committedHistory[i]) { return committedHistory[i] }
+        }
+        return nil
     }
     let db: DatabaseManager
     let azooKeyConverter: AzooKeyConverter
@@ -210,6 +218,9 @@ struct InputHandler {
                 db.recordBigram(prev: p1, input: state.finalizedText, output: text)
                 if let p2 = prev2Output {
                     db.recordTrigram(prev2: p2, prev1: p1, input: state.finalizedText, output: text)
+                }
+                if InputHandler.particles.contains(p1), let prevContent = mostRecentContentWord() {
+                    db.recordSkipBigram(prev: prevContent, input: state.finalizedText, output: text)
                 }
             }
         }
