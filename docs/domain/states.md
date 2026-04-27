@@ -58,6 +58,7 @@ stateDiagram-v2
 | キー | 動作 |
 |------|------|
 | かな系文字 | composedHiragana / pendingRomaji に蓄積 |
+| `. / ,`（Shift なし） | `。`/`、` として composedHiragana に追加し候補ウィンドウを更新 |
 | Space | セグメントモードへ遷移 |
 | ↑↓ | 候補選択中へ遷移 |
 | Enter | 組成テキストをそのまま確定 |
@@ -77,6 +78,7 @@ stateDiagram-v2
 | Enter | 選択候補を確定 → 待機 |
 | → | 組成テキストをひらがなのまま確定 → 待機（選択候補は無視） |
 | Escape | 組成クリア → 待機 |
+| Backspace | 組成を1文字削除。1文字になった → `.dismiss`、2文字以上残る → `.show`（候補リフレッシュ） |
 | Shift+Delete | 選択中の候補を履歴 DB から削除 |
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*

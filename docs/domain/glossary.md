@@ -51,7 +51,7 @@
 
 ### isExplicitlySelected
 ↑↓ キーでユーザーが能動的に候補を選んだかどうかのフラグ。  
-**役割**: `false` のまま Enter を押すと先頭候補ではなく現在の組成テキストを確定する。
+**役割**: `true` のとき、文字キー入力で選択候補をまず確定してから新しい文字を処理する。`false` のときは文字入力しても候補を確定せず組成に追加する。Enter は `isExplicitlySelected` に関係なく `selectedText`（現在の視覚的選択）をそのまま確定する。
 
 ### autoShow
 文字入力中に候補ウィンドウを自動表示するかどうか。履歴・辞書・予測候補（tri-gram + bi-gram）がすべて 0 件なら表示しない。
@@ -108,6 +108,11 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 ### DatabaseManager
 変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）の 3 テーブルを持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。
+
+#### recordPrefixes
+読みが5文字以上のひらがなを確定するとき、N-1/N-2/N-3 の前方一致パターンも同時に `history` に記録する。  
+例: 「とうきょう」（5文字）を確定 → `とうきょう`/`とうきょ`/`とうき`/`とう` の4エントリを記録。  
+「とう」と打つだけで「東京」が履歴候補に出るようになる。ASCII のみの読み（`github` など）は prefix 記録しない。
 
 *Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`*
 

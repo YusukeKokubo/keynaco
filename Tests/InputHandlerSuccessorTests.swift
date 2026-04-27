@@ -239,6 +239,30 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         XCTAssertTrue(InputHandler.particles.allSatisfy { candidates.contains($0) }, "格助詞 fallback も表示")
     }
 
+    func testSuccessorFirstCharFallthroughOnSecondKeyMismatch() {
+        // S-03 2b: 格助詞1打目 "g" をバッファ後、マッチしない2打目 "z" が来ると
+        // "g" を通常入力に流してモード解除し、"gz" が pendingRomaji に入る
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+
+        // 1打目 "g" → successorFirstChar にバッファ、候補を "が" に絞り込む
+        let filterResult = type(chars: "g", base: "g")
+        XCTAssertTrue(handler.isSuccessorMode, "「g」バッファリング中はSuccessor モードを維持")
+        XCTAssertNotNil(handler.successorFirstChar, "successorFirstChar にバッファされているはず")
+        guard case .show(let filtered, _, _) = filterResult.candidateAction else {
+            XCTFail("絞り込み後は .show を返すはず: \(filterResult.candidateAction)"); return
+        }
+        XCTAssertEqual(filtered, ["が"], "「g」で候補が「が」のみに絞り込まれるはず")
+
+        // 2打目 "z" → マッチなし → "g" を通常入力に流しモード解除
+        let result = type(chars: "z", base: "z")
+        XCTAssertFalse(handler.isSuccessorMode, "2打目マッチなしでSuccessor モードを抜けるはず")
+        XCTAssertNil(handler.successorFirstChar, "successorFirstChar がクリアされるはず")
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.markedText, "gz", "「g」→「z」が通常組成（pendingRomaji: gz）に入るはず")
+    }
+
     func testSuccessorModeNonParticleBigramFallsThroughOn1stKey() {
         // ひらがな末尾「おつかれ」の後に非格助詞 bi-gram「です」を学習
         handler.db.recordBigram(prev: "おつかれ", input: "です", output: "です")
