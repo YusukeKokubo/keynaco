@@ -1,2 +1,2 @@
 CFBundleName = "keynaco";
-com.apple.inputmethod.Roman = "keynaco";
+com.yusuke.inputmethod.keynaco.Hiragana = "keynaco";

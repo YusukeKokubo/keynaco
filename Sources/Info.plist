@@ -46,6 +46,8 @@
 			<dict>
 				<key>TISInputSourceID</key>
 				<string>com.yusuke.inputmethod.keynaco.Hiragana</string>
+				<key>tsInputModeName</key>
+				<string>keynaco</string>
 				<key>tsInputModeScriptKey</key>
 				<string>smJapanese</string>
 				<key>tsInputModePrimaryInScriptKey</key>
