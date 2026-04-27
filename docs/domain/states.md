@@ -74,12 +74,14 @@ stateDiagram-v2
 | キー | 動作 |
 |------|------|
 | ↑↓ | 候補を移動 |
+| Tab / Shift+Tab | 次候補 / 前候補へ移動 |
 | Space | 次候補へ（ページ送り） |
 | Enter | 選択候補を確定 → 待機 |
 | → | 組成テキストをひらがなのまま確定 → 待機（選択候補は無視） |
 | Escape | 組成クリア → 待機 |
 | Backspace | 組成を1文字削除。1文字になった → `.dismiss`、2文字以上残る → `.show`（候補リフレッシュ） |
-| Shift+Delete | 選択中の候補を履歴 DB から削除 |
+| Shift+Delete | 選択中の候補を履歴 DB から削除（`index < historyEnd` のときのみ有効） |
+| `. / ,`（Shift なし） | 選択候補を確定**せず**、`。`/`、` を組成に追加して候補をリフレッシュ |
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
@@ -106,5 +108,6 @@ stateDiagram-v2
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
+- **ASCII モードの F キー**: F6–F10 は ASCII モード中では無効（組成が空のため）
 - **セグメントモードのテスト**: `Tests/InputHandlerSegmentTests.swift`
 - **ASCII モードのテスト**: `Tests/InputHandlerAsciiTests.swift`
