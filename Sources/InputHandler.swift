@@ -94,7 +94,7 @@ struct InputHandler {
         if !InputHandler.isAsciiMode,
            [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) {
             let consumed = handleFunctionKey(keyCode: keyCode, client: client)
-            return (consumed, consumed ? doSuggestSuccessors() : .none)
+            return (consumed, consumed ? suggestSuccessors() : .none)
         }
 
         // セグメントモード中は最優先でハンドリング
@@ -141,7 +141,7 @@ struct InputHandler {
             case KeyCode.enter:
                 guard !state.composingText.isEmpty else { return (false, .none) }
                 commitComposition(client: client)
-                return (true, doSuggestSuccessors())
+                return (true, suggestSuccessors())
             case KeyCode.escape:
                 return doEscape(client: client)
             default:
@@ -158,16 +158,16 @@ struct InputHandler {
     /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
     mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
         // セグメントモード中の強制確定（アプリ切り替えなど）
-        if let ss = state.segmentState {
-            let selectedText = candidate.selectedText ?? ss.focusedSegment.selectedText
+        if let segmentState = state.segmentState {
+            let selectedText = candidate.selectedText ?? segmentState.focusedSegment.selectedText
             var confirmed = ""
-            for (i, seg) in ss.segments.enumerated() {
-                let text = (i == ss.focusedIndex) ? selectedText : seg.selectedText
+            for (i, seg) in segmentState.segments.enumerated() {
+                let text = (i == segmentState.focusedIndex) ? selectedText : seg.selectedText
                 db.record(input: seg.reading, output: text)
                 azooKeyConverter.commit(reading: seg.reading, text: text)
                 confirmed += text
             }
-            doCommit(text: confirmed, client: client)
+            commitText(text: confirmed, client: client)
             return
         }
         guard !state.composingText.isEmpty else { return }
@@ -176,10 +176,10 @@ struct InputHandler {
         if candidate.isVisible, let selected = candidate.selectedText {
             db.record(input: normalizedInput, output: selected)
             azooKeyConverter.commit(reading: inputKey, text: selected)
-            doCommit(text: selected, client: client)
+            commitText(text: selected, client: client)
         } else {
             db.record(input: normalizedInput, output: inputKey)
-            doCommit(text: inputKey, client: client)
+            commitText(text: inputKey, client: client)
         }
     }
 
@@ -194,14 +194,14 @@ struct InputHandler {
         if let selected = candidate.selectedText {
             db.record(input: normalizedInput, output: selected)
             azooKeyConverter.commit(reading: inputKey, text: selected)
-            doCommit(text: selected, client: client)
+            commitText(text: selected, client: client)
         } else {
             commitComposition(client: client)
         }
-        return doSuggestSuccessors()
+        return suggestSuccessors()
     }
 
-    private mutating func doCommit(text: String, client: TextInputClient) {
+    private mutating func commitText(text: String, client: TextInputClient) {
         if !state.composingText.isEmpty {
             if let p1 = lastCommittedOutput {
                 db.recordBigram(prev: p1, input: state.finalizedText, output: text)
@@ -237,7 +237,7 @@ struct InputHandler {
         return isKanji || isKatakana
     }
 
-    private mutating func doSuggestSuccessors() -> CandidateAction {
+    private mutating func suggestSuccessors() -> CandidateAction {
         guard let last = lastCommittedOutput else {
             isSuccessorMode = false; successorFirstChar = nil
             return .dismiss
@@ -349,7 +349,7 @@ struct InputHandler {
             return (true, .selectPrev)
         case KeyCode.space:
             if !state.composedHiragana.isEmpty {
-                let action = doEnterSegmentMode()
+                let action = enterSegmentMode()
                 if state.isSegmentMode {
                     applySegmentMarkedText(client: client)
                 } else {
@@ -368,7 +368,7 @@ struct InputHandler {
             return doEscape(client: client)
         case KeyCode.rightArrow:
             commitComposition(client: client)
-            return (true, doSuggestSuccessors())
+            return (true, suggestSuccessors())
         case KeyCode.backspace where modifiers.contains(.shift):
             if candidate.selectedRow < candidate.historyEnd { return (true, .deleteSelected) }
             return (true, .none)
@@ -389,7 +389,7 @@ struct InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         if keyCode == KeyCode.space {
             if !state.composedHiragana.isEmpty {
-                let action = doEnterSegmentMode()
+                let action = enterSegmentMode()
                 if state.isSegmentMode {
                     applySegmentMarkedText(client: client)
                 } else {
@@ -417,7 +417,7 @@ struct InputHandler {
                     state.pendingRomaji = ""
                 }
                 state.composedHiragana += mappedPunct
-                let action = doRefreshCandidates()
+                let action = buildCandidateList()
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, action)
             }
@@ -433,7 +433,7 @@ struct InputHandler {
                 state.pendingRomaji = ""
             }
             state.composedHiragana += chars
-            let action = doRefreshCandidates(autoShow: true)
+            let action = buildCandidateList(autoShow: true)
             applyMarkedText(candidateText: nil, client: client)
             return (true, action)
         }
@@ -458,7 +458,7 @@ struct InputHandler {
                 _ = doConfirmSelection(candidate: candidate, client: client)
             }
             state.composedHiragana += chars
-            let action = doRefreshCandidates(autoShow: true)
+            let action = buildCandidateList(autoShow: true)
             applyMarkedText(candidateText: nil, client: client)
             return (true, action)
         }
@@ -468,14 +468,14 @@ struct InputHandler {
         }
         let needsRefresh = state.addRomaji(base)
         let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
-        let candidateAction: CandidateAction = (needsRefresh || hasBigramContext) ? doRefreshCandidates(autoShow: true) : .dismiss
+        let candidateAction: CandidateAction = (needsRefresh || hasBigramContext) ? buildCandidateList(autoShow: true) : .dismiss
         applyMarkedText(candidateText: nil, client: client)
         return (true, candidateAction)
     }
 
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
-    private mutating func doRefreshCandidates(autoShow: Bool = false) -> CandidateAction {
+    private mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
         let h = state.composedHiragana
         let azooKeyCandidates = h.allSatisfy({ $0.isASCII }) ? [] : azooKeyConverter.requestCandidates(hiragana: h)
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
@@ -573,8 +573,8 @@ struct InputHandler {
 
     /// F6–F10 の変換確定。composingText が空なら false を返す。
     private mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
-        if state.isSegmentMode, let ss = state.segmentState {
-            state.composedHiragana = ss.segments.map(\.reading).joined()
+        if state.isSegmentMode, let segmentState = state.segmentState {
+            state.composedHiragana = segmentState.segments.map(\.reading).joined()
             state.segmentState = nil
         }
         guard !state.composingText.isEmpty else { return false }
@@ -593,7 +593,7 @@ struct InputHandler {
         default: return false
         }
         db.record(input: hiragana, output: text)
-        doCommit(text: text, client: client)
+        commitText(text: text, client: client)
         return true
     }
 
@@ -610,7 +610,7 @@ struct InputHandler {
     private mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         let (handled, needsRefresh) = state.backspace()
         guard handled else { return (false, .none) }
-        let action: CandidateAction = needsRefresh ? doRefreshCandidates() : .dismiss
+        let action: CandidateAction = needsRefresh ? buildCandidateList() : .dismiss
         applyMarkedText(candidateText: nil, client: client)
         return (true, action)
     }
@@ -623,7 +623,7 @@ struct InputHandler {
 
     // MARK: - セグメントモード
 
-    private mutating func doEnterSegmentMode() -> CandidateAction {
+    private mutating func enterSegmentMode() -> CandidateAction {
         if !state.pendingRomaji.isEmpty {
             state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
             state.pendingRomaji = ""
@@ -632,7 +632,7 @@ struct InputHandler {
 
         // 1セグメントのみなら従来の候補ウィンドウにフォールバック
         guard rawSegments.count >= 2 else {
-            return doRefreshCandidates()
+            return buildCandidateList()
         }
 
         let segments = rawSegments.map { buildSegmentCandidates(reading: $0.reading, dictCandidates: $0.candidates) }
@@ -669,8 +669,8 @@ struct InputHandler {
     }
 
     private func makeCandidateActionForFocusedSegment() -> CandidateAction {
-        guard let ss = state.segmentState else { return .none }
-        let seg = ss.focusedSegment
+        guard let segmentState = state.segmentState else { return .none }
+        let seg = segmentState.focusedSegment
         guard !seg.candidates.isEmpty else { return .dismiss }
         return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex)
     }
@@ -681,14 +681,14 @@ struct InputHandler {
         candidate: CandidateContext,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        guard let ss = state.segmentState else { return (false, .none) }
+        guard let segmentState = state.segmentState else { return (false, .none) }
 
         switch keyCode {
         case KeyCode.leftArrow:
             if modifiers.contains(.shift) {
                 return resizeFocusedSegment(expand: false, candidate: candidate, client: client)
             }
-            guard ss.focusedIndex > 0 else { return (true, .none) }
+            guard segmentState.focusedIndex > 0 else { return (true, .none) }
             syncFocusedSegmentSelection(from: candidate)
             state.segmentState!.focusedIndex -= 1
             applySegmentMarkedText(client: client)
@@ -698,7 +698,7 @@ struct InputHandler {
             if modifiers.contains(.shift) {
                 return resizeFocusedSegment(expand: true, candidate: candidate, client: client)
             }
-            guard ss.focusedIndex < ss.segments.count - 1 else { return (true, .none) }
+            guard segmentState.focusedIndex < segmentState.segments.count - 1 else { return (true, .none) }
             syncFocusedSegmentSelection(from: candidate)
             state.segmentState!.focusedIndex += 1
             applySegmentMarkedText(client: client)
@@ -738,45 +738,45 @@ struct InputHandler {
         candidate: CandidateContext,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        guard var ss = state.segmentState else { return (false, .none) }
+        guard var segmentState = state.segmentState else { return (false, .none) }
         syncFocusedSegmentSelection(from: candidate)
-        let i = ss.focusedIndex
+        let i = segmentState.focusedIndex
 
         if expand {
-            guard i + 1 < ss.segments.count else { return (true, .none) }
-            let nextReading = ss.segments[i + 1].reading
+            guard i + 1 < segmentState.segments.count else { return (true, .none) }
+            let nextReading = segmentState.segments[i + 1].reading
             guard !nextReading.isEmpty else { return (true, .none) }
-            let newFocusedReading = ss.segments[i].reading + String(nextReading.first!)
+            let newFocusedReading = segmentState.segments[i].reading + String(nextReading.first!)
             let newNextReading = String(nextReading.dropFirst())
-            ss.segments[i] = buildSegmentCandidates(
+            segmentState.segments[i] = buildSegmentCandidates(
                 reading: newFocusedReading,
                 dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
             )
             if newNextReading.isEmpty {
-                ss.segments.remove(at: i + 1)
+                segmentState.segments.remove(at: i + 1)
             } else {
-                ss.segments[i + 1] = buildSegmentCandidates(
+                segmentState.segments[i + 1] = buildSegmentCandidates(
                     reading: newNextReading,
                     dictCandidates: azooKeyConverter.candidatesForSegment(reading:newNextReading)
                 )
             }
         } else {
-            let focusedReading = ss.segments[i].reading
+            let focusedReading = segmentState.segments[i].reading
             guard focusedReading.count >= 2 else { return (true, .none) }
             let newFocusedReading = String(focusedReading.dropLast())
             let removedChar = String(focusedReading.last!)
-            ss.segments[i] = buildSegmentCandidates(
+            segmentState.segments[i] = buildSegmentCandidates(
                 reading: newFocusedReading,
                 dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
             )
-            if i + 1 < ss.segments.count {
-                let newNextReading = removedChar + ss.segments[i + 1].reading
-                ss.segments[i + 1] = buildSegmentCandidates(
+            if i + 1 < segmentState.segments.count {
+                let newNextReading = removedChar + segmentState.segments[i + 1].reading
+                segmentState.segments[i + 1] = buildSegmentCandidates(
                     reading: newNextReading,
                     dictCandidates: azooKeyConverter.candidatesForSegment(reading:newNextReading)
                 )
             } else {
-                ss.segments.insert(
+                segmentState.segments.insert(
                     buildSegmentCandidates(
                         reading: removedChar,
                         dictCandidates: azooKeyConverter.candidatesForSegment(reading:removedChar)
@@ -786,34 +786,34 @@ struct InputHandler {
             }
         }
 
-        state.segmentState = ss
+        state.segmentState = segmentState
         applySegmentMarkedText(client: client)
         return (true, makeCandidateActionForFocusedSegment())
     }
 
     private mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {
-        guard let ss = state.segmentState, let selectedText = candidate.selectedText else { return }
-        if let idx = ss.focusedSegment.candidates.firstIndex(of: selectedText) {
-            state.segmentState!.segments[ss.focusedIndex].selectedIndex = idx
+        guard let segmentState = state.segmentState, let selectedText = candidate.selectedText else { return }
+        if let idx = segmentState.focusedSegment.candidates.firstIndex(of: selectedText) {
+            state.segmentState!.segments[segmentState.focusedIndex].selectedIndex = idx
         }
     }
 
     private mutating func doConfirmSegments(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         syncFocusedSegmentSelection(from: candidate)
-        guard let ss = state.segmentState else { return .none }
+        guard let segmentState = state.segmentState else { return .none }
         var confirmed = ""
-        for seg in ss.segments {
+        for seg in segmentState.segments {
             db.record(input: seg.reading, output: seg.selectedText)
             azooKeyConverter.commit(reading: seg.reading, text: seg.selectedText)
             confirmed += seg.selectedText
         }
-        doCommit(text: confirmed, client: client)
-        return doSuggestSuccessors()
+        commitText(text: confirmed, client: client)
+        return suggestSuccessors()
     }
 
     private func applySegmentMarkedText(client: TextInputClient) {
-        guard let ss = state.segmentState else { return }
-        let str = ss.attributedString()
+        guard let segmentState = state.segmentState else { return }
+        let str = segmentState.attributedString()
         client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
     }
 
