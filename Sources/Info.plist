@@ -58,10 +58,10 @@
 				<true/>
 				<key>TISIntendedLanguage</key>
 				<string>ja</string>
-				<key>TISIconIsTemplate</key>
-				<true/>
-				<key>TISIconImageFile</key>
-				<string>InputSource.png</string>
+				<key>tsInputModeMenuIconFileKey</key>
+				<string>InputSource.tiff</string>
+				<key>tsInputModePaletteIconFileKey</key>
+				<string>InputSource.tiff</string>
 			</dict>
 		</dict>
 	</dict>

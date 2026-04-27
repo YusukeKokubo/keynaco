@@ -22,6 +22,7 @@
 		97506D2D83D03ABF9DF72361 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FECEC3CBD864BE0FA7202F3 /* main.swift */; };
 		9816A2BE911D5EA8F440EB0D /* InputHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781BA31568827C4C7ABA5758 /* InputHandlerTests.swift */; };
 		A1CA0C0EB56C14AAB5A87BDA /* CompositionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A63EA4E6329AB0A60E30A8 /* CompositionState.swift */; };
+		A6E40259CBFDB1F7925D8EAD /* InputSource.tiff in Resources */ = {isa = PBXBuildFile; fileRef = C8F905020C8A707920C53337 /* InputSource.tiff */; };
 		B6A394F4C8CEFE7B98992E12 /* AzooKeyConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */; };
 		BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */; };
 		CA9DA0E228B3736FED19A8C7 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8870F701310164C98A33E /* BigramViewController.swift */; };
@@ -70,6 +71,7 @@
 		B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftInputTests.swift; sourceTree = "<group>"; };
+		C8F905020C8A707920C53337 /* InputSource.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = InputSource.tiff; sourceTree = "<group>"; };
 		D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
 		F2289452FE1578194147B535 /* keynaco.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = keynaco.entitlements; sourceTree = "<group>"; };
 		FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyConverter.swift; sourceTree = "<group>"; };
@@ -152,6 +154,7 @@
 				A7EA5A03205A3A4B861980E8 /* InputController.swift */,
 				34144C2DA730A7CFDC7B4149 /* InputHandler.swift */,
 				30417076AD2C2828F84F56D7 /* InputSource.png */,
+				C8F905020C8A707920C53337 /* InputSource.tiff */,
 				F2289452FE1578194147B535 /* keynaco.entitlements */,
 				8FECEC3CBD864BE0FA7202F3 /* main.swift */,
 				86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */,
@@ -250,6 +253,7 @@
 				4D2A168DE48D8E47E75049BE /* Assets.xcassets in Resources */,
 				0521D725A698985598C0AEF1 /* InfoPlist.strings in Resources */,
 				CCAFA4CFB86584E8385625F2 /* InputSource.png in Resources */,
+				A6E40259CBFDB1F7925D8EAD /* InputSource.tiff in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
