@@ -10,23 +10,27 @@
 		014E93622F1E490E3CADC108 /* CompositionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B2777B55743611F1112961 /* CompositionStateTests.swift */; };
 		0521D725A698985598C0AEF1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = EB4429C5180AA3C30E50DD09 /* InfoPlist.strings */; };
 		087D83DB5E5BD1979F0BA0A5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558C3E35C47661D5D98A0A57 /* AppDelegate.swift */; };
+		19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */; };
 		25A7798A7237BDF2124782E0 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54631F84EB0B2E3208C05023 /* SettingsWindowController.swift */; };
 		2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */; };
 		32AA887B33A030356BA62078 /* DatabaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */; };
 		417423818A8C02627A56F0D9 /* KanaKanjiConverterModuleWithDefaultDictionary in Frameworks */ = {isa = PBXBuildFile; productRef = 4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */; };
 		449322D03ACDF2D3EDBE3EEF /* TextInputClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A60998D2E36F9EBDF51923 /* TextInputClient.swift */; };
+		497FC36A92BC2D68915117E3 /* InputHandler+SegmentMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85697F1F7C185DA4A05FFAA5 /* InputHandler+SegmentMode.swift */; };
 		4D2A168DE48D8E47E75049BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */; };
 		4EE90AF2E1605DEEEA8214D6 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */; };
 		7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */; };
 		840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34144C2DA730A7CFDC7B4149 /* InputHandler.swift */; };
 		97506D2D83D03ABF9DF72361 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FECEC3CBD864BE0FA7202F3 /* main.swift */; };
 		9816A2BE911D5EA8F440EB0D /* InputHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781BA31568827C4C7ABA5758 /* InputHandlerTests.swift */; };
+		9DAE303C0C92DC6BE8675EBE /* InputHandler+Candidates.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */; };
 		A1CA0C0EB56C14AAB5A87BDA /* CompositionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A63EA4E6329AB0A60E30A8 /* CompositionState.swift */; };
 		A6E40259CBFDB1F7925D8EAD /* InputSource.tiff in Resources */ = {isa = PBXBuildFile; fileRef = C8F905020C8A707920C53337 /* InputSource.tiff */; };
 		B6A394F4C8CEFE7B98992E12 /* AzooKeyConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */; };
 		BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */; };
 		CA9DA0E228B3736FED19A8C7 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8870F701310164C98A33E /* BigramViewController.swift */; };
 		CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01349F1120E395B87FF8E96B /* DatabaseManager.swift */; };
+		CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565B8F19A5E192228B765163 /* KanaUtils.swift */; };
 		E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EA5A03205A3A4B861980E8 /* InputController.swift */; };
 		E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */; };
 		F317D8234DE824CA1056CE5C /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD350111182091DBDE4ECE9B /* CandidateWindow.swift */; };
@@ -57,16 +61,20 @@
 		52B2777B55743611F1112961 /* CompositionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionStateTests.swift; sourceTree = "<group>"; };
 		54631F84EB0B2E3208C05023 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		558C3E35C47661D5D98A0A57 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		565B8F19A5E192228B765163 /* KanaUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanaUtils.swift; sourceTree = "<group>"; };
 		59721E10162EA851CA8CB8B2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = System/Library/Frameworks/InputMethodKit.framework; sourceTree = SDKROOT; };
 		781BA31568827C4C7ABA5758 /* InputHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerTests.swift; sourceTree = "<group>"; };
 		7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverterTests.swift; sourceTree = "<group>"; };
 		832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		85697F1F7C185DA4A05FFAA5 /* InputHandler+SegmentMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+SegmentMode.swift"; sourceTree = "<group>"; };
 		86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
 		8FECEC3CBD864BE0FA7202F3 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+SuccessorMode.swift"; sourceTree = "<group>"; };
 		A7EA5A03205A3A4B861980E8 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		AD350111182091DBDE4ECE9B /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
 		B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Candidates.swift"; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftInputTests.swift; sourceTree = "<group>"; };
 		C8F905020C8A707920C53337 /* InputSource.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = InputSource.tiff; sourceTree = "<group>"; };
@@ -151,7 +159,11 @@
 				59721E10162EA851CA8CB8B2 /* Info.plist */,
 				A7EA5A03205A3A4B861980E8 /* InputController.swift */,
 				34144C2DA730A7CFDC7B4149 /* InputHandler.swift */,
+				B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */,
+				85697F1F7C185DA4A05FFAA5 /* InputHandler+SegmentMode.swift */,
+				9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */,
 				C8F905020C8A707920C53337 /* InputSource.tiff */,
+				565B8F19A5E192228B765163 /* KanaUtils.swift */,
 				F2289452FE1578194147B535 /* keynaco.entitlements */,
 				8FECEC3CBD864BE0FA7202F3 /* main.swift */,
 				86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */,
@@ -280,7 +292,11 @@
 				CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */,
 				4EE90AF2E1605DEEEA8214D6 /* HistoryViewController.swift in Sources */,
 				E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */,
+				9DAE303C0C92DC6BE8675EBE /* InputHandler+Candidates.swift in Sources */,
+				497FC36A92BC2D68915117E3 /* InputHandler+SegmentMode.swift in Sources */,
+				19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */,
 				840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */,
+				CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */,
 				BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */,
 				FC361366E3DE4C6B91491F28 /* RomajiConverter.swift in Sources */,
 				25A7798A7237BDF2124782E0 /* SettingsWindowController.swift in Sources */,

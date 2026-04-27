@@ -44,6 +44,11 @@ enum KeyCode {
 }
 
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
+///
+/// 機能ごとの実装は extension で別ファイルに分散している：
+/// - `InputHandler+SuccessorMode.swift`：後続語サジェストと格助詞 fast-path
+/// - `InputHandler+SegmentMode.swift`  ：文節分割と境界調整
+/// - `InputHandler+Candidates.swift`   ：候補リスト構築・候補表示中・通常入力
 struct InputHandler {
 
     // 全InputControllerインスタンスで共有するモード（アプリ切替後も保持）
@@ -57,10 +62,10 @@ struct InputHandler {
     var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }
-    private var prev2Output: String? {
+    var prev2Output: String? {
         committedHistory.count >= 2 ? committedHistory[committedHistory.count - 2] : nil
     }
-    private mutating func pushCommitted(_ text: String) {
+    mutating func pushCommitted(_ text: String) {
         committedHistory.append(text)
         if committedHistory.count > 2 { committedHistory.removeFirst() }
     }
@@ -82,6 +87,15 @@ struct InputHandler {
         candidate: CandidateContext,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
+
+        // Dispatch order (early return wins):
+        // 1. successor mode    → handleSuccessorMode
+        // 2. F6–F10 (組成中)   → handleFunctionKey
+        // 3. segment mode      → handleSegmentModeKey
+        // 4. eisu / kana       → toggle ASCII mode
+        // 5. ASCII mode        → passthrough
+        // 6. candidate visible → handleCandidateVisible
+        // 7. else              → handleNormalInput
 
         if isSuccessorMode {
             return handleSuccessorMode(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
@@ -183,25 +197,9 @@ struct InputHandler {
         }
     }
 
-    // MARK: - プライベートヘルパー
+    // MARK: - 共通ヘルパー（extension からも参照される）
 
-    @discardableResult
-    private mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
-        guard !state.composingText.isEmpty else { return .none }
-        let inputKey = state.finalizedText
-        let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
-        // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する
-        if let selected = candidate.selectedText {
-            db.record(input: normalizedInput, output: selected)
-            azooKeyConverter.commit(reading: inputKey, text: selected)
-            commitText(text: selected, client: client)
-        } else {
-            commitComposition(client: client)
-        }
-        return suggestSuccessors()
-    }
-
-    private mutating func commitText(text: String, client: TextInputClient) {
+    mutating func commitText(text: String, client: TextInputClient) {
         if !state.composingText.isEmpty {
             if let p1 = lastCommittedOutput {
                 db.recordBigram(prev: p1, input: state.finalizedText, output: text)
@@ -215,364 +213,8 @@ struct InputHandler {
         state = CompositionState()
     }
 
-    // 頭文字（ローマ字1文字）→ 格助詞リスト（複数ある場合は使用頻度の高い順）
-    private static let particleRomajiMap: [String: [String]] = [
-        "g": ["が"],
-        "w": ["を"],
-        "n": ["に", "の"],
-        "d": ["で"],
-        "h": ["は", "へ"],
-        "t": ["と"],
-        "k": ["から"],
-        "m": ["も", "まで"],
-        "y": ["より"],
-    ]
-
-    // 漢字またはカタカナで終わる語（名詞らしい）かどうか
-    private func isNounLike(_ text: String) -> Bool {
-        guard let last = text.unicodeScalars.last else { return false }
-        let v = last.value
-        let isKanji = (v >= 0x4E00 && v <= 0x9FFF) || (v >= 0x3400 && v <= 0x4DBF) || (v >= 0xF900 && v <= 0xFAFF)
-        let isKatakana = v >= 0x30A0 && v <= 0x30FF
-        return isKanji || isKatakana
-    }
-
-    private mutating func suggestSuccessors() -> CandidateAction {
-        guard let last = lastCommittedOutput else {
-            isSuccessorMode = false; successorFirstChar = nil
-            return .dismiss
-        }
-        // 直前の確定が格助詞自身なら再表示しない（無限ループ防止）
-        if InputHandler.particles.contains(last) {
-            isSuccessorMode = false; successorFirstChar = nil
-            return .dismiss
-        }
-
-        let bigramTop = db.fetchBigramTop(prev: last)
-        let trigramTop: [String] = prev2Output.map { db.fetchTrigramTop(prev2: $0, prev1: last) } ?? []
-        let predictTop = trigramTop + bigramTop.filter { !trigramTop.contains($0) }
-        // 名詞末尾のとき限定で格助詞 fallback を tail に追加
-        let particlesFallback = isNounLike(last)
-            ? InputHandler.particles.filter { !predictTop.contains($0) }
-            : []
-        let candidates = predictTop + particlesFallback
-
-        guard !candidates.isEmpty else {
-            isSuccessorMode = false; successorFirstChar = nil
-            return .dismiss
-        }
-
-        isSuccessorMode = true
-        successorFirstChar = nil
-        return .show(candidates: candidates, historyEnd: 0, initialRow: 0)
-    }
-
-    private mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
-        isSuccessorMode = false; successorFirstChar = nil
-        if let p1 = lastCommittedOutput {
-            db.recordBigram(prev: p1, input: particle, output: particle)
-            if let p2 = prev2Output {
-                db.recordTrigram(prev2: p2, prev1: p1, input: particle, output: particle)
-            }
-        }
-        db.record(input: particle, output: particle)
-        pushCommitted(particle)
-        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
-        client.insertText(particle)
-    }
-
-    private mutating func handleSuccessorMode(
-        keyCode: UInt16,
-        characters: String?,
-        baseCharacters: String?,
-        modifiers: NSEvent.ModifierFlags,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        switch keyCode {
-        case KeyCode.space, KeyCode.enter:
-            guard let selected = candidate.selectedText else {
-                isSuccessorMode = false; successorFirstChar = nil
-                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
-                return (true, .dismiss)
-            }
-            confirmSuccessor(selected, client: client)
-            return (true, .dismiss)
-        case KeyCode.downArrow, KeyCode.tab:
-            return (true, .selectNext)
-        case KeyCode.upArrow:
-            return (true, .selectPrev)
-        case KeyCode.escape, KeyCode.backspace, KeyCode.rightArrow:
-            isSuccessorMode = false; successorFirstChar = nil
-            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
-            return (true, .dismiss)
-        default:
-            // 格助詞 fast-path: 名詞末尾の確定後は候補に格助詞 fallback が必ず含まれる。
-            // このときはローマ字 1 打で「が/を/に…」に絞り込める既存挙動を維持する。
-            let char = (baseCharacters ?? characters ?? "").lowercased()
-            if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
-               let last = lastCommittedOutput, isNounLike(last) {
-                let matched = InputHandler.particleRomajiMap[char] ?? []
-                if !matched.isEmpty {
-                    successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                    let fromBigram = db.fetchBigramInList(prev: last, list: matched)
-                    let fromTrigram: [String] = prev2Output.map {
-                        db.fetchTrigramInList(prev2: $0, prev1: last, list: matched)
-                    } ?? []
-                    let merged = fromTrigram + fromBigram.filter { !fromTrigram.contains($0) }
-                    let rest = matched.filter { !merged.contains($0) }
-                    return (true, .show(candidates: merged + rest, historyEnd: 0, initialRow: 0))
-                }
-            }
-            // fast-path 非該当 → モード解除、バッファがあれば先に通常入力に流す
-            let first = successorFirstChar
-            isSuccessorMode = false; successorFirstChar = nil
-            if let first {
-                _ = handle(keyCode: first.keyCode, characters: first.characters, baseCharacters: first.baseCharacters,
-                           modifiers: modifiers, candidate: .hidden, client: client)
-            }
-            return handle(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-                          modifiers: modifiers, candidate: .hidden, client: client)
-        }
-    }
-
-    private mutating func handleCandidateVisible(
-        keyCode: UInt16,
-        characters: String?,
-        modifiers: NSEvent.ModifierFlags,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
-        switch keyCode {
-        case KeyCode.tab where modifiers.contains(.shift):
-            return (true, .selectPrev)
-        case KeyCode.space:
-            if !state.composedHiragana.isEmpty {
-                let action = enterSegmentMode()
-                if state.isSegmentMode {
-                    applySegmentMarkedText(client: client)
-                } else {
-                    applyMarkedText(candidateText: nil, client: client)
-                }
-                return (true, action)
-            }
-            return (true, .selectNext)
-        case KeyCode.tab, KeyCode.downArrow:
-            return (true, .selectNext)
-        case KeyCode.upArrow:
-            return (true, .selectPrev)
-        case KeyCode.enter:
-            return (true, doConfirmSelection(candidate: candidate, client: client))
-        case KeyCode.escape:
-            return doEscape(client: client)
-        case KeyCode.rightArrow:
-            commitComposition(client: client)
-            return (true, suggestSuccessors())
-        case KeyCode.backspace where modifiers.contains(.shift):
-            if candidate.selectedRow < candidate.historyEnd { return (true, .deleteSelected) }
-            return (true, .none)
-        default:
-            if isBackspace { return doBackspace(client: client) }
-            return nil
-        }
-    }
-
-    private mutating func handleNormalInput(
-        keyCode: UInt16,
-        characters: String?,
-        baseCharacters: String?,
-        modifiers: NSEvent.ModifierFlags,
-        wasExplicitlySelected: Bool,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        if keyCode == KeyCode.space {
-            if !state.composedHiragana.isEmpty {
-                let action = enterSegmentMode()
-                if state.isSegmentMode {
-                    applySegmentMarkedText(client: client)
-                } else {
-                    applyMarkedText(candidateText: nil, client: client)
-                }
-                return (true, action)
-            }
-            return (false, .none)
-        }
-
-        if keyCode >= KeyCode.leftArrow && keyCode <= KeyCode.upArrow { return (false, .none) }
-        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
-        guard let chars = characters, !chars.isEmpty,
-              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 }) else { return (false, .none) }
-        let base = baseCharacters ?? chars
-
-        let punctuationMap: [String: String] = [",": "、", ".": "。"]
-        if let mappedPunct = punctuationMap[base], !modifiers.contains(.shift) {
-            if state.composingText.isEmpty {
-                client.insertText(mappedPunct)
-                return (true, .dismiss)
-            } else {
-                if !state.pendingRomaji.isEmpty {
-                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                    state.pendingRomaji = ""
-                }
-                state.composedHiragana += mappedPunct
-                let action = buildCandidateList()
-                applyMarkedText(candidateText: nil, client: client)
-                return (true, action)
-            }
-        }
-
-        let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
-
-        if modifiers.contains(.shift) && !isNonAscii {
-            if wasExplicitlySelected {
-                _ = doConfirmSelection(candidate: candidate, client: client)
-            } else if !state.pendingRomaji.isEmpty {
-                state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                state.pendingRomaji = ""
-            }
-            state.composedHiragana += chars
-            let action = buildCandidateList(autoShow: true)
-            applyMarkedText(candidateText: nil, client: client)
-            return (true, action)
-        }
-
-        if isNonAscii {
-            if state.composingText.isEmpty {
-                client.insertText(chars)
-            } else {
-                if !state.pendingRomaji.isEmpty {
-                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                    state.pendingRomaji = ""
-                }
-                state.composedHiragana += chars
-                applyMarkedText(candidateText: nil, client: client)
-            }
-            return (true, .dismiss)
-        }
-
-        if !state.composedHiragana.isEmpty && state.pendingRomaji.isEmpty
-            && state.composedHiragana.allSatisfy({ $0.isASCII }) {
-            if wasExplicitlySelected {
-                _ = doConfirmSelection(candidate: candidate, client: client)
-            }
-            state.composedHiragana += chars
-            let action = buildCandidateList(autoShow: true)
-            applyMarkedText(candidateText: nil, client: client)
-            return (true, action)
-        }
-
-        if wasExplicitlySelected {
-            _ = doConfirmSelection(candidate: candidate, client: client)
-        }
-        let needsRefresh = state.addRomaji(base)
-        let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
-        let candidateAction: CandidateAction = (needsRefresh || hasBigramContext) ? buildCandidateList(autoShow: true) : .dismiss
-        applyMarkedText(candidateText: nil, client: client)
-        return (true, candidateAction)
-    }
-
-    /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
-    ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
-    private mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
-        let h = state.composedHiragana
-        let azooKeyCandidates = h.allSatisfy({ $0.isASCII }) ? [] : azooKeyConverter.requestCandidates(hiragana: h)
-        let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
-        let exactCandidates = db.fetchHistoryExact(reading: historyKey)
-        let prefixCandidates = db.fetchHistoryPrefix(reading: historyKey)
-        let historyCandidates = exactCandidates + prefixCandidates.filter { !exactCandidates.contains($0) }
-        let historyCount = historyCandidates.count
-
-        let bigramRaw = lastCommittedOutput.map { db.fetchBigram(prev: $0, reading: state.composedHiragana) } ?? []
-        let trigramRaw: [String] = {
-            guard let p1 = lastCommittedOutput, let p2 = prev2Output else { return [] }
-            return db.fetchTrigram(prev2: p2, prev1: p1, reading: state.composedHiragana)
-        }()
-        let predictRaw = trigramRaw + bigramRaw.filter { !trigramRaw.contains($0) }
-        var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
-        let uniquePredictions = predictRaw.filter { !candidates.contains($0) }
-        candidates.insert(contentsOf: uniquePredictions, at: 0)
-        let predictCount = uniquePredictions.count
-
-        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0 { return .dismiss }
-
-        let hiragana = state.composedHiragana
-        let katakana = hiraganaToKatakana(hiragana)
-
-        // 履歴にひらがな・カタカナが含まれるかを確認する
-        // 履歴にある場合 → 履歴エントリとして可視範囲に残す（固定位置に追加しない）
-        // 履歴にない場合 → スクロール範囲外の固定位置に追加し、↑ キーで到達できるようにする
-        let hiraganaInHistory = candidates.prefix(predictCount + historyCount).contains(hiragana)
-        let katakanaInHistory = candidates.prefix(predictCount + historyCount).contains(katakana)
-
-        var fixedCount = 0
-        if !katakanaInHistory {
-            candidates.removeAll { $0 == katakana }
-            candidates.insert(katakana, at: 0)
-            fixedCount += 1
-        }
-        // hiragana == katakana（非ひらがな文字）の場合は重複挿入しない
-        if !hiraganaInHistory && hiragana != katakana {
-            candidates.removeAll { $0 == hiragana }
-            candidates.insert(hiragana, at: 0)
-            fixedCount += 1
-        }
-
-        let historyEnd = fixedCount + predictCount + historyCount
-        // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
-        let initialRow = candidates.count > fixedCount ? fixedCount : 0
-        guard !candidates.isEmpty else { return .dismiss }
-        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow)
-    }
-
-    private func hiraganaToKatakana(_ text: String) -> String {
-        String(text.unicodeScalars.map { scalar in
-            // ひらがな: U+3041〜U+3096 → カタカナ: U+30A1〜U+30F6 (offset +0x60)
-            if scalar.value >= 0x3041 && scalar.value <= 0x3096 {
-                return Character(UnicodeScalar(scalar.value + 0x60)!)
-            }
-            return Character(scalar)
-        })
-    }
-
-    private func hiraganaToHankakuKatakana(_ text: String) -> String {
-        let map: [Character: String] = [
-            "ぁ": "ｧ", "あ": "ｱ", "ぃ": "ｨ", "い": "ｲ", "ぅ": "ｩ", "う": "ｳ",
-            "ぇ": "ｪ", "え": "ｴ", "ぉ": "ｫ", "お": "ｵ",
-            "か": "ｶ", "が": "ｶﾞ", "き": "ｷ", "ぎ": "ｷﾞ", "く": "ｸ", "ぐ": "ｸﾞ",
-            "け": "ｹ", "げ": "ｹﾞ", "こ": "ｺ", "ご": "ｺﾞ",
-            "さ": "ｻ", "ざ": "ｻﾞ", "し": "ｼ", "じ": "ｼﾞ", "す": "ｽ", "ず": "ｽﾞ",
-            "せ": "ｾ", "ぜ": "ｾﾞ", "そ": "ｿ", "ぞ": "ｿﾞ",
-            "た": "ﾀ", "だ": "ﾀﾞ", "ち": "ﾁ", "ぢ": "ﾁﾞ", "っ": "ｯ", "つ": "ﾂ", "づ": "ﾂﾞ",
-            "て": "ﾃ", "で": "ﾃﾞ", "と": "ﾄ", "ど": "ﾄﾞ",
-            "な": "ﾅ", "に": "ﾆ", "ぬ": "ﾇ", "ね": "ﾈ", "の": "ﾉ",
-            "は": "ﾊ", "ば": "ﾊﾞ", "ぱ": "ﾊﾟ", "ひ": "ﾋ", "び": "ﾋﾞ", "ぴ": "ﾋﾟ",
-            "ふ": "ﾌ", "ぶ": "ﾌﾞ", "ぷ": "ﾌﾟ", "へ": "ﾍ", "べ": "ﾍﾞ", "ぺ": "ﾍﾟ",
-            "ほ": "ﾎ", "ぼ": "ﾎﾞ", "ぽ": "ﾎﾟ",
-            "ま": "ﾏ", "み": "ﾐ", "む": "ﾑ", "め": "ﾒ", "も": "ﾓ",
-            "ゃ": "ｬ", "や": "ﾔ", "ゅ": "ｭ", "ゆ": "ﾕ", "ょ": "ｮ", "よ": "ﾖ",
-            "ら": "ﾗ", "り": "ﾘ", "る": "ﾙ", "れ": "ﾚ", "ろ": "ﾛ",
-            "わ": "ﾜ", "ゐ": "ｲ", "ゑ": "ｴ", "を": "ｦ",
-            "ん": "ﾝ", "ー": "ｰ",
-            "。": "｡", "「": "｢", "」": "｣", "、": "､", "・": "･",
-        ]
-        return text.map { map[$0] ?? String($0) }.joined()
-    }
-
-    private func toZenkakuAscii(_ text: String) -> String {
-        String(text.unicodeScalars.map { scalar in
-            if scalar.value == 0x20 {
-                return Character(UnicodeScalar(0x3000)!)
-            } else if scalar.value >= 0x21 && scalar.value <= 0x7E {
-                return Character(UnicodeScalar(scalar.value + 0xFEE0)!)
-            }
-            return Character(scalar)
-        })
-    }
-
     /// F6–F10 の変換確定。composingText が空なら false を返す。
-    private mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
+    mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
         if state.isSegmentMode, let segmentState = state.segmentState {
             state.composedHiragana = segmentState.segments.map(\.reading).joined()
             state.segmentState = nil
@@ -586,9 +228,9 @@ struct InputHandler {
         let text: String
         switch keyCode {
         case KeyCode.f6:  text = hiragana
-        case KeyCode.f7:  text = hiraganaToKatakana(hiragana)
-        case KeyCode.f8:  text = hiraganaToHankakuKatakana(hiragana)
-        case KeyCode.f9:  text = toZenkakuAscii(RomajiConverter.hiraganaToRomaji(hiragana))
+        case KeyCode.f7:  text = KanaUtils.hiraganaToKatakana(hiragana)
+        case KeyCode.f8:  text = KanaUtils.hiraganaToHankakuKatakana(hiragana)
+        case KeyCode.f9:  text = KanaUtils.toZenkakuAscii(RomajiConverter.hiraganaToRomaji(hiragana))
         case KeyCode.f10: text = RomajiConverter.hiraganaToRomaji(hiragana)
         default: return false
         }
@@ -597,7 +239,7 @@ struct InputHandler {
         return true
     }
 
-    private func applyMarkedText(candidateText: String?, client: TextInputClient) {
+    func applyMarkedText(candidateText: String?, client: TextInputClient) {
         let text: String
         if let selected = candidateText {
             text = selected + state.pendingRomaji
@@ -607,7 +249,7 @@ struct InputHandler {
         client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
 
-    private mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
+    mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         let (handled, needsRefresh) = state.backspace()
         guard handled else { return (false, .none) }
         let action: CandidateAction = needsRefresh ? buildCandidateList() : .dismiss
@@ -615,207 +257,9 @@ struct InputHandler {
         return (true, action)
     }
 
-    private mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
+    mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         guard state.reset() else { return (false, .none) }
         applyMarkedText(candidateText: nil, client: client)
         return (true, .dismiss)
     }
-
-    // MARK: - セグメントモード
-
-    private mutating func enterSegmentMode() -> CandidateAction {
-        if !state.pendingRomaji.isEmpty {
-            state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-            state.pendingRomaji = ""
-        }
-        let rawSegments = azooKeyConverter.segmentize(state.composedHiragana)
-
-        // 1セグメントのみなら従来の候補ウィンドウにフォールバック
-        guard rawSegments.count >= 2 else {
-            return buildCandidateList()
-        }
-
-        let segments = rawSegments.map { buildSegmentCandidates(reading: $0.reading, dictCandidates: $0.candidates) }
-        state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
-        return makeCandidateActionForFocusedSegment()
-    }
-
-    private func buildSegmentCandidates(reading: String, dictCandidates: [String]) -> Segment {
-        let hiragana = reading
-        let katakana = hiraganaToKatakana(reading)
-        let historyCandidates = db.fetchHistoryExact(reading: reading)
-
-        var candidates: [String] = []
-        var seen = Set<String>()
-
-        let hiraganaInHistory = historyCandidates.contains(hiragana)
-        let katakanaInHistory = historyCandidates.contains(katakana)
-        var fixedCount = 0
-        if !katakanaInHistory {
-            candidates.insert(katakana, at: 0); seen.insert(katakana); fixedCount += 1
-        }
-        // hiragana == katakana（非ひらがな文字）の場合は重複挿入しない
-        if !hiraganaInHistory && hiragana != katakana {
-            candidates.insert(hiragana, at: 0); seen.insert(hiragana); fixedCount += 1
-        }
-
-        for h in historyCandidates where seen.insert(h).inserted { candidates.append(h) }
-        let historyEnd = fixedCount + historyCandidates.count
-
-        for d in dictCandidates where seen.insert(d).inserted { candidates.append(d) }
-
-        let initialIndex = candidates.count > fixedCount ? fixedCount : 0
-        return Segment(reading: reading, candidates: candidates, selectedIndex: initialIndex, historyEnd: historyEnd)
-    }
-
-    private func makeCandidateActionForFocusedSegment() -> CandidateAction {
-        guard let segmentState = state.segmentState else { return .none }
-        let seg = segmentState.focusedSegment
-        guard !seg.candidates.isEmpty else { return .dismiss }
-        return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex)
-    }
-
-    private mutating func handleSegmentModeKey(
-        keyCode: UInt16,
-        modifiers: NSEvent.ModifierFlags,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        guard let segmentState = state.segmentState else { return (false, .none) }
-
-        switch keyCode {
-        case KeyCode.leftArrow:
-            if modifiers.contains(.shift) {
-                return resizeFocusedSegment(expand: false, candidate: candidate, client: client)
-            }
-            guard segmentState.focusedIndex > 0 else { return (true, .none) }
-            syncFocusedSegmentSelection(from: candidate)
-            state.segmentState!.focusedIndex -= 1
-            applySegmentMarkedText(client: client)
-            return (true, makeCandidateActionForFocusedSegment())
-
-        case KeyCode.rightArrow:
-            if modifiers.contains(.shift) {
-                return resizeFocusedSegment(expand: true, candidate: candidate, client: client)
-            }
-            guard segmentState.focusedIndex < segmentState.segments.count - 1 else { return (true, .none) }
-            syncFocusedSegmentSelection(from: candidate)
-            state.segmentState!.focusedIndex += 1
-            applySegmentMarkedText(client: client)
-            return (true, makeCandidateActionForFocusedSegment())
-
-        case KeyCode.space, KeyCode.tab, KeyCode.downArrow:
-            return (true, .selectNext)
-
-        case KeyCode.upArrow:
-            return (true, .selectPrev)
-
-        case KeyCode.enter:
-            return (true, doConfirmSegments(candidate: candidate, client: client))
-
-        case KeyCode.escape:
-            state.segmentState = nil
-            applyMarkedText(candidateText: nil, client: client)
-            return (true, .dismiss)
-
-        default:
-            if keyCode == KeyCode.backspace {
-                state.segmentState = nil
-                applyMarkedText(candidateText: nil, client: client)
-                return (true, .dismiss)
-            }
-            // その他のキー → セグメントモード解除してそのキーをスルー
-            state.segmentState = nil
-            return (false, .dismiss)
-        }
-    }
-
-    /// Shift+右/左矢印でセグメント境界を1文字単位で調整する。
-    /// expand=true: フォーカスセグメントを右に1文字拡張（次セグメントの先頭1文字を奪う）
-    /// expand=false: フォーカスセグメントを左に1文字縮小（末尾1文字を次セグメントの先頭に渡す）
-    private mutating func resizeFocusedSegment(
-        expand: Bool,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        guard var segmentState = state.segmentState else { return (false, .none) }
-        syncFocusedSegmentSelection(from: candidate)
-        let i = segmentState.focusedIndex
-
-        if expand {
-            guard i + 1 < segmentState.segments.count else { return (true, .none) }
-            let nextReading = segmentState.segments[i + 1].reading
-            guard !nextReading.isEmpty else { return (true, .none) }
-            let newFocusedReading = segmentState.segments[i].reading + String(nextReading.first!)
-            let newNextReading = String(nextReading.dropFirst())
-            segmentState.segments[i] = buildSegmentCandidates(
-                reading: newFocusedReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
-            )
-            if newNextReading.isEmpty {
-                segmentState.segments.remove(at: i + 1)
-            } else {
-                segmentState.segments[i + 1] = buildSegmentCandidates(
-                    reading: newNextReading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading:newNextReading)
-                )
-            }
-        } else {
-            let focusedReading = segmentState.segments[i].reading
-            guard focusedReading.count >= 2 else { return (true, .none) }
-            let newFocusedReading = String(focusedReading.dropLast())
-            let removedChar = String(focusedReading.last!)
-            segmentState.segments[i] = buildSegmentCandidates(
-                reading: newFocusedReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
-            )
-            if i + 1 < segmentState.segments.count {
-                let newNextReading = removedChar + segmentState.segments[i + 1].reading
-                segmentState.segments[i + 1] = buildSegmentCandidates(
-                    reading: newNextReading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading:newNextReading)
-                )
-            } else {
-                segmentState.segments.insert(
-                    buildSegmentCandidates(
-                        reading: removedChar,
-                        dictCandidates: azooKeyConverter.candidatesForSegment(reading:removedChar)
-                    ),
-                    at: i + 1
-                )
-            }
-        }
-
-        state.segmentState = segmentState
-        applySegmentMarkedText(client: client)
-        return (true, makeCandidateActionForFocusedSegment())
-    }
-
-    private mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {
-        guard let segmentState = state.segmentState, let selectedText = candidate.selectedText else { return }
-        if let idx = segmentState.focusedSegment.candidates.firstIndex(of: selectedText) {
-            state.segmentState!.segments[segmentState.focusedIndex].selectedIndex = idx
-        }
-    }
-
-    private mutating func doConfirmSegments(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
-        syncFocusedSegmentSelection(from: candidate)
-        guard let segmentState = state.segmentState else { return .none }
-        var confirmed = ""
-        for seg in segmentState.segments {
-            db.record(input: seg.reading, output: seg.selectedText)
-            azooKeyConverter.commit(reading: seg.reading, text: seg.selectedText)
-            confirmed += seg.selectedText
-        }
-        commitText(text: confirmed, client: client)
-        return suggestSuccessors()
-    }
-
-    private func applySegmentMarkedText(client: TextInputClient) {
-        guard let segmentState = state.segmentState else { return }
-        let str = segmentState.attributedString()
-        client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
-    }
-
-
 }
