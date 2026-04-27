@@ -88,4 +88,28 @@ final class SkipBigramTests: InputHandlerTestCase {
         let result = handler.mostRecentContentWord()
         XCTAssertNil(result, "履歴が1件以下なら nil")
     }
+
+    // MARK: - 文脈リセット（A-1）
+
+    func testSentenceTerminatorClearsHistory() {
+        handler.commitText(text: "日本語", client: client)
+        handler.commitText(text: "。", client: client)
+        XCTAssertTrue(handler.committedHistory.isEmpty, "文末記号確定後に history がリセットされる")
+    }
+
+    func testNoBigramAcrossSentenceBoundary() {
+        handler.commitText(text: "日本語", client: client)
+        handler.commitText(text: "。", client: client)
+        handler.commitText(text: "新しい文", client: client)
+        let bigramResults = handler.db.fetchBigramTop(prev: "。")
+        XCTAssertTrue(bigramResults.isEmpty, "文末記号を prev とする bigram は記録されない")
+    }
+
+    func testMostRecentContentWordNilAfterSentenceBreak() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        handler.commitText(text: "。", client: client)
+        XCTAssertTrue(handler.committedHistory.isEmpty)
+        XCTAssertNil(handler.mostRecentContentWord())
+    }
 }

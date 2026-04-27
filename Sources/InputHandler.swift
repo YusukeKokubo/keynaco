@@ -55,6 +55,7 @@ struct InputHandler {
     nonisolated(unsafe) static var isAsciiMode = false
 
     static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
+    static let sentenceTerminators: Set<String> = ["。", "！", "？", "\n"]
 
     var state = CompositionState()
     var ignoreNextModeSwitch = false
@@ -66,6 +67,10 @@ struct InputHandler {
         committedHistory.count >= 2 ? committedHistory[committedHistory.count - 2] : nil
     }
     mutating func pushCommitted(_ text: String) {
+        if InputHandler.sentenceTerminators.contains(text) {
+            committedHistory.removeAll()
+            return
+        }
         committedHistory.append(text)
         if committedHistory.count > 5 { committedHistory.removeFirst() }
     }
