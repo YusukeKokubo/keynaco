@@ -836,14 +836,27 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.markedText, "かんじ")
     }
 
-    func testNNPendingNRemainsAfterDoubleN() {
+    func testNNShowsNWithoutPending() {
+        // 標準IME準拠: "nn" 後は "ん" のみ表示（pending "n" は非表示）
         typeRomaji("nn")
-        XCTAssertEqual(client.markedText, "んn")
+        XCTAssertEqual(client.markedText, "ん")
     }
 
     func testNNThenVowelFinalizesN() {
         typeRomaji("nna")
         XCTAssertEqual(client.markedText, "んな")
+    }
+
+    func testKonnnaProducesKonna() {
+        // "konnna": nn→ん、3つ目のnはhidden nを破棄して新しいpendingに。na→な
+        typeRomaji("konnna")
+        XCTAssertEqual(client.markedText, "こんな")
+    }
+
+    func testKonnichiwa() {
+        // hidden "n" + 母音 は通常どおり組み合わせ
+        typeRomaji("konnichiwa")
+        XCTAssertEqual(client.markedText, "こんにちわ")
     }
 
     func testNBeforeVowelDoesNotProduceN() {
