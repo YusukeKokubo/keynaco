@@ -315,4 +315,16 @@ final class DatabaseManager: @unchecked Sendable {
             sqlite3_bind_int64($0, 3, t)
         }
     }
+
+    /// フル読みに加え、先頭 2〜(N-1) 文字の各 prefix でも record する。
+    /// 読みが ASCII のみ、または 5 文字未満の場合はフル読みのみ。
+    func recordPrefixes(reading: String, output: String) {
+        record(input: reading, output: output)
+        guard !reading.allSatisfy({ $0.isASCII }) else { return }
+        let chars = Array(reading)
+        guard chars.count >= 5 else { return }
+        for len in 2..<chars.count {
+            record(input: String(chars.prefix(len)), output: output)
+        }
+    }
 }

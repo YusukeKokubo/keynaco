@@ -1307,4 +1307,44 @@ final class InputHandlerTests: XCTestCase {
         let original = handler.db.fetchHistoryExact(reading: "あAPI")
         XCTAssertEqual(original, ["あAPI"])
     }
+
+    // MARK: - 読み省略パターンの自動学習（recordPrefixes）
+
+    func testPrefixRecord() {
+        // 5文字以上のひらがな読みを確定すると prefix も記録される
+        // "とうきょう"(5文字) → フル + prefix 3件("とうきょ","とうき","とう")
+        handler.db.recordPrefixes(reading: "とうきょう", output: "東京")
+
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうきょう"), ["東京"], "フル読みで exact ヒット")
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうきょ"),   ["東京"], "N-1 prefix で exact ヒット")
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうき"),     ["東京"], "N-2 prefix で exact ヒット")
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とう"),       ["東京"], "N-3 prefix で exact ヒット")
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "と").isEmpty,  "1文字(len<2)は記録しない")
+    }
+
+    func testPrefixRecordSkipsShortReading() {
+        // 4文字以下はフル読みのみ記録（prefix なし）
+        handler.db.recordPrefixes(reading: "とうき", output: "東")
+
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうき"), ["東"], "フル読みは記録される")
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "とう").isEmpty, "4文字以下は prefix 記録しない")
+    }
+
+    func testPrefixRecordSkipsASCII() {
+        // ASCII のみの読みは prefix 記録しない（英字単語モード対策）
+        handler.db.recordPrefixes(reading: "github", output: "GitHub")
+
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "github"), ["GitHub"], "フル読みは記録される")
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "githu").isEmpty, "ASCII は prefix 記録しない")
+    }
+
+    func testPrefixRecordViaCommit() {
+        // 通常確定パスで recordPrefixes が呼ばれ、prefix で候補が出ることを確認
+        typeRomaji("toukyou")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+
+        // "とうきょ" (prefix) で exact 検索できる
+        let result = handler.db.fetchHistoryExact(reading: "とうきょ")
+        XCTAssertEqual(result, ["東京"], "確定後、prefix でも履歴ヒットするはず")
+    }
 }

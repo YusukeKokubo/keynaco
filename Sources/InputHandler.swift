@@ -177,7 +177,7 @@ struct InputHandler {
             var confirmed = ""
             for (i, seg) in segmentState.segments.enumerated() {
                 let text = (i == segmentState.focusedIndex) ? selectedText : seg.selectedText
-                db.record(input: seg.reading, output: text)
+                db.recordPrefixes(reading: seg.reading, output: text)
                 azooKeyConverter.commit(reading: seg.reading, text: text)
                 confirmed += text
             }
@@ -188,11 +188,11 @@ struct InputHandler {
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         if candidate.isVisible, let selected = candidate.selectedText {
-            db.record(input: normalizedInput, output: selected)
+            db.recordPrefixes(reading: normalizedInput, output: selected)
             azooKeyConverter.commit(reading: inputKey, text: selected)
             commitText(text: selected, client: client)
         } else {
-            db.record(input: normalizedInput, output: inputKey)
+            db.recordPrefixes(reading: normalizedInput, output: inputKey)
             commitText(text: inputKey, client: client)
         }
     }
@@ -234,7 +234,7 @@ struct InputHandler {
         case KeyCode.f10: text = RomajiConverter.hiraganaToRomaji(hiragana)
         default: return false
         }
-        db.record(input: hiragana, output: text)
+        db.recordPrefixes(reading: hiragana, output: text)
         commitText(text: text, client: client)
         return true
     }

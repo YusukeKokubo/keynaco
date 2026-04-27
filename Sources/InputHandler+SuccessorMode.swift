@@ -41,7 +41,7 @@ extension InputHandler {
                 db.recordTrigram(prev2: p2, prev1: p1, input: particle, output: particle)
             }
         }
-        db.record(input: particle, output: particle)
+        db.recordPrefixes(reading: particle, output: particle)
         pushCommitted(particle)
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
         client.insertText(particle)

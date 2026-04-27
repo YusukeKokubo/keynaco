@@ -17,7 +17,7 @@ extension InputHandler {
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する
         if let selected = candidate.selectedText {
-            db.record(input: normalizedInput, output: selected)
+            db.recordPrefixes(reading: normalizedInput, output: selected)
             azooKeyConverter.commit(reading: inputKey, text: selected)
             commitText(text: selected, client: client)
         } else {
