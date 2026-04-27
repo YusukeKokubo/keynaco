@@ -1204,6 +1204,56 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertTrue(resultsG.contains("GITHUB"), "prefix 'g' で GITHUB が候補に出る: \(resultsG)")
     }
 
+    // MARK: - 英字単語モード（Shift 起動 + 小文字継続）
+
+    func testGitHubMixedCaseMarkedText() {
+        // Shift+G → 全ASCII組成開始、以降の小文字もそのまま蓄積される
+        type(chars: "G", base: "g", modifiers: .shift)
+        XCTAssertEqual(client.markedText, "G")
+        type(chars: "i", base: "i")
+        XCTAssertEqual(client.markedText, "Gi")
+        type(chars: "t", base: "t")
+        XCTAssertEqual(client.markedText, "Git")
+        type(chars: "H", base: "h", modifiers: .shift)
+        XCTAssertEqual(client.markedText, "GitH")
+        type(chars: "u", base: "u")
+        XCTAssertEqual(client.markedText, "GitHu")
+        type(chars: "b", base: "b")
+        XCTAssertEqual(client.markedText, "GitHub")
+    }
+
+    func testGitHubConfirmsExactString() {
+        type(chars: "G", base: "g", modifiers: .shift)
+        type(chars: "i", base: "i")
+        type(chars: "t", base: "t")
+        type(chars: "H", base: "h", modifiers: .shift)
+        type(chars: "u", base: "u")
+        type(chars: "b", base: "b")
+        press(keyCode: 36)  // Enter
+        XCTAssertEqual(client.inserted.last, "GitHub")
+    }
+
+    func testGitHubRecordedInHistory() {
+        type(chars: "G", base: "g", modifiers: .shift)
+        type(chars: "i", base: "i")
+        type(chars: "t", base: "t")
+        type(chars: "H", base: "h", modifiers: .shift)
+        type(chars: "u", base: "u")
+        type(chars: "b", base: "b")
+        press(keyCode: 36)  // Enter
+
+        // historyKey は小文字正規化されるので "github" で検索
+        let exact = handler.db.fetchHistoryExact(reading: "github")
+        XCTAssertTrue(exact.contains("GitHub"), "exact 'github' → GitHub: \(exact)")
+    }
+
+    func testLowercaseStartStillDoesRomaji() {
+        // 小文字始まり（Shift なし）はローマ字変換される（英字単語モードに入らない）
+        type(chars: "g", base: "g")
+        type(chars: "o", base: "o")
+        XCTAssertEqual(client.markedText, "ご")
+    }
+
     func testMixedHiraganaAndAsciiNotNormalized() {
         // ひらがな混在の input は小文字化されない（記録はそのまま "あAPI"）
         typeRomaji("a")  // → composedHiragana = "あ"

@@ -254,6 +254,18 @@ struct InputHandler {
             return (true, .dismiss)
         }
 
+        // 全ASCII組成中（英字単語モード）: Shift で始まった英字バッファに小文字もそのまま蓄積
+        if !state.composedHiragana.isEmpty && state.pendingRomaji.isEmpty
+            && state.composedHiragana.allSatisfy({ $0.isASCII }) {
+            if wasExplicitlySelected {
+                _ = doConfirmSelection(candidate: candidate, client: client)
+            }
+            state.composedHiragana += chars
+            let action = doRefreshCandidates(autoShow: true)
+            applyMarkedText(candidateText: nil, client: client)
+            return (true, action)
+        }
+
         if wasExplicitlySelected {
             _ = doConfirmSelection(candidate: candidate, client: client)
         }
@@ -449,8 +461,8 @@ struct InputHandler {
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     private mutating func doRefreshCandidates(autoShow: Bool = false) -> CandidateAction {
-        let azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: state.composedHiragana)
         let h = state.composedHiragana
+        let azooKeyCandidates = h.allSatisfy({ $0.isASCII }) ? [] : azooKeyConverter.requestCandidates(hiragana: h)
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
         let exactCandidates = db.fetchHistoryExact(reading: historyKey)
         let prefixCandidates = db.fetchHistoryPrefix(reading: historyKey)
