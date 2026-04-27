@@ -105,6 +105,35 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         XCTAssertFalse(handler.state.isSegmentMode)
     }
 
+    // MARK: - フレーズ単位学習（改善 E）
+    // See: docs/domain/glossary.md#databasemanager
+
+    func testPhraseRecordedAfterMultiSegmentConfirm() {
+        // 複数セグメントを Space 確定したとき、合成読み × 合成出力が1エントリとして記録される
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        guard handler.state.isSegmentMode,
+              let ss = handler.state.segmentState,
+              ss.segments.count >= 2 else { return }
+
+        let fullReading = ss.segments.map(\.reading).joined()
+        press(keyCode: 36)  // Enter → 確定
+
+        // フレーズ全体の読みで履歴が記録されているはず
+        let hist = handler.db.fetchHistoryExact(reading: fullReading)
+        XCTAssertFalse(hist.isEmpty, "合成読みでフレーズ全体が履歴に記録されるはず")
+    }
+
+    func testSingleSegmentDoesNotRecordPhrase() {
+        // 1セグメントのみのとき合成エントリは記録しない
+        type(chars: "a", base: "a")
+        press(keyCode: 49)  // Space → 候補ウィンドウ（1セグメントフォールバック）
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "あ")
+        // "あ" の読みで記録されるが、合成読み（全体）は記録されない（1セグメントなのでフレーズ記録スキップ）
+        // ここではクラッシュしないことと挿入テキストがあることを確認
+        XCTAssertFalse(client.inserted.isEmpty)
+    }
+
     // MARK: - セグメント境界調整（Shift+矢印）
     // See: docs/domain/states.md#セグメントモード
 

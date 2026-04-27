@@ -175,11 +175,16 @@ struct InputHandler {
         if let segmentState = state.segmentState {
             let selectedText = candidate.selectedText ?? segmentState.focusedSegment.selectedText
             var confirmed = ""
+            var fullReading = ""
             for (i, seg) in segmentState.segments.enumerated() {
                 let text = (i == segmentState.focusedIndex) ? selectedText : seg.selectedText
                 db.recordPrefixes(reading: seg.reading, output: text)
                 azooKeyConverter.commit(reading: seg.reading, text: text)
                 confirmed += text
+                fullReading += seg.reading
+            }
+            if segmentState.segments.count >= 2 {
+                db.recordPrefixes(reading: fullReading, output: confirmed)
             }
             commitText(text: confirmed, client: client)
             return

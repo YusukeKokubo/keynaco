@@ -186,10 +186,15 @@ extension InputHandler {
         syncFocusedSegmentSelection(from: candidate)
         guard let segmentState = state.segmentState else { return .none }
         var confirmed = ""
+        var fullReading = ""
         for seg in segmentState.segments {
-            db.record(input: seg.reading, output: seg.selectedText)
+            db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
             azooKeyConverter.commit(reading: seg.reading, text: seg.selectedText)
             confirmed += seg.selectedText
+            fullReading += seg.reading
+        }
+        if segmentState.segments.count >= 2 {
+            db.recordPrefixes(reading: fullReading, output: confirmed)
         }
         commitText(text: confirmed, client: client)
         return suggestSuccessors()
