@@ -79,35 +79,44 @@ final class DatabaseManager: @unchecked Sendable {
         sqlite3_bind_text(stmt, index, value, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
 
-    // MARK: - 検索
-
-    /// 読みに完全一致する履歴候補を使用頻度順で返す。
-    func fetchHistoryExact(reading: String) -> [String] {
-        let sql = "SELECT output FROM history WHERE input = ? COLLATE NOCASE ORDER BY count DESC, used_at DESC LIMIT 10"
+    private func queryStrings(
+        _ sql: String,
+        bind: ((OpaquePointer?) -> Void)? = nil,
+        columnIndex: Int32 = 0
+    ) -> [String] {
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        bindText(stmt, 1, reading)
+        bind?(stmt)
         var results: [String] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+            if let ptr = sqlite3_column_text(stmt, columnIndex) { results.append(String(cString: ptr)) }
         }
         return results
     }
 
+    private func execute(_ sql: String, bind: ((OpaquePointer?) -> Void)? = nil) {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        bind?(stmt)
+        sqlite3_step(stmt)
+    }
+
+    // MARK: - 検索
+
+    /// 読みに完全一致する履歴候補を使用頻度順で返す。
+    func fetchHistoryExact(reading: String) -> [String] {
+        queryStrings("SELECT output FROM history WHERE input = ? COLLATE NOCASE ORDER BY count DESC, used_at DESC LIMIT 10") {
+            self.bindText($0, 1, reading)
+        }
+    }
+
     /// 読みが前方一致する履歴候補を使用頻度順で返す（完全一致は除外）。
     func fetchHistoryPrefix(reading: String) -> [String] {
-        let sql = "SELECT output FROM history WHERE input LIKE ? AND input != ? ORDER BY count DESC, used_at DESC LIMIT 10"
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        bindText(stmt, 1, reading + "%")
-        bindText(stmt, 2, reading)
-        var results: [String] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        queryStrings("SELECT output FROM history WHERE input LIKE ? AND input != ? ORDER BY count DESC, used_at DESC LIMIT 10") {
+            self.bindText($0, 1, reading + "%"); self.bindText($0, 2, reading)
         }
-        return results
     }
 
     // MARK: - 設定画面用
@@ -144,12 +153,9 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     func deleteBigram(prev: String, input: String, output: String) {
-        let sql = "DELETE FROM bigram WHERE prev = ? AND input = ? AND output = ?"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, prev); bindText(stmt, 2, input); bindText(stmt, 3, output)
-        sqlite3_step(stmt)
+        execute("DELETE FROM bigram WHERE prev = ? AND input = ? AND output = ?") {
+            self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+        }
     }
 
     func fetchAllHistory() -> [HistoryEntry] {
@@ -170,12 +176,9 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     func deleteHistoryEntry(input: String, output: String) {
-        let sql = "DELETE FROM history WHERE input = ? AND output = ?"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, input); bindText(stmt, 2, output)
-        sqlite3_step(stmt)
+        execute("DELETE FROM history WHERE input = ? AND output = ?") {
+            self.bindText($0, 1, input); self.bindText($0, 2, output)
+        }
     }
 
     /// 既存の bi-gram を全削除してからインポートデータで置き換える。
@@ -202,183 +205,114 @@ final class DatabaseManager: @unchecked Sendable {
     // MARK: - Bi-gram
 
     func recordBigram(prev: String, input: String, output: String) {
-        let sql = """
+        let t = Int64(Date().timeIntervalSince1970)
+        execute("""
         INSERT INTO bigram (prev, input, output, count, used_at)
         VALUES (?, ?, ?, 1, ?)
         ON CONFLICT(prev, input, output) DO UPDATE SET
             count   = count + 1,
             used_at = excluded.used_at;
-        """
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
-        let t = Int64(Date().timeIntervalSince1970)
-        bindText(stmt, 1, prev)
-        bindText(stmt, 2, input)
-        bindText(stmt, 3, output)
-        sqlite3_bind_int64(stmt, 4, t)
-        sqlite3_step(stmt)
+        """) {
+            self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+            sqlite3_bind_int64($0, 4, t)
+        }
     }
 
     func fetchBigram(prev: String, reading: String) -> [String] {
-        let sql = "SELECT output FROM bigram WHERE prev = ? AND input LIKE ? ORDER BY count DESC, used_at DESC LIMIT 10"
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        bindText(stmt, 1, prev)
-        bindText(stmt, 2, reading + "%")
-        var results: [String] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        queryStrings("SELECT output FROM bigram WHERE prev = ? AND input LIKE ? ORDER BY count DESC, used_at DESC LIMIT 10") {
+            self.bindText($0, 1, prev); self.bindText($0, 2, reading + "%")
         }
-        return results
     }
 
     /// prev に続く bi-gram 上位候補を返す（input に依らず output を集約）。
     /// 同じ output が複数 input で学習されている場合は count の合計でソートする。
     func fetchBigramTop(prev: String, limit: Int = 20) -> [String] {
-        let sql = """
+        queryStrings("""
         SELECT output FROM bigram
         WHERE prev = ?
         GROUP BY output
         ORDER BY SUM(count) DESC, MAX(used_at) DESC
         LIMIT ?
-        """
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        bindText(stmt, 1, prev)
-        sqlite3_bind_int(stmt, 2, Int32(limit))
-        var results: [String] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        """) {
+            self.bindText($0, 1, prev); sqlite3_bind_int($0, 2, Int32(limit))
         }
-        return results
     }
 
     /// list 内の候補を bi-gram 頻度順で返す（未登録分は除外）。
     func fetchBigramInList(prev: String, list: [String]) -> [String] {
         guard !list.isEmpty else { return [] }
         let placeholders = list.map { _ in "?" }.joined(separator: ",")
-        let sql = "SELECT output FROM bigram WHERE prev = ? AND output IN (\(placeholders)) ORDER BY count DESC, used_at DESC"
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        bindText(stmt, 1, prev)
-        for (i, item) in list.enumerated() { bindText(stmt, Int32(i + 2), item) }
-        var results: [String] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        return queryStrings("SELECT output FROM bigram WHERE prev = ? AND output IN (\(placeholders)) ORDER BY count DESC, used_at DESC") {
+            self.bindText($0, 1, prev)
+            for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 2), item) }
         }
-        return results
     }
 
     // MARK: - Tri-gram
 
     func recordTrigram(prev2: String, prev1: String, input: String, output: String) {
-        let sql = """
+        let t = Int64(Date().timeIntervalSince1970)
+        execute("""
         INSERT INTO trigram (prev2, prev1, input, output, count, used_at)
         VALUES (?, ?, ?, ?, 1, ?)
         ON CONFLICT(prev2, prev1, input, output) DO UPDATE SET
             count   = count + 1,
             used_at = excluded.used_at;
-        """
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
-        let t = Int64(Date().timeIntervalSince1970)
-        bindText(stmt, 1, prev2)
-        bindText(stmt, 2, prev1)
-        bindText(stmt, 3, input)
-        bindText(stmt, 4, output)
-        sqlite3_bind_int64(stmt, 5, t)
-        sqlite3_step(stmt)
+        """) {
+            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
+            self.bindText($0, 3, input); self.bindText($0, 4, output)
+            sqlite3_bind_int64($0, 5, t)
+        }
     }
 
     func fetchTrigram(prev2: String, prev1: String, reading: String) -> [String] {
-        let sql = "SELECT output FROM trigram WHERE prev2 = ? AND prev1 = ? AND input LIKE ? ORDER BY count DESC, used_at DESC LIMIT 10"
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        bindText(stmt, 1, prev2)
-        bindText(stmt, 2, prev1)
-        bindText(stmt, 3, reading + "%")
-        var results: [String] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        queryStrings("SELECT output FROM trigram WHERE prev2 = ? AND prev1 = ? AND input LIKE ? ORDER BY count DESC, used_at DESC LIMIT 10") {
+            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1); self.bindText($0, 3, reading + "%")
         }
-        return results
     }
 
     func fetchTrigramTop(prev2: String, prev1: String, limit: Int = 20) -> [String] {
-        let sql = """
+        queryStrings("""
         SELECT output FROM trigram
         WHERE prev2 = ? AND prev1 = ?
         GROUP BY output
         ORDER BY SUM(count) DESC, MAX(used_at) DESC
         LIMIT ?
-        """
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        bindText(stmt, 1, prev2)
-        bindText(stmt, 2, prev1)
-        sqlite3_bind_int(stmt, 3, Int32(limit))
-        var results: [String] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        """) {
+            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1); sqlite3_bind_int($0, 3, Int32(limit))
         }
-        return results
     }
 
     func fetchTrigramInList(prev2: String, prev1: String, list: [String]) -> [String] {
         guard !list.isEmpty else { return [] }
         let placeholders = list.map { _ in "?" }.joined(separator: ",")
-        let sql = "SELECT output FROM trigram WHERE prev2 = ? AND prev1 = ? AND output IN (\(placeholders)) ORDER BY count DESC, used_at DESC"
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        bindText(stmt, 1, prev2)
-        bindText(stmt, 2, prev1)
-        for (i, item) in list.enumerated() { bindText(stmt, Int32(i + 3), item) }
-        var results: [String] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        return queryStrings("SELECT output FROM trigram WHERE prev2 = ? AND prev1 = ? AND output IN (\(placeholders)) ORDER BY count DESC, used_at DESC") {
+            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
+            for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 3), item) }
         }
-        return results
     }
 
     // MARK: - 削除
 
     /// 履歴から指定の output を持つエントリを削除
     func deleteHistory(output: String) {
-        let sql = "DELETE FROM history WHERE output = ?"
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, output)
-        sqlite3_step(stmt)
+        execute("DELETE FROM history WHERE output = ?") { self.bindText($0, 1, output) }
     }
 
     // MARK: - 記録
 
     /// 変換確定時に履歴へ追記（同じ input/output ペアはカウントアップ）
     func record(input: String, output: String) {
-        let sql = """
+        let t = Int64(Date().timeIntervalSince1970)
+        execute("""
         INSERT INTO history (input, output, count, used_at)
         VALUES (?, ?, 1, ?)
         ON CONFLICT(input, output) DO UPDATE SET
             count   = count + 1,
             used_at = excluded.used_at;
-        """
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
-
-        let t = Int64(Date().timeIntervalSince1970)
-        bindText(stmt, 1, input)
-        bindText(stmt, 2, output)
-        sqlite3_bind_int64(stmt, 3, t)
-        sqlite3_step(stmt)
+        """) {
+            self.bindText($0, 1, input); self.bindText($0, 2, output)
+            sqlite3_bind_int64($0, 3, t)
+        }
     }
 }
