@@ -52,7 +52,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 ## コンポーネント構成
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` もここで管理
-- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須
+- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+Candidates.swift`（候補リスト・通常入力）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
@@ -68,10 +68,11 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 
 ### Successor モード（isSuccessorMode / successorFirstChar）
 
-確定直後に `doSuggestSuccessors()` が後続語候補ウィンドウを自動表示する。候補は以下の順：
+確定直後に `suggestSuccessors()` が後続語候補ウィンドウを自動表示する。候補は以下の順：
 
-1. `db.fetchBigramTop(prev: lastCommittedOutput)` の上位（prev だけで引く、output 集約）
-2. `isNounLike(last)` が真のときのみ、格助詞固定リスト（`InputHandler.particles`）を tail に fallback として並べる
+1. `db.fetchTrigramTop(prev2:prev1:)` の上位（2語前コンテキスト優先）
+2. `db.fetchBigramTop(prev:)` の上位（tri-gram に含まれないもの）
+3. `isNounLike(last)` が真のときのみ、格助詞固定リスト（`InputHandler.particles`）を tail に fallback として並べる
 
 bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。
 
@@ -85,7 +86,7 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 `doRefreshCandidates()` が組み立てる候補リスト（上が高優先）:
 
 1. ひらがな / カタカナ固定候補（`fixedCount` 件、スクロール外の先頭に挿入）
-2. bi-gram 候補（`lastCommittedOutput` × 現在の読みで検索、重複除去後に固定候補の直後に挿入）
+2. tri-gram → bi-gram 候補（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先、重複除去後に固定候補の直後に挿入）
 3. 履歴 exact（入力に完全一致）+ prefix（前方一致、完全一致を除外）
 4. AzooKey 辞書候補
 
@@ -103,6 +104,7 @@ IME はバックグラウンドエージェントとして動作するため、`
 
 ### Shift キー入力の挙動
 
+- **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始。以降の小文字も `composedHiragana` に直接蓄積（ローマ字変換しない）。AzooKey は呼ばず、履歴検索キーは小文字正規化。`GitHub` 等の混在ケース入力に対応。
 - **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
 - **かなキー（keyCode 104）**: 日本語モードに戻る
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。`punctuationMap`は`baseCharacters`で照合するため Shift+`,`/`.` が `<`/`>` になる
