@@ -322,7 +322,7 @@ final class DatabaseManager: @unchecked Sendable {
         record(input: reading, output: output)
         guard !reading.allSatisfy({ $0.isASCII }) else { return }
         let chars = Array(reading)
-        guard chars.count >= 5 else { return }
+        guard chars.count >= 3 else { return }
         for len in 2..<chars.count {
             record(input: String(chars.prefix(len)), output: output)
         }

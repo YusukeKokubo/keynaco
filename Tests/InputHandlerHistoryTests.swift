@@ -52,12 +52,32 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(handler.db.fetchHistoryExact(reading: "と").isEmpty,  "1文字(len<2)は記録しない")
     }
 
-    func testPrefixRecordSkipsShortReading() {
-        // 4文字以下はフル読みのみ記録（prefix なし）
-        handler.db.recordPrefixes(reading: "とうき", output: "東")
+    func testPrefixRecord3Chars() {
+        // 3文字のひらがな読みを確定すると prefix も記録される
+        // "ぜんぶ"(3文字) → フル + prefix 1件("ぜん")
+        handler.db.recordPrefixes(reading: "ぜんぶ", output: "全部")
 
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうき"), ["東"], "フル読みは記録される")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "とう").isEmpty, "4文字以下は prefix 記録しない")
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "ぜんぶ"), ["全部"], "フル読みで exact ヒット")
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "ぜん"),   ["全部"], "N-1 prefix で exact ヒット")
+    }
+
+    func testPrefixRecord4Chars() {
+        // 4文字のひらがな読みを確定すると prefix も記録される
+        // "おはよう"(4文字) → フル + prefix 2件("おは","おはよ")
+        handler.db.recordPrefixes(reading: "おはよう", output: "おはよう")
+
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "おはよう"), ["おはよう"], "フル読みで exact ヒット")
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "おはよ"),   ["おはよう"], "N-1 prefix で exact ヒット")
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "おは"),     ["おはよう"], "N-2 prefix で exact ヒット")
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "お").isEmpty, "1文字(len<2)は記録しない")
+    }
+
+    func testPrefixRecordSkips2Chars() {
+        // 2文字はフル読みのみ記録（prefix なし）
+        handler.db.recordPrefixes(reading: "とう", output: "東")
+
+        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とう"), ["東"], "フル読みは記録される")
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "と").isEmpty, "2文字以下は prefix 記録しない")
     }
 
     func testPrefixRecordSkipsASCII() {
