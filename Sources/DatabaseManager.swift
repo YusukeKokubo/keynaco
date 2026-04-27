@@ -6,6 +6,11 @@ final class DatabaseManager: @unchecked Sendable {
 
     private var db: OpaquePointer?
 
+    // τ = 30日: 30日経過で count の重みが半減するスケール
+    private static let recencyTauSeconds: Double = 30 * 86400
+    var clock: () -> Int64 = { Int64(Date().timeIntervalSince1970) }
+    private func nowEpoch() -> Int64 { clock() }
+
     private init() {
         openDatabase()
         createTables()
@@ -107,15 +112,31 @@ final class DatabaseManager: @unchecked Sendable {
 
     /// 読みに完全一致する履歴候補を使用頻度順で返す。
     func fetchHistoryExact(reading: String) -> [String] {
-        queryStrings("SELECT output FROM history WHERE input = ? COLLATE NOCASE ORDER BY count DESC, used_at DESC LIMIT 10") {
+        let now = nowEpoch()
+        return queryStrings("""
+        SELECT output FROM history
+        WHERE input = ? COLLATE NOCASE
+        ORDER BY (count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, used_at DESC
+        LIMIT 10
+        """) {
             self.bindText($0, 1, reading)
+            sqlite3_bind_int64($0, 2, now)
+            sqlite3_bind_double($0, 3, Self.recencyTauSeconds)
         }
     }
 
     /// 読みが前方一致する履歴候補を使用頻度順で返す（完全一致は除外）。
     func fetchHistoryPrefix(reading: String) -> [String] {
-        queryStrings("SELECT output FROM history WHERE input LIKE ? AND input != ? ORDER BY count DESC, used_at DESC LIMIT 10") {
+        let now = nowEpoch()
+        return queryStrings("""
+        SELECT output FROM history
+        WHERE input LIKE ? AND input != ?
+        ORDER BY (count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, used_at DESC
+        LIMIT 10
+        """) {
             self.bindText($0, 1, reading + "%"); self.bindText($0, 2, reading)
+            sqlite3_bind_int64($0, 3, now)
+            sqlite3_bind_double($0, 4, Self.recencyTauSeconds)
         }
     }
 
@@ -188,7 +209,7 @@ final class DatabaseManager: @unchecked Sendable {
         INSERT INTO bigram (prev, input, output, count, used_at)
         VALUES (?, ?, ?, ?, ?)
         """
-        let t = Int64(Date().timeIntervalSince1970)
+        let t = nowEpoch()
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
         defer { sqlite3_finalize(stmt) }
@@ -205,7 +226,7 @@ final class DatabaseManager: @unchecked Sendable {
     // MARK: - Bi-gram
 
     func recordBigram(prev: String, input: String, output: String) {
-        let t = Int64(Date().timeIntervalSince1970)
+        let t = nowEpoch()
         execute("""
         INSERT INTO bigram (prev, input, output, count, used_at)
         VALUES (?, ?, ?, 1, ?)
@@ -219,39 +240,58 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     func fetchBigram(prev: String, reading: String) -> [String] {
-        queryStrings("SELECT output FROM bigram WHERE prev = ? AND input LIKE ? ORDER BY count DESC, used_at DESC LIMIT 10") {
+        let now = nowEpoch()
+        return queryStrings("""
+        SELECT output FROM bigram
+        WHERE prev = ? AND input LIKE ?
+        ORDER BY (count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, used_at DESC
+        LIMIT 10
+        """) {
             self.bindText($0, 1, prev); self.bindText($0, 2, reading + "%")
+            sqlite3_bind_int64($0, 3, now)
+            sqlite3_bind_double($0, 4, Self.recencyTauSeconds)
         }
     }
 
     /// prev に続く bi-gram 上位候補を返す（input に依らず output を集約）。
     /// 同じ output が複数 input で学習されている場合は count の合計でソートする。
     func fetchBigramTop(prev: String, limit: Int = 20) -> [String] {
-        queryStrings("""
+        let now = nowEpoch()
+        return queryStrings("""
         SELECT output FROM bigram
         WHERE prev = ?
         GROUP BY output
-        ORDER BY SUM(count) DESC, MAX(used_at) DESC
+        ORDER BY SUM(count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, MAX(used_at) DESC
         LIMIT ?
         """) {
-            self.bindText($0, 1, prev); sqlite3_bind_int($0, 2, Int32(limit))
+            self.bindText($0, 1, prev)
+            sqlite3_bind_int64($0, 2, now)
+            sqlite3_bind_double($0, 3, Self.recencyTauSeconds)
+            sqlite3_bind_int($0, 4, Int32(limit))
         }
     }
 
     /// list 内の候補を bi-gram 頻度順で返す（未登録分は除外）。
     func fetchBigramInList(prev: String, list: [String]) -> [String] {
         guard !list.isEmpty else { return [] }
+        let now = nowEpoch()
         let placeholders = list.map { _ in "?" }.joined(separator: ",")
-        return queryStrings("SELECT output FROM bigram WHERE prev = ? AND output IN (\(placeholders)) ORDER BY count DESC, used_at DESC") {
+        return queryStrings("""
+        SELECT output FROM bigram
+        WHERE prev = ? AND output IN (\(placeholders))
+        ORDER BY (count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, used_at DESC
+        """) {
             self.bindText($0, 1, prev)
             for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 2), item) }
+            sqlite3_bind_int64($0, Int32(list.count + 2), now)
+            sqlite3_bind_double($0, Int32(list.count + 3), Self.recencyTauSeconds)
         }
     }
 
     // MARK: - Tri-gram
 
     func recordTrigram(prev2: String, prev1: String, input: String, output: String) {
-        let t = Int64(Date().timeIntervalSince1970)
+        let t = nowEpoch()
         execute("""
         INSERT INTO trigram (prev2, prev1, input, output, count, used_at)
         VALUES (?, ?, ?, ?, 1, ?)
@@ -266,29 +306,48 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     func fetchTrigram(prev2: String, prev1: String, reading: String) -> [String] {
-        queryStrings("SELECT output FROM trigram WHERE prev2 = ? AND prev1 = ? AND input LIKE ? ORDER BY count DESC, used_at DESC LIMIT 10") {
+        let now = nowEpoch()
+        return queryStrings("""
+        SELECT output FROM trigram
+        WHERE prev2 = ? AND prev1 = ? AND input LIKE ?
+        ORDER BY (count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, used_at DESC
+        LIMIT 10
+        """) {
             self.bindText($0, 1, prev2); self.bindText($0, 2, prev1); self.bindText($0, 3, reading + "%")
+            sqlite3_bind_int64($0, 4, now)
+            sqlite3_bind_double($0, 5, Self.recencyTauSeconds)
         }
     }
 
     func fetchTrigramTop(prev2: String, prev1: String, limit: Int = 20) -> [String] {
-        queryStrings("""
+        let now = nowEpoch()
+        return queryStrings("""
         SELECT output FROM trigram
         WHERE prev2 = ? AND prev1 = ?
         GROUP BY output
-        ORDER BY SUM(count) DESC, MAX(used_at) DESC
+        ORDER BY SUM(count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, MAX(used_at) DESC
         LIMIT ?
         """) {
-            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1); sqlite3_bind_int($0, 3, Int32(limit))
+            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
+            sqlite3_bind_int64($0, 3, now)
+            sqlite3_bind_double($0, 4, Self.recencyTauSeconds)
+            sqlite3_bind_int($0, 5, Int32(limit))
         }
     }
 
     func fetchTrigramInList(prev2: String, prev1: String, list: [String]) -> [String] {
         guard !list.isEmpty else { return [] }
+        let now = nowEpoch()
         let placeholders = list.map { _ in "?" }.joined(separator: ",")
-        return queryStrings("SELECT output FROM trigram WHERE prev2 = ? AND prev1 = ? AND output IN (\(placeholders)) ORDER BY count DESC, used_at DESC") {
+        return queryStrings("""
+        SELECT output FROM trigram
+        WHERE prev2 = ? AND prev1 = ? AND output IN (\(placeholders))
+        ORDER BY (count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)) DESC, used_at DESC
+        """) {
             self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
             for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 3), item) }
+            sqlite3_bind_int64($0, Int32(list.count + 3), now)
+            sqlite3_bind_double($0, Int32(list.count + 4), Self.recencyTauSeconds)
         }
     }
 
@@ -303,7 +362,7 @@ final class DatabaseManager: @unchecked Sendable {
 
     /// 変換確定時に履歴へ追記（同じ input/output ペアはカウントアップ）
     func record(input: String, output: String) {
-        let t = Int64(Date().timeIntervalSince1970)
+        let t = nowEpoch()
         execute("""
         INSERT INTO history (input, output, count, used_at)
         VALUES (?, ?, 1, ?)

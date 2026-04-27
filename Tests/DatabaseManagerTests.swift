@@ -152,4 +152,49 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(results.contains("行った"), "前方一致で行った が取れる")
         XCTAssertFalse(results.contains("上"), "前方一致しない候補は除外")
     }
+
+    // MARK: - 時間減衰スコアリング（改善 G）
+
+    func testRecencySameCountRecentWins() {
+        // 同 count なら直近の方が上位
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.record(input: "あい", output: "愛")
+        db.clock = { base + 10 }
+        db.record(input: "あい", output: "相")
+        // どちらも count=1、"相" の方が直近
+        db.clock = { base + 20 }
+        let results = db.fetchHistoryExact(reading: "あい")
+        XCTAssertEqual(results.first, "相", "同 count なら直近の方が上位")
+    }
+
+    func testRecencyHighCountOldBeatsLowCountRecent() {
+        // count=10 / 30日前 (score≈5.0) と count=3 / 直近 (score=3.0) → 前者が上位
+        let base: Int64 = 1_700_000_000
+        let tau = Int64(30 * 86400)
+        db.clock = { base }
+        for _ in 0..<10 { db.record(input: "あ", output: "高頻度古い") }
+        db.clock = { base + tau }  // 30日後に直近を記録
+        for _ in 0..<3 { db.record(input: "あ", output: "低頻度新しい") }
+        db.clock = { base + tau + 10 }
+        let results = db.fetchHistoryExact(reading: "あ")
+        let idxOld = results.firstIndex(of: "高頻度古い")!
+        let idxNew = results.firstIndex(of: "低頻度新しい")!
+        XCTAssertLessThan(idxOld, idxNew, "count=10 / score≈5.0 が count=3 / score=3.0 より上位")
+    }
+
+    func testRecencyHighCountVeryOldBeatsLowCountRecent() {
+        // count=10 / 60日前 (score≈3.33) と count=4 / 直近 (score=4.0) → 後者が上位
+        let base: Int64 = 1_700_000_000
+        let tau = Int64(30 * 86400)
+        db.clock = { base }
+        for _ in 0..<10 { db.record(input: "あ", output: "高頻度古い") }
+        db.clock = { base + 2 * tau }  // 60日後
+        for _ in 0..<4 { db.record(input: "あ", output: "低頻度新しい") }
+        db.clock = { base + 2 * tau + 10 }
+        let results = db.fetchHistoryExact(reading: "あ")
+        let idxOld = results.firstIndex(of: "高頻度古い")!
+        let idxNew = results.firstIndex(of: "低頻度新しい")!
+        XCTAssertLessThan(idxNew, idxOld, "count=4 / score=4.0 が count=10 / score≈3.33 より上位")
+    }
 }
