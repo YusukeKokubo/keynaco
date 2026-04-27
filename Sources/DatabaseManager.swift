@@ -58,6 +58,17 @@ final class DatabaseManager: @unchecked Sendable {
             UNIQUE(prev, input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_bigram ON bigram(prev, input);
+        CREATE TABLE IF NOT EXISTS trigram (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            prev2   TEXT    NOT NULL,
+            prev1   TEXT    NOT NULL,
+            input   TEXT    NOT NULL,
+            output  TEXT    NOT NULL,
+            count   INTEGER NOT NULL DEFAULT 1,
+            used_at INTEGER NOT NULL,
+            UNIQUE(prev2, prev1, input, output)
+        );
+        CREATE INDEX IF NOT EXISTS idx_trigram ON trigram(prev2, prev1, input);
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }
@@ -255,6 +266,81 @@ final class DatabaseManager: @unchecked Sendable {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         bindText(stmt, 1, prev)
         for (i, item) in list.enumerated() { bindText(stmt, Int32(i + 2), item) }
+        var results: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        }
+        return results
+    }
+
+    // MARK: - Tri-gram
+
+    func recordTrigram(prev2: String, prev1: String, input: String, output: String) {
+        let sql = """
+        INSERT INTO trigram (prev2, prev1, input, output, count, used_at)
+        VALUES (?, ?, ?, ?, 1, ?)
+        ON CONFLICT(prev2, prev1, input, output) DO UPDATE SET
+            count   = count + 1,
+            used_at = excluded.used_at;
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        let t = Int64(Date().timeIntervalSince1970)
+        bindText(stmt, 1, prev2)
+        bindText(stmt, 2, prev1)
+        bindText(stmt, 3, input)
+        bindText(stmt, 4, output)
+        sqlite3_bind_int64(stmt, 5, t)
+        sqlite3_step(stmt)
+    }
+
+    func fetchTrigram(prev2: String, prev1: String, reading: String) -> [String] {
+        let sql = "SELECT output FROM trigram WHERE prev2 = ? AND prev1 = ? AND input LIKE ? ORDER BY count DESC, used_at DESC LIMIT 10"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        bindText(stmt, 1, prev2)
+        bindText(stmt, 2, prev1)
+        bindText(stmt, 3, reading + "%")
+        var results: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        }
+        return results
+    }
+
+    func fetchTrigramTop(prev2: String, prev1: String, limit: Int = 20) -> [String] {
+        let sql = """
+        SELECT output FROM trigram
+        WHERE prev2 = ? AND prev1 = ?
+        GROUP BY output
+        ORDER BY SUM(count) DESC, MAX(used_at) DESC
+        LIMIT ?
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        bindText(stmt, 1, prev2)
+        bindText(stmt, 2, prev1)
+        sqlite3_bind_int(stmt, 3, Int32(limit))
+        var results: [String] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }
+        }
+        return results
+    }
+
+    func fetchTrigramInList(prev2: String, prev1: String, list: [String]) -> [String] {
+        guard !list.isEmpty else { return [] }
+        let placeholders = list.map { _ in "?" }.joined(separator: ",")
+        let sql = "SELECT output FROM trigram WHERE prev2 = ? AND prev1 = ? AND output IN (\(placeholders)) ORDER BY count DESC, used_at DESC"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        bindText(stmt, 1, prev2)
+        bindText(stmt, 2, prev1)
+        for (i, item) in list.enumerated() { bindText(stmt, Int32(i + 3), item) }
         var results: [String] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             if let ptr = sqlite3_column_text(stmt, 0) { results.append(String(cString: ptr)) }

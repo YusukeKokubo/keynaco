@@ -54,7 +54,15 @@ struct InputHandler {
     var ignoreNextModeSwitch = false
     var isSuccessorMode = false
     var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
-    var lastCommittedOutput: String? = nil
+    var committedHistory: [String] = []
+    var lastCommittedOutput: String? { committedHistory.last }
+    private var prev2Output: String? {
+        committedHistory.count >= 2 ? committedHistory[committedHistory.count - 2] : nil
+    }
+    private mutating func pushCommitted(_ text: String) {
+        committedHistory.append(text)
+        if committedHistory.count > 2 { committedHistory.removeFirst() }
+    }
     let db: DatabaseManager
     let azooKeyConverter: AzooKeyConverter
 
@@ -301,10 +309,15 @@ struct InputHandler {
     }
 
     private mutating func doCommit(text: String, client: TextInputClient) {
-        if let prev = lastCommittedOutput, !state.composingText.isEmpty {
-            db.recordBigram(prev: prev, input: state.finalizedText, output: text)
+        if !state.composingText.isEmpty {
+            if let p1 = lastCommittedOutput {
+                db.recordBigram(prev: p1, input: state.finalizedText, output: text)
+                if let p2 = prev2Output {
+                    db.recordTrigram(prev2: p2, prev1: p1, input: state.finalizedText, output: text)
+                }
+            }
         }
-        lastCommittedOutput = text
+        pushCommitted(text)
         client.insertText(text)
         state = CompositionState()
     }
@@ -343,11 +356,13 @@ struct InputHandler {
         }
 
         let bigramTop = db.fetchBigramTop(prev: last)
+        let trigramTop: [String] = prev2Output.map { db.fetchTrigramTop(prev2: $0, prev1: last) } ?? []
+        let predictTop = trigramTop + bigramTop.filter { !trigramTop.contains($0) }
         // 名詞末尾のとき限定で格助詞 fallback を tail に追加
         let particlesFallback = isNounLike(last)
-            ? InputHandler.particles.filter { !bigramTop.contains($0) }
+            ? InputHandler.particles.filter { !predictTop.contains($0) }
             : []
-        let candidates = bigramTop + particlesFallback
+        let candidates = predictTop + particlesFallback
 
         guard !candidates.isEmpty else {
             isSuccessorMode = false; successorFirstChar = nil
@@ -361,9 +376,14 @@ struct InputHandler {
 
     private mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
         isSuccessorMode = false; successorFirstChar = nil
-        if let prev = lastCommittedOutput { db.recordBigram(prev: prev, input: particle, output: particle) }
+        if let p1 = lastCommittedOutput {
+            db.recordBigram(prev: p1, input: particle, output: particle)
+            if let p2 = prev2Output {
+                db.recordTrigram(prev2: p2, prev1: p1, input: particle, output: particle)
+            }
+        }
         db.record(input: particle, output: particle)
-        lastCommittedOutput = particle
+        pushCommitted(particle)
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
         client.insertText(particle)
     }
@@ -403,8 +423,12 @@ struct InputHandler {
                 if !matched.isEmpty {
                     successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
                     let fromBigram = db.fetchBigramInList(prev: last, list: matched)
-                    let rest = matched.filter { !fromBigram.contains($0) }
-                    return (true, .show(candidates: fromBigram + rest, historyEnd: 0, initialRow: 0))
+                    let fromTrigram: [String] = prev2Output.map {
+                        db.fetchTrigramInList(prev2: $0, prev1: last, list: matched)
+                    } ?? []
+                    let merged = fromTrigram + fromBigram.filter { !fromTrigram.contains($0) }
+                    let rest = matched.filter { !merged.contains($0) }
+                    return (true, .show(candidates: merged + rest, historyEnd: 0, initialRow: 0))
                 }
             }
             // fast-path 非該当 → モード解除、バッファがあれば先に通常入力に流す
@@ -429,12 +453,17 @@ struct InputHandler {
         let historyCount = historyCandidates.count
 
         let bigramRaw = lastCommittedOutput.map { db.fetchBigram(prev: $0, reading: state.composedHiragana) } ?? []
+        let trigramRaw: [String] = {
+            guard let p1 = lastCommittedOutput, let p2 = prev2Output else { return [] }
+            return db.fetchTrigram(prev2: p2, prev1: p1, reading: state.composedHiragana)
+        }()
+        let predictRaw = trigramRaw + bigramRaw.filter { !trigramRaw.contains($0) }
         var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
-        let uniqueBigrams = bigramRaw.filter { !candidates.contains($0) }
-        candidates.insert(contentsOf: uniqueBigrams, at: 0)
-        let bigramCount = uniqueBigrams.count
+        let uniquePredictions = predictRaw.filter { !candidates.contains($0) }
+        candidates.insert(contentsOf: uniquePredictions, at: 0)
+        let predictCount = uniquePredictions.count
 
-        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && bigramCount == 0 { return .dismiss }
+        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0 { return .dismiss }
 
         let hiragana = state.composedHiragana
         let katakana = hiraganaToKatakana(hiragana)
@@ -442,8 +471,8 @@ struct InputHandler {
         // 履歴にひらがな・カタカナが含まれるかを確認する
         // 履歴にある場合 → 履歴エントリとして可視範囲に残す（固定位置に追加しない）
         // 履歴にない場合 → スクロール範囲外の固定位置に追加し、↑ キーで到達できるようにする
-        let hiraganaInHistory = candidates.prefix(bigramCount + historyCount).contains(hiragana)
-        let katakanaInHistory = candidates.prefix(bigramCount + historyCount).contains(katakana)
+        let hiraganaInHistory = candidates.prefix(predictCount + historyCount).contains(hiragana)
+        let katakanaInHistory = candidates.prefix(predictCount + historyCount).contains(katakana)
 
         var fixedCount = 0
         if !katakanaInHistory {
@@ -458,7 +487,7 @@ struct InputHandler {
             fixedCount += 1
         }
 
-        let historyEnd = fixedCount + bigramCount + historyCount
+        let historyEnd = fixedCount + predictCount + historyCount
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }

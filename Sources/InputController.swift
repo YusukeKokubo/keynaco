@@ -87,7 +87,7 @@ class InputController: IMKInputController {
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         handler.state = CompositionState()
-        handler.lastCommittedOutput = nil
+        handler.committedHistory = []
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
         handler.ignoreNextModeSwitch = true
