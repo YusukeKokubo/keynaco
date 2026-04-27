@@ -132,149 +132,26 @@ struct InputHandler {
 
         // 候補ウィンドウ表示中
         if candidate.isVisible {
-            switch keyCode {
-            case KeyCode.tab where modifiers.contains(.shift):  // Shift+Tab
-                return (true, .selectPrev)
-            case KeyCode.space:   // Space → セグメントモードへ（または次の候補）
-                if !state.composedHiragana.isEmpty {
-                    let action = doEnterSegmentMode()
-                    if state.isSegmentMode {
-                        applySegmentMarkedText(client: client)
-                    } else {
-                        applyMarkedText(candidateText: nil, client: client)
-                    }
-                    return (true, action)
-                }
-                return (true, .selectNext)
-            case KeyCode.tab, KeyCode.downArrow:  // Tab, ↓
-                return (true, .selectNext)
-            case KeyCode.upArrow:  // ↑
-                return (true, .selectPrev)
-            case KeyCode.enter:   // Return
-                let action = doConfirmSelection(candidate: candidate, client: client)
-                return (true, action)
-            case KeyCode.escape:  // Escape
-                return doEscape(client: client)
-            case KeyCode.rightArrow:  // →: ひらがなのまま確定
-                commitComposition(client: client)
-                return (true, doSuggestSuccessors())
-            case KeyCode.backspace where modifiers.contains(.shift):  // Shift+Delete: 履歴から削除
-                if candidate.selectedRow < candidate.historyEnd {
-                    return (true, .deleteSelected)
-                }
-                return (true, .none)
-            default:
-                if isBackspace { return doBackspace(client: client) }
+            if let result = handleCandidateVisible(keyCode: keyCode, characters: characters,
+                                                   modifiers: modifiers, candidate: candidate, client: client) {
+                return result
             }
         } else {
             switch keyCode {
-            case KeyCode.enter:   // Return
+            case KeyCode.enter:
                 guard !state.composingText.isEmpty else { return (false, .none) }
                 commitComposition(client: client)
                 return (true, doSuggestSuccessors())
-            case KeyCode.escape:  // Escape
+            case KeyCode.escape:
                 return doEscape(client: client)
             default:
                 if isBackspace { return doBackspace(client: client) }
             }
         }
 
-        // スペースキー（候補なし時）
-        if keyCode == KeyCode.space {
-            if !state.composedHiragana.isEmpty {
-                let action = doEnterSegmentMode()
-                if state.isSegmentMode {
-                    applySegmentMarkedText(client: client)
-                } else {
-                    applyMarkedText(candidateText: nil, client: client)
-                }
-                return (true, action)
-            }
-            return (false, .none)
-        }
-
-        // 矢印キー等の特殊キー
-        if keyCode >= KeyCode.leftArrow && keyCode <= KeyCode.upArrow { return (false, .none) }
-
-        // 修飾キー付きはスルー
-        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
-
-        // 印字可能文字のみ（ASCII および全角記号などの非ASCII文字を含む）
-        guard let chars = characters, !chars.isEmpty,
-              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 }) else { return (false, .none) }
-        let base = baseCharacters ?? chars
-
-        // 句読点：かなモードで , → 、、. → 。に変換
-        // 組成中なら組成バッファに追加して変換モードへ（候補ウィンドウを開く）
-        // 組成なしなら直接挿入
-        let punctuationMap: [String: String] = [",": "、", ".": "。"]
-        if let mappedPunct = punctuationMap[base], !modifiers.contains(.shift) {
-            if state.composingText.isEmpty {
-                client.insertText(mappedPunct)
-                return (true, .dismiss)
-            } else {
-                if !state.pendingRomaji.isEmpty {
-                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                    state.pendingRomaji = ""
-                }
-                state.composedHiragana += mappedPunct
-                let action = doRefreshCandidates()
-                applyMarkedText(candidateText: nil, client: client)
-                return (true, action)
-            }
-        }
-
-        let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
-
-        // Shift + ASCII → 組成バッファに英字として貯める（Enter で確定）
-        if modifiers.contains(.shift) && !isNonAscii {
-            if wasExplicitlySelected {
-                _ = doConfirmSelection(candidate: candidate, client: client)
-            } else if !state.pendingRomaji.isEmpty {
-                state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                state.pendingRomaji = ""
-            }
-            state.composedHiragana += chars
-            let action = doRefreshCandidates(autoShow: true)
-            applyMarkedText(candidateText: nil, client: client)
-            return (true, action)
-        }
-
-        // 非ASCII文字（全角記号など）→ 組成中なら組成バッファに追加、空なら直接挿入
-        if isNonAscii {
-            if state.composingText.isEmpty {
-                client.insertText(chars)
-            } else {
-                if !state.pendingRomaji.isEmpty {
-                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                    state.pendingRomaji = ""
-                }
-                state.composedHiragana += chars
-                applyMarkedText(candidateText: nil, client: client)
-            }
-            return (true, .dismiss)
-        }
-
-        // 全ASCII組成中（英字単語モード）: Shift で始まった英字バッファに小文字もそのまま蓄積
-        if !state.composedHiragana.isEmpty && state.pendingRomaji.isEmpty
-            && state.composedHiragana.allSatisfy({ $0.isASCII }) {
-            if wasExplicitlySelected {
-                _ = doConfirmSelection(candidate: candidate, client: client)
-            }
-            state.composedHiragana += chars
-            let action = doRefreshCandidates(autoShow: true)
-            applyMarkedText(candidateText: nil, client: client)
-            return (true, action)
-        }
-
-        if wasExplicitlySelected {
-            _ = doConfirmSelection(candidate: candidate, client: client)
-        }
-        let needsRefresh = state.addRomaji(base)
-        let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
-        let candidateAction: CandidateAction = (needsRefresh || hasBigramContext) ? doRefreshCandidates(autoShow: true) : .dismiss
-        applyMarkedText(candidateText: nil, client: client)
-        return (true, candidateAction)
+        return handleNormalInput(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+                                 modifiers: modifiers, wasExplicitlySelected: wasExplicitlySelected,
+                                 candidate: candidate, client: client)
     }
 
     /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
@@ -457,6 +334,143 @@ struct InputHandler {
             return handle(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
                           modifiers: modifiers, candidate: .hidden, client: client)
         }
+    }
+
+    private mutating func handleCandidateVisible(
+        keyCode: UInt16,
+        characters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
+        switch keyCode {
+        case KeyCode.tab where modifiers.contains(.shift):
+            return (true, .selectPrev)
+        case KeyCode.space:
+            if !state.composedHiragana.isEmpty {
+                let action = doEnterSegmentMode()
+                if state.isSegmentMode {
+                    applySegmentMarkedText(client: client)
+                } else {
+                    applyMarkedText(candidateText: nil, client: client)
+                }
+                return (true, action)
+            }
+            return (true, .selectNext)
+        case KeyCode.tab, KeyCode.downArrow:
+            return (true, .selectNext)
+        case KeyCode.upArrow:
+            return (true, .selectPrev)
+        case KeyCode.enter:
+            return (true, doConfirmSelection(candidate: candidate, client: client))
+        case KeyCode.escape:
+            return doEscape(client: client)
+        case KeyCode.rightArrow:
+            commitComposition(client: client)
+            return (true, doSuggestSuccessors())
+        case KeyCode.backspace where modifiers.contains(.shift):
+            if candidate.selectedRow < candidate.historyEnd { return (true, .deleteSelected) }
+            return (true, .none)
+        default:
+            if isBackspace { return doBackspace(client: client) }
+            return nil
+        }
+    }
+
+    private mutating func handleNormalInput(
+        keyCode: UInt16,
+        characters: String?,
+        baseCharacters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        wasExplicitlySelected: Bool,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        if keyCode == KeyCode.space {
+            if !state.composedHiragana.isEmpty {
+                let action = doEnterSegmentMode()
+                if state.isSegmentMode {
+                    applySegmentMarkedText(client: client)
+                } else {
+                    applyMarkedText(candidateText: nil, client: client)
+                }
+                return (true, action)
+            }
+            return (false, .none)
+        }
+
+        if keyCode >= KeyCode.leftArrow && keyCode <= KeyCode.upArrow { return (false, .none) }
+        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
+        guard let chars = characters, !chars.isEmpty,
+              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 }) else { return (false, .none) }
+        let base = baseCharacters ?? chars
+
+        let punctuationMap: [String: String] = [",": "、", ".": "。"]
+        if let mappedPunct = punctuationMap[base], !modifiers.contains(.shift) {
+            if state.composingText.isEmpty {
+                client.insertText(mappedPunct)
+                return (true, .dismiss)
+            } else {
+                if !state.pendingRomaji.isEmpty {
+                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+                    state.pendingRomaji = ""
+                }
+                state.composedHiragana += mappedPunct
+                let action = doRefreshCandidates()
+                applyMarkedText(candidateText: nil, client: client)
+                return (true, action)
+            }
+        }
+
+        let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
+
+        if modifiers.contains(.shift) && !isNonAscii {
+            if wasExplicitlySelected {
+                _ = doConfirmSelection(candidate: candidate, client: client)
+            } else if !state.pendingRomaji.isEmpty {
+                state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+                state.pendingRomaji = ""
+            }
+            state.composedHiragana += chars
+            let action = doRefreshCandidates(autoShow: true)
+            applyMarkedText(candidateText: nil, client: client)
+            return (true, action)
+        }
+
+        if isNonAscii {
+            if state.composingText.isEmpty {
+                client.insertText(chars)
+            } else {
+                if !state.pendingRomaji.isEmpty {
+                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+                    state.pendingRomaji = ""
+                }
+                state.composedHiragana += chars
+                applyMarkedText(candidateText: nil, client: client)
+            }
+            return (true, .dismiss)
+        }
+
+        if !state.composedHiragana.isEmpty && state.pendingRomaji.isEmpty
+            && state.composedHiragana.allSatisfy({ $0.isASCII }) {
+            if wasExplicitlySelected {
+                _ = doConfirmSelection(candidate: candidate, client: client)
+            }
+            state.composedHiragana += chars
+            let action = doRefreshCandidates(autoShow: true)
+            applyMarkedText(candidateText: nil, client: client)
+            return (true, action)
+        }
+
+        if wasExplicitlySelected {
+            _ = doConfirmSelection(candidate: candidate, client: client)
+        }
+        let needsRefresh = state.addRomaji(base)
+        let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
+        let candidateAction: CandidateAction = (needsRefresh || hasBigramContext) ? doRefreshCandidates(autoShow: true) : .dismiss
+        applyMarkedText(candidateText: nil, client: client)
+        return (true, candidateAction)
     }
 
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
