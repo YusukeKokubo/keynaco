@@ -37,13 +37,13 @@ stateDiagram-v2
 
     組成中 --> セグメントモード : Space
     セグメントモード --> セグメントモード : Space（次候補）
-    セグメントモード --> セグメントモード : Shift+Tab / Shift+矢印（境界調整）
+    セグメントモード --> セグメントモード : Shift+矢印（境界調整）
     セグメントモード --> 待機 : Enter（確定）
     セグメントモード --> 組成中 : Escape（組成に戻す）
 
     待機 --> Successorモード : 確定直後に tri-gram / bi-gram 候補 or 格助詞 fallback が存在
     Successorモード --> 待機 : 候補確定
-    Successorモード --> 組成中 : →（キャンセル）
+    Successorモード --> 待機 : →（キャンセル）
     Successorモード --> 待機 : Escape
     Successorモード --> 待機 : Enter
 ```
@@ -85,7 +85,7 @@ stateDiagram-v2
 | Tab | 次候補へ |
 | ローマ字 1 文字（格助詞 fast-path, 名詞末尾時のみ） | `particleRomajiMap` で格助詞サブセットに絞り込み |
 | 非対応キー（1 打目） | バッファがあれば流す → モード解除 → 通常組成へ |
-| → | モードキャンセル → 組成中（1 打目があれば組成に追加） |
+| → | モードキャンセル → 待機（successorFirstChar は破棄） |
 | Escape / Backspace | モード解除 → 待機 |
 
 ---

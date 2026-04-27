@@ -52,7 +52,7 @@
 
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
-2. 予測候補（`prev2Output` × `lastCommittedOutput` で trigram 検索、なければ `lastCommittedOutput` で bigram フォールバック）
+2. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結）
 3. 履歴 exact → 履歴 prefix
 4. AzooKey 辞書候補
 
