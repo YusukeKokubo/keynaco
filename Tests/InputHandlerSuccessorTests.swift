@@ -290,6 +290,42 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     // See: docs/domain/glossary.md#prev2output
     // See: docs/domain/scenarios.md#s-05-予測候補の表示trigram--bigram
 
+    func testSuccessorChainViaParticleFastPath() {
+        // S-03c: 格助詞 fast-path ("g" で絞り込み → Space で確定) を経由した Successor チェーン
+        // testSuccessorChain は Space 直接確定のみ検証。本テストは絞り込み後の確定＋チェーン継続を検証する。
+        handler.db.recordBigram(prev: "東京", input: "が", output: "が")
+        handler.db.recordBigram(prev: "が", input: "好き", output: "好き")
+
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+
+        // "g" → 候補を「が」に絞り込み（Successor モードを維持）
+        let gResult = type(chars: "g", base: "g")
+        XCTAssertTrue(handler.isSuccessorMode, "絞り込み中は Successor モードを維持するはず")
+        guard case .show(let filtered, _, _) = gResult.candidateAction else {
+            XCTFail(".show を返すはず: \(gResult.candidateAction)"); return
+        }
+        XCTAssertEqual(filtered, ["が"], "「g」で候補が「が」のみに絞り込まれるはず")
+
+        // Space で「が」確定 → bigram から「好き」を後続表示（チェーン継続）
+        let spaceResult = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "が")
+        XCTAssertTrue(client.inserted.contains("が"), "fast-path + Space で「が」が挿入されるはず")
+        XCTAssertTrue(handler.isSuccessorMode, "「が」確定後も Successor モードが継続するはず")
+        guard case .show(let chain, _, _) = spaceResult.candidateAction else {
+            XCTFail(".show を返すはず: \(spaceResult.candidateAction)"); return
+        }
+        XCTAssertTrue(chain.contains("好き"), "bigram 学習済みの「好き」が後続候補に含まれるはず")
+
+        // Space で「好き」確定 → bigram なし → Successor 終了
+        let endResult = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "好き")
+        XCTAssertTrue(client.inserted.contains("好き"))
+        XCTAssertFalse(handler.isSuccessorMode, "「好き」確定後は Successor モードが終了するはず")
+        guard case .dismiss = endResult.candidateAction else {
+            XCTFail(".dismiss を返すはず: \(endResult.candidateAction)"); return
+        }
+    }
+
     func testTrigramLearnedAndPrioritizedOverBigram() {
         // 1語目「昨日」確定
         typeRomaji("kinou")

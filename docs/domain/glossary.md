@@ -120,6 +120,13 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 古い高頻度語より直近の語が優先されやすくなり、今日のタスクに合った語が上位に出やすい。  
 テストでは `db.clock = { fixedEpoch }` で時刻を固定して検証する。
 
+#### committedHistory
+直近に確定した変換出力のリスト。`mostRecentContentWord` および skip-bigram 記録で参照される。  
+**不変条件**: 上限は **5 件**。6 件目が追加されると先頭がドロップされる。  
+**注意**: `mostRecentContentWord` は `committedHistory` の末尾から助詞をスキップして最初の内容語を返す。履歴が 1 件以下（直前語のみ）または全て助詞の場合は `nil`。
+
+*Tests: `Tests/SkipBigramTests.swift` — `testCommittedHistoryCapAt5`, `testMostRecentContentWordSkipsParticle`*
+
 #### skip-bigram
 助詞（`InputHandler.particles`）が直前に確定されたとき、`mostRecentContentWord`（直近の非助詞語）と現在の確定語のペアを `skip_bigram` テーブルに記録する。  
 `今日 → を → 行く` `今日 → が → 走る` のように助詞でバラけたペアが「今日 → 行く/走る」として統合される。

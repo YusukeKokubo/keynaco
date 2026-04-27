@@ -49,10 +49,11 @@
 | ステップ | キー | successorFirstChar | 動作 |
 |---------|------|--------------------|------|
 | 1 | `g` | `g` | バッファリング。`particleRomajiMap["g"] = ["が"]` で候補を「が」に絞り込み |
-| 2a | `a` | — | `が` を確定 → bigram があれば Successor 継続、なければ待機 |
+| 2a | Space | — | 絞り込み中の先頭候補「が」を確定 → bigram があれば Successor 継続、なければ待機 |
 | 2b | `z` | — | `g` を通常入力として流す（`g` → pendingRomaji）、モード解除 |
 
-2b のケースでは、1 打目 `g` が組成バッファに入り直し、`gz` の途中状態から通常の組成処理が続く。
+2b のケースでは、1 打目 `g` が組成バッファに入り直し、`gz` の途中状態から通常の組成処理が続く。  
+**注意**: `g` の後に `a` を打つと 2b 同様にモード解除→通常組成になり `が` が markedText に入る（自動確定はしない）。
 **注意**: この fast-path は `isNounLike(last)` を満たすとき限定。ひらがな末尾の語の後は 1 打目で即座に通常組成へフォールスルーする。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
@@ -178,6 +179,9 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 
 **次回**: `今日` の後に `い` を打つと、通常 bigram には `(を → い*)` のみだが、
 skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加される。
+
+**committedHistory の上限**: `mostRecentContentWord` が参照する `committedHistory` は最大 **5 件**。
+6 件目が追加されると先頭がドロップされる。非常に長い文章を連続確定した場合、5語以上前の内容語は skip-bigram 検索に使われない。
 
 *Tests: `Tests/SkipBigramTests.swift`*
 
