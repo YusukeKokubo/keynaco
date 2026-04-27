@@ -42,10 +42,11 @@ stateDiagram-v2
     セグメントモード --> 組成中 : Escape（組成に戻す）
 
     待機 --> Successorモード : 確定直後に tri-gram / bi-gram 候補 or 格助詞 fallback が存在
-    Successorモード --> 待機 : 候補確定
+    Successorモード --> Successorモード : 候補確定後に次の tri-gram / bi-gram 候補が存在
+    Successorモード --> 待機 : 候補確定後に次候補なし
     Successorモード --> 待機 : →（キャンセル）
     Successorモード --> 待機 : Escape
-    Successorモード --> 待機 : Enter
+    Successorモード --> 待機 : Enter（候補なし）
 ```
 
 ---
@@ -80,7 +81,7 @@ stateDiagram-v2
 
 | キー | 動作 |
 |------|------|
-| Space / Enter | 選択候補（先頭 or ↑↓ で選択中）を確定 → 待機 |
+| Space / Enter | 選択候補を確定 → 次の Successor 候補があれば継続、なければ待機 |
 | ↑↓ | 候補を移動 |
 | Tab | 次候補へ |
 | ローマ字 1 文字（格助詞 fast-path, 名詞末尾時のみ） | `particleRomajiMap` で格助詞サブセットに絞り込み |
@@ -92,7 +93,7 @@ stateDiagram-v2
 
 ## 補足
 
-- **Successor モードの再帰防止**: 確定が格助詞自身（`InputHandler.particles` に含まれる）の直後は再表示しない
+- **Successor の再帰防止**: 格助詞チェックは廃止。候補が空なら自然に `.dismiss` になるため、無限ループは起きない
 - **候補取得の優先順位**: `prev2Output`（2語前）× `lastCommittedOutput`（1語前）で trigram を引き、なければ `lastCommittedOutput` だけで bigram をフォールバック
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）

@@ -85,7 +85,7 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 
 - `successorFirstChar`: 頭文字 1 打目のバッファリング。`particleRomajiMap` による格助詞 fast-path が効くのは `isNounLike` のときのみ。非名詞末尾では 1 打目で即座に通常組成へフォールスルーする。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
-- 格助詞自身を確定した直後は再表示しない（無限ループ防止）。
+- 候補確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば連鎖表示を継続する。候補が空なら自然に `.dismiss`（格助詞チェックは廃止）。
 - Successor モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。
 
 ### 候補表示の優先順位

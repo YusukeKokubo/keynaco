@@ -14,12 +14,6 @@ extension InputHandler {
             isSuccessorMode = false; successorFirstChar = nil
             return .dismiss
         }
-        // 直前の確定が格助詞自身なら再表示しない（無限ループ防止）
-        if InputHandler.particles.contains(last) {
-            isSuccessorMode = false; successorFirstChar = nil
-            return .dismiss
-        }
-
         let bigramTop = db.fetchBigramTop(prev: last)
         let trigramTop: [String] = prev2Output.map { db.fetchTrigramTop(prev2: $0, prev1: last) } ?? []
         let predictTop = trigramTop + bigramTop.filter { !trigramTop.contains($0) }
@@ -69,7 +63,7 @@ extension InputHandler {
                 return (true, .dismiss)
             }
             confirmSuccessor(selected, client: client)
-            return (true, .dismiss)
+            return (true, suggestSuccessors())
         case KeyCode.downArrow, KeyCode.tab:
             return (true, .selectNext)
         case KeyCode.upArrow:

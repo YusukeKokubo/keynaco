@@ -45,7 +45,7 @@
 | ステップ | キー | successorFirstChar | 動作 |
 |---------|------|--------------------|------|
 | 1 | `g` | `g` | バッファリング。`particleRomajiMap["g"] = ["が"]` で候補を「が」に絞り込み |
-| 2a | `a` | — | `が` を確定 → 待機（格助詞なので再表示なし） |
+| 2a | `a` | — | `が` を確定 → bigram があれば Successor 継続、なければ待機 |
 | 2b | `z` | — | `g` を通常入力として流す（`g` → pendingRomaji）、モード解除 |
 
 2b のケースでは、1 打目 `g` が組成バッファに入り直し、`gz` の途中状態から通常の組成処理が続く。
@@ -66,6 +66,18 @@
 | 1b | `k` | 組成中 | — | fast-path 非該当 → 通常組成、`k` が pendingRomaji へ |
 
 trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismiss` が返り Successor モードには入らない。
+
+---
+
+## S-03c: Successor チェーン（格助詞を経由した連鎖）
+
+**前提**: `東京` を確定。bigram `(東京, が)` および `(が, 好き)` を学習済み。
+
+| ステップ | キー | 状態 | 動作 |
+|---------|------|------|------|
+| 0 | — | Successor モード | candidates: `["が", ...]`（bigram + 格助詞 fallback）|
+| 1 | Space | Successor モード | 「が」確定 → `suggestSuccessors()` → candidates: `["好き"]` |
+| 2 | Space | 待機 | 「好き」確定 → bigram なし → `.dismiss` |
 
 ---
 

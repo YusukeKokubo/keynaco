@@ -74,6 +74,8 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 2語前文脈（trigram）を優先し、trigram にない候補を bigram で補完する。  
 漢字・カタカナ末尾（`isNounLike`）のときのみ、固定格助詞リスト（`InputHandler.particles`）を
 tail に fallback として並べる。ひらがな末尾の語では格助詞 fallback は出さず、予測候補のみ表示する。
+確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば
+連鎖表示を継続する（格助詞チェックは廃止。候補空なら自然に `.dismiss`）。
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。  

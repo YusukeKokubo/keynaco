@@ -967,13 +967,41 @@ final class InputHandlerTests: XCTestCase {
         XCTAssertEqual(client.markedText, "s", "通常の組成が始まるはず")
     }
 
-    func testSuccessorModeNotRetriggeredAfterParticleConfirm() {
+    func testSuccessorModeNotRetriggeredWithoutBigramData() {
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let firstParticle = InputHandler.particles[0]
         press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: firstParticle)
-        // 格助詞確定後はSuccessor モードが再トリガーされない
-        XCTAssertFalse(handler.isSuccessorMode, "格助詞確定後はSuccessor モードにならないはず")
+        // bigram 学習ゼロ → 格助詞確定後も Successor 候補が空で再起動しない
+        XCTAssertFalse(handler.isSuccessorMode, "bigram なし → Successor モードにならないはず")
+    }
+
+    func testSuccessorChain() {
+        // bigram 事前学習: 東京→が, が→好き
+        handler.db.recordBigram(prev: "東京", input: "が", output: "が")
+        handler.db.recordBigram(prev: "が", input: "好き", output: "好き")
+
+        // "東京" 確定 → Successor モード
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+
+        // "が" 確定 → 次の Successor 候補（好き）が出る
+        let chain1 = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "が")
+        XCTAssertTrue(client.inserted.contains("が"))
+        XCTAssertTrue(handler.isSuccessorMode, "が確定後も Successor モードが継続するはず")
+        guard case .show(let cands1, _, _) = chain1.candidateAction else {
+            XCTFail(".show を返すはず: \(chain1.candidateAction)"); return
+        }
+        XCTAssertTrue(cands1.contains("好き"), "bigram 学習済みの「好き」が候補に含まれるはず")
+
+        // "好き" 確定 → bigram なし → Successor モード終了
+        let chain2 = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "好き")
+        XCTAssertTrue(client.inserted.contains("好き"))
+        XCTAssertFalse(handler.isSuccessorMode, "好き確定後は Successor モードが終了するはず")
+        guard case .dismiss = chain2.candidateAction else {
+            XCTFail(".dismiss を返すはず: \(chain2.candidateAction)"); return
+        }
     }
 
     func testSuccessorModeArrowNavigates() {
