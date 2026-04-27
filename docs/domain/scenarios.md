@@ -17,13 +17,13 @@
 | 4 | `j` | 組成中 | `かん` | `j` | `かんj` | — |
 | 5 | `i` | 組成中 | `かんじ` | `` | `かんじ` | — |
 | 6 | Space | セグメントモード | — | — | `漢字`（AzooKey 先頭） | 表示 |
-| 7 | Enter | 待機 | — | — | — | 非表示 → 格助詞モードへ |
+| 7 | Enter | 待機 | — | — | — | 非表示 → Successor モードへ（末尾が漢字のため） |
 
-**確定後**: `漢字` が挿入される。末尾が漢字なので格助詞モードへ自動遷移。
+**確定後**: `漢字` が挿入される。末尾が漢字（`isNounLike` 真）なので Successor モードへ自動遷移。
 
 ---
 
-## S-02: 候補選択（↑↓）と右矢印キャンセル
+## S-02: 候補選択（↑↓）と右矢印確定
 
 **入力**: `k` `a` ↓ ↓ →
 
@@ -32,9 +32,9 @@
 | 1–2 | `ka` | 組成中 | false | autoShow で表示（履歴あり時） |
 | 3 | ↓ | 候補選択中 | **true** | 1番目を選択 |
 | 4 | ↓ | 候補選択中 | true | 2番目を選択 |
-| 5 | → | 組成中 | false | 非表示 |
+| 5 | → | 待機 | — | 非表示 |
 
-→ キーは `applyMarkedText + .dismiss` でひらがな組成に戻す。`insertText` を使うと Electron 系アプリに半角スペースが挿入されるため使わない。
+→ キーは `commitComposition` を呼び、選択候補を無視して組成テキスト（ひらがな）をそのまま `insertText` で確定する。Enter（選択候補を確定）とは異なる。
 
 ---
 
@@ -74,7 +74,7 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 **入力**: `t` Shift+`O` Shift+`K` `y` `o` Enter
 
 - `t` → pendingRomaji: `t`
-- Shift+`O` → composedHiragana に大文字 `O` を直接追加（pendingRomaji の `t` は？ → `t` は捨てられ `O` が蓄積 ※ローマ字ルールの実装次第）
+- Shift+`O` → `forceFinalize("t")` で pending `t` を先に composedHiragana へ追記し、続けて大文字 `O` を追加（`tO` が蓄積）
 - Enter → `tOKyo` 相当の文字列を確定
 
 **ポイント**: 日本語モード中の Shift+ASCII 文字は pendingRomaji 経由ではなく `composedHiragana` に直接追加される。
@@ -114,5 +114,5 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 | F6 | `とうきょう` | ひらがなのまま確定 |
 | F7 | `トウキョウ` | 全角カタカナ |
 | F8 | `ﾄｳｷｮｳ` | 半角カタカナ |
-| F9 | `とうきょう`（全角ASCII相当） | 実装参照 |
-| F10 | `とうきょう`（半角ASCII相当） | 実装参照 |
+| F9 | `ｔｏｕｋｙｏｕ` | ひらがな→ローマ字→全角ASCII（`toZenkakuAscii(hiraganaToRomaji(h))`） |
+| F10 | `toukyou` | ひらがな→ローマ字（半角ASCII）（`hiraganaToRomaji(h)`） |
