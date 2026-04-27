@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// InputController から分離した純粋な状態遷移ロジック。
 /// IMK ランタイムに依存しないため、ユニットテストで検証可能。
@@ -112,5 +112,19 @@ struct SegmentState {
 
     var allSelectedText: String {
         segments.map(\.selectedText).joined()
+    }
+
+    func attributedString(overrideFocusedText: String? = nil) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+        for (i, seg) in segments.enumerated() {
+            let text = (i == focusedIndex)
+                ? (overrideFocusedText ?? seg.selectedText)
+                : seg.selectedText
+            let style: Int = (i == focusedIndex)
+                ? NSUnderlineStyle.thick.rawValue
+                : NSUnderlineStyle.single.rawValue
+            result.append(NSAttributedString(string: text, attributes: [.underlineStyle: style]))
+        }
+        return result
     }
 }

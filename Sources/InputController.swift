@@ -1,8 +1,5 @@
 import Cocoa
 import InputMethodKit
-import os
-
-private let logger = Logger(subsystem: "com.yusuke.inputmethod.keynaco", category: "input")
 
 // MARK: - IMKTextInput → TextInputClient アダプタ
 
@@ -105,7 +102,7 @@ class InputController: IMKInputController {
         guard let event = event else { return false }
 
         // Caps Lock でモード切替（LED ON = 英字モード、LED OFF = 日本語モード）
-        if event.type == .flagsChanged && event.keyCode == 57 {
+        if event.type == .flagsChanged && event.keyCode == KeyCode.capsLock {
             InputHandler.isAsciiMode = event.modifierFlags.contains(.capsLock)
             return false
         }
@@ -197,7 +194,7 @@ class InputController: IMKInputController {
 
     private func updateMarkedText(client: TextInputClient) {
         if let ss = handler.state.segmentState {
-            let str = buildSegmentAttributedString(ss: ss, overrideFocusedText: candidateWindow.selectedText())
+            let str = ss.attributedString(overrideFocusedText: candidateWindow.selectedText())
             client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
         } else {
             let text: String
@@ -210,20 +207,6 @@ class InputController: IMKInputController {
         }
     }
 
-    /// セグメント全体の NSAttributedString を構築（focused=太い下線、他=細い下線）
-    private func buildSegmentAttributedString(ss: SegmentState, overrideFocusedText: String? = nil) -> NSAttributedString {
-        let result = NSMutableAttributedString()
-        for (i, seg) in ss.segments.enumerated() {
-            let text = (i == ss.focusedIndex)
-                ? (overrideFocusedText ?? seg.selectedText)
-                : seg.selectedText
-            let style: Int = (i == ss.focusedIndex)
-                ? NSUnderlineStyle.thick.rawValue
-                : NSUnderlineStyle.single.rawValue
-            result.append(NSAttributedString(string: text, attributes: [.underlineStyle: style]))
-        }
-        return result
-    }
 }
 
 private extension NSRange {

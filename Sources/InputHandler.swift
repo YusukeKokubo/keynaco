@@ -23,7 +23,7 @@ struct CandidateContext {
     static let hidden = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
 }
 
-private enum KeyCode {
+enum KeyCode {
     static let eisu:      UInt16 = 102
     static let kana:      UInt16 = 104
     static let backspace: UInt16 = 51
@@ -31,6 +31,7 @@ private enum KeyCode {
     static let enter:     UInt16 = 36
     static let escape:    UInt16 = 53
     static let tab:       UInt16 = 48
+    static let capsLock:  UInt16 = 57
     static let downArrow: UInt16 = 125
     static let upArrow:   UInt16 = 126
     static let leftArrow: UInt16 = 123
@@ -798,22 +799,9 @@ struct InputHandler {
 
     private func applySegmentMarkedText(client: TextInputClient) {
         guard let ss = state.segmentState else { return }
-        let str = buildSegmentAttributedString(ss: ss)
+        let str = ss.attributedString()
         client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
     }
 
-    private func buildSegmentAttributedString(ss: SegmentState, overrideFocusedText: String? = nil) -> NSAttributedString {
-        let result = NSMutableAttributedString()
-        for (i, seg) in ss.segments.enumerated() {
-            let text = (i == ss.focusedIndex)
-                ? (overrideFocusedText ?? seg.selectedText)
-                : seg.selectedText
-            let style: Int = (i == ss.focusedIndex)
-                ? NSUnderlineStyle.thick.rawValue
-                : NSUnderlineStyle.single.rawValue
-            result.append(NSAttributedString(string: text, attributes: [.underlineStyle: style]))
-        }
-        return result
-    }
 
 }

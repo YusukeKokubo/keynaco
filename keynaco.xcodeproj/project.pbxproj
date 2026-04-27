@@ -26,7 +26,6 @@
 		B6A394F4C8CEFE7B98992E12 /* AzooKeyConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */; };
 		BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */; };
 		CA9DA0E228B3736FED19A8C7 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8870F701310164C98A33E /* BigramViewController.swift */; };
-		CCAFA4CFB86584E8385625F2 /* InputSource.png in Resources */ = {isa = PBXBuildFile; fileRef = 30417076AD2C2828F84F56D7 /* InputSource.png */; };
 		CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01349F1120E395B87FF8E96B /* DatabaseManager.swift */; };
 		E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EA5A03205A3A4B861980E8 /* InputController.swift */; };
 		E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */; };
@@ -51,7 +50,6 @@
 		0DF633BBF3C756509E09F05A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		15033BFDFA6A888F753B0666 /* keynacoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = keynacoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		21A8870F701310164C98A33E /* BigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigramViewController.swift; sourceTree = "<group>"; };
-		30417076AD2C2828F84F56D7 /* InputSource.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = InputSource.png; sourceTree = "<group>"; };
 		32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverter.swift; sourceTree = "<group>"; };
 		34144C2DA730A7CFDC7B4149 /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
 		36A60998D2E36F9EBDF51923 /* TextInputClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInputClient.swift; sourceTree = "<group>"; };
@@ -153,7 +151,6 @@
 				59721E10162EA851CA8CB8B2 /* Info.plist */,
 				A7EA5A03205A3A4B861980E8 /* InputController.swift */,
 				34144C2DA730A7CFDC7B4149 /* InputHandler.swift */,
-				30417076AD2C2828F84F56D7 /* InputSource.png */,
 				C8F905020C8A707920C53337 /* InputSource.tiff */,
 				F2289452FE1578194147B535 /* keynaco.entitlements */,
 				8FECEC3CBD864BE0FA7202F3 /* main.swift */,
@@ -252,7 +249,6 @@
 			files = (
 				4D2A168DE48D8E47E75049BE /* Assets.xcassets in Resources */,
 				0521D725A698985598C0AEF1 /* InfoPlist.strings in Resources */,
-				CCAFA4CFB86584E8385625F2 /* InputSource.png in Resources */,
 				A6E40259CBFDB1F7925D8EAD /* InputSource.tiff in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
