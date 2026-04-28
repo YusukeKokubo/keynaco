@@ -304,7 +304,7 @@ extension InputHandler {
     }
 
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
-    /// 候補が存在すれば pendingRomaji を破棄し isSuccessorMode = true を立てて返す。
+    /// 候補が存在すれば isSuccessorMode = true を立てて返す。pendingRomaji は confirmSuccessor() で破棄される。
     mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
         guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
               let prev = lastCommittedOutput else { return .dismiss }

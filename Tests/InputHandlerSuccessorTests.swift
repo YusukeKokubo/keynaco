@@ -461,4 +461,44 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
             XCTFail("90日超のレコードは閾値対象外 → .dismiss を返すはず: \(result.candidateAction)"); return
         }
     }
+
+    // MARK: - particleRomajiMap の複数候補（n → に/の）
+
+    func testSuccessorModeNKeyShowsBothNiAndNo() {
+        // n → particleRomajiMap["n"] = ["に", "の"]、両方 bigram があれば両方表示
+        handler.db.recordBigram(prev: "東京", input: "に", output: "に")
+        handler.db.recordBigram(prev: "東京", input: "の", output: "の")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+
+        let result = type(chars: "n", base: "n")
+        guard case .show(let candidates, _, _) = result.candidateAction else {
+            XCTFail("n → .show を返すはず（に/の bigram あり）: \(result.candidateAction)"); return
+        }
+        XCTAssertTrue(candidates.contains("に"), "「に」が候補に含まれるはず: \(candidates)")
+        XCTAssertTrue(candidates.contains("の"), "「の」が候補に含まれるはず: \(candidates)")
+        XCTAssertFalse(candidates.contains("が"), "「が」は含まれないはず")
+    }
+
+    func testSuccessorModeNKeyKanaArrayOrderPreserved() {
+        // N-gram フィルタ経由（pendingSuccessorCandidates あり）の場合、
+        // romajiToInitialKana["n"] = ["な","に","ぬ","ね","の"] の kana 配列順で並ぶ。
+        // bigram 頻度（の=3 > に=1）ではなく kana 配列順が優先される。
+        for _ in 0..<3 { handler.db.recordBigram(prev: "東京", input: "の", output: "の") }
+        handler.db.recordBigram(prev: "東京", input: "に", output: "に")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        let result = type(chars: "n", base: "n")
+        guard case .show(let candidates, _, _) = result.candidateAction else {
+            XCTFail(".show を返すはず"); return
+        }
+        let idxNi = candidates.firstIndex(of: "に")
+        let idxNo = candidates.firstIndex(of: "の")
+        XCTAssertNotNil(idxNi, "「に」が候補に含まれるはず: \(candidates)")
+        XCTAssertNotNil(idxNo, "「の」が候補に含まれるはず: \(candidates)")
+        if let ni = idxNi, let n = idxNo {
+            XCTAssertLessThan(ni, n, "kana 配列順（に が の より前）で表示されるはず")
+        }
+    }
 }

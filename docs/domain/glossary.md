@@ -89,7 +89,9 @@ tail に fallback として並べる。ひらがな末尾の語では格助詞 f
 
 **N-gram 候補の遅延表示と読みフィルタ**:
 N-gram 由来の候補（tri-gram + bi-gram + skip-bigram）がある場合、`suggestSuccessors()` は
-候補を `pendingSuccessorCandidates` に保存して `.dismiss`（候補ウィンドウを閉じる）を返す。
+まず `fetchBigramTopCount(prev: last)` で前語に対する bi-gram 上位使用回数を取得する。
+`successorImmediateThreshold`（デフォルト 5）以上なら「高信頼ペア」とみなして即時表示（`.show`）。
+閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。
 1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、
 DB を再クエリして一致する候補のみ `.show` する（読みが一致しなければモード解除）。  
 格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。

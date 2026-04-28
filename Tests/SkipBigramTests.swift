@@ -112,4 +112,28 @@ final class SkipBigramTests: InputHandlerTestCase {
         XCTAssertTrue(handler.committedHistory.isEmpty)
         XCTAssertNil(handler.mostRecentContentWord())
     }
+
+    // MARK: - 文末記号後の trigram コンテキストリセット
+
+    func testSentenceTerminatorClearsPrev2Output() {
+        // 文末記号確定後は committedHistory が空になり prev2Output / lastCommittedOutput が nil になる
+        handler.commitText(text: "昨日", client: client)
+        handler.commitText(text: "東京", client: client)
+        XCTAssertEqual(handler.lastCommittedOutput, "東京")
+        XCTAssertEqual(handler.prev2Output, "昨日")
+
+        handler.commitText(text: "。", client: client)
+        XCTAssertTrue(handler.committedHistory.isEmpty, "文末記号確定後に committedHistory がリセットされる")
+        XCTAssertNil(handler.lastCommittedOutput, "lastCommittedOutput が nil になるはず")
+        XCTAssertNil(handler.prev2Output, "prev2Output が nil になるはず")
+    }
+
+    func testSentenceTerminatorPreventsSuccessorAfterNewWord() {
+        // 「。」確定後に次の語を確定しても、前の文の bigram コンテキストは使われない
+        handler.commitText(text: "東京", client: client)
+        handler.commitText(text: "。", client: client)
+        handler.commitText(text: "大阪", client: client)
+        let bigramFromTokyo = handler.db.fetchBigramTop(prev: "東京")
+        XCTAssertTrue(bigramFromTokyo.isEmpty, "文末記号をまたぐ bigram は記録されないはず")
+    }
 }

@@ -180,4 +180,42 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         XCTAssertFalse(handler.state.isSegmentMode)
         XCTAssertFalse(client.inserted.isEmpty)
     }
+
+    // MARK: - セグメントモード中の Space・候補選択
+
+    func testSegmentModeSpaceSelectsNextCandidate() {
+        // セグメントモード中の Space は .selectNext（次の変換候補へ）
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode else { return }
+
+        let (consumed, action) = press(keyCode: 49, candidateVisible: true)
+        XCTAssertTrue(consumed)
+        XCTAssertTrue(handler.state.isSegmentMode, "Space 後もセグメントモードを維持するはず")
+        guard case .selectNext = action else {
+            XCTFail("セグメントモード中の Space は .selectNext を返すはず: \(action)"); return
+        }
+    }
+
+    func testSegmentModeSelectionSavedWhenFocusChanges() {
+        // フォーカスセグメントの候補を選択後に別セグメントへ移動し、戻ると選択が保持される
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss0 = handler.state.segmentState,
+              ss0.segments.count >= 2,
+              ss0.segments[0].candidates.count >= 2 else { return }
+
+        let secondCand = ss0.segments[0].candidates[1]
+        // フォーカス 0 で 2番目候補を選択した状態で Right キー
+        press(keyCode: 124, candidateVisible: true, selectedRow: 1, selectedText: secondCand)
+        XCTAssertEqual(handler.state.segmentState?.focusedIndex, 1)
+
+        // Left で 0 に戻る
+        press(keyCode: 123, candidateVisible: true)
+        let ss2 = handler.state.segmentState
+        XCTAssertEqual(ss2?.focusedIndex, 0)
+        XCTAssertEqual(ss2?.segments[0].selectedIndex, 1,
+                       "右移動前に選択した候補インデックスが保持されるはず")
+    }
 }

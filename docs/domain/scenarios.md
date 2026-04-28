@@ -86,9 +86,9 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 
 | ステップ | キー | 状態 | 動作 |
 |---------|------|------|------|
-| 0 | — | Successor モード | N-gram あり（`が` が bigram 学習済み）→ `.none`（1打目待ち） |
+| 0 | — | Successor モード | N-gram あり（`が` が bigram 学習済み）→ `.dismiss`（1打目待ち） |
 | 1 | 任意キー | Successor モード | `pendingSuccessorCandidates` を表示（candidates: `["が", ...]`）|
-| 2 | Space | Successor モード | 「が」確定 → `suggestSuccessors()` → N-gram あり（`好き`）→ `.none` |
+| 2 | Space | Successor モード | 「が」確定 → `suggestSuccessors()` → N-gram あり（`好き`）→ `.dismiss`（1打目待ち） |
 | 3 | 任意キー | Successor モード | `pendingSuccessorCandidates` を表示（candidates: `["好き"]`）|
 | 4 | Space | 待機 | 「好き」確定 → bigram なし → `.dismiss` |
 
@@ -207,7 +207,7 @@ skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加され
 | ステップ | キー | 状態 | 動作 |
 |---------|------|------|------|
 | 0 | — | 待機 | `lastCommittedOutput = "て"`、bi-gram `(て, から)` 学習済み |
-| 1 | `k` | Successor モード | `buildPendingCandidateList("k")` → `["か", "き", ..., "から"]` → `.show`、`pendingRomaji = ""` |
+| 1 | `k` | Successor モード | `buildPendingCandidateList("k")` → `["か", "き", ..., "から"]` → `.show`（`pendingRomaji = "k"` は保持） |
 | 2 | Space | 待機 | `confirmSuccessor("から")` → 「から」確定（`i` を打たず1打削減） |
 
 **制約**: `composedHiragana` が空のとき限定。2文字目（`sh` 等）は対象外（`pending.count == 1` ガード）。

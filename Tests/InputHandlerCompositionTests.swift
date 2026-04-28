@@ -554,4 +554,43 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
             XCTFail("ASCII モードで F7 は .none を返すはず: \(action)"); return
         }
     }
+
+    // MARK: - 括弧モード中の F キー・Shift+Delete
+
+    func testBracketModeFKeyInsertsBracketAndClearsMode() {
+        // 括弧モード中に F7 → 選択中の括弧が挿入されてモード解除（F7 自体は composing 空で無効）
+        type(chars: "[", base: "[")
+        XCTAssertTrue(handler.isBracketMode)
+        let selectedBracket = "「"
+        let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: selectedBracket)
+        _ = handler.handle(keyCode: KeyCode.f7, characters: nil, baseCharacters: nil,
+                           modifiers: [], candidate: ctx, client: client)
+        XCTAssertFalse(handler.isBracketMode, "F キー後は括弧モードが解除されるはず")
+        XCTAssertEqual(client.inserted.last, selectedBracket, "選択中の括弧が挿入されるはず")
+    }
+
+    func testBracketModeShiftDeleteDismisses() {
+        // 括弧モード中に Shift+Delete（backspace keyCode + shift）→ Escape と同様にモード解除
+        type(chars: "[", base: "[")
+        XCTAssertTrue(handler.isBracketMode)
+        let result = press(keyCode: KeyCode.backspace, modifiers: .shift, candidateVisible: true)
+        XCTAssertFalse(handler.isBracketMode, "Shift+Delete で括弧モードが解除されるはず")
+        XCTAssertTrue(client.inserted.isEmpty, "Shift+Delete では括弧は挿入されないはず")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("Shift+Delete は .dismiss を返すはず: \(result.candidateAction)"); return
+        }
+    }
+
+    // MARK: - Shift+句読点確定後の Successor モード非起動
+
+    func testShiftAngleBracketConfirmedNotNounLikeNoSuccessor() {
+        // `<` 確定後は isNounLike("<") = false → Successor モードは起動しない
+        type(chars: "<", base: ",", modifiers: .shift)
+        let result = press(keyCode: KeyCode.enter)
+        XCTAssertFalse(handler.isSuccessorMode, "「<」は名詞でないため Successor モードは起動しないはず")
+        XCTAssertEqual(client.inserted.last, "<")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
+        }
+    }
 }

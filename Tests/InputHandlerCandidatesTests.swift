@@ -400,4 +400,82 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         let (_, action) = type(chars: "a", base: "a")  // k+a=か
         XCTAssertEqual(client.markedText, "か", "Escape 後に続けて a を入力すると k+a=か になるはず")
     }
+
+    // MARK: - pendingRomaji 先読み予測（f/j/c キー）
+
+    func testPendingPreviewWithFKeyMatches() {
+        // f → romajiToInitialKana["f"] = ["ふ"]
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "ふう", output: "風")
+        let (_, action) = type(chars: "f", base: "f")
+        XCTAssertTrue(handler.isSuccessorMode, "f キーで先読み候補あれば isSuccessorMode になるはず")
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail("f キー先読み → .show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains("風"), "「ふ」行の bigram 候補が含まれるはず")
+    }
+
+    func testPendingPreviewWithJKeyMatches() {
+        // j → romajiToInitialKana["j"] = ["じ"]
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "じゆう", output: "自由")
+        let (_, action) = type(chars: "j", base: "j")
+        XCTAssertTrue(handler.isSuccessorMode, "j キーで先読み候補あれば isSuccessorMode になるはず")
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail("j キー先読み → .show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains("自由"), "「じ」行の bigram 候補が含まれるはず")
+    }
+
+    func testPendingPreviewWithCKeyMatchesKaAndChiRows() {
+        // c → romajiToInitialKana["c"] = ["か","き","く","け","こ","ち"]
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "ちかく", output: "近く")  // ち行
+        handler.db.recordBigram(prev: "て", input: "かれ", output: "彼")    // か行
+        let (_, action) = type(chars: "c", base: "c")
+        XCTAssertTrue(handler.isSuccessorMode)
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail("c キー先読み → .show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains("近く") || candidates.contains("彼"),
+                      "「ち」または「か」行の bigram 候補が含まれるはず: \(candidates)")
+    }
+
+    func testPendingPreviewNExclusionContinuesAsNormalRomaji() {
+        // n は先読み除外 → pendingRomaji = "n" が残り n+i=に と組成できる
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "にほんご", output: "日本語")
+        type(chars: "n", base: "n")
+        XCTAssertFalse(handler.isSuccessorMode, "n では先読みに入らないはず")
+        XCTAssertEqual(handler.state.pendingRomaji, "n")
+        type(chars: "i", base: "i")
+        XCTAssertEqual(client.markedText, "に", "n+i → に として組成されるはず")
+        XCTAssertTrue(handler.state.pendingRomaji.isEmpty)
+    }
+
+    func testPendingPreviewTrigramPrioritizedInPreview() {
+        // buildPendingCandidateList で tri-gram 候補が bigram のみの候補より先に来る
+        typeRomaji("kinou")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "昨日")
+        press(keyCode: 53)
+        typeRomaji("toukyou")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        press(keyCode: 53)
+        handler.db.recordBigram(prev: "東京", input: "とさん", output: "都産")
+        handler.db.recordTrigram(prev2: "昨日", prev1: "東京", input: "いった", output: "行った")
+        let (_, action) = type(chars: "i", base: "i")
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail("先読みで .show を返すはず: \(action)"); return
+        }
+        let idxItta = candidates.firstIndex(of: "行った")
+        let idxTosan = candidates.firstIndex(of: "都産")
+        XCTAssertNotNil(idxItta, "tri-gram 候補「行った」が含まれるはず: \(candidates)")
+        if let i = idxItta, let t = idxTosan {
+            XCTAssertLessThan(i, t, "tri-gram 由来の候補が bigram のみの候補より上位に来るはず")
+        }
+    }
 }
