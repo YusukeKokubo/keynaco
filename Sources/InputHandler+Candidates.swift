@@ -2,13 +2,65 @@ import AppKit
 
 // MARK: - 候補リスト構築・候補表示中・通常入力
 //
-// `handle()` の主要分岐 3 つ：
+// `handle()` の主要分岐 4 つ：
 //   - handleCandidateVisible  : 候補ウィンドウ表示中のキー
+//   - handleBracketModeKey    : 括弧候補ウィンドウ表示中のキー
 //   - handleNormalInput       : 通常の文字入力（ローマ字・Shift・記号）
 //   - buildCandidateList      : 候補列の組み立て（履歴・bi-gram・azooKey 統合）
 //   - doConfirmSelection      : Enter による候補確定
 
 extension InputHandler {
+
+    // MARK: - 括弧候補マップ
+
+    static let bracketOptions: [String: [String]] = [
+        "[": ["「", "【", "〔", "［", "〈", "《", "『"],
+        "]": ["」", "】", "〕", "］", "〉", "》", "』"],
+        "(": ["（", "〔", "｟"],
+        ")": ["）", "〕", "｠"],
+        "{": ["｛"],
+        "}": ["｝"],
+    ]
+
+    // MARK: - 括弧モード
+
+    mutating func handleBracketModeKey(
+        keyCode: UInt16,
+        characters: String?,
+        baseCharacters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        let brackets = bracketCandidates!
+        let selectedText = candidate.selectedText ?? brackets[0]
+
+        switch keyCode {
+        case KeyCode.escape, KeyCode.backspace:
+            bracketCandidates = nil
+            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
+            return (true, .dismiss)
+
+        case KeyCode.enter:
+            bracketCandidates = nil
+            client.insertText(selectedText)
+            return (true, .dismiss)
+
+        case KeyCode.tab where modifiers.contains(.shift), KeyCode.upArrow:
+            return (true, .selectPrev)
+
+        case KeyCode.space, KeyCode.tab, KeyCode.downArrow:
+            return (true, .selectNext)
+
+        default:
+            // 選択中の括弧を確定して、このキーは通常処理へ
+            bracketCandidates = nil
+            client.insertText(selectedText)
+            return handleNormalInput(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+                                      modifiers: modifiers, wasExplicitlySelected: false,
+                                      candidate: .hidden, client: client)
+        }
+    }
 
     @discardableResult
     mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
@@ -107,6 +159,23 @@ extension InputHandler {
                     state.pendingRomaji = ""
                 }
                 state.composedHiragana += mappedPunct
+                let action = buildCandidateList()
+                applyMarkedText(candidateText: nil, client: client)
+                return (true, action)
+            }
+        }
+
+        if let options = InputHandler.bracketOptions[chars] {
+            if state.composingText.isEmpty {
+                bracketCandidates = options
+                client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
+                return (true, .show(candidates: options, historyEnd: 0, initialRow: 0))
+            } else {
+                if !state.pendingRomaji.isEmpty {
+                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+                    state.pendingRomaji = ""
+                }
+                state.composedHiragana += options[0]
                 let action = buildCandidateList()
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, action)

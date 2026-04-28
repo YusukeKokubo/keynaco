@@ -226,6 +226,110 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         XCTAssertEqual(client.inserted, ["。"])
     }
 
+    // MARK: - 括弧変換（組成なし → 候補ウィンドウ）
+
+    func testOpenBracketShowsCandidateWindow() {
+        // "[" → 候補ウィンドウが開き marked text に先頭候補「「」が表示される
+        let result = type(chars: "[", base: "[")
+        XCTAssertTrue(result.consumed)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "「")
+        if case .show(let candidates, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("「"))
+            XCTAssertTrue(candidates.contains("【"))
+        } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
+    }
+
+    func testCloseBracketShowsCandidateWindow() {
+        let result = type(chars: "]", base: "]")
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.markedText, "」")
+        if case .show(let candidates, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("」"))
+            XCTAssertTrue(candidates.contains("】"))
+        } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
+    }
+
+    func testOpenParenShowsCandidateWindow() {
+        // Shift+9 → "（" の候補ウィンドウ
+        let result = type(chars: "(", base: "9", modifiers: .shift)
+        XCTAssertTrue(result.consumed)
+        XCTAssertEqual(client.markedText, "（")
+        if case .show(let candidates, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("（"))
+        } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
+    }
+
+    func testBracketEnterConfirmsSelection() {
+        // "[" → Enter で先頭候補「「」を確定
+        type(chars: "[", base: "[")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: "「")
+        _ = handler.handle(keyCode: KeyCode.enter, characters: nil, baseCharacters: nil,
+                           modifiers: [], candidate: ctx, client: client)
+        XCTAssertEqual(client.inserted, ["「"])
+        XCTAssertFalse(handler.isBracketMode)
+    }
+
+    func testBracketEscapeCancels() {
+        // "[" → Escape でキャンセル、何も挿入されない
+        type(chars: "[", base: "[")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: "「")
+        _ = handler.handle(keyCode: KeyCode.escape, characters: nil, baseCharacters: nil,
+                           modifiers: [], candidate: ctx, client: client)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "")
+        XCTAssertFalse(handler.isBracketMode)
+    }
+
+    func testBracketSelectionThenNextChar() {
+        // "[" → 候補選択中に次の文字を押すと括弧を確定して通常組成を開始
+        type(chars: "[", base: "[")
+        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "【")
+        _ = handler.handle(keyCode: 0, characters: "a", baseCharacters: "a",
+                           modifiers: [], candidate: ctx, client: client)
+        XCTAssertEqual(client.inserted, ["【"])
+        XCTAssertEqual(client.markedText, "あ")
+        XCTAssertFalse(handler.isBracketMode)
+    }
+
+    // MARK: - 括弧変換（組成あり → 先頭候補を末尾に追加）
+
+    func testBracketAppendsToComposition() {
+        type(chars: "a", base: "a")
+        let result = type(chars: "[", base: "[")
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ「")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
+    }
+
+    func testParenAppendsToComposition() {
+        type(chars: "a", base: "a")
+        let result = type(chars: "(", base: "9", modifiers: .shift)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ（")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
+    }
+
+    func testBracketAfterPendingConsonantFlushesPending() {
+        type(chars: "k", base: "k")
+        let result = type(chars: "[", base: "[")
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "k「")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
+    }
+
     // MARK: - 確定後の再入力
 
     func testTypingAfterConfirmationStartsFreshComposition() {

@@ -157,7 +157,7 @@ class InputController: IMKInputController {
             candidateWindow.dismiss()
         case .selectNext:
             candidateWindow.selectNext()
-            if handler.isSuccessorMode {
+            if handler.isSuccessorMode || handler.isBracketMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
             } else {
@@ -165,7 +165,7 @@ class InputController: IMKInputController {
             }
         case .selectPrev:
             candidateWindow.selectPrev()
-            if handler.isSuccessorMode {
+            if handler.isSuccessorMode || handler.isBracketMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
             } else {
@@ -201,6 +201,7 @@ class InputController: IMKInputController {
         handler.commitComposition(client: adapter, candidate: ctx)
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
+        handler.bracketCandidates = nil
         candidateWindow.dismiss()
     }
 

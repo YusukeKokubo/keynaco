@@ -62,6 +62,8 @@ struct InputHandler {
     var isSuccessorMode = false
     var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
     var pendingSuccessorCandidates: [String] = []
+    var bracketCandidates: [String]? = nil
+    var isBracketMode: Bool { bracketCandidates != nil }
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }
     var prev2Output: String? {
@@ -114,6 +116,11 @@ struct InputHandler {
         if isSuccessorMode {
             return handleSuccessorMode(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
                                       modifiers: modifiers, candidate: candidate, client: client)
+        }
+
+        if isBracketMode {
+            return handleBracketModeKey(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+                                        modifiers: modifiers, candidate: candidate, client: client)
         }
 
         let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
