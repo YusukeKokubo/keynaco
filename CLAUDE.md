@@ -73,9 +73,9 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 `KanaUtils` = ひらがな↔カタカナ変換ユーティリティ（`hiraganaToKatakana` / `hiraganaToHankakuKatakana` / `toZenkakuAscii`）。F7–F9 変換確定とカタカナ候補生成で使用。
 
-### Successor モード（isSuccessorMode / successorFirstChar）
+### Successor モード（isSuccessorMode / successorFirstChar / pendingSuccessorCandidates）
 
-確定直後に `suggestSuccessors()` が後続語候補ウィンドウを自動表示する。候補は以下の順：
+確定直後に `suggestSuccessors()` が後続語候補を準備する。候補は以下の順：
 
 1. `db.fetchTrigramTop(prev2:prev1:)` の上位（2語前コンテキスト優先）
 2. `db.fetchBigramTop(prev:)` の上位（tri-gram に含まれないもの）
@@ -84,7 +84,9 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 
 bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。
 
-- `successorFirstChar`: 頭文字 1 打目のバッファリング。`particleRomajiMap` による格助詞 fast-path が効くのは `isNounLike` のときのみ。非名詞末尾では 1 打目で即座に通常組成へフォールスルーする。
+**N-gram 候補の遅延表示と読みフィルタ**: N-gram 由来の候補がある場合、`suggestSuccessors()` は候補を `pendingSuccessorCandidates` に保存して `.dismiss`（ウィンドウを閉じる）を返す。1打目が入力されたとき `romajiToInitialKana` でかな先頭一致フィルタを行い、一致候補のみ表示する。一致なしはモード解除。格助詞のみ（N-gram なし）の場合は従来通り確定後すぐ表示する。
+
+- `successorFirstChar`: 頭文字 1 打目のバッファリング。`particleRomajiMap` による格助詞 fast-path が効くのは `isNounLike` のときのみ。N-gram 保留表示後の 2 打目でモード解除する際にも使用する。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
 - 候補確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば連鎖表示を継続する。候補が空なら自然に `.dismiss`（格助詞チェックは廃止）。
 - Successor モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。

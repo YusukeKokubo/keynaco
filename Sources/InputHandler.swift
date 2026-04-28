@@ -61,6 +61,7 @@ struct InputHandler {
     var ignoreNextModeSwitch = false
     var isSuccessorMode = false
     var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
+    var pendingSuccessorCandidates: [String] = []
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }
     var prev2Output: String? {

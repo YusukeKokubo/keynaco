@@ -67,12 +67,14 @@
 
 | ステップ | キー | 状態 | candidates | 動作 |
 |---------|------|------|-----------|------|
-| 0a | — | Successor モード | `["さまです", "です"]` | trigram あり → trigram 優先、bigram で補完 |
-| 0b | — | Successor モード | `["です"]` | trigram なし → bigram のみ。格助詞 fallback なし（`isNounLike` 偽） |
-| 1a | Space | 待機 | — | 先頭候補を確定 |
-| 1b | `k` | 組成中 | — | fast-path 非該当 → 通常組成、`k` が pendingRomaji へ |
+| 0a | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram あり → N-gram 遅延表示（候補ウィンドウは開かない） |
+| 0b | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram なし → bigram のみ。格助詞 fallback なし（`isNounLike` 偽）|
+| 1a | `d`（「で」行） | Successor モード | `["さまです", "です"]` or `["です"]` | 1打目 `romajiToInitialKana["d"]`→「で」行フィルタで一致候補を表示 |
+| 1b | Space | 待機 | — | 1打後、先頭候補を確定 |
+| 1c | マッチしないキー | 待機 | — | 一致候補なし → モード解除→通常入力 |
 
-trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismiss` が返り Successor モードには入らない。
+trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismiss` が返り Successor モードには入らない。  
+格助詞のみ（N-gram なし、名詞末尾）の場合は従来通り確定後すぐに候補ウィンドウを表示する。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
@@ -84,9 +86,11 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 
 | ステップ | キー | 状態 | 動作 |
 |---------|------|------|------|
-| 0 | — | Successor モード | candidates: `["が", ...]`（bigram + 格助詞 fallback）|
-| 1 | Space | Successor モード | 「が」確定 → `suggestSuccessors()` → candidates: `["好き"]` |
-| 2 | Space | 待機 | 「好き」確定 → bigram なし → `.dismiss` |
+| 0 | — | Successor モード | N-gram あり（`が` が bigram 学習済み）→ `.none`（1打目待ち） |
+| 1 | 任意キー | Successor モード | `pendingSuccessorCandidates` を表示（candidates: `["が", ...]`）|
+| 2 | Space | Successor モード | 「が」確定 → `suggestSuccessors()` → N-gram あり（`好き`）→ `.none` |
+| 3 | 任意キー | Successor モード | `pendingSuccessorCandidates` を表示（candidates: `["好き"]`）|
+| 4 | Space | 待機 | 「好き」確定 → bigram なし → `.dismiss` |
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 

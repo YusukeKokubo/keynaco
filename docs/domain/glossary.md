@@ -87,13 +87,29 @@ tail に fallback として並べる。ひらがな末尾の語では格助詞 f
 確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば
 連鎖表示を継続する（格助詞チェックは廃止。候補空なら自然に `.dismiss`）。
 
+**N-gram 候補の遅延表示と読みフィルタ**:
+N-gram 由来の候補（tri-gram + bi-gram + skip-bigram）がある場合、`suggestSuccessors()` は
+候補を `pendingSuccessorCandidates` に保存して `.dismiss`（候補ウィンドウを閉じる）を返す。
+1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、
+DB を再クエリして一致する候補のみ `.show` する（読みが一致しなければモード解除）。  
+格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。
+
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
+
+### pendingSuccessorCandidates
+Successor モードで N-gram 候補を1打目まで遅延表示するためのバッファ。  
+**不変条件**: `suggestSuccessors()` が N-gram 候補を計算した際に設定され、1打目の入力時に
+`romajiToInitialKana` で読み前方一致フィルタを行い `.show` して空になる。
+読みが一致しない場合はモード解除して空になる。
+`isSuccessorMode = false` になるすべての経路でクリアされる。
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。  
 **不変条件**: 1 打目が格助詞 fast-path（`particleRomajiMap`）に対応し、かつ直前確定語が `isNounLike`
-を満たすときのみバッファリング。2 打目が格助詞サブセットにマッチしなければ 1 打目を通常入力として
-流してからモード解除する。非名詞末尾では fast-path を使わず即座に通常組成へフォールスルー。
+を満たすときのみ格助詞絞り込みバッファとして使用。2 打目が格助詞サブセットにマッチしなければ 1 打目を
+通常入力として流してからモード解除する。  
+`pendingSuccessorCandidates` が非空の場合（N-gram 遅延表示中）は、格助詞 fast-path 非該当の 1 打目でも
+`successorFirstChar` にバッファして N-gram 候補を表示する（2打目でマッチしなければ通常通り流す）。
 
 ---
 

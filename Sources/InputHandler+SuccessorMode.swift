@@ -8,10 +8,11 @@ import AppKit
 extension InputHandler {
 
     /// 後続語候補を組み立ててモードに入る／出る判定をする。
-    /// - Returns: 候補があれば `.show`、無ければ `.dismiss`。
+    /// N-gram 候補がある場合は `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目まで表示を遅延）。
+    /// 格助詞のみの場合（名詞末尾 + N-gram なし）は従来通り `.show` を返す。
     mutating func suggestSuccessors() -> CandidateAction {
         guard let last = lastCommittedOutput else {
-            isSuccessorMode = false; successorFirstChar = nil
+            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             return .dismiss
         }
         let bigramTop = db.fetchBigramTop(prev: last)
@@ -26,17 +27,26 @@ extension InputHandler {
         let candidates = predictTop + particlesFallback
 
         guard !candidates.isEmpty else {
-            isSuccessorMode = false; successorFirstChar = nil
+            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             return .dismiss
         }
 
         isSuccessorMode = true
         successorFirstChar = nil
-        return .show(candidates: candidates, historyEnd: 0, initialRow: 0)
+
+        if predictTop.isEmpty {
+            // 格助詞 fallback のみ（N-gram なし）→ 従来通りすぐ表示
+            pendingSuccessorCandidates = []
+            return .show(candidates: candidates, historyEnd: 0, initialRow: 0)
+        } else {
+            // N-gram 候補あり → 保存して1打目まで待つ（変換候補ウィンドウは閉じる）
+            pendingSuccessorCandidates = candidates
+            return .dismiss
+        }
     }
 
     mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
-        isSuccessorMode = false; successorFirstChar = nil
+        isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
         if let p1 = lastCommittedOutput {
             db.recordBigram(prev: p1, input: particle, output: particle)
             if let p2 = prev2Output {
@@ -60,7 +70,7 @@ extension InputHandler {
         switch keyCode {
         case KeyCode.space, KeyCode.enter:
             guard let selected = candidate.selectedText else {
-                isSuccessorMode = false; successorFirstChar = nil
+                isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
                 client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
                 return (true, .dismiss)
             }
@@ -71,7 +81,7 @@ extension InputHandler {
         case KeyCode.upArrow:
             return (true, .selectPrev)
         case KeyCode.escape, KeyCode.backspace, KeyCode.rightArrow:
-            isSuccessorMode = false; successorFirstChar = nil
+            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
             return (true, .dismiss)
         default:
@@ -92,9 +102,36 @@ extension InputHandler {
                     return (true, .show(candidates: merged + rest, historyEnd: 0, initialRow: 0))
                 }
             }
-            // fast-path 非該当 → モード解除、バッファがあれば先に通常入力に流す
+            // fast-path 非該当かつ N-gram 保留あり → 1打目で読み前方一致フィルタして表示
             let first = successorFirstChar
-            isSuccessorMode = false; successorFirstChar = nil
+            if !pendingSuccessorCandidates.isEmpty, first == nil {
+                let char = (baseCharacters ?? characters ?? "").lowercased()
+                if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
+                   let last = lastCommittedOutput {
+                    let kanas = InputHandler.romajiToInitialKana[char] ?? []
+                    var filtered: [String] = []
+                    for kana in kanas {
+                        let fromTrigram: [String] = prev2Output.map {
+                            db.fetchTrigram(prev2: $0, prev1: last, reading: kana)
+                        } ?? []
+                        let fromBigram = db.fetchBigram(prev: last, reading: kana)
+                        let fromSkip = mostRecentContentWord().map {
+                            db.fetchSkipBigram(prev: $0, reading: kana)
+                        } ?? []
+                        for s in fromTrigram where !filtered.contains(s) { filtered.append(s) }
+                        for s in fromBigram where !filtered.contains(s) { filtered.append(s) }
+                        for s in fromSkip where !filtered.contains(s) { filtered.append(s) }
+                    }
+                    if !filtered.isEmpty {
+                        pendingSuccessorCandidates = []
+                        successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
+                        return (true, .show(candidates: filtered, historyEnd: 0, initialRow: 0))
+                    }
+                }
+                pendingSuccessorCandidates = []
+            }
+            // モード解除、バッファがあれば先に通常入力に流す
+            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             if let first {
                 _ = handle(keyCode: first.keyCode, characters: first.characters, baseCharacters: first.baseCharacters,
                            modifiers: modifiers, candidate: .hidden, client: client)
@@ -105,6 +142,33 @@ extension InputHandler {
     }
 
     // MARK: - Successor 用の static データ
+
+    /// ローマ字1文字 → 読みの先頭になりうるひらがな（N-gram 保留候補の読みフィルタに使用）
+    static let romajiToInitialKana: [String: [String]] = [
+        "a": ["あ"],
+        "i": ["い"],
+        "u": ["う"],
+        "e": ["え"],
+        "o": ["お"],
+        "k": ["か", "き", "く", "け", "こ"],
+        "s": ["さ", "し", "す", "せ", "そ"],
+        "t": ["た", "ち", "つ", "て", "と"],
+        "n": ["な", "に", "ぬ", "ね", "の"],
+        "h": ["は", "ひ", "ふ", "へ", "ほ"],
+        "m": ["ま", "み", "む", "め", "も"],
+        "y": ["や", "ゆ", "よ"],
+        "r": ["ら", "り", "る", "れ", "ろ"],
+        "w": ["わ", "を"],
+        "g": ["が", "ぎ", "ぐ", "げ", "ご"],
+        "z": ["ざ", "じ", "ず", "ぜ", "ぞ"],
+        "d": ["だ", "ぢ", "づ", "で", "ど"],
+        "b": ["ば", "び", "ぶ", "べ", "ぼ"],
+        "p": ["ぱ", "ぴ", "ぷ", "ぺ", "ぽ"],
+        "f": ["ふ"],
+        "j": ["じ"],
+        "c": ["か", "き", "く", "け", "こ", "ち"],
+        "v": ["ヴ"],
+    ]
 
     /// 頭文字（ローマ字1文字）→ 格助詞リスト（複数ある場合は使用頻度の高い順）
     static let particleRomajiMap: [String: [String]] = [

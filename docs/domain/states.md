@@ -93,7 +93,8 @@ stateDiagram-v2
 | ↑↓ | 候補を移動 |
 | Tab | 次候補へ |
 | ローマ字 1 文字（格助詞 fast-path, 名詞末尾時のみ） | `particleRomajiMap` で格助詞サブセットに絞り込み |
-| 非対応キー（1 打目） | バッファがあれば流す → モード解除 → 通常組成へ |
+| 非対応キー（1 打目, `pendingSuccessorCandidates` あり） | `romajiToInitialKana` で読みフィルタ→一致候補を表示。一致なしはモード解除 |
+| 非対応キー（1 打目, `pendingSuccessorCandidates` なし） | バッファがあれば流す → モード解除 → 通常組成へ |
 | → | モードキャンセル → 待機（successorFirstChar は破棄） |
 | Escape / Backspace | モード解除 → 待機 |
 
@@ -106,6 +107,7 @@ stateDiagram-v2
 - **Successor の再帰防止**: 格助詞チェックは廃止。候補が空なら自然に `.dismiss` になるため、無限ループは起きない
 - **候補取得の優先順位**: `prev2Output`（2語前）× `lastCommittedOutput`（1語前）で trigram を引き、なければ `lastCommittedOutput` だけで bigram をフォールバック
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
+- **N-gram 遅延表示と読みフィルタ**: N-gram 候補がある場合、確定直後は候補ウィンドウを閉じ（`.dismiss`）`pendingSuccessorCandidates` に保存。1打目の入力で `romajiToInitialKana` によるかな先頭一致フィルタを行い、一致候補のみ表示する。一致なしはモード解除して通常入力に流す（格助詞のみの場合は従来通り即時表示）
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
 - **ASCII モードの F キー**: F6–F10 は ASCII モード中では無効（組成が空のため）
