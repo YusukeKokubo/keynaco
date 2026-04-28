@@ -191,6 +191,31 @@ skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加され
 
 ---
 
+## S-03d: pendingRomaji 先読み予測（1打削減）
+
+**前提**: `東京` を確定。bigram `(東京, について, について)` を学習済み（Successor の閾値未満で遅延表示中）。
+
+| ステップ | キー | 状態 | pendingRomaji | composedHiragana | 動作 |
+|---------|------|------|--------------|-----------------|------|
+| 0 | — | Successor モード | — | — | N-gram 遅延表示中（`pendingSuccessorCandidates = ["について"]`） |
+| 1 | Escape | 待機 | — | — | Successor モードキャンセル（`lastCommittedOutput = "東京"` は保持） |
+| 2 | `n` | 組成中 | `n` | `` | **先読み除外**（`n` は `ん` との曖昧さあり） → `.dismiss` |
+| — | `i` | 組成中 | `` | `に` | 「に」が組成 → bigram フィルタで候補表示 |
+
+**先読みが効くケース**: `t` を入力すると `romajiToInitialKana["t"]` → 「た行」全体で先読み → 「て」「と」「た」始まりの bi-gram があれば即座に候補表示 → Space で確定（`i` 打鍵を省略）。
+
+| ステップ | キー | 状態 | 動作 |
+|---------|------|------|------|
+| 0 | — | 待機 | `lastCommittedOutput = "て"`、bi-gram `(て, から)` 学習済み |
+| 1 | `k` | Successor モード | `buildPendingCandidateList("k")` → `["か", "き", ..., "から"]` → `.show`、`pendingRomaji = ""` |
+| 2 | Space | 待機 | `confirmSuccessor("から")` → 「から」確定（`i` を打たず1打削減） |
+
+**制約**: `composedHiragana` が空のとき限定。2文字目（`sh` 等）は対象外（`pending.count == 1` ガード）。
+
+*Tests: `Tests/InputHandlerCandidatesTests.swift`*
+
+---
+
 ## S-07: F キーで即時確定
 
 **状態**: `とうきょう` 組成中

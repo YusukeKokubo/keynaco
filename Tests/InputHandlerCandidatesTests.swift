@@ -287,4 +287,117 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
         XCTAssertTrue(client.inserted.isEmpty, "削除不可なので確定テキストは挿入されないはず")
     }
+
+    // MARK: - pendingRomaji 先読み予測
+    // 注: ひらがな末尾の単語を確定後（bi-gram なし → isSuccessorMode=false）に bi-gram を事後記録する
+    // ことで、確定時には Successor モードに入らず、その後の先読みをテストできる
+
+    func testPendingPreviewShowsCandidatesOnFirstChar() {
+        // bi-gram 学習済みで k を入力 → .show + isSuccessorMode = true
+        typeRomaji("te")
+        press(keyCode: 36)  // 「て」を確定（bi-gram なし → Successor モードなし）
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")  // 事後に記録
+        XCTAssertFalse(handler.isSuccessorMode)
+        let (_, action) = type(chars: "k", base: "k")
+        XCTAssertTrue(handler.isSuccessorMode, "先読み候補ありで isSuccessorMode になるはず")
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail("bi-gram 学習済みで k → .show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains("から"), "学習済みの「から」が候補に含まれるはず")
+    }
+
+    func testPendingPreviewNExcluded() {
+        // n は ん との曖昧さがあるため先読み対象外
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        let (_, action) = type(chars: "n", base: "n")
+        guard case .dismiss = action else {
+            XCTFail("n は先読み対象外なので .dismiss を返すはず: \(action)"); return
+        }
+        XCTAssertFalse(handler.isSuccessorMode, "n では isSuccessorMode に入らないはず")
+        XCTAssertEqual(handler.state.pendingRomaji, "n", "pendingRomaji = 'n' のまま残るはず")
+    }
+
+    func testPendingPreviewNoBigramDismisses() {
+        // bi-gram 未学習で k → .dismiss、pendingRomaji が残る
+        typeRomaji("te")
+        press(keyCode: 36)
+        let (_, action) = type(chars: "k", base: "k")
+        guard case .dismiss = action else {
+            XCTFail("bi-gram 未学習で k → .dismiss を返すはず: \(action)"); return
+        }
+        XCTAssertFalse(handler.isSuccessorMode, "候補ゼロなら isSuccessorMode に入らないはず")
+        XCTAssertEqual(handler.state.pendingRomaji, "k", "pendingRomaji = 'k' のまま残るはず")
+    }
+
+    func testPendingPreviewElectronSafetySetMarkedText() {
+        // 先読み後の markedText が candidates[0]（空でない）であること
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        type(chars: "k", base: "k")
+        XCTAssertFalse(client.markedText.isEmpty, "Electron 対策: markedText が空でないはず")
+    }
+
+    func testPendingPreviewSpaceConfirms() {
+        // 先読み → Space → confirmSuccessor が呼ばれ bigram が記録される
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        type(chars: "k", base: "k")
+        XCTAssertTrue(handler.isSuccessorMode)
+        press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "から")
+        XCTAssertFalse(handler.isSuccessorMode, "Space 確定後は isSuccessorMode が解除されるはず")
+        XCTAssertEqual(client.inserted.last, "から", "「から」が確定されるはず")
+    }
+
+    func testPendingPreviewEscapeCancels() {
+        // 先読み → Escape → isSuccessorMode = false
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        type(chars: "k", base: "k")
+        XCTAssertTrue(handler.isSuccessorMode)
+        press(keyCode: 53)
+        XCTAssertFalse(handler.isSuccessorMode, "Escape で isSuccessorMode が解除されるはず")
+    }
+
+    func testPendingPreviewCancelledByNonMatchingKeyContinuesRomaji() {
+        // 先読み → マッチしないキーでキャンセル → pendingRomaji が残り連続組成できる
+        // 例: k 先読み → u → k+u=く になる（t+u=つ と同様の原理）
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        type(chars: "k", base: "k")  // 先読み → isSuccessorMode = true、pendingRomaji = "k"
+        XCTAssertTrue(handler.isSuccessorMode)
+        let (_, action) = type(chars: "u", base: "u")  // Successor キャンセル → k+u=く
+        XCTAssertFalse(handler.isSuccessorMode, "u でキャンセル後は isSuccessorMode = false")
+        XCTAssertEqual(client.markedText, "く", "先読みキャンセル後に k+u=く になるはず（pendingRomaji が保持される）")
+    }
+
+    func testPendingPreviewConfirmedClearsPendingRomaji() {
+        // 先読み → Space 確定 → pendingRomaji がクリアされ次の入力が単独で組成される
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        type(chars: "k", base: "k")  // 先読み
+        press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "から")  // Space 確定
+        XCTAssertFalse(handler.isSuccessorMode)
+        type(chars: "t", base: "t")
+        type(chars: "u", base: "u")
+        XCTAssertEqual(client.markedText, "つ", "先読み確定後に t+u=つ として組成されるはず")
+    }
+
+    func testPendingPreviewEscapePreservesRomajiInMarkedText() {
+        // 先読み → Escape → pendingRomaji が markedText に表示されて続きを入力できる
+        typeRomaji("te")
+        press(keyCode: 36)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        type(chars: "k", base: "k")  // 先読み → pendingRomaji = "k"
+        press(keyCode: 53)  // Escape → applyMarkedText で "k" を表示
+        XCTAssertEqual(client.markedText, "k", "Escape 後に pendingRomaji が markedText に残るはず")
+        let (_, action) = type(chars: "a", base: "a")  // k+a=か
+        XCTAssertEqual(client.markedText, "か", "Escape 後に続けて a を入力すると k+a=か になるはず")
+    }
 }

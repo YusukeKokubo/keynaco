@@ -42,6 +42,7 @@ stateDiagram-v2
     セグメントモード --> 組成中 : Escape（組成に戻す）
 
     待機 --> Successorモード : 確定直後に tri-gram / bi-gram 候補 or 格助詞 fallback が存在
+    組成中 --> Successorモード : ローマ字1文字入力かつ composedHiragana 空で bi-gram 先読みヒット（pendingRomaji を破棄）
     Successorモード --> Successorモード : 候補確定後に次の tri-gram / bi-gram 候補が存在
     Successorモード --> 待機 : 候補確定後に次候補なし
     Successorモード --> 待機 : →（キャンセル）
@@ -108,6 +109,7 @@ stateDiagram-v2
 - **候補取得の優先順位**: `prev2Output`（2語前）× `lastCommittedOutput`（1語前）で trigram を引き、なければ `lastCommittedOutput` だけで bigram をフォールバック
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
 - **N-gram 遅延表示と読みフィルタ**: N-gram 候補がある場合、確定直後は候補ウィンドウを閉じ（`.dismiss`）`pendingSuccessorCandidates` に保存。1打目の入力で `romajiToInitialKana` によるかな先頭一致フィルタを行い、一致候補のみ表示する。一致なしはモード解除して通常入力に流す（格助詞のみの場合は従来通り即時表示）
+- **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき `buildPendingCandidateList` が bi-gram/trigram/skip-bigram を先読みし、候補があれば `isSuccessorMode = true` へ移行。`n` は `ん` との曖昧さがあるため除外。候補ゼロなら `pendingRomaji` はそのまま通常組成を続ける
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
 - **ASCII モードの F キー**: F6–F10 は ASCII モード中では無効（組成が空のため）

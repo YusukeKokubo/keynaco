@@ -54,6 +54,7 @@ extension InputHandler {
 
     mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
         isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+        state.pendingRomaji = ""
         if let p1 = lastCommittedOutput {
             db.recordBigram(prev: p1, input: particle, output: particle)
             if let p2 = prev2Output {
@@ -89,13 +90,14 @@ extension InputHandler {
             return (true, .selectPrev)
         case KeyCode.escape, KeyCode.backspace, KeyCode.rightArrow:
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
-            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
+            applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         default:
-            // 格助詞 fast-path: 名詞末尾の確定後は候補に格助詞 fallback が必ず含まれる。
-            // このときはローマ字 1 打で「が/を/に…」に絞り込める既存挙動を維持する。
+            // 格助詞 fast-path: N-gram 保留なし かつ 名詞末尾のときのみ実行。
+            // pendingSuccessorCandidates がある場合は N-gram フィルタを優先し fast-path をスキップ。
             let char = (baseCharacters ?? characters ?? "").lowercased()
-            if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
+            if pendingSuccessorCandidates.isEmpty,
+               char.count == 1, let c = char.first, c.isLetter, c.isASCII,
                let last = lastCommittedOutput, isNounLike(last) {
                 let matched = InputHandler.particleRomajiMap[char] ?? []
                 if !matched.isEmpty {

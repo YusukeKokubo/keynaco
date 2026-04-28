@@ -227,8 +227,24 @@ extension InputHandler {
         }
         let needsRefresh = state.addRomaji(base)
         let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
-        let candidateAction: CandidateAction = (needsRefresh || hasBigramContext) ? buildCandidateList(autoShow: true) : .dismiss
-        applyMarkedText(candidateText: nil, client: client)
+        let pending = state.pendingRomaji
+        let hasPendingPreview = lastCommittedOutput != nil
+            && state.composedHiragana.isEmpty
+            && pending.count == 1
+            && pending != "n"
+            && InputHandler.romajiToInitialKana[pending] != nil
+
+        let candidateAction: CandidateAction
+        if needsRefresh || hasBigramContext {
+            candidateAction = buildCandidateList(autoShow: true)
+        } else if hasPendingPreview {
+            candidateAction = buildPendingCandidateList(pendingChar: pending, client: client)
+        } else {
+            candidateAction = .dismiss
+        }
+        if !isSuccessorMode {
+            applyMarkedText(candidateText: nil, client: client)
+        }
         return (true, candidateAction)
     }
 
@@ -285,5 +301,33 @@ extension InputHandler {
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
         return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow)
+    }
+
+    /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
+    /// 候補が存在すれば pendingRomaji を破棄し isSuccessorMode = true を立てて返す。
+    mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
+        guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
+              let prev = lastCommittedOutput else { return .dismiss }
+        var candidates: [String] = []
+        for kana in kanas {
+            let fromTrigram: [String] = prev2Output.map {
+                db.fetchTrigram(prev2: $0, prev1: prev, reading: kana)
+            } ?? []
+            let fromBigram = db.fetchBigram(prev: prev, reading: kana)
+            let fromSkip: [String] = mostRecentContentWord().map {
+                db.fetchSkipBigram(prev: $0, reading: kana)
+            } ?? []
+            for s in fromTrigram where !candidates.contains(s) { candidates.append(s) }
+            for s in fromBigram where !candidates.contains(s) { candidates.append(s) }
+            for s in fromSkip where !candidates.contains(s) { candidates.append(s) }
+        }
+        guard !candidates.isEmpty else { return .dismiss }
+        isSuccessorMode = true
+        successorFirstChar = nil
+        pendingSuccessorCandidates = []
+        client.setMarkedText(candidates[0], selectionRange: NSRange(location: candidates[0].count, length: 0))
+        let fixedCandidates = kanas
+        let allCandidates = fixedCandidates + candidates.filter { !fixedCandidates.contains($0) }
+        return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count)
     }
 }
