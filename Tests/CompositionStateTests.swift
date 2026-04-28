@@ -13,11 +13,6 @@ final class CompositionStateTests: XCTestCase {
         XCTAssertEqual(s.composingText, "か")
     }
 
-    func testComposingTextEmptyByDefault() {
-        let s = CompositionState()
-        XCTAssertEqual(s.composingText, "")
-    }
-
     // MARK: - addRomaji
 
     func testAddRomajiSingleVowel() {

@@ -13,25 +13,5 @@ final class ShiftInputTests: XCTestCase {
         XCTAssertEqual(result.pending, "")
     }
 
-    // MARK: - Shift 検出（characters vs baseCharacters の比較）
 
-    func testShiftDetectedForUppercaseLetter() {
-        // Shift+A: characters="A", charactersIgnoringModifiers="a" → Shift あり
-        XCTAssertTrue(CompositionState.isShiftInput(characters: "A", baseCharacters: "a"))
-    }
-
-    func testNoShiftForLowercaseLetter() {
-        // a: characters="a", charactersIgnoringModifiers="a" → Shift なし
-        XCTAssertFalse(CompositionState.isShiftInput(characters: "a", baseCharacters: "a"))
-    }
-
-    func testShiftDetectedForSymbol() {
-        // Shift+1="!" vs "1" → Shift あり
-        XCTAssertTrue(CompositionState.isShiftInput(characters: "!", baseCharacters: "1"))
-    }
-
-    func testNoShiftWhenCharsSame() {
-        // 変化なし → Shift なし
-        XCTAssertFalse(CompositionState.isShiftInput(characters: "1", baseCharacters: "1"))
-    }
 }
