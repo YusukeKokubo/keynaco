@@ -120,6 +120,8 @@ extension InputHandler {
         }
     }
 
+    // handleNormalInput は入力種別ごとのプライベートハンドラへ振り分けるディスパッチテーブル。
+    // 各ハンドラは nil（自分の担当外）または (consumed, action) を返す。
     mutating func handleNormalInput(
         keyCode: UInt16,
         characters: String?,
@@ -132,11 +134,8 @@ extension InputHandler {
         if keyCode == KeyCode.space {
             if !state.composedHiragana.isEmpty {
                 let action = enterSegmentMode()
-                if state.isSegmentMode {
-                    applySegmentMarkedText(client: client)
-                } else {
-                    applyMarkedText(candidateText: nil, client: client)
-                }
+                if state.isSegmentMode { applySegmentMarkedText(client: client) }
+                else { applyMarkedText(candidateText: nil, client: client) }
                 return (true, action)
             }
             return (false, .none)
@@ -147,105 +146,18 @@ extension InputHandler {
         guard let chars = characters, !chars.isEmpty,
               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 }) else { return (false, .none) }
         let base = baseCharacters ?? chars
-
-        let punctuationMap: [String: String] = [",": "、", ".": "。"]
-        if let mappedPunct = punctuationMap[base], !modifiers.contains(.shift) {
-            if state.composingText.isEmpty {
-                client.insertText(mappedPunct)
-                return (true, .dismiss)
-            } else {
-                if !state.pendingRomaji.isEmpty {
-                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                    state.pendingRomaji = ""
-                }
-                state.composedHiragana += mappedPunct
-                let action = buildCandidateList()
-                applyMarkedText(candidateText: nil, client: client)
-                return (true, action)
-            }
-        }
-
-        if let options = InputHandler.bracketOptions[chars] {
-            if state.composingText.isEmpty {
-                bracketCandidates = options
-                client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
-                return (true, .show(candidates: options, historyEnd: 0, initialRow: 0))
-            } else {
-                if !state.pendingRomaji.isEmpty {
-                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                    state.pendingRomaji = ""
-                }
-                state.composedHiragana += options[0]
-                let action = buildCandidateList()
-                applyMarkedText(candidateText: nil, client: client)
-                return (true, action)
-            }
-        }
-
         let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
 
-        if modifiers.contains(.shift) && !isNonAscii {
-            if wasExplicitlySelected {
-                _ = doConfirmSelection(candidate: candidate, client: client)
-            } else if !state.pendingRomaji.isEmpty {
-                state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                state.pendingRomaji = ""
-            }
-            state.composedHiragana += chars
-            let action = buildCandidateList(autoShow: true)
-            applyMarkedText(candidateText: nil, client: client)
-            return (true, action)
-        }
-
-        if isNonAscii {
-            if state.composingText.isEmpty {
-                client.insertText(chars)
-            } else {
-                if !state.pendingRomaji.isEmpty {
-                    state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-                    state.pendingRomaji = ""
-                }
-                state.composedHiragana += chars
-                applyMarkedText(candidateText: nil, client: client)
-            }
-            return (true, .dismiss)
-        }
-
-        if !state.composedHiragana.isEmpty && state.pendingRomaji.isEmpty
-            && state.composedHiragana.allSatisfy({ $0.isASCII }) {
-            if wasExplicitlySelected {
-                _ = doConfirmSelection(candidate: candidate, client: client)
-            }
-            state.composedHiragana += chars
-            let action = buildCandidateList(autoShow: true)
-            applyMarkedText(candidateText: nil, client: client)
-            return (true, action)
-        }
-
-        if wasExplicitlySelected {
-            _ = doConfirmSelection(candidate: candidate, client: client)
-        }
-        let needsRefresh = state.addRomaji(base)
-        let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
-        let pending = state.pendingRomaji
-        let hasPendingPreview = lastCommittedOutput != nil
-            && state.composedHiragana.isEmpty
-            && pending.count == 1
-            && pending != "n"
-            && InputHandler.romajiToInitialKana[pending] != nil
-
-        let candidateAction: CandidateAction
-        if needsRefresh || hasBigramContext {
-            candidateAction = buildCandidateList(autoShow: true)
-        } else if hasPendingPreview {
-            candidateAction = buildPendingCandidateList(pendingChar: pending, client: client)
-        } else {
-            candidateAction = .dismiss
-        }
-        if !isSuccessorMode {
-            applyMarkedText(candidateText: nil, client: client)
-        }
-        return (true, candidateAction)
+        if let r = handlePunctuation(base: base, modifiers: modifiers, client: client) { return r }
+        if let r = handleBracketChar(chars: chars, client: client) { return r }
+        if let r = handleShiftChar(chars: chars, isNonAscii: isNonAscii, modifiers: modifiers,
+                                    wasExplicitlySelected: wasExplicitlySelected,
+                                    candidate: candidate, client: client) { return r }
+        if let r = handleNonAsciiChar(chars: chars, isNonAscii: isNonAscii, client: client) { return r }
+        if let r = handleAsciiWord(chars: chars, wasExplicitlySelected: wasExplicitlySelected,
+                                    candidate: candidate, client: client) { return r }
+        return handleRomaji(base: base, wasExplicitlySelected: wasExplicitlySelected,
+                             candidate: candidate, client: client)
     }
 
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
@@ -329,5 +241,109 @@ extension InputHandler {
         let fixedCandidates = kanas
         let allCandidates = fixedCandidates + candidates.filter { !fixedCandidates.contains($0) }
         return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count)
+    }
+
+    // MARK: - Private input handlers
+
+    private mutating func flushPendingRomaji() {
+        guard !state.pendingRomaji.isEmpty else { return }
+        state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
+        state.pendingRomaji = ""
+    }
+
+    private mutating func handlePunctuation(
+        base: String, modifiers: NSEvent.ModifierFlags, client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        let punctuationMap: [String: String] = [",": "、", ".": "。"]
+        guard let mappedPunct = punctuationMap[base], !modifiers.contains(.shift) else { return nil }
+        if state.composingText.isEmpty {
+            client.insertText(mappedPunct)
+            return (true, .dismiss)
+        }
+        flushPendingRomaji()
+        state.composedHiragana += mappedPunct
+        let action = buildCandidateList()
+        applyMarkedText(candidateText: nil, client: client)
+        return (true, action)
+    }
+
+    private mutating func handleBracketChar(
+        chars: String, client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        guard let options = InputHandler.bracketOptions[chars] else { return nil }
+        if state.composingText.isEmpty {
+            bracketCandidates = options
+            client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
+            return (true, .show(candidates: options, historyEnd: 0, initialRow: 0))
+        }
+        flushPendingRomaji()
+        state.composedHiragana += options[0]
+        let action = buildCandidateList()
+        applyMarkedText(candidateText: nil, client: client)
+        return (true, action)
+    }
+
+    private mutating func handleShiftChar(
+        chars: String, isNonAscii: Bool, modifiers: NSEvent.ModifierFlags,
+        wasExplicitlySelected: Bool, candidate: CandidateContext, client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        guard modifiers.contains(.shift) && !isNonAscii else { return nil }
+        if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
+        else { flushPendingRomaji() }
+        state.composedHiragana += chars
+        let action = buildCandidateList(autoShow: true)
+        applyMarkedText(candidateText: nil, client: client)
+        return (true, action)
+    }
+
+    private mutating func handleNonAsciiChar(
+        chars: String, isNonAscii: Bool, client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        guard isNonAscii else { return nil }
+        if state.composingText.isEmpty {
+            client.insertText(chars)
+        } else {
+            flushPendingRomaji()
+            state.composedHiragana += chars
+            applyMarkedText(candidateText: nil, client: client)
+        }
+        return (true, .dismiss)
+    }
+
+    private mutating func handleAsciiWord(
+        chars: String, wasExplicitlySelected: Bool, candidate: CandidateContext, client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        guard !state.composedHiragana.isEmpty && state.pendingRomaji.isEmpty
+              && state.composedHiragana.allSatisfy({ $0.isASCII }) else { return nil }
+        if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
+        state.composedHiragana += chars
+        let action = buildCandidateList(autoShow: true)
+        applyMarkedText(candidateText: nil, client: client)
+        return (true, action)
+    }
+
+    private mutating func handleRomaji(
+        base: String, wasExplicitlySelected: Bool, candidate: CandidateContext, client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
+        let needsRefresh = state.addRomaji(base)
+        let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
+        let pending = state.pendingRomaji
+        let hasPendingPreview = lastCommittedOutput != nil
+            && state.composedHiragana.isEmpty
+            && pending.count == 1
+            && pending != "n"
+            && InputHandler.romajiToInitialKana[pending] != nil
+
+        let candidateAction: CandidateAction
+        if needsRefresh || hasBigramContext {
+            candidateAction = buildCandidateList(autoShow: true)
+        } else if hasPendingPreview {
+            candidateAction = buildPendingCandidateList(pendingChar: pending, client: client)
+        } else {
+            candidateAction = .dismiss
+        }
+        if !isSuccessorMode { applyMarkedText(candidateText: nil, client: client) }
+        return (true, candidateAction)
     }
 }

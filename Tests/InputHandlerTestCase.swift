@@ -59,4 +59,27 @@ class InputHandlerTestCase: XCTestCase {
     func typeRomaji(_ s: String) {
         for c in s { type(chars: String(c), base: String(c)) }
     }
+
+    // MARK: - アサーションヘルパー
+
+    /// action が .show なら候補リストを返す。そうでなければテストを失敗させて nil を返す。
+    @discardableResult
+    func candidates(
+        in action: CandidateAction, _ msg: String = "",
+        file: StaticString = #file, line: UInt = #line
+    ) -> [String]? {
+        guard case .show(let candidates, _, _) = action else {
+            XCTFail("Expected .show but got \(action). \(msg)", file: file, line: line)
+            return nil
+        }
+        return candidates
+    }
+
+    func assertDismiss(
+        _ action: CandidateAction, _ msg: String = "",
+        file: StaticString = #file, line: UInt = #line
+    ) {
+        if case .dismiss = action { return }
+        XCTFail("Expected .dismiss but got \(action). \(msg)", file: file, line: line)
+    }
 }
