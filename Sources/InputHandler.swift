@@ -56,6 +56,7 @@ struct InputHandler {
 
     static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
     static let sentenceTerminators: Set<String> = ["。", "！", "？", "\n"]
+    static let successorImmediateThreshold = 5
 
     var state = CompositionState()
     var ignoreNextModeSwitch = false

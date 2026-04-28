@@ -413,4 +413,52 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
             XCTFail("行った が候補に含まれていない: \(candidates)")
         }
     }
+
+    // MARK: - 即時表示（高信頼チェック）
+
+    func testSuccessorImmediateThresholdNotMet() {
+        // count = 4（閾値 5 未満）→ 確定後 .dismiss（遅延表示）
+        for _ in 0..<4 {
+            handler.db.recordBigram(prev: "東京", input: "について", output: "について")
+        }
+        typeRomaji("tokyo")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("count < threshold → .dismiss を返すはず: \(result.candidateAction)"); return
+        }
+        XCTAssertFalse(handler.pendingSuccessorCandidates.isEmpty, "保留候補が保存されているはず")
+    }
+
+    func testSuccessorImmediateThresholdMet() {
+        // count = 5（閾値以上）→ 確定後すぐ .show（即時表示）
+        for _ in 0..<5 {
+            handler.db.recordBigram(prev: "東京", input: "について", output: "について")
+        }
+        typeRomaji("tokyo")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+        guard case .show(let candidates, _, _) = result.candidateAction else {
+            XCTFail("count >= threshold → .show を返すはず: \(result.candidateAction)"); return
+        }
+        XCTAssertTrue(candidates.contains("について"), "高信頼候補「について」が含まれるはず")
+        XCTAssertTrue(handler.pendingSuccessorCandidates.isEmpty, "即時表示時は保留候補が空のはず")
+    }
+
+    func testSuccessorImmediateThresholdOutdated() {
+        // 91日前にcount=5分記録 → 直近90日外なので .dismiss（遅延表示）
+        let base: Int64 = 1_700_000_000
+        let ninetyOneDaysAgo = base - 91 * 86400
+        handler.db.clock = { ninetyOneDaysAgo }
+        for _ in 0..<5 {
+            handler.db.recordBigram(prev: "東京", input: "について", output: "について")
+        }
+        handler.db.clock = { base }
+        typeRomaji("tokyo")
+        let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("90日超のレコードは閾値対象外 → .dismiss を返すはず: \(result.candidateAction)"); return
+        }
+    }
 }

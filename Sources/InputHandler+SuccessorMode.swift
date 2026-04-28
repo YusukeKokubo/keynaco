@@ -39,9 +39,16 @@ extension InputHandler {
             pendingSuccessorCandidates = []
             return .show(candidates: candidates, historyEnd: 0, initialRow: 0)
         } else {
-            // N-gram 候補あり → 保存して1打目まで待つ（変換候補ウィンドウは閉じる）
-            pendingSuccessorCandidates = candidates
-            return .dismiss
+            // 高信頼チェック：直近90日以内に閾値回数以上使ったペアは即時表示
+            let topCount = db.fetchBigramTopCount(prev: last)
+            if topCount >= InputHandler.successorImmediateThreshold {
+                pendingSuccessorCandidates = []
+                return .show(candidates: candidates, historyEnd: 0, initialRow: 0)
+            } else {
+                // 通常 → 保存して1打目まで待つ
+                pendingSuccessorCandidates = candidates
+                return .dismiss
+            }
         }
     }
 

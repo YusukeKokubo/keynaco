@@ -281,6 +281,19 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    /// prev に続く bi-gram の直近 90 日以内の最大 count を返す。即時表示の閾値判定用。
+    func fetchBigramTopCount(prev: String) -> Int {
+        let cutoff = nowEpoch() - 90 * 86400
+        var stmt: OpaquePointer?
+        let sql = "SELECT MAX(count) FROM bigram WHERE prev = ? AND used_at > ?"
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        bindText(stmt, 1, prev)
+        sqlite3_bind_int64(stmt, 2, cutoff)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int(stmt, 0))
+    }
+
     /// list 内の候補を bi-gram 頻度順で返す（未登録分は除外）。
     func fetchBigramInList(prev: String, list: [String]) -> [String] {
         guard !list.isEmpty else { return [] }
