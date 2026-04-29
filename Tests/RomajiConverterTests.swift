@@ -106,6 +106,30 @@ final class RomajiConverterTests: XCTestCase {
         XCTAssertEqual(RomajiConverter.forceFinalize("sh"), "sh")
     }
 
+    // MARK: - 外来音
+
+    func testForeignSounds() {
+        // ゔ行
+        assertConvert("va", converted: "ゔぁ", pending: "")
+        assertConvert("vi", converted: "ゔぃ", pending: "")
+        assertConvert("vu", converted: "ゔ",   pending: "")
+        assertConvert("ve", converted: "ゔぇ", pending: "")
+        assertConvert("vo", converted: "ゔぉ", pending: "")
+        // でぃ / でゅ
+        assertConvert("dhi", converted: "でぃ", pending: "")
+        assertConvert("dhu", converted: "でゅ", pending: "")
+        // てゅ
+        assertConvert("thu", converted: "てゅ", pending: "")
+        // つぁ行
+        assertConvert("tsa", converted: "つぁ", pending: "")
+        assertConvert("tse", converted: "つぇ", pending: "")
+        assertConvert("tso", converted: "つぉ", pending: "")
+        // ウ行拡張
+        assertConvert("wi",  converted: "うぃ", pending: "")
+        assertConvert("we",  converted: "うぇ", pending: "")
+        assertConvert("who", converted: "うぉ", pending: "")
+    }
+
     // MARK: - エッジケース
 
     func testSpacePassesThrough() {
