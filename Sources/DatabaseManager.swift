@@ -148,7 +148,8 @@ final class DatabaseManager: @unchecked Sendable {
         return queryStrings("""
         SELECT output FROM history
         WHERE input LIKE ? AND input != ?
-        ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
+        GROUP BY output
+        ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
         LIMIT 10
         """) {
             self.bindText($0, 1, reading + "%"); self.bindText($0, 2, reading)

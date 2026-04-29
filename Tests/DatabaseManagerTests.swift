@@ -59,6 +59,51 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertLessThan(idxAi, idxSou, "使用頻度の高い候補が先頭")
     }
 
+    // MARK: - fetchHistoryPrefix / recordPrefixes
+
+    func testFetchHistoryPrefixReturnsPartialMatch() {
+        db.record(input: "かいぎ", output: "会議")
+        let results = db.fetchHistoryPrefix(reading: "か")
+        XCTAssertTrue(results.contains("会議"), "前方一致する候補を返す")
+    }
+
+    func testFetchHistoryPrefixExcludesExactMatch() {
+        db.record(input: "かい", output: "会")
+        db.record(input: "かいぎ", output: "会議")
+        let exact = db.fetchHistoryPrefix(reading: "かい")
+        XCTAssertFalse(exact.contains("会"), "完全一致は除外される")
+        XCTAssertTrue(exact.contains("会議"))
+    }
+
+    func testFetchHistoryPrefixNoDuplicatesWhenMultiplePrefixRowsExist() {
+        // recordPrefixes は "えくすぽーと" → "えく"/"えくす"/"えくすぽ"/"えくすぽー"/"えくすぽーと" を全て記録する。
+        // fetchHistoryPrefix("え") はこれら全行が LIKE "え%" にマッチするが、
+        // GROUP BY output により "エクスポート" は1件だけ返される。
+        db.recordPrefixes(reading: "えくすぽーと", output: "エクスポート")
+        let results = db.fetchHistoryPrefix(reading: "え")
+        let count = results.filter { $0 == "エクスポート" }.count
+        XCTAssertEqual(count, 1, "複数のプレフィックス行があっても重複なく1件")
+    }
+
+    func testFetchHistoryPrefixDeduplicatesMultipleOutputs() {
+        db.recordPrefixes(reading: "えくすぽーと", output: "エクスポート")
+        db.recordPrefixes(reading: "えーす", output: "エース")
+        let results = db.fetchHistoryPrefix(reading: "え")
+        let exportCount = results.filter { $0 == "エクスポート" }.count
+        let aceCount    = results.filter { $0 == "エース" }.count
+        XCTAssertEqual(exportCount, 1)
+        XCTAssertEqual(aceCount, 1)
+    }
+
+    func testRecordPrefixesStoresPrefixReading() {
+        db.recordPrefixes(reading: "かいぎ", output: "会議")
+        // prefix "か" / "かい" でも前方一致して返るか
+        XCTAssertTrue(db.fetchHistoryPrefix(reading: "か").contains("会議"))
+        XCTAssertTrue(db.fetchHistoryPrefix(reading: "かい").contains("会議"))
+        // フル読みは exact で返る
+        XCTAssertTrue(db.fetchHistoryExact(reading: "かいぎ").contains("会議"))
+    }
+
     // MARK: - fetchBigramTop
 
     func testFetchBigramTopEmptyDBReturnsEmpty() {
