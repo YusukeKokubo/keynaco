@@ -12,13 +12,28 @@ extension InputHandler {
             state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
             state.pendingRomaji = ""
         }
-        let rawSegments = azooKeyConverter.segmentize(state.composedHiragana)
+        let fullReading = state.composedHiragana
 
-        // 1セグメントのみなら従来の候補ウィンドウにフォールバック
+        if let stored = db.fetchBoundaryPref(fullReading: fullReading), stored.count >= 2 {
+            var segments: [Segment] = []
+            var prevText: String? = lastCommittedOutput
+            for reading in stored {
+                let seg = buildSegmentCandidates(
+                    reading: reading,
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading),
+                    prev: prevText
+                )
+                segments.append(seg)
+                prevText = seg.selectedText
+            }
+            state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
+            return makeCandidateActionForFocusedSegment()
+        }
+
+        let rawSegments = azooKeyConverter.segmentize(fullReading)
         guard rawSegments.count >= 2 else {
             return buildCandidateList()
         }
-
         var segments: [Segment] = []
         var prevText: String? = lastCommittedOutput
         for raw in rawSegments {
@@ -242,6 +257,9 @@ extension InputHandler {
                 db.recordBigram(prev: prev, input: next.reading, output: next.selectedText)
                 db.recordBigram(prev: prev, input: next.reading, output: next.selectedText)
             }
+        }
+        if segs.contains(where: { $0.isManuallyAdjusted }) {
+            db.saveBoundaryPref(fullReading: fullReading, segments: segs.map { $0.reading })
         }
         commitText(text: confirmed, client: client)
         return suggestSuccessors()

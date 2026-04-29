@@ -93,6 +93,11 @@ final class DatabaseManager: @unchecked Sendable {
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_user_dict ON user_dict(input);
+        CREATE TABLE IF NOT EXISTS boundary_pref (
+            full_reading  TEXT NOT NULL PRIMARY KEY,
+            boundaries    TEXT NOT NULL,
+            used_at       INTEGER NOT NULL
+        );
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }
@@ -532,6 +537,32 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    // MARK: - 境界学習
+
+    func saveBoundaryPref(fullReading: String, segments: [String]) {
+        let boundaries = segments.joined(separator: ",")
+        let t = nowEpoch()
+        execute("""
+        INSERT INTO boundary_pref (full_reading, boundaries, used_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(full_reading) DO UPDATE SET
+            boundaries = excluded.boundaries,
+            used_at    = excluded.used_at;
+        """) {
+            self.bindText($0, 1, fullReading)
+            self.bindText($0, 2, boundaries)
+            sqlite3_bind_int64($0, 3, t)
+        }
+    }
+
+    func fetchBoundaryPref(fullReading: String) -> [String]? {
+        let rows = queryStrings(
+            "SELECT boundaries FROM boundary_pref WHERE full_reading = ?",
+            bind: { self.bindText($0, 1, fullReading) }
+        )
+        return rows.first.map { $0.components(separatedBy: ",") }
+    }
+
     // MARK: - GC
 
     func performGCIfNeeded() {
@@ -548,6 +579,7 @@ final class DatabaseManager: @unchecked Sendable {
                 sqlite3_bind_int64(stmt, 1, cutoff)
             }
         }
+        execute("DELETE FROM boundary_pref WHERE used_at < ?") { sqlite3_bind_int64($0, 1, cutoff) }
         sqlite3_exec(db, "VACUUM;", nil, nil, nil)
         defaults.set(now, forKey: key)
         NSLog("keynaco: DB GC 完了")

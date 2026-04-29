@@ -4,6 +4,17 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 
 ---
 
+## 2026-04-29 — セグメント境界の学習
+
+### 追加
+- **セグメント境界学習（B-1）** — セグメントモードで Shift+矢印による手動境界調整を確定すると、その境界を `boundary_pref` テーブルに保存。次回同じ読みで Space を押すと AzooKey の初期分割ではなく保存済み境界で再現する。上書きポリシーは最後に確定した境界を優先（`ON CONFLICT DO UPDATE`）
+- `DatabaseManager` に `saveBoundaryPref` / `fetchBoundaryPref` を追加
+- `performGCIfNeeded()` の対象に `boundary_pref` を追加（180日未使用で削除）
+
+> 関連: [PLAN260429e](plans/PLAN260429e.md)
+
+---
+
 ## 2026-04-29 — ユーザー辞書・外来音ローマ字拡充・候補品質改善・DB 自動 GC
 
 ### 追加
