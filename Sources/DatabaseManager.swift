@@ -463,4 +463,25 @@ final class DatabaseManager: @unchecked Sendable {
             record(input: String(chars.prefix(len)), output: output)
         }
     }
+
+    // MARK: - GC
+
+    func performGCIfNeeded() {
+        let key = "lastGCDate"
+        let defaults = UserDefaults.standard
+        let now = nowEpoch()
+        if let lastEpoch = defaults.object(forKey: key) as? Int64,
+           now - lastEpoch < 7 * 86400 { return }
+
+        let cutoff = now - 180 * 86400
+        let tables = ["history", "bigram", "trigram", "skip_bigram"]
+        for table in tables {
+            execute("DELETE FROM \(table) WHERE count = 1 AND used_at < ?") { stmt in
+                sqlite3_bind_int64(stmt, 1, cutoff)
+            }
+        }
+        sqlite3_exec(db, "VACUUM;", nil, nil, nil)
+        defaults.set(now, forKey: key)
+        NSLog("keynaco: DB GC 完了")
+    }
 }

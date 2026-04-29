@@ -22,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("keynaco: IMKServer started connection=\(connectionName) bundle=\(bundleID)")
         setupMainMenu()
         setupStatusItem()
+        Task.detached(priority: .background) {
+            DatabaseManager.shared.performGCIfNeeded()
+        }
     }
 
     // アクセサリアプリはデフォルトでメインメニューを持たず Cmd+V/A 等が無視される。

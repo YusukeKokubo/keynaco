@@ -12,6 +12,7 @@ final class DatabaseManagerTests: XCTestCase {
 
     override func tearDown() {
         db = nil
+        UserDefaults.standard.removeObject(forKey: "lastGCDate")
         super.tearDown()
     }
 
@@ -241,5 +242,46 @@ final class DatabaseManagerTests: XCTestCase {
         let idxOld = results.firstIndex(of: "高頻度古い")!
         let idxNew = results.firstIndex(of: "低頻度新しい")!
         XCTAssertLessThan(idxNew, idxOld, "count=4 / score=4.0 が count=10 / score≈3.33 より上位")
+    }
+
+    // MARK: - GC
+
+    func testGCDeletesOldSingleCountEntries() {
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.record(input: "あ", output: "古い")
+        db.clock = { base + 181 * 86400 }
+        db.performGCIfNeeded()
+        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").isEmpty, "count=1 かつ 180日超は削除")
+    }
+
+    func testGCKeepsHighCountEntries() {
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.record(input: "あ", output: "高頻度")
+        db.record(input: "あ", output: "高頻度")  // count=2
+        db.clock = { base + 181 * 86400 }
+        db.performGCIfNeeded()
+        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("高頻度"), "count=2 は残る")
+    }
+
+    func testGCKeepsRecentSingleCountEntries() {
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.record(input: "あ", output: "新しい")  // count=1 だが直近
+        db.clock = { base + 90 * 86400 }
+        db.performGCIfNeeded()
+        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("新しい"), "count=1 でも 90日前は残る")
+    }
+
+    func testGCSkipsIfRunRecently() {
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.record(input: "あ", output: "古い")
+        // 3日前に GC 済みとしてマーク
+        UserDefaults.standard.set(base - 3 * 86400, forKey: "lastGCDate")
+        db.clock = { base }
+        db.performGCIfNeeded()
+        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("古い"), "7日以内は GC を実行しない")
     }
 }
