@@ -63,6 +63,7 @@
 2. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWord` × 現読みで skip-bigram を引き、trigram・bigram にない候補を末尾に追加）
 3. 履歴 exact → 履歴 prefix
 4. AzooKey 辞書候補
+5. **日時候補**（読みが `きょう` / `きのう` / `あした` / `あす` / `いま` / `ことし` / `きょねん` / `らいねん` / `こんげつ` / `せんげつ` / `らいげつ` のとき、動的に生成した日付・時刻・年の文字列を末尾に追加。`InputHandler.generateDateTimeCandidates(for:)` が生成）
 
 ---
 
@@ -73,6 +74,14 @@ Space 押下時に AzooKey の変換結果をセグメント（文節）分割�
 Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 
 *Tests: `Tests/InputHandlerSegmentTests.swift`*
+
+### boundary_pref（境界学習）
+手動調整した境界を保存する `boundary_pref` テーブルのエントリ。  
+`enterSegmentMode()` は `azooKeyConverter.segmentize()` を呼ぶ前に `fetchBoundaryPref` を確認し、
+ヒットすれば保存済み境界を優先して使う。ヒットしなければ AzooKey の初期分割にフォールバック。  
+**保存条件**: `doConfirmSegments()` 時に `isManuallyAdjusted` なセグメントが 1 つ以上ある場合のみ記録する（デフォルト境界のまま確定した場合は記録しない）。  
+**上書きポリシー**: 同じ `full_reading` に対して再調整・確定すると前回エントリが上書きされる（`ON CONFLICT DO UPDATE`）。  
+**GC**: 180日未使用のエントリを `performGCIfNeeded()` で削除する（`count` カラムなし、`used_at` のみで判定）。
 
 ---
 
@@ -124,7 +133,7 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。
 
 ### DatabaseManager
-変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）の **4 テーブル**を持つ SQLite ストア。  
+変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・境界学習（`boundary_pref`）の **5 テーブル**を持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。  
 **`clock` var** でエポック秒を注入可能（テスト用）。全 record/fetch で `nowEpoch()` を使うことで時系列が一貫する。
 

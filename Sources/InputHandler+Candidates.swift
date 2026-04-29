@@ -188,8 +188,9 @@ extension InputHandler {
         candidates.insert(contentsOf: uniquePredictions, at: 0)
         let predictCount = uniquePredictions.count
 
+        let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
         if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0
-            && userDictRaw.isEmpty { return .dismiss }
+            && userDictRaw.isEmpty && dateTimeCandidates.isEmpty { return .dismiss }
 
         let hiragana = state.composedHiragana
         let katakana = KanaUtils.hiraganaToKatakana(hiragana)
@@ -224,6 +225,7 @@ extension InputHandler {
         let predictionEnd = fixedEnd + predictCount
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
+        candidates.append(contentsOf: dateTimeCandidates.filter { !candidates.contains($0) })
         guard !candidates.isEmpty else { return .dismiss }
         return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
                      predictionEnd: predictionEnd, fixedEnd: fixedEnd)

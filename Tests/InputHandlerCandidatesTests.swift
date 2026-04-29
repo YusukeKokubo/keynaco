@@ -520,4 +520,16 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTAssertFalse(candidates.contains("Acme Corp"), "前方一致ではユーザー辞書エントリが現れないはず")
         }
     }
+
+    // MARK: - 日時候補
+
+    func testKyouIncludesDateCandidates() {
+        typeRomaji("kyou")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains { $0.contains("-") }, "ISO日付が候補に含まれるはず: \(candidates)")
+        XCTAssertTrue(candidates.contains { $0.hasSuffix("日") }, "日本語日付が候補に含まれるはず")
+    }
 }
