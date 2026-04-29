@@ -128,5 +128,6 @@ stateDiagram-v2
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
 - **ASCII モードの F キー**: F6–F10 は ASCII モード中では無効（組成が空のため）
+- **セグメント境界学習**: Shift+矢印で手動調整した境界は、確定時に `boundary_pref` テーブルへ保存される。次回同じ読みで Space を押すと AzooKey の初期分割より保存済み境界が優先される
 - **セグメントモードのテスト**: `Tests/InputHandlerSegmentTests.swift`
 - **ASCII モードのテスト**: `Tests/InputHandlerAsciiTests.swift`

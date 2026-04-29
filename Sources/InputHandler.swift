@@ -219,9 +219,10 @@ struct InputHandler {
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         if candidate.isVisible, let selected = candidate.selectedText {
-            db.recordPrefixes(reading: normalizedInput, output: selected)
+            let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
+            if !isDateTime { db.recordPrefixes(reading: normalizedInput, output: selected) }
             azooKeyConverter.commit(reading: inputKey, text: selected)
-            commitText(text: selected, client: client)
+            commitText(text: selected, skipHistory: isDateTime, client: client)
         } else {
             db.recordPrefixes(reading: normalizedInput, output: inputKey)
             commitText(text: inputKey, client: client)
@@ -230,8 +231,8 @@ struct InputHandler {
 
     // MARK: - 共通ヘルパー（extension からも参照される）
 
-    mutating func commitText(text: String, client: TextInputClient) {
-        if !state.composingText.isEmpty {
+    mutating func commitText(text: String, skipHistory: Bool = false, client: TextInputClient) {
+        if !state.composingText.isEmpty && !skipHistory {
             if let p1 = lastCommittedOutput {
                 db.recordBigram(prev: p1, input: state.finalizedText, output: text)
                 if let p2 = prev2Output {

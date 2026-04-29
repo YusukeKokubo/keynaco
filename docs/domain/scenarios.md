@@ -216,6 +216,32 @@ skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加され
 
 ---
 
+## S-11: 境界学習の保存と再現
+
+**前提**: 初回入力。`boundary_pref` テーブルは空。
+
+**1回目の入力**: `kyouha` Space
+
+| ステップ | キー | 状態 | セグメント | 動作 |
+|---------|------|------|-----------|------|
+| 1 | Space | セグメントモード | AzooKey 初期分割（例: `きょうは` / 1セグメント or `きょう`+`は`） | `fetchBoundaryPref` ミス → AzooKey へフォールバック |
+| 2 | Shift+← | セグメントモード | 境界縮小 → `isManuallyAdjusted = true` | フォーカス文節を1文字縮小 |
+| 3 | Enter | 待機 | — | `isManuallyAdjusted` あり → `saveBoundaryPref(fullReading: "きょうは", segments: [...])` |
+
+**2回目の入力**: `kyouha` Space
+
+| ステップ | キー | 状態 | セグメント | 動作 |
+|---------|------|------|-----------|------|
+| 1 | Space | セグメントモード | 保存済み境界 | `fetchBoundaryPref("きょうは")` ヒット → 手動調整後の境界で直接セグメントを構築 |
+
+**制約**:
+- 完全一致のみ。`きょうはよいてんきです` の保存は `きょうはてんきです` 入力には適用されない
+- 手動調整なしで確定しても `boundary_pref` に保存されない
+
+*Tests: `Tests/InputHandlerSegmentTests.swift` — `testBoundaryPrefSavedOnManualAdjust`, `testBoundaryPrefReproducedOnReenter`*
+
+---
+
 ## S-07: F キーで即時確定
 
 **状態**: `とうきょう` 組成中

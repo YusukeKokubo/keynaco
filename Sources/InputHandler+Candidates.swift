@@ -69,9 +69,10 @@ extension InputHandler {
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する
         if let selected = candidate.selectedText {
-            db.recordPrefixes(reading: normalizedInput, output: selected)
+            let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
+            if !isDateTime { db.recordPrefixes(reading: normalizedInput, output: selected) }
             azooKeyConverter.commit(reading: inputKey, text: selected)
-            commitText(text: selected, client: client)
+            commitText(text: selected, skipHistory: isDateTime, client: client)
         } else {
             commitComposition(client: client)
         }
@@ -223,9 +224,9 @@ extension InputHandler {
 
         let historyEnd = fixedEnd + predictCount + historyCount
         let predictionEnd = fixedEnd + predictCount
+        candidates.insert(contentsOf: dateTimeCandidates.filter { !candidates.contains($0) }, at: historyEnd)
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
-        candidates.append(contentsOf: dateTimeCandidates.filter { !candidates.contains($0) })
         guard !candidates.isEmpty else { return .dismiss }
         return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
                      predictionEnd: predictionEnd, fixedEnd: fixedEnd)
