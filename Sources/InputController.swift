@@ -24,6 +24,14 @@ private final class IMKTextInputAdapter: TextInputClient {
         client?.setMarkedText(text, selectionRange: selectionRange, replacementRange: .notFound)
     }
 
+    func selectedRange() -> NSRange {
+        client?.selectedRange() ?? NSRange(location: NSNotFound, length: 0)
+    }
+
+    func setMarkedText(_ text: String, selectionRange: NSRange, replacementRange: NSRange) {
+        client?.setMarkedText(text, selectionRange: selectionRange, replacementRange: replacementRange)
+    }
+
     func cursorRect() -> NSRect {
         var rect = NSRect.zero
         client?.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)

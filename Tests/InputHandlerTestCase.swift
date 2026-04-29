@@ -6,9 +6,17 @@ import XCTest
 final class MockTextClient: TextInputClient {
     private(set) var inserted: [String] = []
     private(set) var markedText: String = ""
+    var mockedSelectedRange: NSRange = .init(location: 0, length: 0)
+    private(set) var lastReplacementRange: NSRange? = nil
 
     func insertText(_ text: String) { inserted.append(text); markedText = "" }
     func setMarkedText(_ text: String, selectionRange: NSRange) { markedText = text }
+    func selectedRange() -> NSRange { mockedSelectedRange }
+    func setMarkedText(_ text: String, selectionRange: NSRange, replacementRange: NSRange) {
+        lastReplacementRange = replacementRange
+        mockedSelectedRange = NSRange(location: text.count, length: 0)
+        setMarkedText(text, selectionRange: selectionRange)
+    }
     func cursorRect() -> NSRect { .zero }
 }
 
