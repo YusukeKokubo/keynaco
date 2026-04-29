@@ -129,5 +129,6 @@ stateDiagram-v2
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
 - **ASCII モードの F キー**: F6–F10 は ASCII モード中では無効（組成が空のため）
 - **セグメント境界学習**: Shift+矢印で手動調整した境界は、確定時に `boundary_pref` テーブルへ保存される。次回同じ読みで Space を押すと AzooKey の初期分割より保存済み境界が優先される
+- **日時候補**: 読みが `きょう` / `いま` / `ことし` 等のとき、`historyEnd` の直後（AzooKey 辞書候補の前）に日付・時刻・年の文字列を動的に追加（`InputHandler.generateDateTimeCandidates(for:)`）。確定しても history / bigram / trigram には記録しない
 - **セグメントモードのテスト**: `Tests/InputHandlerSegmentTests.swift`
 - **ASCII モードのテスト**: `Tests/InputHandlerAsciiTests.swift`

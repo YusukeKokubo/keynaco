@@ -242,6 +242,26 @@ skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加され
 
 ---
 
+## S-12: 日時候補の選択
+
+**前提**: `lastCommittedOutput` は空（文頭）。
+
+| ステップ | キー | 状態 | markedText | 動作 |
+|---------|------|------|-----------|------|
+| 1 | `k`,`y`,`o`,`u` | 組成中 | `きょう` | ローマ字変換 |
+| 2 | Space | 候補選択中 | `今日`（選択中） | `buildCandidateList` が候補を組み立て。リスト末尾側（historyEnd 直後）に `2026年4月29日` / `4月29日` / `2026-04-29` / `2026/04/29` を追加 |
+| 3 | ↓×N | 候補選択中 | `2026-04-29` | 日時候補まで移動 |
+| 4 | Enter | 待機 | — | `2026-04-29` を確定。`recordPrefixes` / bigram / trigram には**記録しない** |
+
+**制約**:
+- 日時候補は `historyEnd` より後（AzooKey 辞書候補と同じゾーン）に挿入されるため Shift+Delete 不可
+- 確定しても変換履歴に残らない（再変換時にノイズにならない）
+
+*Tests: `Tests/InputHandlerCandidatesTests.swift` — `testKyouIncludesDateCandidates`*
+*Tests: `Tests/InputHandlerDateTimeTests.swift`*
+
+---
+
 ## S-07: F キーで即時確定
 
 **状態**: `とうきょう` 組成中
