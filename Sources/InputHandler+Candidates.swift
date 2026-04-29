@@ -167,7 +167,9 @@ extension InputHandler {
         let h = state.composedHiragana
         let azooKeyCandidates = h.allSatisfy({ $0.isASCII }) ? [] : azooKeyConverter.requestCandidates(hiragana: h)
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
-        let userDictRaw = db.fetchUserDict(reading: historyKey)
+        let userDictExact = db.fetchUserDict(reading: historyKey)
+        let userDictPrefix = db.fetchUserDictPrefix(reading: historyKey)
+        let userDictRaw = userDictExact + userDictPrefix.filter { !userDictExact.contains($0) }
         let exactCandidates = db.fetchHistoryExact(reading: historyKey)
         let prefixCandidates = db.fetchHistoryPrefix(reading: historyKey)
         let historyCandidates = exactCandidates + prefixCandidates.filter { !exactCandidates.contains($0) }

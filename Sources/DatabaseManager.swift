@@ -489,6 +489,17 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    func fetchUserDictPrefix(reading: String) -> [String] {
+        return queryStrings("""
+        SELECT output FROM user_dict
+        WHERE ? LIKE (input || '%') AND input != ?
+        ORDER BY id ASC
+        """) {
+            self.bindText($0, 1, reading)
+            self.bindText($0, 2, reading)
+        }
+    }
+
     func fetchAllUserDict() -> [UserDictEntry] {
         let sql = "SELECT id, input, output FROM user_dict ORDER BY id ASC"
         var stmt: OpaquePointer?

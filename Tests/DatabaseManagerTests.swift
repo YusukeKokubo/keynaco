@@ -325,4 +325,23 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results[0], "Leaner", "登録順が先")
     }
+
+    func testUserDictPrefixMatch() {
+        db.addUserDict(input: "とうきょう", output: "東京")
+        let results = db.fetchUserDictPrefix(reading: "とうきょうと")
+        XCTAssertEqual(results, ["東京"])
+    }
+
+    func testUserDictPrefixExcludesExactMatch() {
+        db.addUserDict(input: "とうきょう", output: "東京")
+        let results = db.fetchUserDictPrefix(reading: "とうきょう")
+        XCTAssertTrue(results.isEmpty, "完全一致は除外する")
+    }
+
+    func testUserDictPrefixOrderedByRegistration() {
+        db.addUserDict(input: "とうきょう", output: "東京")
+        db.addUserDict(input: "とうきょうと", output: "東京都")
+        let results = db.fetchUserDictPrefix(reading: "とうきょうとちょう")
+        XCTAssertEqual(results, ["東京", "東京都"], "登録順で返る")
+    }
 }
