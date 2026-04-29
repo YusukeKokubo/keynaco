@@ -19,12 +19,18 @@ extension InputHandler {
             return buildCandidateList()
         }
 
-        let segments = rawSegments.map { buildSegmentCandidates(reading: $0.reading, dictCandidates: $0.candidates) }
+        var segments: [Segment] = []
+        var prevText: String? = lastCommittedOutput
+        for raw in rawSegments {
+            let seg = buildSegmentCandidates(reading: raw.reading, dictCandidates: raw.candidates, prev: prevText)
+            segments.append(seg)
+            prevText = seg.selectedText
+        }
         state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
         return makeCandidateActionForFocusedSegment()
     }
 
-    func buildSegmentCandidates(reading: String, dictCandidates: [String]) -> Segment {
+    func buildSegmentCandidates(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
         let hiragana = reading
         let katakana = KanaUtils.hiraganaToKatakana(reading)
         let historyCandidates = db.fetchHistoryExact(reading: reading)
@@ -43,8 +49,16 @@ extension InputHandler {
             candidates.insert(hiragana, at: 0); seen.insert(hiragana); fixedCount += 1
         }
 
+        var bigramCount = 0
+        if let p = prev {
+            for b in db.fetchBigram(prev: p, reading: reading) where seen.insert(b).inserted {
+                candidates.append(b)
+                bigramCount += 1
+            }
+        }
+
         for h in historyCandidates where seen.insert(h).inserted { candidates.append(h) }
-        let historyEnd = fixedCount + historyCandidates.count
+        let historyEnd = fixedCount + bigramCount + historyCandidates.count
 
         for d in dictCandidates where seen.insert(d).inserted { candidates.append(d) }
 
@@ -84,7 +98,15 @@ extension InputHandler {
             }
             guard segmentState.focusedIndex < segmentState.segments.count - 1 else { return (true, .none) }
             syncFocusedSegmentSelection(from: candidate)
-            state.segmentState!.focusedIndex += 1
+            let newIndex = segmentState.focusedIndex + 1
+            let prevText = state.segmentState!.segments[segmentState.focusedIndex].selectedText
+            let nextSeg = segmentState.segments[newIndex]
+            state.segmentState!.segments[newIndex] = buildSegmentCandidates(
+                reading: nextSeg.reading,
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: nextSeg.reading),
+                prev: prevText
+            )
+            state.segmentState!.focusedIndex = newIndex
             applySegmentMarkedText(client: client)
             return (true, makeCandidateActionForFocusedSegment())
 
@@ -126,6 +148,8 @@ extension InputHandler {
         syncFocusedSegmentSelection(from: candidate)
         let i = segmentState.focusedIndex
 
+        let focusedPrev: String? = i > 0 ? segmentState.segments[i - 1].selectedText : lastCommittedOutput
+
         if expand {
             guard i + 1 < segmentState.segments.count else { return (true, .none) }
             let nextReading = segmentState.segments[i + 1].reading
@@ -134,7 +158,8 @@ extension InputHandler {
             let newNextReading = String(nextReading.dropFirst())
             var rebuilt = buildSegmentCandidates(
                 reading: newFocusedReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading),
+                prev: focusedPrev
             )
             rebuilt.isManuallyAdjusted = true
             segmentState.segments[i] = rebuilt
@@ -143,7 +168,8 @@ extension InputHandler {
             } else {
                 segmentState.segments[i + 1] = buildSegmentCandidates(
                     reading: newNextReading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading:newNextReading)
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading),
+                    prev: rebuilt.selectedText
                 )
             }
         } else {
@@ -153,7 +179,8 @@ extension InputHandler {
             let removedChar = String(focusedReading.last!)
             var rebuilt = buildSegmentCandidates(
                 reading: newFocusedReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading),
+                prev: focusedPrev
             )
             rebuilt.isManuallyAdjusted = true
             segmentState.segments[i] = rebuilt
@@ -161,13 +188,15 @@ extension InputHandler {
                 let newNextReading = removedChar + segmentState.segments[i + 1].reading
                 segmentState.segments[i + 1] = buildSegmentCandidates(
                     reading: newNextReading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading:newNextReading)
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading),
+                    prev: rebuilt.selectedText
                 )
             } else {
                 segmentState.segments.insert(
                     buildSegmentCandidates(
                         reading: removedChar,
-                        dictCandidates: azooKeyConverter.candidatesForSegment(reading:removedChar)
+                        dictCandidates: azooKeyConverter.candidatesForSegment(reading: removedChar),
+                        prev: rebuilt.selectedText
                     ),
                     at: i + 1
                 )

@@ -219,6 +219,86 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
                        "右移動前に選択した候補インデックスが保持されるはず")
     }
 
+    // MARK: - セグメント候補への bigram 活用（F-2）
+
+    func testBigramAppearsInFirstSegmentCandidates() {
+        // lastCommittedOutput が第1セグメントの bigram prev として使われることを確認
+        handler.db.recordBigram(prev: "前語", input: "わたし", output: "私")
+        handler.committedHistory = ["前語"]
+
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)  // Space → segment mode
+        guard handler.state.isSegmentMode,
+              let ss = handler.state.segmentState else { return }
+
+        let firstCandidates = ss.segments[0].candidates
+        XCTAssertTrue(firstCandidates.contains("私"),
+                      "lastCommittedOutput を prev とする bigram 候補が第1セグメントに含まれるはず")
+    }
+
+    func testBigramCandidatePrecedesHistoryInSegment() {
+        // bigram 候補は固定候補（ひらがな・カタカナ）の直後、履歴より前に挿入される
+        handler.db.recordBigram(prev: "前語", input: "わたし", output: "私")
+        handler.db.recordPrefixes(reading: "わたし", output: "吾")
+        handler.committedHistory = ["前語"]
+
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss = handler.state.segmentState else { return }
+
+        let candidates = ss.segments[0].candidates
+        guard let bigramIdx = candidates.firstIndex(of: "私"),
+              let historyIdx = candidates.firstIndex(of: "吾") else { return }
+        XCTAssertLessThan(bigramIdx, historyIdx,
+                          "bigram 候補は履歴候補より前に表示されるはず")
+    }
+
+    func testBigramCascadesFromFirstToSecondSegment() {
+        // 第1セグメントのデフォルト選択テキストが第2セグメントの bigram prev になる
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss = handler.state.segmentState,
+              ss.segments.count >= 2 else { return }
+
+        let seg0Text = ss.segments[0].selectedText
+        let seg1Reading = ss.segments[1].reading
+        // seg0Text を prev とする bigram として seg1 の読みに合う候補を学習
+        handler.db.recordBigram(prev: seg0Text, input: seg1Reading, output: "ビグラム候補")
+
+        // セグメントモードを抜けて再入: 学習後に再度セグメントモードに入る
+        press(keyCode: 53)  // Escape
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss2 = handler.state.segmentState,
+              ss2.segments.count >= 2 else { return }
+
+        XCTAssertTrue(ss2.segments[1].candidates.contains("ビグラム候補"),
+                      "第1セグメントのデフォルト選択が第2セグメントの bigram prev として使われるはず")
+    }
+
+    func testBigramRebuildOnRightArrowNavigation() {
+        // 右矢印で次セグメントへ移動するとき、移動元の選択テキストを prev として候補がリビルドされる
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss = handler.state.segmentState,
+              ss.segments.count >= 2 else { return }
+
+        let seg0Text = ss.segments[0].selectedText
+        let seg1Reading = ss.segments[1].reading
+        handler.db.recordBigram(prev: seg0Text, input: seg1Reading, output: "ナビ候補")
+
+        press(keyCode: 124)  // Right → seg[1] にフォーカス
+        guard let ss2 = handler.state.segmentState,
+              ss2.focusedIndex == 1 else { return }
+
+        XCTAssertTrue(ss2.segments[1].candidates.contains("ナビ候補"),
+                      "右矢印移動後のセグメントで bigram リビルドが反映されるはず")
+    }
+
     // MARK: - セグメント間 bigram 学習
 
     func testInterSegmentBigramRecordedAfterConfirm() {

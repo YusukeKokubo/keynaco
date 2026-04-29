@@ -12,11 +12,12 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - ネガティブフィードバック機能（確定しなかった候補を学習スコアから減衰させる）
 - セグメント確定時に bi-gram を記録する仕組み（文節変換の学習品質向上）
 - **DB 自動 GC** — `count=1` かつ 180日以上未使用のエントリを全 4 テーブルから削除し `VACUUM` を実行（7日に1回、起動時バックグラウンドで実行）
+- **セグメント候補への bi-gram 活用** — `buildSegmentCandidates` が前語コンテキスト（`prev`）を受け取り、`fetchBigram` の結果を固定候補の直後・履歴の前に挿入。セグメント進入時は `lastCommittedOutput` を起点にカスケードで引き継ぎ、右矢印移動時は移動元の選択テキストを prev として次セグメントをリビルド
 
 ### 修正
 - `fetchHistoryPrefix` で同一出力が複数行返る重複候補を `GROUP BY output` で排除
 
-> 関連: [PLAN260429](plans/PLAN260429.md) · [PLAN260429b](plans/PLAN260429b.md) · [IDEA260429](ideas/IDEA260429.md)
+> 関連: [PLAN260429](plans/PLAN260429.md) · [PLAN260429b](plans/PLAN260429b.md) · [PLAN260429c](plans/PLAN260429c.md) · [IDEA260429](ideas/IDEA260429.md)
 
 ---
 
