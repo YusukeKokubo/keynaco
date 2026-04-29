@@ -86,12 +86,13 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 
 bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。
 
-**N-gram 候補の遅延表示と読みフィルタ**: N-gram 由来の候補がある場合、`suggestSuccessors()` は候補を `pendingSuccessorCandidates` に保存して `.dismiss`（ウィンドウを閉じる）を返す。1打目が入力されたとき `romajiToInitialKana` でかな先頭一致フィルタを行い、一致候補のみ表示する。一致なしはモード解除。格助詞のみ（N-gram なし）の場合は従来通り確定後すぐ表示する。
+**N-gram 候補の遅延表示と読みフィルタ**: N-gram 由来の候補がある場合、`suggestSuccessors()` は まず `fetchBigramTopCount(prev: last)` で前語に対する bi-gram 上位使用回数を取得する。`successorImmediateThreshold`（デフォルト 5）以上なら「高信頼ペア」とみなして即時表示（`.show`）。閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリして一致する候補のみ `.show` する（読みが一致しなければモード解除）。格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。
 
 - `successorFirstChar`: 頭文字 1 打目のバッファリング。`particleRomajiMap` による格助詞 fast-path が効くのは `isNounLike` のときのみ。N-gram 保留表示後の 2 打目でモード解除する際にも使用する。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
 - 候補確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば連鎖表示を継続する。候補が空なら自然に `.dismiss`（格助詞チェックは廃止）。
 - Successor モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。
+- **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき `buildPendingCandidateList` が bi-gram/trigram/skip-bigram を先読みし、候補があれば `isSuccessorMode = true` へ移行。`n` は `ん` との曖昧さがあるため除外。候補ゼロなら `pendingRomaji` はそのまま通常組成を続ける。確定時（Space/Enter）に `confirmSuccessor()` が `pendingRomaji` をクリアする（`buildPendingCandidateList` 内ではクリアしない。Escape 後に続きのローマ字を入力できるようにするため）。
 
 ### 候補表示の優先順位
 
