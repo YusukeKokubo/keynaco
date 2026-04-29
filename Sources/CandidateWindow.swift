@@ -10,6 +10,7 @@ private class CandidateRowView: NSView {
     let label = NSTextField(labelWithString: "")
     let deleteButton = FirstMouseButton(title: "\u{2715}", target: nil, action: nil)
     let sectionDivider = NSView()
+    let sectionLabel = NSTextField(labelWithString: "")
 
     var isHistory: Bool = false {
         didSet {
@@ -42,12 +43,19 @@ private class CandidateRowView: NSView {
         sectionDivider.translatesAutoresizingMaskIntoConstraints = false
         addSubview(sectionDivider)
 
+        sectionLabel.font = .systemFont(ofSize: 9)
+        sectionLabel.textColor = .tertiaryLabelColor
+        sectionLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(sectionLabel)
+
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
             deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            label.trailingAnchor.constraint(lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -4),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: sectionLabel.leadingAnchor, constant: -4),
+            sectionLabel.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -4),
+            sectionLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             sectionDivider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
             sectionDivider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
             sectionDivider.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -73,6 +81,8 @@ final class CandidateWindow: NSPanel {
     private var fixedRowCount: Int = 0
     /// 履歴セクションの末尾インデックス（この行の後にセパレータを描画）
     private(set) var historySectionEnd: Int = 0
+    /// 予測セクションの末尾インデックス（fixedRowCount <= row < predictionSectionEnd が予測行）
+    private var predictionSectionEnd: Int = 0
 
     var onSelect: ((String) -> Void)?
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
@@ -123,9 +133,10 @@ final class CandidateWindow: NSPanel {
 
     // MARK: - Public API
 
-    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, near rect: NSRect) {
+    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, predictionEnd: Int = 0, near rect: NSRect) {
         self.candidates = candidates
         self.historySectionEnd = historySectionEnd
+        self.predictionSectionEnd = predictionEnd
         self.selectedRow = candidates.isEmpty ? 0 : min(initialRow, candidates.count - 1)
         self.isExplicitlySelected = false
         self.fixedRowCount = initialRow
@@ -160,6 +171,7 @@ final class CandidateWindow: NSPanel {
         isExplicitlySelected = false
         fixedRowCount = 0
         historySectionEnd = 0
+        predictionSectionEnd = 0
     }
 
     func selectNext() {
@@ -187,9 +199,8 @@ final class CandidateWindow: NSPanel {
     func removeCandidate(at row: Int) {
         guard row >= 0, row < candidates.count else { return }
         candidates.remove(at: row)
-        if row < historySectionEnd {
-            historySectionEnd -= 1
-        }
+        if row < predictionSectionEnd { predictionSectionEnd -= 1 }
+        if row < historySectionEnd { historySectionEnd -= 1 }
         tableView.reloadData()
         if candidates.isEmpty {
             dismiss()
@@ -229,8 +240,19 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
         rowView.label.stringValue = candidates[row]
         rowView.deleteButton.tag = row
         rowView.deleteButton.isHidden = row < fixedRowCount || row >= historySectionEnd
-        rowView.isHistory = historySectionEnd > 0 && row < historySectionEnd
-        let showDivider = row == historySectionEnd - 1 && historySectionEnd < candidates.count
+        rowView.isHistory = row >= predictionSectionEnd && row < historySectionEnd
+
+        let sectionLabelText: String
+        switch row {
+        case fixedRowCount where row < predictionSectionEnd:      sectionLabelText = "予測"
+        case predictionSectionEnd where row < historySectionEnd:  sectionLabelText = "履歴"
+        case historySectionEnd where historySectionEnd < candidates.count: sectionLabelText = "辞書"
+        default:                                                   sectionLabelText = ""
+        }
+        rowView.sectionLabel.stringValue = sectionLabelText
+
+        let showDivider = (predictionSectionEnd > fixedRowCount && row == predictionSectionEnd - 1 && predictionSectionEnd <= historySectionEnd)
+            || (row == historySectionEnd - 1 && historySectionEnd < candidates.count)
         rowView.sectionDivider.isHidden = !showDivider
 
         return rowView

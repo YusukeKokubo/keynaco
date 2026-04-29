@@ -68,7 +68,7 @@ class InputHandlerTestCase: XCTestCase {
         in action: CandidateAction, _ msg: String = "",
         file: StaticString = #file, line: UInt = #line
     ) -> [String]? {
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("Expected .show but got \(action). \(msg)", file: file, line: line)
             return nil
         }

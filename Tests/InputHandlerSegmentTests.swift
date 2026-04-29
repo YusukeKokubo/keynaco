@@ -218,4 +218,50 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         XCTAssertEqual(ss2?.segments[0].selectedIndex, 1,
                        "右移動前に選択した候補インデックスが保持されるはず")
     }
+
+    // MARK: - セグメント間 bigram 学習
+
+    func testInterSegmentBigramRecordedAfterConfirm() {
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss = handler.state.segmentState,
+              ss.segments.count >= 2 else { return }
+
+        let seg0Text = ss.segments[0].selectedText
+        let seg1Reading = ss.segments[1].reading
+        let seg1Text = ss.segments[1].selectedText
+
+        press(keyCode: 36)  // Enter → 確定
+
+        let bigram = handler.db.fetchBigram(prev: seg0Text, reading: seg1Reading)
+        XCTAssertTrue(bigram.contains(seg1Text),
+                      "2セグメント確定後に隣接 bigram が記録されるはず")
+    }
+
+    func testManuallyAdjustedSegmentBigramCountIsHigher() {
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss0 = handler.state.segmentState,
+              ss0.segments.count >= 2 else { return }
+
+        // focus を seg[1] へ移動してから Shift+Right でリサイズ → seg[1].isManuallyAdjusted = true
+        press(keyCode: 124)  // Right（フォーカス移動）
+        guard handler.state.segmentState?.focusedIndex == 1 else { return }
+        press(keyCode: 124, modifiers: .shift)  // Shift+Right → seg[1] を拡張
+        guard let ss1 = handler.state.segmentState, ss1.segments.count >= 2 else { return }
+
+        let seg0Text = ss1.segments[0].selectedText
+        let seg1Reading = ss1.segments[1].reading
+        let seg1Text = ss1.segments[1].selectedText
+
+        press(keyCode: 36)  // Enter → 確定
+
+        let entries = handler.db.fetchAllBigram()
+        let entry = entries.first(where: { $0.prev == seg0Text && $0.input == seg1Reading && $0.output == seg1Text })
+        XCTAssertNotNil(entry, "手動調整セグメントを含む bigram が記録されるはず")
+        XCTAssertGreaterThanOrEqual(entry?.count ?? 0, 3,
+                                    "手動調整（isManuallyAdjusted）により bigram カウントが 3 以上になるはず")
+    }
 }

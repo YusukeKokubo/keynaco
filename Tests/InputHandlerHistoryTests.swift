@@ -30,7 +30,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         press(keyCode: 53)  // Escape でSuccessor モードを解除
         typeRomaji("tanoshii")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, let historyEnd, _) = action else {
+        guard case .show(let candidates, let historyEnd, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.prefix(historyEnd).contains("楽しい"),
@@ -96,5 +96,52 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         // "とうきょ" (prefix) で exact 検索できる
         let result = handler.db.fetchHistoryExact(reading: "とうきょ")
         XCTAssertEqual(result, ["東京"], "確定後、prefix でも履歴ヒットするはず")
+    }
+
+    // MARK: - ネガティブフィードバック（確定直後 Backspace でカウント減算）
+    // See: docs/domain/glossary.md#databasemanager
+
+    func testNegativeFeedbackDecreasesCount() {
+        // 事前に count=1 のエントリを作成
+        handler.db.recordPrefixes(reading: "あ", output: "阿")
+
+        // 確定（recordPrefixes が呼ばれ count=2）
+        type(chars: "a", base: "a")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿")
+
+        // 確定直後 Backspace → penalizeHistory で count -1 → 1
+        press(keyCode: 51)
+
+        let entries = handler.db.fetchAllHistory()
+        let entry = entries.first(where: { $0.input == "あ" && $0.output == "阿" })
+        XCTAssertNotNil(entry, "ペナルティ後もエントリが残るはず")
+        XCTAssertEqual(entry?.count, 1, "penalizeHistory でカウントが 1 減るはず")
+    }
+
+    func testNegativeFeedbackDeletesWhenCountReachesZero() {
+        // 事前登録なし（count=0 から確定で count=1 になる）
+        type(chars: "a", base: "a")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿")
+
+        // 確定直後 Backspace → penalizeHistory → count=0 → DELETE
+        press(keyCode: 51)
+
+        let hist = handler.db.fetchHistoryExact(reading: "あ")
+        XCTAssertFalse(hist.contains("阿"), "count <= 0 でエントリが削除されるはず")
+    }
+
+    func testNegativeFeedbackNotTriggeredAfterOtherKey() {
+        // 確定 (count=1)
+        type(chars: "a", base: "a")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿")
+
+        // 別キー打鍵 → lastConfirmedPair をクリア
+        press(keyCode: 36)  // Enter（composingText なし → pass-through、かつ lastConfirmedPair = nil）
+
+        // Backspace → penalize されない
+        press(keyCode: 51)
+
+        let hist = handler.db.fetchHistoryExact(reading: "あ")
+        XCTAssertTrue(hist.contains("阿"), "別キー後の Backspace では penalize されないはず")
     }
 }

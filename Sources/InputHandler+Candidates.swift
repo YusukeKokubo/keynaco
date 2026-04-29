@@ -209,10 +209,11 @@ extension InputHandler {
         }
 
         let historyEnd = fixedCount + predictCount + historyCount
+        let predictionEnd = fixedCount + predictCount
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
-        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow)
+        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd)
     }
 
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
@@ -240,7 +241,7 @@ extension InputHandler {
         client.setMarkedText(candidates[0], selectionRange: NSRange(location: candidates[0].count, length: 0))
         let fixedCandidates = kanas
         let allCandidates = fixedCandidates + candidates.filter { !fixedCandidates.contains($0) }
-        return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count)
+        return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count, predictionEnd: 0)
     }
 
     // MARK: - Private input handlers
@@ -274,7 +275,7 @@ extension InputHandler {
         if state.composingText.isEmpty {
             bracketCandidates = options
             client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
-            return (true, .show(candidates: options, historyEnd: 0, initialRow: 0))
+            return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, predictionEnd: 0))
         }
         flushPendingRomaji()
         state.composedHiragana += options[0]

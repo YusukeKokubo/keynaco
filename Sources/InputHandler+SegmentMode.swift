@@ -56,7 +56,7 @@ extension InputHandler {
         guard let segmentState = state.segmentState else { return .none }
         let seg = segmentState.focusedSegment
         guard !seg.candidates.isEmpty else { return .dismiss }
-        return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex)
+        return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex, predictionEnd: seg.historyEnd)
     }
 
     mutating func handleSegmentModeKey(
@@ -132,10 +132,12 @@ extension InputHandler {
             guard !nextReading.isEmpty else { return (true, .none) }
             let newFocusedReading = segmentState.segments[i].reading + String(nextReading.first!)
             let newNextReading = String(nextReading.dropFirst())
-            segmentState.segments[i] = buildSegmentCandidates(
+            var rebuilt = buildSegmentCandidates(
                 reading: newFocusedReading,
                 dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
             )
+            rebuilt.isManuallyAdjusted = true
+            segmentState.segments[i] = rebuilt
             if newNextReading.isEmpty {
                 segmentState.segments.remove(at: i + 1)
             } else {
@@ -149,10 +151,12 @@ extension InputHandler {
             guard focusedReading.count >= 2 else { return (true, .none) }
             let newFocusedReading = String(focusedReading.dropLast())
             let removedChar = String(focusedReading.last!)
-            segmentState.segments[i] = buildSegmentCandidates(
+            var rebuilt = buildSegmentCandidates(
                 reading: newFocusedReading,
                 dictCandidates: azooKeyConverter.candidatesForSegment(reading:newFocusedReading)
             )
+            rebuilt.isManuallyAdjusted = true
+            segmentState.segments[i] = rebuilt
             if i + 1 < segmentState.segments.count {
                 let newNextReading = removedChar + segmentState.segments[i + 1].reading
                 segmentState.segments[i + 1] = buildSegmentCandidates(
@@ -190,11 +194,25 @@ extension InputHandler {
         for seg in segmentState.segments {
             db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
             azooKeyConverter.commit(reading: seg.reading, text: seg.selectedText)
+            if seg.isManuallyAdjusted {
+                db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
+                db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
+            }
             confirmed += seg.selectedText
             fullReading += seg.reading
         }
         if segmentState.segments.count >= 2 {
             db.recordPrefixes(reading: fullReading, output: confirmed)
+        }
+        let segs = segmentState.segments
+        for i in 0..<segs.count - 1 {
+            let prev = segs[i].selectedText
+            let next = segs[i + 1]
+            db.recordBigram(prev: prev, input: next.reading, output: next.selectedText)
+            if next.isManuallyAdjusted {
+                db.recordBigram(prev: prev, input: next.reading, output: next.selectedText)
+                db.recordBigram(prev: prev, input: next.reading, output: next.selectedText)
+            }
         }
         commitText(text: confirmed, client: client)
         return suggestSuccessors()

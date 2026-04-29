@@ -143,9 +143,9 @@ class InputController: IMKInputController {
         switch action {
         case .none:
             break
-        case .show(let candidates, let historyEnd, let initialRow):
+        case .show(let candidates, let historyEnd, let initialRow, let predictionEnd):
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
-            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, near: adapter.cursorRect())
+            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, near: adapter.cursorRect())
             if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。
                 // 空文字ではなく実際のテキストを持つことで Electron 系アプリが

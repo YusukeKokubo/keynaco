@@ -218,6 +218,15 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    func penalizeHistory(input: String, output: String) {
+        execute("UPDATE history SET count = count - 1 WHERE input = ? AND output = ?") {
+            self.bindText($0, 1, input); self.bindText($0, 2, output)
+        }
+        execute("DELETE FROM history WHERE input = ? AND output = ? AND count <= 0") {
+            self.bindText($0, 1, input); self.bindText($0, 2, output)
+        }
+    }
+
     /// 既存の bi-gram を全削除してからインポートデータで置き換える。
     func replaceBigram(_ entries: [BigramEntry]) {
         sqlite3_exec(db, "DELETE FROM bigram", nil, nil, nil)

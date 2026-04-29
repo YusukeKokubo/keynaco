@@ -37,13 +37,13 @@ extension InputHandler {
         if predictTop.isEmpty {
             // 格助詞 fallback のみ（N-gram なし）→ 従来通りすぐ表示
             pendingSuccessorCandidates = []
-            return .show(candidates: candidates, historyEnd: 0, initialRow: 0)
+            return .show(candidates: candidates, historyEnd: 0, initialRow: 0, predictionEnd: 0)
         } else {
             // 高信頼チェック：直近90日以内に閾値回数以上使ったペアは即時表示
             let topCount = db.fetchBigramTopCount(prev: last)
             if topCount >= InputHandler.successorImmediateThreshold {
                 pendingSuccessorCandidates = []
-                return .show(candidates: candidates, historyEnd: 0, initialRow: 0)
+                return .show(candidates: candidates, historyEnd: 0, initialRow: 0, predictionEnd: 0)
             } else {
                 // 通常 → 保存して1打目まで待つ
                 pendingSuccessorCandidates = candidates
@@ -89,6 +89,10 @@ extension InputHandler {
         case KeyCode.upArrow:
             return (true, .selectPrev)
         case KeyCode.escape, KeyCode.backspace, KeyCode.rightArrow:
+            if keyCode == KeyCode.backspace, let pair = lastConfirmedPair {
+                db.penalizeHistory(input: pair.input, output: pair.output)
+                lastConfirmedPair = nil
+            }
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
@@ -108,7 +112,7 @@ extension InputHandler {
                     } ?? []
                     let merged = fromTrigram + fromBigram.filter { !fromTrigram.contains($0) }
                     let rest = matched.filter { !merged.contains($0) }
-                    return (true, .show(candidates: merged + rest, historyEnd: 0, initialRow: 0))
+                    return (true, .show(candidates: merged + rest, historyEnd: 0, initialRow: 0, predictionEnd: 0))
                 }
             }
             // fast-path 非該当かつ N-gram 保留あり → 1打目で読み前方一致フィルタして表示
@@ -134,7 +138,7 @@ extension InputHandler {
                     if !filtered.isEmpty {
                         pendingSuccessorCandidates = []
                         successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                        return (true, .show(candidates: filtered, historyEnd: 0, initialRow: 0))
+                        return (true, .show(candidates: filtered, historyEnd: 0, initialRow: 0, predictionEnd: 0))
                     }
                 }
                 pendingSuccessorCandidates = []

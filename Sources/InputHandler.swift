@@ -3,7 +3,7 @@ import AppKit
 /// 候補ウィンドウに対する操作指示
 enum CandidateAction {
     case none
-    case show(candidates: [String], historyEnd: Int, initialRow: Int)
+    case show(candidates: [String], historyEnd: Int, initialRow: Int, predictionEnd: Int)
     case dismiss
     case selectNext
     case selectPrev
@@ -65,6 +65,7 @@ struct InputHandler {
     var pendingSuccessorCandidates: [String] = []
     var bracketCandidates: [String]? = nil
     var isBracketMode: Bool { bracketCandidates != nil }
+    var lastConfirmedPair: (input: String, output: String)? = nil
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }
     var prev2Output: String? {
@@ -113,6 +114,9 @@ struct InputHandler {
         // 5. ASCII mode        → passthrough
         // 6. candidate visible → handleCandidateVisible
         // 7. else              → handleNormalInput
+
+        let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
+        if !isBackspace { lastConfirmedPair = nil }
 
         if isSuccessorMode {
             return handleSuccessorMode(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
@@ -163,8 +167,6 @@ struct InputHandler {
             client.insertText(chars)
             return (true, .none)
         }
-
-        let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
 
         // 候補ウィンドウ表示中
         if candidate.isVisible {
@@ -238,6 +240,7 @@ struct InputHandler {
                 }
             }
         }
+        lastConfirmedPair = (state.finalizedText, text)
         pushCommitted(text)
         client.insertText(text)
         state = CompositionState()
@@ -281,6 +284,10 @@ struct InputHandler {
 
     mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         let (handled, needsRefresh) = state.backspace()
+        if !handled, let pair = lastConfirmedPair {
+            db.penalizeHistory(input: pair.input, output: pair.output)
+            lastConfirmedPair = nil
+        }
         guard handled else { return (false, .none) }
         let action: CandidateAction = needsRefresh ? buildCandidateList() : .dismiss
         applyMarkedText(candidateText: nil, client: client)

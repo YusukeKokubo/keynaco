@@ -15,7 +15,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("スペースで .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("あ"))
@@ -29,7 +29,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates[0], "あい", "先頭はひらがなのはず")
@@ -40,7 +40,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("ア"), "カタカナが候補に含まれるはず")
@@ -53,7 +53,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "たのしい")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("Space で .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("楽しい"), "「楽しい」が候補に含まれるはず: \(candidates)")
@@ -67,7 +67,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertGreaterThan(candidates.count, 2, "azooKey が候補を返すはず")
@@ -78,7 +78,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "あい")
         type(chars: "a", base: "a")
         let (_, action) = type(chars: "i", base: "i")
-        guard case .show(let candidates, _, let initialRow) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates[0], "アイ", "カタカナが固定位置0番")
@@ -90,7 +90,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "アイ")
         type(chars: "a", base: "a")
         let (_, action) = type(chars: "i", base: "i")
-        guard case .show(let candidates, _, let initialRow) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates[0], "あい", "ひらがなが固定位置0番")
@@ -132,7 +132,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "u", base: "u")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("う"))
@@ -300,7 +300,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertFalse(handler.isSuccessorMode)
         let (_, action) = type(chars: "k", base: "k")
         XCTAssertTrue(handler.isSuccessorMode, "先読み候補ありで isSuccessorMode になるはず")
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("bi-gram 学習済みで k → .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("から"), "学習済みの「から」が候補に含まれるはず")
@@ -410,7 +410,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordBigram(prev: "て", input: "ふう", output: "風")
         let (_, action) = type(chars: "f", base: "f")
         XCTAssertTrue(handler.isSuccessorMode, "f キーで先読み候補あれば isSuccessorMode になるはず")
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("f キー先読み → .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("風"), "「ふ」行の bigram 候補が含まれるはず")
@@ -423,7 +423,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordBigram(prev: "て", input: "じゆう", output: "自由")
         let (_, action) = type(chars: "j", base: "j")
         XCTAssertTrue(handler.isSuccessorMode, "j キーで先読み候補あれば isSuccessorMode になるはず")
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("j キー先読み → .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("自由"), "「じ」行の bigram 候補が含まれるはず")
@@ -437,7 +437,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordBigram(prev: "て", input: "かれ", output: "彼")    // か行
         let (_, action) = type(chars: "c", base: "c")
         XCTAssertTrue(handler.isSuccessorMode)
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("c キー先読み → .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("近く") || candidates.contains("彼"),
@@ -468,7 +468,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordBigram(prev: "東京", input: "とさん", output: "都産")
         handler.db.recordTrigram(prev2: "昨日", prev1: "東京", input: "いった", output: "行った")
         let (_, action) = type(chars: "i", base: "i")
-        guard case .show(let candidates, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("先読みで .show を返すはず: \(action)"); return
         }
         let idxItta = candidates.firstIndex(of: "行った")

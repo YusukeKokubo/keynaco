@@ -94,6 +94,7 @@ struct Segment {
     var candidates: [String]
     var selectedIndex: Int
     var historyEnd: Int
+    var isManuallyAdjusted: Bool = false
 
     var selectedText: String {
         guard !candidates.isEmpty else { return reading }
