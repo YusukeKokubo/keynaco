@@ -27,7 +27,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         let (consumed, action) = type(chars: "i", base: "i")
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.markedText, "あい")
-        guard case .show(let candidates, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail("辞書候補があればタイピング中も自動表示するはず: \(action)"); return
         }
         XCTAssertFalse(candidates.isEmpty)
@@ -39,7 +39,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         let (consumed, action) = type(chars: "i", base: "i")
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.markedText, "あい")
-        guard case .show(let candidates, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail("履歴ありなら自動表示するはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("あい"))
@@ -234,7 +234,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "「")
-        if case .show(let candidates, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("「"))
             XCTAssertTrue(candidates.contains("【"))
         } else {
@@ -246,7 +246,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         let result = type(chars: "]", base: "]")
         XCTAssertTrue(result.consumed)
         XCTAssertEqual(client.markedText, "」")
-        if case .show(let candidates, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("」"))
             XCTAssertTrue(candidates.contains("】"))
         } else {
@@ -259,7 +259,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         let result = type(chars: "(", base: "9", modifiers: .shift)
         XCTAssertTrue(result.consumed)
         XCTAssertEqual(client.markedText, "（")
-        if case .show(let candidates, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("（"))
         } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
@@ -477,7 +477,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         typeRomaji("kaki")
         XCTAssertEqual(client.markedText, "かき")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("書き"), "「書き」が候補に含まれるはず: \(candidates)")

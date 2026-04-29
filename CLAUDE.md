@@ -65,9 +65,9 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
 - `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/keynaco/` に保存）
-- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` / `skip_bigram` の **4 テーブル**を持つ。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）
-- `SettingsWindowController` / `BigramViewController` / `HistoryViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応
-- `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+予測+履歴セクションの末尾インデックス。これ未満の候補は Shift+Delete で削除可能、以降は AzooKey 専用候補）が重要
+- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` / `skip_bigram` / `user_dict` の **5 テーブル**を持つ。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）。`user_dict` のみ time-decay なし（永続登録）
+- `SettingsWindowController` / `BigramViewController` / `HistoryViewController` / `UserDictViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「ユーザー辞書」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD
+- `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
 - `EventViewerWindow` = `Sources/Debug/EventViewerWindow.swift`。`AppDelegate` が NSStatusItem（⌨アイコン）として常駐し、メニューから起動。keyCode・chars・mods・consumed・action・app をリアルタイム表示。確定テキストと候補リストをキャプチャしてクリップボードにコピー可能。JSONL エクスポートで `~/Library/Application Support/keynaco/sessions/` に保存。デバッグ用途
 
@@ -99,11 +99,14 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 `buildCandidateList()` が組み立てる候補リスト（上が高優先）:
 
 1. ひらがな / カタカナ固定候補（`fixedCount` 件、スクロール外の先頭に挿入）
-2. tri-gram → bi-gram 候補（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先、重複除去後に固定候補の直後に挿入）
-3. 履歴 exact（入力に完全一致）+ prefix（前方一致、完全一致を除外）
-4. AzooKey 辞書候補
+2. **ユーザー辞書**候補（完全一致のみ、`fixedCount` の直後に挿入。`fixedEnd = fixedCount + userDictCount`）
+3. tri-gram → bi-gram 候補（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先、重複除去後にユーザー辞書の直後に挿入）
+4. 履歴 exact（入力に完全一致）+ prefix（前方一致、完全一致を除外）
+5. AzooKey 辞書候補
 
-`autoShow=true`（文字入力中の自動表示）のとき、履歴・辞書・bi-gram が0件なら表示しない。
+`autoShow=true`（文字入力中の自動表示）のとき、履歴・辞書・bi-gram・ユーザー辞書が0件なら表示しない。
+
+Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（ユーザー辞書行 `fixedCount <= row < fixedEnd` は削除不可）。
 
 ## テスト方針
 

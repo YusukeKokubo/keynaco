@@ -30,7 +30,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         press(keyCode: 53)  // Escape でSuccessor モードを解除
         typeRomaji("tanoshii")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, let historyEnd, _, _) = action else {
+        guard case .show(let candidates, let historyEnd, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.prefix(historyEnd).contains("楽しい"),

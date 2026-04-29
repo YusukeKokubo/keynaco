@@ -3,7 +3,7 @@ import AppKit
 /// 候補ウィンドウに対する操作指示
 enum CandidateAction {
     case none
-    case show(candidates: [String], historyEnd: Int, initialRow: Int, predictionEnd: Int)
+    case show(candidates: [String], historyEnd: Int, initialRow: Int, predictionEnd: Int, fixedEnd: Int)
     case dismiss
     case selectNext
     case selectPrev
@@ -19,6 +19,8 @@ struct CandidateContext {
     var isExplicitlySelected: Bool = false
     /// 履歴セクションの末尾インデックス（これ未満の行が履歴）
     var historyEnd: Int = 0
+    /// ユーザー辞書+カナ固定行の末尾インデックス（これ未満の行は Shift+Delete 不可）
+    var fixedEnd: Int = 0
 
     static let hidden = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
 }

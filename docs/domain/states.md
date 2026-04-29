@@ -81,7 +81,7 @@ stateDiagram-v2
 | → | 組成テキストをひらがなのまま確定 → 待機（選択候補は無視） |
 | Escape | 組成クリア → 待機 |
 | Backspace | 組成を1文字削除。1文字になった → `.dismiss`、2文字以上残る → `.show`（候補リフレッシュ） |
-| Shift+Delete | 選択中の候補を履歴 DB から削除（`index < historyEnd` のときのみ有効） |
+| Shift+Delete | 選択中の候補を履歴 DB から削除（`fixedEnd <= index < historyEnd` のときのみ有効。ユーザー辞書行は削除不可） |
 | `. / ,`（Shift なし） | 選択候補を確定**せず**、`。`/`、` を組成に追加して候補をリフレッシュ |
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*

@@ -15,7 +15,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         typeRomaji("tokyo")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode, "漢字確定後はSuccessor モードになるはず")
-        guard case .show(let candidates, _, _, _) = result.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
             XCTFail("格助詞リストを表示するはず: \(result.candidateAction)"); return
         }
         XCTAssertTrue(InputHandler.particles.allSatisfy { candidates.contains($0) }, "全格助詞が候補に含まれるはず")
@@ -80,7 +80,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
         // "g" → 格助詞 fast-path（名詞末尾）で「が」を表示
         let showResult = type(chars: "g", base: "g")
-        guard case .show(let shown, _, _, _) = showResult.candidateAction else {
+        guard case .show(let shown, _, _, _, _) = showResult.candidateAction else {
             XCTFail(".show を返すはず: \(showResult.candidateAction)"); return
         }
         XCTAssertTrue(shown.contains("が"), "bigram 学習済みの「が」が候補に含まれるはず")
@@ -96,7 +96,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
         // "s" → 「す」行フィルタで「好き」（読み: すき）を表示
         let showResult2 = type(chars: "s", base: "s")
-        guard case .show(let cands1, _, _, _) = showResult2.candidateAction else {
+        guard case .show(let cands1, _, _, _, _) = showResult2.candidateAction else {
             XCTFail(".show を返すはず: \(showResult2.candidateAction)"); return
         }
         XCTAssertTrue(cands1.contains("好き"), "bigram 学習済みの「好き」が候補に含まれるはず")
@@ -128,7 +128,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         let filterResult = type(chars: "g", base: "g")
         XCTAssertTrue(filterResult.consumed)
         XCTAssertTrue(handler.isSuccessorMode, "フィルタリング中はSuccessor モードを維持するはず")
-        guard case .show(let candidates, _, _, _) = filterResult.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = filterResult.candidateAction else {
             XCTFail("絞り込み後は .show を返すはず: \(filterResult.candidateAction)"); return
         }
         XCTAssertEqual(candidates, ["が"], "「が」のみが候補に含まれるはず")
@@ -149,7 +149,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         let result = type(chars: "n", base: "n", candidateVisible: true, selectedRow: 0, selectedText: "が")
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(handler.isSuccessorMode, "絞り込み中はSuccessor モードを維持するはず")
-        guard case .show(let candidates, _, _, _) = result.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
             XCTFail("絞り込み後は .show を返すはず: \(result.candidateAction)"); return
         }
         XCTAssertTrue(candidates.contains("に") && candidates.contains("の"), "に・の が候補に含まれるはず: \(candidates)")
@@ -241,7 +241,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         XCTAssertFalse(handler.pendingSuccessorCandidates.isEmpty, "pendingSuccessorCandidates に候補が保存されているはず")
         // 任意の1打 → N-gram 候補を表示
         let showResult = type(chars: "d", base: "d")
-        guard case .show(let candidates, _, _, _) = showResult.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
             XCTFail("1打後は .show を返すはず: \(showResult.candidateAction)"); return
         }
         XCTAssertEqual(candidates, ["です"], "bi-gram 学習済みの output のみ表示（格助詞 fallback なし）")
@@ -259,7 +259,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         }
         // "s" → さ行フィルタ → 頻度順で表示
         let showResult = type(chars: "s", base: "s")
-        guard case .show(let candidates, _, _, _) = showResult.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
             XCTFail("1打後は .show を返すはず: \(showResult.candidateAction)"); return
         }
         let idxSaikin = candidates.firstIndex(of: "最近")
@@ -282,7 +282,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         let filterResult = type(chars: "g", base: "g")
         XCTAssertTrue(handler.isSuccessorMode, "「g」バッファリング中はSuccessor モードを維持")
         XCTAssertNotNil(handler.successorFirstChar, "successorFirstChar にバッファされているはず")
-        guard case .show(let filtered, _, _, _) = filterResult.candidateAction else {
+        guard case .show(let filtered, _, _, _, _) = filterResult.candidateAction else {
             XCTFail("絞り込み後は .show を返すはず: \(filterResult.candidateAction)"); return
         }
         XCTAssertEqual(filtered, ["が"], "「g」で候補が「が」のみに絞り込まれるはず")
@@ -307,7 +307,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         // 「d」打鍵 → 格助詞 fast-path 非該当（非名詞末尾）→ で行フィルタで「です」を表示
         let showResult = type(chars: "d", base: "d")
         XCTAssertTrue(handler.isSuccessorMode, "pendingSuccessorCandidates 表示中は Successor モード継続")
-        guard case .show(let candidates, _, _, _) = showResult.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
             XCTFail(".show を返すはず（N-gram 候補）: \(showResult.candidateAction)"); return
         }
         XCTAssertEqual(candidates, ["です"], "bi-gram 学習済みの「です」が表示されるはず")
@@ -345,7 +345,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         // pendingSuccessorCandidates は格助詞 fast-path に先に入るので無視される
         let gResult = type(chars: "g", base: "g")
         XCTAssertTrue(handler.isSuccessorMode, "絞り込み中は Successor モードを維持するはず")
-        guard case .show(let filtered, _, _, _) = gResult.candidateAction else {
+        guard case .show(let filtered, _, _, _, _) = gResult.candidateAction else {
             XCTFail(".show を返すはず: \(gResult.candidateAction)"); return
         }
         XCTAssertEqual(filtered, ["が"], "「g」で候補が「が」のみに絞り込まれるはず")
@@ -360,7 +360,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
         // "s" → す行フィルタで「好き」（読み: すき）を表示
         let chainShowResult = type(chars: "s", base: "s")
-        guard case .show(let chain, _, _, _) = chainShowResult.candidateAction else {
+        guard case .show(let chain, _, _, _, _) = chainShowResult.candidateAction else {
             XCTFail(".show を返すはず: \(chainShowResult.candidateAction)"); return
         }
         XCTAssertTrue(chain.contains("好き"), "bigram 学習済みの「好き」が後続候補に含まれるはず")
@@ -401,7 +401,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         // 「昨日」「東京」に続く4語目を組成中 → trigram (昨日/東京→行った) が上に来るはず
         typeRomaji("i")
         let action = type(chars: "t", base: "t")
-        guard case .show(let candidates, _, _, _) = action.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = action.candidateAction else {
             XCTFail("候補が表示されるはず"); return
         }
         // bigram のみ持つ「住んだ」より trigram で学習済みの「行った」が上位にあること
@@ -438,7 +438,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         typeRomaji("tokyo")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode)
-        guard case .show(let candidates, _, _, _) = result.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
             XCTFail("count >= threshold → .show を返すはず: \(result.candidateAction)"); return
         }
         XCTAssertTrue(candidates.contains("について"), "高信頼候補「について」が含まれるはず")
@@ -473,7 +473,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         XCTAssertTrue(handler.isSuccessorMode)
 
         let result = type(chars: "n", base: "n")
-        guard case .show(let candidates, _, _, _) = result.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
             XCTFail("n → .show を返すはず（に/の bigram あり）: \(result.candidateAction)"); return
         }
         XCTAssertTrue(candidates.contains("に"), "「に」が候補に含まれるはず: \(candidates)")
@@ -490,7 +490,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let result = type(chars: "n", base: "n")
-        guard case .show(let candidates, _, _, _) = result.candidateAction else {
+        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
             XCTFail(".show を返すはず"); return
         }
         let idxNi = candidates.firstIndex(of: "に")

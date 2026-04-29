@@ -86,6 +86,13 @@ final class DatabaseManager: @unchecked Sendable {
             UNIQUE(prev, input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_skip_bigram ON skip_bigram(prev, input);
+        CREATE TABLE IF NOT EXISTS user_dict (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            input   TEXT    NOT NULL,
+            output  TEXT    NOT NULL,
+            UNIQUE(input, output)
+        );
+        CREATE INDEX IF NOT EXISTS idx_user_dict ON user_dict(input);
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }
@@ -170,6 +177,12 @@ final class DatabaseManager: @unchecked Sendable {
         let input: String
         let output: String
         let count: Int
+    }
+
+    struct UserDictEntry {
+        let id: Int
+        let input: String
+        let output: String
     }
 
     func fetchAllBigram() -> [BigramEntry] {
@@ -461,6 +474,50 @@ final class DatabaseManager: @unchecked Sendable {
         guard chars.count >= 3 else { return }
         for len in 2..<chars.count {
             record(input: String(chars.prefix(len)), output: output)
+        }
+    }
+
+    // MARK: - ユーザー辞書
+
+    func fetchUserDict(reading: String) -> [String] {
+        return queryStrings("""
+        SELECT output FROM user_dict
+        WHERE input = ?
+        ORDER BY id ASC
+        """) {
+            self.bindText($0, 1, reading)
+        }
+    }
+
+    func fetchAllUserDict() -> [UserDictEntry] {
+        let sql = "SELECT id, input, output FROM user_dict ORDER BY id ASC"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        var results: [UserDictEntry] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let i = sqlite3_column_text(stmt, 1),
+                  let o = sqlite3_column_text(stmt, 2) else { continue }
+            results.append(UserDictEntry(
+                id: Int(sqlite3_column_int(stmt, 0)),
+                input: String(cString: i),
+                output: String(cString: o)
+            ))
+        }
+        return results
+    }
+
+    @discardableResult
+    func addUserDict(input: String, output: String) -> Bool {
+        execute("INSERT OR IGNORE INTO user_dict (input, output) VALUES (?, ?)") {
+            self.bindText($0, 1, input); self.bindText($0, 2, output)
+        }
+        return sqlite3_changes(db) == 1
+    }
+
+    func deleteUserDict(id: Int) {
+        execute("DELETE FROM user_dict WHERE id = ?") {
+            sqlite3_bind_int($0, 1, Int32(id))
         }
     }
 

@@ -112,7 +112,8 @@ extension InputHandler {
             commitComposition(client: client)
             return (true, suggestSuccessors())
         case KeyCode.backspace where modifiers.contains(.shift):
-            if candidate.selectedRow < candidate.historyEnd { return (true, .deleteSelected) }
+            let row = candidate.selectedRow
+            if candidate.fixedEnd <= row && row < candidate.historyEnd { return (true, .deleteSelected) }
             return (true, .none)
         default:
             if isBackspace { return doBackspace(client: client) }
@@ -166,6 +167,7 @@ extension InputHandler {
         let h = state.composedHiragana
         let azooKeyCandidates = h.allSatisfy({ $0.isASCII }) ? [] : azooKeyConverter.requestCandidates(hiragana: h)
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
+        let userDictRaw = db.fetchUserDict(reading: historyKey)
         let exactCandidates = db.fetchHistoryExact(reading: historyKey)
         let prefixCandidates = db.fetchHistoryPrefix(reading: historyKey)
         let historyCandidates = exactCandidates + prefixCandidates.filter { !exactCandidates.contains($0) }
@@ -184,7 +186,8 @@ extension InputHandler {
         candidates.insert(contentsOf: uniquePredictions, at: 0)
         let predictCount = uniquePredictions.count
 
-        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0 { return .dismiss }
+        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0
+            && userDictRaw.isEmpty { return .dismiss }
 
         let hiragana = state.composedHiragana
         let katakana = KanaUtils.hiraganaToKatakana(hiragana)
@@ -208,12 +211,20 @@ extension InputHandler {
             fixedCount += 1
         }
 
-        let historyEnd = fixedCount + predictCount + historyCount
-        let predictionEnd = fixedCount + predictCount
+        // ユーザー辞書エントリをカナ固定の直後（initialRow = fixedCount）に挿入する。
+        // 予測・履歴より高優先で表示し、Shift+Delete の誤削除から守るため fixedEnd で追跡する。
+        let uniqueUserDict = userDictRaw.filter { !candidates.contains($0) }
+        candidates.insert(contentsOf: uniqueUserDict, at: fixedCount)
+        let userDictCount = uniqueUserDict.count
+        let fixedEnd = fixedCount + userDictCount
+
+        let historyEnd = fixedEnd + predictCount + historyCount
+        let predictionEnd = fixedEnd + predictCount
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
-        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd)
+        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
+                     predictionEnd: predictionEnd, fixedEnd: fixedEnd)
     }
 
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
@@ -241,7 +252,7 @@ extension InputHandler {
         client.setMarkedText(candidates[0], selectionRange: NSRange(location: candidates[0].count, length: 0))
         let fixedCandidates = kanas
         let allCandidates = fixedCandidates + candidates.filter { !fixedCandidates.contains($0) }
-        return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count, predictionEnd: 0)
+        return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count, predictionEnd: 0, fixedEnd: 0)
     }
 
     // MARK: - Private input handlers
@@ -275,7 +286,7 @@ extension InputHandler {
         if state.composingText.isEmpty {
             bracketCandidates = options
             client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
-            return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, predictionEnd: 0))
+            return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
         }
         flushPendingRomaji()
         state.composedHiragana += options[0]

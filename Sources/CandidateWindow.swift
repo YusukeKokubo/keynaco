@@ -78,7 +78,7 @@ final class CandidateWindow: NSPanel {
     /// ユーザーが ↑↓ で明示的に候補を動かしたか
     private(set) var isExplicitlySelected: Bool = false
     /// スクロール範囲外の固定行数（削除ボタンを非表示にする行数）
-    private var fixedRowCount: Int = 0
+    private(set) var fixedRowCount: Int = 0
     /// 履歴セクションの末尾インデックス（この行の後にセパレータを描画）
     private(set) var historySectionEnd: Int = 0
     /// 予測セクションの末尾インデックス（fixedRowCount <= row < predictionSectionEnd が予測行）
@@ -133,13 +133,13 @@ final class CandidateWindow: NSPanel {
 
     // MARK: - Public API
 
-    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, predictionEnd: Int = 0, near rect: NSRect) {
+    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, predictionEnd: Int = 0, fixedSectionEnd: Int? = nil, near rect: NSRect) {
         self.candidates = candidates
         self.historySectionEnd = historySectionEnd
         self.predictionSectionEnd = predictionEnd
         self.selectedRow = candidates.isEmpty ? 0 : min(initialRow, candidates.count - 1)
         self.isExplicitlySelected = false
-        self.fixedRowCount = initialRow
+        self.fixedRowCount = fixedSectionEnd ?? initialRow
         tableView.reloadData()
 
         // initialRow より前の行（ひらがな・カタカナ）はウィンドウ高さに含めず、

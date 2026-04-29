@@ -284,4 +284,45 @@ final class DatabaseManagerTests: XCTestCase {
         db.performGCIfNeeded()
         XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("古い"), "7日以内は GC を実行しない")
     }
+
+    // MARK: - ユーザー辞書
+
+    func testUserDictAddAndFetch() {
+        XCTAssertTrue(db.addUserDict(input: "けいなこ", output: "keynaco"))
+        let results = db.fetchUserDict(reading: "けいなこ")
+        XCTAssertEqual(results, ["keynaco"])
+    }
+
+    func testUserDictDuplicateReturnsFalse() {
+        db.addUserDict(input: "けいなこ", output: "keynaco")
+        XCTAssertFalse(db.addUserDict(input: "けいなこ", output: "keynaco"))
+    }
+
+    func testUserDictExactMatchOnly() {
+        db.addUserDict(input: "けいなこ", output: "keynaco")
+        XCTAssertTrue(db.fetchUserDict(reading: "けいな").isEmpty, "前方一致は返さない")
+    }
+
+    func testUserDictDelete() {
+        db.addUserDict(input: "けいなこ", output: "keynaco")
+        let all = db.fetchAllUserDict()
+        guard let entry = all.first else { XCTFail("エントリが存在するはず"); return }
+        db.deleteUserDict(id: entry.id)
+        XCTAssertTrue(db.fetchUserDict(reading: "けいなこ").isEmpty)
+    }
+
+    func testUserDictFetchAllOrdered() {
+        db.addUserDict(input: "あ", output: "A")
+        db.addUserDict(input: "い", output: "I")
+        let all = db.fetchAllUserDict()
+        XCTAssertEqual(all.map(\.output), ["A", "I"], "登録順で返る")
+    }
+
+    func testUserDictMultipleEntriesSameReading() {
+        db.addUserDict(input: "りーなー", output: "Leaner")
+        db.addUserDict(input: "りーなー", output: "リーナー株式会社")
+        let results = db.fetchUserDict(reading: "りーなー")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0], "Leaner", "登録順が先")
+    }
 }

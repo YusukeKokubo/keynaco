@@ -132,7 +132,8 @@ class InputController: IMKInputController {
             selectedRow: candidateWindow.selectedRow,
             selectedText: candidateWindow.selectedText(),
             isExplicitlySelected: candidateWindow.isExplicitlySelected,
-            historyEnd: candidateWindow.historySectionEnd
+            historyEnd: candidateWindow.historySectionEnd,
+            fixedEnd: candidateWindow.fixedRowCount
         )
         let adapter = IMKTextInputAdapter(sender)
 
@@ -151,9 +152,9 @@ class InputController: IMKInputController {
         switch action {
         case .none:
             break
-        case .show(let candidates, let historyEnd, let initialRow, let predictionEnd):
+        case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
-            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, near: adapter.cursorRect())
+            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
             if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。
                 // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
@@ -204,7 +205,8 @@ class InputController: IMKInputController {
             selectedRow: candidateWindow.selectedRow,
             selectedText: candidateWindow.selectedText(),
             isExplicitlySelected: candidateWindow.isExplicitlySelected,
-            historyEnd: candidateWindow.historySectionEnd
+            historyEnd: candidateWindow.historySectionEnd,
+            fixedEnd: candidateWindow.fixedRowCount
         )
         handler.commitComposition(client: adapter, candidate: ctx)
         handler.isSuccessorMode = false

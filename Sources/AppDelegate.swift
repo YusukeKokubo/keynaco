@@ -63,10 +63,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         viewerItem.isEnabled = true
         menu.addItem(viewerItem)
 
+        let userDictItem = NSMenuItem(title: "ユーザー辞書...", action: #selector(openUserDict), keyEquivalent: "")
+        userDictItem.isEnabled = true
+        menu.addItem(userDictItem)
+
         statusItem?.menu = menu
     }
 
     @objc private func openEventViewer() {
         EventViewerWindow.shared.show()
+    }
+
+    @objc private func openUserDict() {
+        SettingsWindowController.shared.showSettings(selectingTab: 1)
     }
 }

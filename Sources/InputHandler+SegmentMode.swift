@@ -70,7 +70,7 @@ extension InputHandler {
         guard let segmentState = state.segmentState else { return .none }
         let seg = segmentState.focusedSegment
         guard !seg.candidates.isEmpty else { return .dismiss }
-        return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex, predictionEnd: seg.historyEnd)
+        return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex, predictionEnd: seg.historyEnd, fixedEnd: 0)
     }
 
     mutating func handleSegmentModeKey(
