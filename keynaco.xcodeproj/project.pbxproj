@@ -14,6 +14,7 @@
 		19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */; };
 		1A270494B5AA24DBDB23DD47 /* UserDictViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF94F7FCC94B872938DE79A3 /* UserDictViewController.swift */; };
 		25A7798A7237BDF2124782E0 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54631F84EB0B2E3208C05023 /* SettingsWindowController.swift */; };
+		29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */; };
 		2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */; };
 		32AA887B33A030356BA62078 /* DatabaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */; };
 		417423818A8C02627A56F0D9 /* KanaKanjiConverterModuleWithDefaultDictionary in Frameworks */ = {isa = PBXBuildFile; productRef = 4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */; };
@@ -85,6 +86,7 @@
 		85697F1F7C185DA4A05FFAA5 /* InputHandler+SegmentMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+SegmentMode.swift"; sourceTree = "<group>"; };
 		86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
 		8DC3622F0AAB2993C7A4DD5A /* InputHandlerSuccessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerSuccessorTests.swift; sourceTree = "<group>"; };
+		8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerZSequenceTests.swift; sourceTree = "<group>"; };
 		8FECEC3CBD864BE0FA7202F3 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+SuccessorMode.swift"; sourceTree = "<group>"; };
 		A7EA5A03205A3A4B861980E8 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
@@ -132,6 +134,7 @@
 				0EA17261D3D888C032F5F102 /* InputHandlerSegmentTests.swift */,
 				8DC3622F0AAB2993C7A4DD5A /* InputHandlerSuccessorTests.swift */,
 				A980CA73C689304375F976DD /* InputHandlerTestCase.swift */,
+				8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */,
 				7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */,
 				BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */,
 				F1AA964A2E0D8230BBA41CD7 /* SkipBigramTests.swift */,
@@ -323,6 +326,7 @@
 				0BCF20F606C0BB4B3CB45BD6 /* InputHandlerSegmentTests.swift in Sources */,
 				E9D9EF1D96F61A715009F278 /* InputHandlerSuccessorTests.swift in Sources */,
 				44BA7DAD02471D3C7678FD24 /* InputHandlerTestCase.swift in Sources */,
+				29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */,
 				7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */,
 				E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */,
 				BDF0B7CF569DBAF2532F1083 /* SkipBigramTests.swift in Sources */,

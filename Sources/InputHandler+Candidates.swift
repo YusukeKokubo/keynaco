@@ -11,6 +11,15 @@ import AppKit
 
 extension InputHandler {
 
+    // MARK: - z + キー 特殊文字マップ
+
+    static let zCharMap: [String: String] = [
+        "-": "〜", "/": "・", ".": "…", ",": "、",
+    ]
+    static let zArrowMap: [UInt16: String] = [
+        KeyCode.rightArrow: "→", KeyCode.leftArrow: "←",
+    ]
+
     // MARK: - 括弧候補マップ
 
     static let bracketOptions: [String: [String]] = [
@@ -143,6 +152,11 @@ extension InputHandler {
             return (false, .none)
         }
 
+        // z + 矢印キー（矢印フィルタより前に処理）
+        if state.pendingRomaji == "z", let special = Self.zArrowMap[keyCode] {
+            return commitZSequence(special: special, client: client)
+        }
+
         if keyCode >= KeyCode.leftArrow && keyCode <= KeyCode.upArrow { return (false, .none) }
         guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
         guard let chars = characters, !chars.isEmpty,
@@ -150,6 +164,7 @@ extension InputHandler {
         let base = baseCharacters ?? chars
         let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
 
+        if let r = handleZSequence(base: base, client: client) { return r }
         if let r = handlePunctuation(base: base, modifiers: modifiers, client: client) { return r }
         if let r = handleBracketChar(chars: chars, client: client) { return r }
         if let r = handleShiftChar(chars: chars, isNonAscii: isNonAscii, modifiers: modifiers,
@@ -266,6 +281,23 @@ extension InputHandler {
         guard !state.pendingRomaji.isEmpty else { return }
         state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
         state.pendingRomaji = ""
+    }
+
+    private mutating func commitZSequence(special: String, client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
+        state.pendingRomaji = ""
+        if state.composedHiragana.isEmpty {
+            client.insertText(special)
+            return (true, .dismiss)
+        }
+        state.composedHiragana += special
+        let action = buildCandidateList()
+        applyMarkedText(candidateText: nil, client: client)
+        return (true, action)
+    }
+
+    private mutating func handleZSequence(base: String, client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        guard state.pendingRomaji == "z", let special = Self.zCharMap[base] else { return nil }
+        return commitZSequence(special: special, client: client)
     }
 
     private mutating func handlePunctuation(
