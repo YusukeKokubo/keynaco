@@ -8,6 +8,7 @@
 | **待機** | `isAsciiMode = false`、組成空、特殊モードなし |
 | **組成中** | `composedHiragana` または `pendingRomaji` が非空 |
 | **候補選択中** | 組成中 + `isExplicitlySelected = true`（↑↓ 操作済み）|
+| **括弧モード** | `bracketCandidates != nil`（組成空で `[`/`(` 等を入力） |
 | **セグメントモード** | `isSegmentMode = true` |
 | **Successor モード** | `isSuccessorMode = true` |
 
@@ -34,6 +35,12 @@ stateDiagram-v2
     候補選択中 --> 候補選択中 : Space（次候補）
     候補選択中 --> 待機 : →（組成テキストをひらがなのまま確定）
     候補選択中 --> 待機 : Escape（クリア）
+
+    待機 --> 括弧モード : 括弧キー（`[`/`(`等）
+    括弧モード --> 括弧モード : ↑↓ / Space / Tab（候補移動）
+    括弧モード --> 待機 : Enter（選択候補を確定）
+    括弧モード --> 待機 : Escape / Backspace（キャンセル）
+    括弧モード --> 組成中 : その他キー（選択候補を確定してから通常入力）
 
     組成中 --> セグメントモード : Space
     セグメントモード --> セグメントモード : Space / Tab / ↓（フォーカス文節の次候補）
@@ -86,6 +93,16 @@ stateDiagram-v2
 | `. / ,`（Shift なし） | 選択候補を確定**せず**、`。`/`、` を組成に追加して候補をリフレッシュ |
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
+
+### 括弧モード
+
+| キー | 動作 |
+|------|------|
+| ↑ / Shift+Tab | 前候補へ |
+| ↓ / Space / Tab | 次候補へ |
+| Enter | 選択候補を確定 → 待機 |
+| Escape / Backspace | キャンセル（何も挿入しない）→ 待機 |
+| その他キー | 選択候補を確定してから、そのキーを通常入力として処理 |
 
 ### セグメントモード
 

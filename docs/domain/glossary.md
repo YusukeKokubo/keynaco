@@ -42,10 +42,14 @@
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
+### fixedEnd
+`fixedEnd = fixedCount + userDictCount`。カナ固定 + ユーザー辞書行の末尾インデックス。
+`fixedEnd` 未満の行は Shift+Delete 削除不可（ユーザー辞書は誤削除から保護）。
+
 ### historyEnd
-候補リスト内の「固定候補 + 予測候補 + 履歴候補」セクションの末尾インデックス。
-`historyEnd = fixedCount + predictCount + historyCount`。
-これ未満の候補は Shift+Delete で履歴 DB から削除可能。これ以降は AzooKey 専用候補（削除不可）。
+候補リスト内の「カナ固定 + ユーザー辞書 + 予測候補 + 履歴候補」セクションの末尾インデックス。
+`historyEnd = fixedEnd + predictCount + historyCount`（= `fixedCount + userDictCount + predictCount + historyCount`）。
+`fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。これ以降は AzooKey 専用候補・日時候補（削除不可）。
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
@@ -54,16 +58,22 @@
 **役割**: `true` のとき、文字キー入力で選択候補をまず確定してから新しい文字を処理する。`false` のときは文字入力しても候補を確定せず組成に追加する。Enter は `isExplicitlySelected` に関係なく `selectedText`（現在の視覚的選択）をそのまま確定する。
 
 ### autoShow
-文字入力中に候補ウィンドウを自動表示するかどうか。履歴・辞書・予測候補（tri-gram + bi-gram）がすべて 0 件なら表示しない。
+文字入力中に候補ウィンドウを自動表示するかどうか。履歴・AzooKey 辞書候補・予測候補（tri-gram + bi-gram）・ユーザー辞書候補・日時候補がすべて 0 件なら表示しない。
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
-2. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWord` × 現読みで skip-bigram を引き、trigram・bigram にない候補を末尾に追加）
-3. 履歴 exact → 履歴 prefix
-4. AzooKey 辞書候補
-5. **日時候補**（読みが `きょう` / `きのう` / `あした` / `あす` / `いま` / `ことし` / `きょねん` / `らいねん` / `こんげつ` / `せんげつ` / `らいげつ` のとき、動的に生成した日付・時刻・年の文字列を末尾に追加。`InputHandler.generateDateTimeCandidates(for:)` が生成）
+2. ユーザー辞書（完全一致 + 前方一致。`fixedEnd = fixedCount + userDictCount`）
+3. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWord` × 現読みで skip-bigram を引き、trigram・bigram にない候補を末尾に追加）
+4. 履歴 exact → 履歴 prefix
+5. AzooKey 辞書候補
+6. **日時候補**（読みが `きょう` / `きのう` / `あした` / `あす` / `いま` / `ことし` / `きょねん` / `らいねん` / `こんげつ` / `せんげつ` / `らいげつ` のとき、動的に生成した日付・時刻・年の文字列を末尾に追加。`InputHandler.generateDateTimeCandidates(for:)` が生成）
+
+### 括弧モード（isBracketMode）
+`[` / `(` 等の括弧キーを**待機中**（組成空）に入力したとき、対応する全角括弧の候補ウィンドウを表示するモード（`bracketCandidates != nil`）。  
+`handleBracketModeKey()` がキーを処理し、`bracketOptions` マップで ASCII 括弧 → 全角候補列に変換する（例: `[` → `「` / `【` / `〔` / ...）。  
+**組成中**に括弧を入力した場合は候補ウィンドウは表示せず、全角1文字目を `composedHiragana` に追加して通常の組成継続。
 
 ---
 
@@ -99,7 +109,7 @@ tail に fallback として並べる。ひらがな末尾の語では格助詞 f
 **N-gram 候補の遅延表示と読みフィルタ**:
 N-gram 由来の候補（tri-gram + bi-gram + skip-bigram）がある場合、`suggestSuccessors()` は
 まず `fetchBigramTopCount(prev: last)` で前語に対する bi-gram 上位使用回数を取得する。
-`successorImmediateThreshold`（デフォルト 5）以上なら「高信頼ペア」とみなして即時表示（`.show`）。
+`successorImmediateThreshold`（デフォルト 5）以上なら「高信頼ペア」とみなして即時表示（`.show`）。なお `fetchBigramTopCount` は直近 **90 日以内**のエントリのみを集計する（古い学習が閾値に寄与しないようにする）。
 閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。
 1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、
 DB を再クエリして一致する候補のみ `.show` する（読みが一致しなければモード解除）。  
