@@ -81,9 +81,10 @@ extension InputHandler {
         // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する
         if let selected = candidate.selectedText {
             let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
-            if !isDateTime { db.recordPrefixes(reading: normalizedInput, output: selected) }
+            let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
+            if !isDateTime && !isNumber { db.recordPrefixes(reading: normalizedInput, output: selected) }
             azooKeyConverter.commit(reading: inputKey, text: selected)
-            commitText(text: selected, skipHistory: isDateTime, client: client)
+            commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
         } else {
             commitComposition(client: client)
         }
@@ -218,9 +219,10 @@ extension InputHandler {
         candidates.insert(contentsOf: uniquePredictions, at: 0)
         let predictCount = uniquePredictions.count
 
+        let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
         if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0
-            && userDictRaw.isEmpty && dateTimeCandidates.isEmpty { return .dismiss }
+            && userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty { return .dismiss }
 
         let hiragana = state.composedHiragana
         let katakana = KanaUtils.hiraganaToKatakana(hiragana)
@@ -254,8 +256,10 @@ extension InputHandler {
 
         let historyEnd = fixedEnd + predictCount + historyCount
         let predictionEnd = fixedEnd + predictCount
+        let uniqueNumberCandidates = numberCandidates.filter { insertedSet.insert($0).inserted }
         let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
-        candidates.insert(contentsOf: uniqueDateTimeCandidates, at: historyEnd)
+        candidates.insert(contentsOf: uniqueNumberCandidates, at: historyEnd)
+        candidates.insert(contentsOf: uniqueDateTimeCandidates, at: historyEnd + uniqueNumberCandidates.count)
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }

@@ -223,9 +223,10 @@ struct InputHandler {
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         if candidate.isVisible, let selected = candidate.selectedText {
             let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
-            if !isDateTime { db.recordPrefixes(reading: normalizedInput, output: selected) }
+            let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
+            if !isDateTime && !isNumber { db.recordPrefixes(reading: normalizedInput, output: selected) }
             azooKeyConverter.commit(reading: inputKey, text: selected)
-            commitText(text: selected, skipHistory: isDateTime, client: client)
+            commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
         } else {
             db.recordPrefixes(reading: normalizedInput, output: inputKey)
             commitText(text: inputKey, client: client)

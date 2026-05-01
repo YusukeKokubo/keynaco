@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		014E93622F1E490E3CADC108 /* CompositionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B2777B55743611F1112961 /* CompositionStateTests.swift */; };
+		027212FC0A63FC71D6BC4A94 /* InputHandler+Numbers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB2A7FAC57151FBB78619D7 /* InputHandler+Numbers.swift */; };
 		0521D725A698985598C0AEF1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = EB4429C5180AA3C30E50DD09 /* InfoPlist.strings */; };
 		087D83DB5E5BD1979F0BA0A5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558C3E35C47661D5D98A0A57 /* AppDelegate.swift */; };
 		0BCF20F606C0BB4B3CB45BD6 /* InputHandlerSegmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EA17261D3D888C032F5F102 /* InputHandlerSegmentTests.swift */; };
@@ -33,6 +34,7 @@
 		9DAE303C0C92DC6BE8675EBE /* InputHandler+Candidates.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */; };
 		A1CA0C0EB56C14AAB5A87BDA /* CompositionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A63EA4E6329AB0A60E30A8 /* CompositionState.swift */; };
 		A6E40259CBFDB1F7925D8EAD /* InputSource.tiff in Resources */ = {isa = PBXBuildFile; fileRef = C8F905020C8A707920C53337 /* InputSource.tiff */; };
+		ABC6F7A690113BABA647A714 /* InputHandlerNumberTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6CB521B2B5C2E5690C75C8B /* InputHandlerNumberTests.swift */; };
 		B6A394F4C8CEFE7B98992E12 /* AzooKeyConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */; };
 		BDF0B7CF569DBAF2532F1083 /* SkipBigramTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1AA964A2E0D8230BBA41CD7 /* SkipBigramTests.swift */; };
 		BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */; };
@@ -96,8 +98,10 @@
 		9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+SuccessorMode.swift"; sourceTree = "<group>"; };
 		A7EA5A03205A3A4B861980E8 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		A980CA73C689304375F976DD /* InputHandlerTestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerTestCase.swift; sourceTree = "<group>"; };
+		AAB2A7FAC57151FBB78619D7 /* InputHandler+Numbers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Numbers.swift"; sourceTree = "<group>"; };
 		AD350111182091DBDE4ECE9B /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
 		B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B6CB521B2B5C2E5690C75C8B /* InputHandlerNumberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerNumberTests.swift; sourceTree = "<group>"; };
 		B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Candidates.swift"; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftInputTests.swift; sourceTree = "<group>"; };
@@ -139,6 +143,7 @@
 				713FA4DA358BC346E58691F1 /* InputHandlerCompositionTests.swift */,
 				F10118D688929D09D7ECE26B /* InputHandlerDateTimeTests.swift */,
 				81BA89C29FD9249A960FDF7F /* InputHandlerHistoryTests.swift */,
+				B6CB521B2B5C2E5690C75C8B /* InputHandlerNumberTests.swift */,
 				0EA17261D3D888C032F5F102 /* InputHandlerSegmentTests.swift */,
 				8DC3622F0AAB2993C7A4DD5A /* InputHandlerSuccessorTests.swift */,
 				A980CA73C689304375F976DD /* InputHandlerTestCase.swift */,
@@ -212,6 +217,7 @@
 				34144C2DA730A7CFDC7B4149 /* InputHandler.swift */,
 				B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */,
 				F297E74682C7CFA426D897D3 /* InputHandler+DateTime.swift */,
+				AAB2A7FAC57151FBB78619D7 /* InputHandler+Numbers.swift */,
 				85697F1F7C185DA4A05FFAA5 /* InputHandler+SegmentMode.swift */,
 				9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */,
 				C8F905020C8A707920C53337 /* InputSource.tiff */,
@@ -334,6 +340,7 @@
 				E1471B2D246CBEFC6740F9F1 /* InputHandlerCompositionTests.swift in Sources */,
 				69677FCF9F1426F96E28A047 /* InputHandlerDateTimeTests.swift in Sources */,
 				604402489F5D5169589FEF35 /* InputHandlerHistoryTests.swift in Sources */,
+				ABC6F7A690113BABA647A714 /* InputHandlerNumberTests.swift in Sources */,
 				0BCF20F606C0BB4B3CB45BD6 /* InputHandlerSegmentTests.swift in Sources */,
 				E9D9EF1D96F61A715009F278 /* InputHandlerSuccessorTests.swift in Sources */,
 				44BA7DAD02471D3C7678FD24 /* InputHandlerTestCase.swift in Sources */,
@@ -360,6 +367,7 @@
 				E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */,
 				9DAE303C0C92DC6BE8675EBE /* InputHandler+Candidates.swift in Sources */,
 				F1613C56A9ED3B9A3C6E306D /* InputHandler+DateTime.swift in Sources */,
+				027212FC0A63FC71D6BC4A94 /* InputHandler+Numbers.swift in Sources */,
 				497FC36A92BC2D68915117E3 /* InputHandler+SegmentMode.swift in Sources */,
 				19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */,
 				840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */,
