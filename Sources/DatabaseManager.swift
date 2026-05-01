@@ -41,7 +41,12 @@ final class DatabaseManager: @unchecked Sendable {
             NSLog("keynaco: DB を開けませんでした: \(path)")
             return
         }
+        execute("PRAGMA journal_mode = WAL;")
+        execute("PRAGMA synchronous = NORMAL;")
+        execute("PRAGMA cache_size = -4096;")
+        #if DEBUG
         NSLog("keynaco: DB パス = \(path)")
+        #endif
     }
 
     private func createTables() {
@@ -136,6 +141,12 @@ final class DatabaseManager: @unchecked Sendable {
         defer { sqlite3_finalize(stmt) }
         bind?(stmt)
         sqlite3_step(stmt)
+    }
+
+    func withTransaction(_ body: () -> Void) {
+        execute("BEGIN")
+        body()
+        execute("COMMIT")
     }
 
     // MARK: - 検索
@@ -471,14 +482,34 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     /// フル読みに加え、先頭 2〜(N-1) 文字の各 prefix でも record する。
-    /// 読みが ASCII のみ、または 5 文字未満の場合はフル読みのみ。
+    /// 読みが ASCII のみ、または 3 文字未満の場合はフル読みのみ。
     func recordPrefixes(reading: String, output: String) {
-        record(input: reading, output: output)
-        guard !reading.allSatisfy({ $0.isASCII }) else { return }
+        guard !reading.allSatisfy({ $0.isASCII }) else {
+            record(input: reading, output: output)
+            return
+        }
         let chars = Array(reading)
-        guard chars.count >= 3 else { return }
-        for len in 2..<chars.count {
-            record(input: String(chars.prefix(len)), output: output)
+        guard chars.count >= 3 else {
+            record(input: reading, output: output)
+            return
+        }
+        let now = nowEpoch()
+        let prefixes = (2...chars.count).map { String(chars.prefix($0)) }
+        let placeholders = prefixes.map { _ in "(?,?,1,?)" }.joined(separator: ",")
+        let sql = """
+            INSERT INTO history (input, output, count, used_at)
+            VALUES \(placeholders)
+            ON CONFLICT(input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """
+        execute(sql) { stmt in
+            for (i, prefix) in prefixes.enumerated() {
+                let base = Int32(i * 3 + 1)
+                self.bindText(stmt, base, prefix)
+                self.bindText(stmt, base + 1, output)
+                sqlite3_bind_int64(stmt, base + 2, now)
+            }
         }
     }
 
@@ -582,6 +613,8 @@ final class DatabaseManager: @unchecked Sendable {
         execute("DELETE FROM boundary_pref WHERE used_at < ?") { sqlite3_bind_int64($0, 1, cutoff) }
         sqlite3_exec(db, "VACUUM;", nil, nil, nil)
         defaults.set(now, forKey: key)
+        #if DEBUG
         NSLog("keynaco: DB GC 完了")
+        #endif
     }
 }

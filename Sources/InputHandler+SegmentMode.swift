@@ -81,6 +81,14 @@ extension InputHandler {
         return Segment(reading: reading, candidates: candidates, selectedIndex: initialIndex, historyEnd: historyEnd)
     }
 
+    mutating func buildSegmentCandidatesCached(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
+        let cacheKey = "\(reading)|\(prev ?? "")"
+        if let cached = segmentCandidateCache[cacheKey] { return cached }
+        let result = buildSegmentCandidates(reading: reading, dictCandidates: dictCandidates, prev: prev)
+        segmentCandidateCache[cacheKey] = result
+        return result
+    }
+
     func makeCandidateActionForFocusedSegment() -> CandidateAction {
         guard let segmentState = state.segmentState else { return .none }
         let seg = segmentState.focusedSegment
@@ -136,17 +144,20 @@ extension InputHandler {
 
         case KeyCode.escape:
             state.segmentState = nil
+            segmentCandidateCache.removeAll()
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
 
         default:
             if keyCode == KeyCode.backspace {
                 state.segmentState = nil
+                segmentCandidateCache.removeAll()
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, .dismiss)
             }
             // その他のキー → セグメントモード解除してそのキーをスルー
             state.segmentState = nil
+            segmentCandidateCache.removeAll()
             return (false, .dismiss)
         }
     }
@@ -171,7 +182,7 @@ extension InputHandler {
             guard !nextReading.isEmpty else { return (true, .none) }
             let newFocusedReading = segmentState.segments[i].reading + String(nextReading.first!)
             let newNextReading = String(nextReading.dropFirst())
-            var rebuilt = buildSegmentCandidates(
+            var rebuilt = buildSegmentCandidatesCached(
                 reading: newFocusedReading,
                 dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading),
                 prev: focusedPrev
@@ -181,7 +192,7 @@ extension InputHandler {
             if newNextReading.isEmpty {
                 segmentState.segments.remove(at: i + 1)
             } else {
-                segmentState.segments[i + 1] = buildSegmentCandidates(
+                segmentState.segments[i + 1] = buildSegmentCandidatesCached(
                     reading: newNextReading,
                     dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading),
                     prev: rebuilt.selectedText
@@ -192,7 +203,7 @@ extension InputHandler {
             guard focusedReading.count >= 2 else { return (true, .none) }
             let newFocusedReading = String(focusedReading.dropLast())
             let removedChar = String(focusedReading.last!)
-            var rebuilt = buildSegmentCandidates(
+            var rebuilt = buildSegmentCandidatesCached(
                 reading: newFocusedReading,
                 dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading),
                 prev: focusedPrev
@@ -201,14 +212,14 @@ extension InputHandler {
             segmentState.segments[i] = rebuilt
             if i + 1 < segmentState.segments.count {
                 let newNextReading = removedChar + segmentState.segments[i + 1].reading
-                segmentState.segments[i + 1] = buildSegmentCandidates(
+                segmentState.segments[i + 1] = buildSegmentCandidatesCached(
                     reading: newNextReading,
                     dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading),
                     prev: rebuilt.selectedText
                 )
             } else {
                 segmentState.segments.insert(
-                    buildSegmentCandidates(
+                    buildSegmentCandidatesCached(
                         reading: removedChar,
                         dictCandidates: azooKeyConverter.candidatesForSegment(reading: removedChar),
                         prev: rebuilt.selectedText

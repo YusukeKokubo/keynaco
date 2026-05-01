@@ -72,6 +72,7 @@ struct InputHandler {
     var lastAzooKeyResults: [String] = []
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }
+    var segmentCandidateCache: [String: Segment] = [:]
     var prev2Output: String? {
         committedHistory.count >= 2 ? committedHistory[committedHistory.count - 2] : nil
     }
@@ -236,12 +237,14 @@ struct InputHandler {
     mutating func commitText(text: String, skipHistory: Bool = false, client: TextInputClient) {
         if !state.composingText.isEmpty && !skipHistory {
             if let p1 = lastCommittedOutput {
-                db.recordBigram(prev: p1, input: state.finalizedText, output: text)
-                if let p2 = prev2Output {
-                    db.recordTrigram(prev2: p2, prev1: p1, input: state.finalizedText, output: text)
-                }
-                if InputHandler.particles.contains(p1), let prevContent = mostRecentContentWord() {
-                    db.recordSkipBigram(prev: prevContent, input: state.finalizedText, output: text)
+                db.withTransaction {
+                    db.recordBigram(prev: p1, input: state.finalizedText, output: text)
+                    if let p2 = prev2Output {
+                        db.recordTrigram(prev2: p2, prev1: p1, input: state.finalizedText, output: text)
+                    }
+                    if InputHandler.particles.contains(p1), let prevContent = mostRecentContentWord() {
+                        db.recordSkipBigram(prev: prevContent, input: state.finalizedText, output: text)
+                    }
                 }
             }
         }
@@ -256,6 +259,7 @@ struct InputHandler {
         if state.isSegmentMode, let segmentState = state.segmentState {
             state.composedHiragana = segmentState.segments.map(\.reading).joined()
             state.segmentState = nil
+            segmentCandidateCache.removeAll()
         }
         guard !state.composingText.isEmpty else { return false }
         if !state.pendingRomaji.isEmpty {

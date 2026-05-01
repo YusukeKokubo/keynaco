@@ -19,7 +19,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         gServer = IMKServer(name: connectionName, bundleIdentifier: bundleID)
+        #if DEBUG
         NSLog("keynaco: IMKServer started connection=\(connectionName) bundle=\(bundleID)")
+        #endif
         setupMainMenu()
         setupStatusItem()
         Task.detached(priority: .background) {
