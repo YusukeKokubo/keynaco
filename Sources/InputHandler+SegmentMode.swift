@@ -14,6 +14,13 @@ extension InputHandler {
         }
         let fullReading = state.composedHiragana
 
+        // 全 ASCII（数字・英単語）はセグメント変換しない。
+        // ASCII 読みを segmentize すると履歴の断片が誤結合して "23456" → "2345656六" のような
+        // 不正な確定になる。buildCandidateList の ASCII ガードとここで一貫させる。
+        if fullReading.allSatisfy({ $0.isASCII }) {
+            return buildCandidateList()
+        }
+
         if let stored = db.fetchBoundaryPref(fullReading: fullReading), stored.count >= 2 {
             var segments: [Segment] = []
             var prevText: String? = lastCommittedOutput
