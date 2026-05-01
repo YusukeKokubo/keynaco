@@ -12,7 +12,9 @@ private final class IMKTextInputAdapter: TextInputClient {
 
     func insertText(_ text: String) {
         // insertText は常に @MainActor の InputController 経由で呼ばれる
+        #if DEBUG
         MainActor.assumeIsolated { EventViewerWindow.shared.addCommit(text) }
+        #endif
         client?.insertText(text, replacementRange: .notFound)
     }
 

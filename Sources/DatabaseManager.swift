@@ -5,6 +5,7 @@ final class DatabaseManager: @unchecked Sendable {
     static let shared = DatabaseManager()
 
     private var db: OpaquePointer?
+    private var stmtCache: [String: OpaquePointer] = [:]
 
     // τ = 30日: 30日経過で count の重みが半減するスケール
     private static let recencyTauSeconds: Double = 30 * 86400
@@ -25,6 +26,7 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     deinit {
+        for (_, stmt) in stmtCache { sqlite3_finalize(stmt) }
         sqlite3_close(db)
     }
 
@@ -119,14 +121,26 @@ final class DatabaseManager: @unchecked Sendable {
         sqlite3_bind_double(stmt, index + 1, Self.recencyTauSeconds)
     }
 
+    private func cachedStmt(for sql: String) -> OpaquePointer? {
+        if let cached = stmtCache[sql] {
+            sqlite3_reset(cached)
+            sqlite3_clear_bindings(cached)
+            return cached
+        }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let s = stmt else {
+            return nil
+        }
+        stmtCache[sql] = s
+        return s
+    }
+
     private func queryStrings(
         _ sql: String,
         bind: ((OpaquePointer?) -> Void)? = nil,
         columnIndex: Int32 = 0
     ) -> [String] {
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        guard let stmt = cachedStmt(for: sql) else { return [] }
         bind?(stmt)
         var results: [String] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -136,9 +150,7 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     private func execute(_ sql: String, bind: ((OpaquePointer?) -> Void)? = nil) {
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
+        guard let stmt = cachedStmt(for: sql) else { return }
         bind?(stmt)
         sqlite3_step(stmt)
     }
@@ -327,10 +339,8 @@ final class DatabaseManager: @unchecked Sendable {
     /// prev に続く bi-gram の直近 90 日以内の最大 count を返す。即時表示の閾値判定用。
     func fetchBigramTopCount(prev: String) -> Int {
         let cutoff = nowEpoch() - 90 * 86400
-        var stmt: OpaquePointer?
         let sql = "SELECT MAX(count) FROM bigram WHERE prev = ? AND used_at > ?"
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        guard let stmt = cachedStmt(for: sql) else { return 0 }
         bindText(stmt, 1, prev)
         sqlite3_bind_int64(stmt, 2, cutoff)
         guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
