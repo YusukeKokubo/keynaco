@@ -160,6 +160,21 @@ final class DatabaseManager: @unchecked Sendable {
         return results
     }
 
+    private func queryStringKindPairsOnQueue(
+        _ sql: String,
+        bind: ((OpaquePointer?) -> Void)? = nil
+    ) -> [(output: String, kind: Int32)] {
+        guard let stmt = cachedStmt(for: sql) else { return [] }
+        bind?(stmt)
+        var results: [(String, Int32)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 0) {
+                results.append((String(cString: ptr), sqlite3_column_int(stmt, 1)))
+            }
+        }
+        return results
+    }
+
     private func executeOnQueue(_ sql: String, bind: ((OpaquePointer?) -> Void)? = nil) {
         guard let stmt = cachedStmt(for: sql) else { return }
         bind?(stmt)
@@ -199,6 +214,38 @@ final class DatabaseManager: @unchecked Sendable {
                 self.bindRecency($0, at: 3, now: now)
             }
         }
+    }
+
+    /// 完全一致・前方一致の履歴候補を 1 クエリで返す（buildCandidateList ホットパス用）。
+    func fetchHistoryCombined(reading: String) -> (exact: [String], prefix: [String]) {
+        let prefix = reading + "%"
+        let pairs = dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringKindPairsOnQueue("""
+            SELECT output, kind FROM (
+              SELECT output, 0 AS kind,
+                     (\(Self.recencyExpr)) AS score
+              FROM history WHERE input = ? COLLATE NOCASE
+              UNION ALL
+              SELECT output, 1 AS kind,
+                     SUM(\(Self.recencyExpr)) AS score
+              FROM history WHERE input LIKE ? AND input != ?
+              GROUP BY output
+            ) ORDER BY kind ASC, score DESC LIMIT 20
+            """) {
+                self.bindRecency($0, at: 1, now: now)
+                self.bindText($0, 3, reading)
+                self.bindRecency($0, at: 4, now: now)
+                self.bindText($0, 6, prefix)
+                self.bindText($0, 7, reading)
+            }
+        }
+        var exact: [String] = []
+        var pfx: [String] = []
+        for (output, kind) in pairs {
+            if kind == 0 { exact.append(output) } else { pfx.append(output) }
+        }
+        return (exact, pfx)
     }
 
     // MARK: - 設定画面用
@@ -671,6 +718,30 @@ final class DatabaseManager: @unchecked Sendable {
                 self.bindText($0, 2, reading)
             }
         }
+    }
+
+    /// 完全一致・前方一致のユーザー辞書候補を 1 クエリで返す（buildCandidateList ホットパス用）。
+    func fetchUserDictCombined(reading: String) -> (exact: [String], prefix: [String]) {
+        let pairs = dbQueue.sync {
+            self.queryStringKindPairsOnQueue("""
+            SELECT output, kind FROM (
+              SELECT output, 0 AS kind, id AS ord FROM user_dict WHERE input = ?
+              UNION ALL
+              SELECT output, 1 AS kind, id AS ord FROM user_dict
+              WHERE ? LIKE (input || '%') AND input != ?
+            ) ORDER BY kind ASC, ord ASC
+            """) {
+                self.bindText($0, 1, reading)
+                self.bindText($0, 2, reading)
+                self.bindText($0, 3, reading)
+            }
+        }
+        var exact: [String] = []
+        var pfx: [String] = []
+        for (output, kind) in pairs {
+            if kind == 0 { exact.append(output) } else { pfx.append(output) }
+        }
+        return (exact, pfx)
     }
 
     func fetchAllUserDict() -> [UserDictEntry] {

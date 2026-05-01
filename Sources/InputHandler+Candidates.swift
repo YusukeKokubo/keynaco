@@ -196,11 +196,9 @@ extension InputHandler {
             lastAzooKeyInput = h; lastAzooKeyResults = azooKeyCandidates
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
-        let userDictExact = db.fetchUserDict(reading: historyKey)
-        let userDictPrefix = db.fetchUserDictPrefix(reading: historyKey)
+        let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
-        let exactCandidates = db.fetchHistoryExact(reading: historyKey)
-        let prefixCandidates = db.fetchHistoryPrefix(reading: historyKey)
+        let (exactCandidates, prefixCandidates) = db.fetchHistoryCombined(reading: historyKey)
         let historyCandidates = Self.merged(exactCandidates, prefixCandidates)
         let historyCount = historyCandidates.count
 
