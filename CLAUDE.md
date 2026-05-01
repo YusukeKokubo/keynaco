@@ -59,13 +59,13 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 ## コンポーネント構成
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` もここで管理
-- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+Candidates.swift`（候補リスト・通常入力）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`等の括弧キー入力時に対応する全角括弧の候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII → 全角候補列に変換）。`sentenceTerminators`（`。！？\n`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する
+- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+Candidates.swift`（候補リスト・通常入力）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`等の括弧キー入力時に対応する全角括弧の候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII → 全角候補列に変換）。`sentenceTerminators`（`。！？\n`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包。`hiddenPendingN` フラグで "nn" → "ん" 後の pending "n" を不可視化（標準 IME 準拠）。Backspace 時は "ん" + hidden n をまとめて1操作で削除する
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
 - `AzooKeyConverter` = ひらがな→漢字変換エンジン（`KanaKanjiConverterModuleWithDefaultDictionary` のラッパー、学習データを `~/Library/Application Support/keynaco/` に保存）
-- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` / `skip_bigram` / `user_dict` の **5 テーブル**を持つ。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）。`user_dict` のみ time-decay なし（永続登録）
+- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` / `skip_bigram` / `user_dict` / `boundary_pref` の **6 テーブル**を持つ。`boundary_pref` はセグメント境界学習（読み全体 → 区切り位置の配列）を保存し、次回同じ読みを変換したとき同じ境界を優先する。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）。`user_dict` のみ time-decay なし（永続登録）。`performGCIfNeeded()` で count=1 かつ 180日超のエントリを定期削除（`boundary_pref` も対象）
 - `SettingsWindowController` / `BigramViewController` / `HistoryViewController` / `UserDictViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「ユーザー辞書」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
@@ -102,7 +102,8 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 2. **ユーザー辞書**候補（完全一致のみ、`fixedCount` の直後に挿入。`fixedEnd = fixedCount + userDictCount`）
 3. tri-gram → bi-gram 候補（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先、重複除去後にユーザー辞書の直後に挿入）
 4. 履歴 exact（入力に完全一致）+ prefix（前方一致、完全一致を除外）
-5. AzooKey 辞書候補
+5. 日時候補（`generateDateTimeCandidates`：きょう/いま/ことし等、`historyEnd` の直後に挿入。変換履歴には記録しない）
+6. AzooKey 辞書候補
 
 `autoShow=true`（文字入力中の自動表示）のとき、履歴・辞書・bi-gram・ユーザー辞書が0件なら表示しない。
 
@@ -129,6 +130,7 @@ IME はバックグラウンドエージェントとして動作するため、`
 - **Shift+Delete（候補選択中）**: 選択中の候補を変換履歴 DB から削除。
 - **Shift+Tab / Shift+矢印（セグメントモード中）**: セグメント境界を1文字単位で調整。
 - **F6–F10（組成中のみ）**: F6=ひらがな、F7=全角カタカナ、F8=半角カタカナ、F9=全角ASCII、F10=半角ASCII で即時確定。`handleFunctionKey()` 参照。
+- **z シーケンス（組成中・組成前どちらでも）**: `z` + 記号/矢印キーで特殊文字を即時挿入。`z-` → `〜`、`z/` → `・`、`z.` → `…`、`z,` → `、`、`z→` → `→`、`z←` → `←`（`zCharMap` / `zArrowMap`）。
 
 ## macOS 26 IME の罠
 
