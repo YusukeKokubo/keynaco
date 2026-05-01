@@ -6,6 +6,9 @@ final class DatabaseManager: @unchecked Sendable {
 
     private var db: OpaquePointer?
     private var stmtCache: [String: OpaquePointer] = [:]
+    private let dbQueue = DispatchQueue(label: "keynaco.db", qos: .utility)
+    // inMemory=true のテストでは書き込みを同期実行して即座に読み取れるようにする
+    private let writeAsync: Bool
 
     // τ = 30日: 30日経過で count の重みが半減するスケール
     private static let recencyTauSeconds: Double = 30 * 86400
@@ -15,19 +18,23 @@ final class DatabaseManager: @unchecked Sendable {
     private func nowEpoch() -> Int64 { clock() }
 
     private init() {
+        writeAsync = true
         openDatabase()
         createTables()
     }
 
     /// テスト用: インメモリ DB で初期化
     init(inMemory: Bool) {
+        writeAsync = false
         guard sqlite3_open(":memory:", &db) == SQLITE_OK else { return }
         createTables()
     }
 
     deinit {
-        for (_, stmt) in stmtCache { sqlite3_finalize(stmt) }
-        sqlite3_close(db)
+        dbQueue.sync {
+            for (_, stmt) in self.stmtCache { sqlite3_finalize(stmt) }
+            sqlite3_close(self.db)
+        }
     }
 
     // MARK: - セットアップ
@@ -43,9 +50,9 @@ final class DatabaseManager: @unchecked Sendable {
             NSLog("keynaco: DB を開けませんでした: \(path)")
             return
         }
-        execute("PRAGMA journal_mode = WAL;")
-        execute("PRAGMA synchronous = NORMAL;")
-        execute("PRAGMA cache_size = -4096;")
+        executeOnQueue("PRAGMA journal_mode = WAL;")
+        executeOnQueue("PRAGMA synchronous = NORMAL;")
+        executeOnQueue("PRAGMA cache_size = -4096;")
         #if DEBUG
         NSLog("keynaco: DB パス = \(path)")
         #endif
@@ -109,7 +116,11 @@ final class DatabaseManager: @unchecked Sendable {
         sqlite3_exec(db, sql, nil, nil, nil)
     }
 
-    // MARK: - SQLite ヘルパー
+    private func dispatchWrite(_ block: @escaping () -> Void) {
+        if writeAsync { dbQueue.async(execute: block) } else { dbQueue.sync(execute: block) }
+    }
+
+    // MARK: - SQLite ヘルパー（dbQueue 上でのみ呼び出す）
 
     private func bindText(_ stmt: OpaquePointer?, _ index: Int32, _ value: String) {
         sqlite3_bind_text(stmt, index, value, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
@@ -135,7 +146,7 @@ final class DatabaseManager: @unchecked Sendable {
         return s
     }
 
-    private func queryStrings(
+    private func queryStringsOnQueue(
         _ sql: String,
         bind: ((OpaquePointer?) -> Void)? = nil,
         columnIndex: Int32 = 0
@@ -149,46 +160,44 @@ final class DatabaseManager: @unchecked Sendable {
         return results
     }
 
-    private func execute(_ sql: String, bind: ((OpaquePointer?) -> Void)? = nil) {
+    private func executeOnQueue(_ sql: String, bind: ((OpaquePointer?) -> Void)? = nil) {
         guard let stmt = cachedStmt(for: sql) else { return }
         bind?(stmt)
         sqlite3_step(stmt)
-    }
-
-    func withTransaction(_ body: () -> Void) {
-        execute("BEGIN")
-        body()
-        execute("COMMIT")
     }
 
     // MARK: - 検索
 
     /// 読みに完全一致する履歴候補を使用頻度順で返す。
     func fetchHistoryExact(reading: String) -> [String] {
-        let now = nowEpoch()
-        return queryStrings("""
-        SELECT output FROM history
-        WHERE input = ? COLLATE NOCASE
-        ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
-        LIMIT 10
-        """) {
-            self.bindText($0, 1, reading)
-            self.bindRecency($0, at: 2, now: now)
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM history
+            WHERE input = ? COLLATE NOCASE
+            ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
+            LIMIT 10
+            """) {
+                self.bindText($0, 1, reading)
+                self.bindRecency($0, at: 2, now: now)
+            }
         }
     }
 
     /// 読みが前方一致する履歴候補を使用頻度順で返す（完全一致は除外）。
     func fetchHistoryPrefix(reading: String) -> [String] {
-        let now = nowEpoch()
-        return queryStrings("""
-        SELECT output FROM history
-        WHERE input LIKE ? AND input != ?
-        GROUP BY output
-        ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
-        LIMIT 10
-        """) {
-            self.bindText($0, 1, reading + "%"); self.bindText($0, 2, reading)
-            self.bindRecency($0, at: 3, now: now)
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM history
+            WHERE input LIKE ? AND input != ?
+            GROUP BY output
+            ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
+            LIMIT 10
+            """) {
+                self.bindText($0, 1, reading + "%"); self.bindText($0, 2, reading)
+                self.bindRecency($0, at: 3, now: now)
+            }
         }
     }
 
@@ -214,256 +223,292 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     func fetchAllBigram() -> [BigramEntry] {
-        let sql = "SELECT prev, input, output, count FROM bigram ORDER BY count DESC, used_at DESC LIMIT 1000"
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        var results: [BigramEntry] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let p = sqlite3_column_text(stmt, 0),
-                  let i = sqlite3_column_text(stmt, 1),
-                  let o = sqlite3_column_text(stmt, 2) else { continue }
-            results.append(BigramEntry(
-                prev: String(cString: p), input: String(cString: i),
-                output: String(cString: o), count: Int(sqlite3_column_int(stmt, 3))
-            ))
+        dbQueue.sync {
+            let sql = "SELECT prev, input, output, count FROM bigram ORDER BY count DESC, used_at DESC LIMIT 1000"
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+            var results: [BigramEntry] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let p = sqlite3_column_text(stmt, 0),
+                      let i = sqlite3_column_text(stmt, 1),
+                      let o = sqlite3_column_text(stmt, 2) else { continue }
+                results.append(BigramEntry(
+                    prev: String(cString: p), input: String(cString: i),
+                    output: String(cString: o), count: Int(sqlite3_column_int(stmt, 3))
+                ))
+            }
+            return results
         }
-        return results
     }
 
     func deleteBigram(prev: String, input: String, output: String) {
-        execute("DELETE FROM bigram WHERE prev = ? AND input = ? AND output = ?") {
-            self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+        dispatchWrite {
+            self.executeOnQueue("DELETE FROM bigram WHERE prev = ? AND input = ? AND output = ?") {
+                self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+            }
         }
     }
 
     func fetchAllHistory() -> [HistoryEntry] {
-        let sql = "SELECT input, output, count FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        var results: [HistoryEntry] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let i = sqlite3_column_text(stmt, 0),
-                  let o = sqlite3_column_text(stmt, 1) else { continue }
-            results.append(HistoryEntry(
-                input: String(cString: i), output: String(cString: o),
-                count: Int(sqlite3_column_int(stmt, 2))
-            ))
+        dbQueue.sync {
+            let sql = "SELECT input, output, count FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+            var results: [HistoryEntry] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let i = sqlite3_column_text(stmt, 0),
+                      let o = sqlite3_column_text(stmt, 1) else { continue }
+                results.append(HistoryEntry(
+                    input: String(cString: i), output: String(cString: o),
+                    count: Int(sqlite3_column_int(stmt, 2))
+                ))
+            }
+            return results
         }
-        return results
     }
 
     func deleteHistoryEntry(input: String, output: String) {
-        execute("DELETE FROM history WHERE input = ? AND output = ?") {
-            self.bindText($0, 1, input); self.bindText($0, 2, output)
+        dispatchWrite {
+            self.executeOnQueue("DELETE FROM history WHERE input = ? AND output = ?") {
+                self.bindText($0, 1, input); self.bindText($0, 2, output)
+            }
         }
     }
 
     func penalizeHistory(input: String, output: String) {
-        execute("UPDATE history SET count = count - 1 WHERE input = ? AND output = ?") {
-            self.bindText($0, 1, input); self.bindText($0, 2, output)
-        }
-        execute("DELETE FROM history WHERE input = ? AND output = ? AND count <= 0") {
-            self.bindText($0, 1, input); self.bindText($0, 2, output)
+        dispatchWrite {
+            self.executeOnQueue("UPDATE history SET count = count - 1 WHERE input = ? AND output = ?") {
+                self.bindText($0, 1, input); self.bindText($0, 2, output)
+            }
+            self.executeOnQueue("DELETE FROM history WHERE input = ? AND output = ? AND count <= 0") {
+                self.bindText($0, 1, input); self.bindText($0, 2, output)
+            }
         }
     }
 
     /// 既存の bi-gram を全削除してからインポートデータで置き換える。
     func replaceBigram(_ entries: [BigramEntry]) {
-        sqlite3_exec(db, "DELETE FROM bigram", nil, nil, nil)
-        let sql = """
-        INSERT INTO bigram (prev, input, output, count, used_at)
-        VALUES (?, ?, ?, ?, ?)
-        """
-        let t = nowEpoch()
-        var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
-        defer { sqlite3_finalize(stmt) }
-        for entry in entries {
-            bindText(stmt, 1, entry.prev); bindText(stmt, 2, entry.input)
-            bindText(stmt, 3, entry.output)
-            sqlite3_bind_int64(stmt, 4, Int64(entry.count))
-            sqlite3_bind_int64(stmt, 5, t)
-            sqlite3_step(stmt)
-            sqlite3_reset(stmt)
+        dbQueue.sync {
+            sqlite3_exec(self.db, "DELETE FROM bigram", nil, nil, nil)
+            let sql = """
+            INSERT INTO bigram (prev, input, output, count, used_at)
+            VALUES (?, ?, ?, ?, ?)
+            """
+            let t = self.nowEpoch()
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+            defer { sqlite3_finalize(stmt) }
+            for entry in entries {
+                self.bindText(stmt, 1, entry.prev); self.bindText(stmt, 2, entry.input)
+                self.bindText(stmt, 3, entry.output)
+                sqlite3_bind_int64(stmt, 4, Int64(entry.count))
+                sqlite3_bind_int64(stmt, 5, t)
+                sqlite3_step(stmt)
+                sqlite3_reset(stmt)
+            }
         }
     }
 
     // MARK: - Bi-gram
 
     func recordBigram(prev: String, input: String, output: String) {
-        let t = nowEpoch()
-        execute("""
-        INSERT INTO bigram (prev, input, output, count, used_at)
-        VALUES (?, ?, ?, 1, ?)
-        ON CONFLICT(prev, input, output) DO UPDATE SET
-            count   = count + 1,
-            used_at = excluded.used_at;
-        """) {
-            self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
-            sqlite3_bind_int64($0, 4, t)
+        dispatchWrite {
+            let t = self.nowEpoch()
+            self.executeOnQueue("""
+            INSERT INTO bigram (prev, input, output, count, used_at)
+            VALUES (?, ?, ?, 1, ?)
+            ON CONFLICT(prev, input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+                sqlite3_bind_int64($0, 4, t)
+            }
         }
     }
 
     func fetchBigram(prev: String, reading: String) -> [String] {
-        let now = nowEpoch()
-        return queryStrings("""
-        SELECT output FROM bigram
-        WHERE prev = ? AND input LIKE ?
-        ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
-        LIMIT 10
-        """) {
-            self.bindText($0, 1, prev); self.bindText($0, 2, reading + "%")
-            self.bindRecency($0, at: 3, now: now)
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM bigram
+            WHERE prev = ? AND input LIKE ?
+            ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
+            LIMIT 10
+            """) {
+                self.bindText($0, 1, prev); self.bindText($0, 2, reading + "%")
+                self.bindRecency($0, at: 3, now: now)
+            }
         }
     }
 
     /// prev に続く bi-gram 上位候補を返す（input に依らず output を集約）。
     /// 同じ output が複数 input で学習されている場合は count の合計でソートする。
     func fetchBigramTop(prev: String, limit: Int = 20) -> [String] {
-        let now = nowEpoch()
-        return queryStrings("""
-        SELECT output FROM bigram
-        WHERE prev = ?
-        GROUP BY output
-        ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
-        LIMIT ?
-        """) {
-            self.bindText($0, 1, prev)
-            self.bindRecency($0, at: 2, now: now)
-            sqlite3_bind_int($0, 4, Int32(limit))
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM bigram
+            WHERE prev = ?
+            GROUP BY output
+            ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
+            LIMIT ?
+            """) {
+                self.bindText($0, 1, prev)
+                self.bindRecency($0, at: 2, now: now)
+                sqlite3_bind_int($0, 4, Int32(limit))
+            }
         }
     }
 
     /// prev に続く bi-gram の直近 90 日以内の最大 count を返す。即時表示の閾値判定用。
     func fetchBigramTopCount(prev: String) -> Int {
-        let cutoff = nowEpoch() - 90 * 86400
-        let sql = "SELECT MAX(count) FROM bigram WHERE prev = ? AND used_at > ?"
-        guard let stmt = cachedStmt(for: sql) else { return 0 }
-        bindText(stmt, 1, prev)
-        sqlite3_bind_int64(stmt, 2, cutoff)
-        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
-        return Int(sqlite3_column_int(stmt, 0))
+        dbQueue.sync {
+            let cutoff = self.nowEpoch() - 90 * 86400
+            let sql = "SELECT MAX(count) FROM bigram WHERE prev = ? AND used_at > ?"
+            guard let stmt = self.cachedStmt(for: sql) else { return 0 }
+            self.bindText(stmt, 1, prev)
+            sqlite3_bind_int64(stmt, 2, cutoff)
+            guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+            return Int(sqlite3_column_int(stmt, 0))
+        }
     }
 
     /// list 内の候補を bi-gram 頻度順で返す（未登録分は除外）。
     func fetchBigramInList(prev: String, list: [String]) -> [String] {
         guard !list.isEmpty else { return [] }
-        let now = nowEpoch()
-        let placeholders = list.map { _ in "?" }.joined(separator: ",")
-        return queryStrings("""
-        SELECT output FROM bigram
-        WHERE prev = ? AND output IN (\(placeholders))
-        ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
-        """) {
-            self.bindText($0, 1, prev)
-            for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 2), item) }
-            self.bindRecency($0, at: Int32(list.count + 2), now: now)
+        return dbQueue.sync {
+            let now = self.nowEpoch()
+            let placeholders = list.map { _ in "?" }.joined(separator: ",")
+            return self.queryStringsOnQueue("""
+            SELECT output FROM bigram
+            WHERE prev = ? AND output IN (\(placeholders))
+            ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
+            """) {
+                self.bindText($0, 1, prev)
+                for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 2), item) }
+                self.bindRecency($0, at: Int32(list.count + 2), now: now)
+            }
         }
     }
 
     // MARK: - Tri-gram
 
     func recordTrigram(prev2: String, prev1: String, input: String, output: String) {
-        let t = nowEpoch()
-        execute("""
-        INSERT INTO trigram (prev2, prev1, input, output, count, used_at)
-        VALUES (?, ?, ?, ?, 1, ?)
-        ON CONFLICT(prev2, prev1, input, output) DO UPDATE SET
-            count   = count + 1,
-            used_at = excluded.used_at;
-        """) {
-            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
-            self.bindText($0, 3, input); self.bindText($0, 4, output)
-            sqlite3_bind_int64($0, 5, t)
+        dispatchWrite {
+            let t = self.nowEpoch()
+            self.executeOnQueue("""
+            INSERT INTO trigram (prev2, prev1, input, output, count, used_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            ON CONFLICT(prev2, prev1, input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
+                self.bindText($0, 3, input); self.bindText($0, 4, output)
+                sqlite3_bind_int64($0, 5, t)
+            }
         }
     }
 
     func fetchTrigram(prev2: String, prev1: String, reading: String) -> [String] {
-        let now = nowEpoch()
-        return queryStrings("""
-        SELECT output FROM trigram
-        WHERE prev2 = ? AND prev1 = ? AND input LIKE ?
-        ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
-        LIMIT 10
-        """) {
-            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1); self.bindText($0, 3, reading + "%")
-            self.bindRecency($0, at: 4, now: now)
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM trigram
+            WHERE prev2 = ? AND prev1 = ? AND input LIKE ?
+            ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
+            LIMIT 10
+            """) {
+                self.bindText($0, 1, prev2); self.bindText($0, 2, prev1); self.bindText($0, 3, reading + "%")
+                self.bindRecency($0, at: 4, now: now)
+            }
         }
     }
 
     func fetchTrigramTop(prev2: String, prev1: String, limit: Int = 20) -> [String] {
-        let now = nowEpoch()
-        return queryStrings("""
-        SELECT output FROM trigram
-        WHERE prev2 = ? AND prev1 = ?
-        GROUP BY output
-        ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
-        LIMIT ?
-        """) {
-            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
-            self.bindRecency($0, at: 3, now: now)
-            sqlite3_bind_int($0, 5, Int32(limit))
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM trigram
+            WHERE prev2 = ? AND prev1 = ?
+            GROUP BY output
+            ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
+            LIMIT ?
+            """) {
+                self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
+                self.bindRecency($0, at: 3, now: now)
+                sqlite3_bind_int($0, 5, Int32(limit))
+            }
         }
     }
 
     func fetchTrigramInList(prev2: String, prev1: String, list: [String]) -> [String] {
         guard !list.isEmpty else { return [] }
-        let now = nowEpoch()
-        let placeholders = list.map { _ in "?" }.joined(separator: ",")
-        return queryStrings("""
-        SELECT output FROM trigram
-        WHERE prev2 = ? AND prev1 = ? AND output IN (\(placeholders))
-        ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
-        """) {
-            self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
-            for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 3), item) }
-            self.bindRecency($0, at: Int32(list.count + 3), now: now)
+        return dbQueue.sync {
+            let now = self.nowEpoch()
+            let placeholders = list.map { _ in "?" }.joined(separator: ",")
+            return self.queryStringsOnQueue("""
+            SELECT output FROM trigram
+            WHERE prev2 = ? AND prev1 = ? AND output IN (\(placeholders))
+            ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
+            """) {
+                self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
+                for (i, item) in list.enumerated() { self.bindText($0, Int32(i + 3), item) }
+                self.bindRecency($0, at: Int32(list.count + 3), now: now)
+            }
         }
     }
 
     // MARK: - Skip-Bigram
 
     func recordSkipBigram(prev: String, input: String, output: String) {
-        let t = nowEpoch()
-        execute("""
-        INSERT INTO skip_bigram (prev, input, output, count, used_at)
-        VALUES (?, ?, ?, 1, ?)
-        ON CONFLICT(prev, input, output) DO UPDATE SET
-            count   = count + 1,
-            used_at = excluded.used_at;
-        """) {
-            self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
-            sqlite3_bind_int64($0, 4, t)
+        dispatchWrite {
+            let t = self.nowEpoch()
+            self.executeOnQueue("""
+            INSERT INTO skip_bigram (prev, input, output, count, used_at)
+            VALUES (?, ?, ?, 1, ?)
+            ON CONFLICT(prev, input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+                sqlite3_bind_int64($0, 4, t)
+            }
         }
     }
 
     func fetchSkipBigram(prev: String, reading: String) -> [String] {
-        let now = nowEpoch()
-        return queryStrings("""
-        SELECT output FROM skip_bigram
-        WHERE prev = ? AND input LIKE ?
-        ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
-        LIMIT 10
-        """) {
-            self.bindText($0, 1, prev); self.bindText($0, 2, reading + "%")
-            self.bindRecency($0, at: 3, now: now)
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM skip_bigram
+            WHERE prev = ? AND input LIKE ?
+            ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
+            LIMIT 10
+            """) {
+                self.bindText($0, 1, prev); self.bindText($0, 2, reading + "%")
+                self.bindRecency($0, at: 3, now: now)
+            }
         }
     }
 
     func fetchSkipBigramTop(prev: String, limit: Int = 20) -> [String] {
-        let now = nowEpoch()
-        return queryStrings("""
-        SELECT output FROM skip_bigram
-        WHERE prev = ?
-        GROUP BY output
-        ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
-        LIMIT ?
-        """) {
-            self.bindText($0, 1, prev)
-            self.bindRecency($0, at: 2, now: now)
-            sqlite3_bind_int($0, 4, Int32(limit))
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM skip_bigram
+            WHERE prev = ?
+            GROUP BY output
+            ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
+            LIMIT ?
+            """) {
+                self.bindText($0, 1, prev)
+                self.bindRecency($0, at: 2, now: now)
+                sqlite3_bind_int($0, 4, Int32(limit))
+            }
         }
     }
 
@@ -471,36 +516,66 @@ final class DatabaseManager: @unchecked Sendable {
 
     /// 履歴から指定の output を持つエントリを削除
     func deleteHistory(output: String) {
-        execute("DELETE FROM history WHERE output = ?") { self.bindText($0, 1, output) }
+        dispatchWrite {
+            self.executeOnQueue("DELETE FROM history WHERE output = ?") { self.bindText($0, 1, output) }
+        }
     }
 
     // MARK: - 記録
 
     /// 変換確定時に履歴へ追記（同じ input/output ペアはカウントアップ）
     func record(input: String, output: String) {
-        let t = nowEpoch()
-        execute("""
-        INSERT INTO history (input, output, count, used_at)
-        VALUES (?, ?, 1, ?)
-        ON CONFLICT(input, output) DO UPDATE SET
-            count   = count + 1,
-            used_at = excluded.used_at;
-        """) {
-            self.bindText($0, 1, input); self.bindText($0, 2, output)
-            sqlite3_bind_int64($0, 3, t)
+        dispatchWrite {
+            let t = self.nowEpoch()
+            self.executeOnQueue("""
+            INSERT INTO history (input, output, count, used_at)
+            VALUES (?, ?, 1, ?)
+            ON CONFLICT(input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, input); self.bindText($0, 2, output)
+                sqlite3_bind_int64($0, 3, t)
+            }
         }
     }
 
     /// フル読みに加え、先頭 2〜(N-1) 文字の各 prefix でも record する。
     /// 読みが ASCII のみ、または 3 文字未満の場合はフル読みのみ。
     func recordPrefixes(reading: String, output: String) {
+        dispatchWrite {
+            self.recordPrefixesOnQueue(reading: reading, output: output)
+        }
+    }
+
+    private func recordPrefixesOnQueue(reading: String, output: String) {
         guard !reading.allSatisfy({ $0.isASCII }) else {
-            record(input: reading, output: output)
+            let t = nowEpoch()
+            executeOnQueue("""
+            INSERT INTO history (input, output, count, used_at)
+            VALUES (?, ?, 1, ?)
+            ON CONFLICT(input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, reading); self.bindText($0, 2, output)
+                sqlite3_bind_int64($0, 3, t)
+            }
             return
         }
         let chars = Array(reading)
         guard chars.count >= 3 else {
-            record(input: reading, output: output)
+            let t = nowEpoch()
+            executeOnQueue("""
+            INSERT INTO history (input, output, count, used_at)
+            VALUES (?, ?, 1, ?)
+            ON CONFLICT(input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, reading); self.bindText($0, 2, output)
+                sqlite3_bind_int64($0, 3, t)
+            }
             return
         }
         let now = nowEpoch()
@@ -513,7 +588,7 @@ final class DatabaseManager: @unchecked Sendable {
                 count   = count + 1,
                 used_at = excluded.used_at;
             """
-        execute(sql) { stmt in
+        executeOnQueue(sql) { stmt in
             for (i, prefix) in prefixes.enumerated() {
                 let base = Int32(i * 3 + 1)
                 self.bindText(stmt, base, prefix)
@@ -523,58 +598,116 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    /// bigram / trigram / skip-bigram をまとめて1トランザクションでバックグラウンド書き込みする。
+    func recordNgrams(
+        bigram: (prev: String, input: String, output: String),
+        trigram: (prev2: String, prev1: String, input: String, output: String)?,
+        skipBigram: (prev: String, input: String, output: String)?
+    ) {
+        dispatchWrite {
+            let t = self.nowEpoch()
+            self.executeOnQueue("BEGIN")
+            self.executeOnQueue("""
+            INSERT INTO bigram (prev, input, output, count, used_at)
+            VALUES (?, ?, ?, 1, ?)
+            ON CONFLICT(prev, input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, bigram.prev); self.bindText($0, 2, bigram.input)
+                self.bindText($0, 3, bigram.output); sqlite3_bind_int64($0, 4, t)
+            }
+            if let tri = trigram {
+                self.executeOnQueue("""
+                INSERT INTO trigram (prev2, prev1, input, output, count, used_at)
+                VALUES (?, ?, ?, ?, 1, ?)
+                ON CONFLICT(prev2, prev1, input, output) DO UPDATE SET
+                    count   = count + 1,
+                    used_at = excluded.used_at;
+                """) {
+                    self.bindText($0, 1, tri.prev2); self.bindText($0, 2, tri.prev1)
+                    self.bindText($0, 3, tri.input); self.bindText($0, 4, tri.output)
+                    sqlite3_bind_int64($0, 5, t)
+                }
+            }
+            if let skip = skipBigram {
+                self.executeOnQueue("""
+                INSERT INTO skip_bigram (prev, input, output, count, used_at)
+                VALUES (?, ?, ?, 1, ?)
+                ON CONFLICT(prev, input, output) DO UPDATE SET
+                    count   = count + 1,
+                    used_at = excluded.used_at;
+                """) {
+                    self.bindText($0, 1, skip.prev); self.bindText($0, 2, skip.input)
+                    self.bindText($0, 3, skip.output); sqlite3_bind_int64($0, 4, t)
+                }
+            }
+            self.executeOnQueue("COMMIT")
+        }
+    }
+
     // MARK: - ユーザー辞書
 
     func fetchUserDict(reading: String) -> [String] {
-        return queryStrings("""
-        SELECT output FROM user_dict
-        WHERE input = ?
-        ORDER BY id ASC
-        """) {
-            self.bindText($0, 1, reading)
+        dbQueue.sync {
+            self.queryStringsOnQueue("""
+            SELECT output FROM user_dict
+            WHERE input = ?
+            ORDER BY id ASC
+            """) {
+                self.bindText($0, 1, reading)
+            }
         }
     }
 
     func fetchUserDictPrefix(reading: String) -> [String] {
-        return queryStrings("""
-        SELECT output FROM user_dict
-        WHERE ? LIKE (input || '%') AND input != ?
-        ORDER BY id ASC
-        """) {
-            self.bindText($0, 1, reading)
-            self.bindText($0, 2, reading)
+        dbQueue.sync {
+            self.queryStringsOnQueue("""
+            SELECT output FROM user_dict
+            WHERE ? LIKE (input || '%') AND input != ?
+            ORDER BY id ASC
+            """) {
+                self.bindText($0, 1, reading)
+                self.bindText($0, 2, reading)
+            }
         }
     }
 
     func fetchAllUserDict() -> [UserDictEntry] {
-        let sql = "SELECT id, input, output FROM user_dict ORDER BY id ASC"
-        var stmt: OpaquePointer?
-        defer { sqlite3_finalize(stmt) }
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-        var results: [UserDictEntry] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let i = sqlite3_column_text(stmt, 1),
-                  let o = sqlite3_column_text(stmt, 2) else { continue }
-            results.append(UserDictEntry(
-                id: Int(sqlite3_column_int(stmt, 0)),
-                input: String(cString: i),
-                output: String(cString: o)
-            ))
+        dbQueue.sync {
+            let sql = "SELECT id, input, output FROM user_dict ORDER BY id ASC"
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+            var results: [UserDictEntry] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let i = sqlite3_column_text(stmt, 1),
+                      let o = sqlite3_column_text(stmt, 2) else { continue }
+                results.append(UserDictEntry(
+                    id: Int(sqlite3_column_int(stmt, 0)),
+                    input: String(cString: i),
+                    output: String(cString: o)
+                ))
+            }
+            return results
         }
-        return results
     }
 
     @discardableResult
     func addUserDict(input: String, output: String) -> Bool {
-        execute("INSERT OR IGNORE INTO user_dict (input, output) VALUES (?, ?)") {
-            self.bindText($0, 1, input); self.bindText($0, 2, output)
+        dbQueue.sync {
+            self.executeOnQueue("INSERT OR IGNORE INTO user_dict (input, output) VALUES (?, ?)") {
+                self.bindText($0, 1, input); self.bindText($0, 2, output)
+            }
+            return sqlite3_changes(self.db) == 1
         }
-        return sqlite3_changes(db) == 1
     }
 
     func deleteUserDict(id: Int) {
-        execute("DELETE FROM user_dict WHERE id = ?") {
-            sqlite3_bind_int($0, 1, Int32(id))
+        dispatchWrite {
+            self.executeOnQueue("DELETE FROM user_dict WHERE id = ?") {
+                sqlite3_bind_int($0, 1, Int32(id))
+            }
         }
     }
 
@@ -582,25 +715,29 @@ final class DatabaseManager: @unchecked Sendable {
 
     func saveBoundaryPref(fullReading: String, segments: [String]) {
         let boundaries = segments.joined(separator: ",")
-        let t = nowEpoch()
-        execute("""
-        INSERT INTO boundary_pref (full_reading, boundaries, used_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(full_reading) DO UPDATE SET
-            boundaries = excluded.boundaries,
-            used_at    = excluded.used_at;
-        """) {
-            self.bindText($0, 1, fullReading)
-            self.bindText($0, 2, boundaries)
-            sqlite3_bind_int64($0, 3, t)
+        dispatchWrite {
+            let t = self.nowEpoch()
+            self.executeOnQueue("""
+            INSERT INTO boundary_pref (full_reading, boundaries, used_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(full_reading) DO UPDATE SET
+                boundaries = excluded.boundaries,
+                used_at    = excluded.used_at;
+            """) {
+                self.bindText($0, 1, fullReading)
+                self.bindText($0, 2, boundaries)
+                sqlite3_bind_int64($0, 3, t)
+            }
         }
     }
 
     func fetchBoundaryPref(fullReading: String) -> [String]? {
-        let rows = queryStrings(
-            "SELECT boundaries FROM boundary_pref WHERE full_reading = ?",
-            bind: { self.bindText($0, 1, fullReading) }
-        )
+        let rows = dbQueue.sync {
+            self.queryStringsOnQueue(
+                "SELECT boundaries FROM boundary_pref WHERE full_reading = ?",
+                bind: { self.bindText($0, 1, fullReading) }
+            )
+        }
         return rows.first.map { $0.components(separatedBy: ",") }
     }
 
@@ -613,18 +750,20 @@ final class DatabaseManager: @unchecked Sendable {
         if let lastEpoch = defaults.object(forKey: key) as? Int64,
            now - lastEpoch < 7 * 86400 { return }
 
-        let cutoff = now - 180 * 86400
-        let tables = ["history", "bigram", "trigram", "skip_bigram"]
-        for table in tables {
-            execute("DELETE FROM \(table) WHERE count = 1 AND used_at < ?") { stmt in
-                sqlite3_bind_int64(stmt, 1, cutoff)
+        dispatchWrite {
+            let cutoff = self.nowEpoch() - 180 * 86400
+            let tables = ["history", "bigram", "trigram", "skip_bigram"]
+            for table in tables {
+                self.executeOnQueue("DELETE FROM \(table) WHERE count = 1 AND used_at < ?") { stmt in
+                    sqlite3_bind_int64(stmt, 1, cutoff)
+                }
             }
+            self.executeOnQueue("DELETE FROM boundary_pref WHERE used_at < ?") { sqlite3_bind_int64($0, 1, cutoff) }
+            sqlite3_exec(self.db, "VACUUM;", nil, nil, nil)
+            defaults.set(self.nowEpoch(), forKey: key)
+            #if DEBUG
+            NSLog("keynaco: DB GC 完了")
+            #endif
         }
-        execute("DELETE FROM boundary_pref WHERE used_at < ?") { sqlite3_bind_int64($0, 1, cutoff) }
-        sqlite3_exec(db, "VACUUM;", nil, nil, nil)
-        defaults.set(now, forKey: key)
-        #if DEBUG
-        NSLog("keynaco: DB GC 完了")
-        #endif
     }
 }

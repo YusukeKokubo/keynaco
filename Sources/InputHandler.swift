@@ -208,7 +208,8 @@ struct InputHandler {
             for (i, seg) in segmentState.segments.enumerated() {
                 let text = (i == segmentState.focusedIndex) ? selectedText : seg.selectedText
                 db.recordPrefixes(reading: seg.reading, output: text)
-                azooKeyConverter.commit(reading: seg.reading, text: text)
+                let conv = azooKeyConverter; let r = seg.reading; let t = text
+                Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
                 confirmed += text
                 fullReading += seg.reading
             }
@@ -225,7 +226,8 @@ struct InputHandler {
             let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
             let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
             if !isDateTime && !isNumber { db.recordPrefixes(reading: normalizedInput, output: selected) }
-            azooKeyConverter.commit(reading: inputKey, text: selected)
+            let conv = azooKeyConverter; let r = inputKey; let t = selected
+            Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
             commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
         } else {
             db.recordPrefixes(reading: normalizedInput, output: inputKey)
@@ -238,15 +240,18 @@ struct InputHandler {
     mutating func commitText(text: String, skipHistory: Bool = false, client: TextInputClient) {
         if !state.composingText.isEmpty && !skipHistory {
             if let p1 = lastCommittedOutput {
-                db.withTransaction {
-                    db.recordBigram(prev: p1, input: state.finalizedText, output: text)
-                    if let p2 = prev2Output {
-                        db.recordTrigram(prev2: p2, prev1: p1, input: state.finalizedText, output: text)
-                    }
-                    if InputHandler.particles.contains(p1), let prevContent = mostRecentContentWord() {
-                        db.recordSkipBigram(prev: prevContent, input: state.finalizedText, output: text)
-                    }
-                }
+                let bigramInput = state.finalizedText
+                let trigramArg: (prev2: String, prev1: String, input: String, output: String)? =
+                    prev2Output.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) }
+                let skipArg: (prev: String, input: String, output: String)? =
+                    InputHandler.particles.contains(p1)
+                    ? mostRecentContentWord().map { (prev: $0, input: bigramInput, output: text) }
+                    : nil
+                db.recordNgrams(
+                    bigram: (prev: p1, input: bigramInput, output: text),
+                    trigram: trigramArg,
+                    skipBigram: skipArg
+                )
             }
         }
         lastConfirmedPair = (state.finalizedText, text)

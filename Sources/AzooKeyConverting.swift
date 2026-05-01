@@ -1,4 +1,4 @@
-protocol AzooKeyConverting: AnyObject {
+protocol AzooKeyConverting: AnyObject, Sendable {
     func requestCandidates(hiragana: String) -> [String]
     func candidatesForSegment(reading: String) -> [String]
     func commit(reading: String, text: String)

@@ -255,7 +255,8 @@ extension InputHandler {
         var fullReading = ""
         for seg in segmentState.segments {
             db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
-            azooKeyConverter.commit(reading: seg.reading, text: seg.selectedText)
+            let conv = azooKeyConverter; let r = seg.reading; let t = seg.selectedText
+            Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
             if seg.isManuallyAdjusted {
                 db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
                 db.recordPrefixes(reading: seg.reading, output: seg.selectedText)

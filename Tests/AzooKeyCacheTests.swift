@@ -3,7 +3,7 @@ import XCTest
 
 // composedHiragana が変わらない場合に requestCandidates が再呼び出しされないことを確認するテスト
 
-final class MockAzooKeyConverter: AzooKeyConverting {
+final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
     private(set) var requestCount = 0
 
     func requestCandidates(hiragana: String) -> [String] {
