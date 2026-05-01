@@ -59,7 +59,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 ## コンポーネント構成
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` もここで管理
-- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+Candidates.swift`（候補リスト・通常入力）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`等の括弧キー入力時に対応する全角括弧の候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII → 全角候補列に変換）。`sentenceTerminators`（`。！？\n`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する
+- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+Candidates.swift`（候補リスト・通常入力）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+Numbers.swift`（数字入力時の全角・桁区切り候補生成）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`等の括弧キー入力時に対応する全角括弧の候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII → 全角候補列に変換）。`sentenceTerminators`（`。！？\n`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包。`hiddenPendingN` フラグで "nn" → "ん" 後の pending "n" を不可視化（標準 IME 準拠）。Backspace 時は "ん" + hidden n をまとめて1操作で削除する
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
@@ -102,8 +102,9 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 2. **ユーザー辞書**候補（完全一致のみ、`fixedCount` の直後に挿入。`fixedEnd = fixedCount + userDictCount`）
 3. tri-gram → bi-gram 候補（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先、重複除去後にユーザー辞書の直後に挿入）
 4. 履歴 exact（入力に完全一致）+ prefix（前方一致、完全一致を除外）
-5. 日時候補（`generateDateTimeCandidates`：きょう/いま/ことし等、`historyEnd` の直後に挿入。変換履歴には記録しない）
-6. AzooKey 辞書候補
+5. 数字候補（`generateNumberCandidates`：全角数字 + 桁区切り。数字のみ入力時に生成、`historyEnd` の直後に挿入。変換履歴には記録しない）
+6. 日時候補（`generateDateTimeCandidates`：きょう/いま/ことし等、数字候補の直後に挿入。変換履歴には記録しない）
+7. AzooKey 辞書候補
 
 `autoShow=true`（文字入力中の自動表示）のとき、履歴・辞書・bi-gram・ユーザー辞書が0件なら表示しない。
 
