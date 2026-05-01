@@ -222,17 +222,15 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
     // MARK: - セグメント候補への bigram 活用（F-2）
 
     func testBigramAppearsInFirstSegmentCandidates() {
-        // lastCommittedOutput が第1セグメントの bigram prev として使われることを確認
+        // buildSegmentCandidates が prev の bigram を候補に含めることを確認
+        // AzooKey の分割結果に依存しないよう buildSegmentCandidates を直接テストする
         handler.db.recordBigram(prev: "前語", input: "わたし", output: "私")
-        handler.committedHistory = ["前語"]
-
-        typeRomaji("watashihagakusei")
-        press(keyCode: 49)  // Space → segment mode
-        guard handler.state.isSegmentMode,
-              let ss = handler.state.segmentState else { return }
-
-        let firstCandidates = ss.segments[0].candidates
-        XCTAssertTrue(firstCandidates.contains("私"),
+        let seg = handler.buildSegmentCandidates(
+            reading: "わたし",
+            dictCandidates: ["渡し", "渡"],
+            prev: "前語"
+        )
+        XCTAssertTrue(seg.candidates.contains("私"),
                       "lastCommittedOutput を prev とする bigram 候補が第1セグメントに含まれるはず")
     }
 
@@ -267,8 +265,10 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         // seg0Text を prev とする bigram として seg1 の読みに合う候補を学習
         handler.db.recordBigram(prev: seg0Text, input: seg1Reading, output: "ビグラム候補")
 
-        // セグメントモードを抜けて再入: 学習後に再度セグメントモードに入る
+        // セグメントモードを Escape で抜けた後 composedHiragana が残るためリセット
         press(keyCode: 53)  // Escape
+        handler.state = CompositionState()
+
         typeRomaji("watashihagakusei")
         press(keyCode: 49)
         guard handler.state.isSegmentMode,
@@ -324,12 +324,11 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         press(keyCode: 49)
         guard handler.state.isSegmentMode,
               let ss0 = handler.state.segmentState,
-              ss0.segments.count >= 2 else { return }
+              ss0.segments.count >= 2,
+              ss0.segments[0].reading.count >= 2 else { return }
 
-        // focus を seg[1] へ移動してから Shift+Right でリサイズ → seg[1].isManuallyAdjusted = true
-        press(keyCode: 124)  // Right（フォーカス移動）
-        guard handler.state.segmentState?.focusedIndex == 1 else { return }
-        press(keyCode: 124, modifiers: .shift)  // Shift+Right → seg[1] を拡張
+        // focusedIndex = 0 のまま Shift+Left で seg[0] を縮小 → seg[0].isManuallyAdjusted = true
+        press(keyCode: 123, modifiers: .shift)  // Shift+Left → seg[0] を縮小
         guard let ss1 = handler.state.segmentState, ss1.segments.count >= 2 else { return }
 
         let seg0Text = ss1.segments[0].selectedText

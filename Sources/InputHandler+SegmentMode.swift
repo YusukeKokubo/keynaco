@@ -261,12 +261,12 @@ extension InputHandler {
         }
         let segs = segmentState.segments
         for i in 0..<segs.count - 1 {
-            let prev = segs[i].selectedText
+            let prevSeg = segs[i]
             let next = segs[i + 1]
-            db.recordBigram(prev: prev, input: next.reading, output: next.selectedText)
-            if next.isManuallyAdjusted {
-                db.recordBigram(prev: prev, input: next.reading, output: next.selectedText)
-                db.recordBigram(prev: prev, input: next.reading, output: next.selectedText)
+            db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
+            if next.isManuallyAdjusted || prevSeg.isManuallyAdjusted {
+                db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
+                db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
             }
         }
         if segs.contains(where: { $0.isManuallyAdjusted }) {
