@@ -18,11 +18,10 @@ extension InputHandler {
         let bigramTop = db.fetchBigramTop(prev: last)
         let trigramTop: [String] = prev2Output.map { db.fetchTrigramTop(prev2: $0, prev1: last) } ?? []
         let skipBigramTop = mostRecentContentWord().map { db.fetchSkipBigramTop(prev: $0) } ?? []
-        let predictTop = trigramTop + bigramTop.filter { !trigramTop.contains($0) }
-            + skipBigramTop.filter { !trigramTop.contains($0) && !bigramTop.contains($0) }
+        let predictTop = InputHandler.merged(trigramTop, bigramTop, skipBigramTop)
         // 名詞末尾のとき限定で格助詞 fallback を tail に追加
         let particlesFallback = isNounLike(last)
-            ? InputHandler.particles.filter { !predictTop.contains($0) }
+            ? InputHandler.particles.filter { !Set(predictTop).contains($0) }
             : []
         let candidates = predictTop + particlesFallback
 
@@ -110,9 +109,10 @@ extension InputHandler {
                     let fromTrigram: [String] = prev2Output.map {
                         db.fetchTrigramInList(prev2: $0, prev1: last, list: matched)
                     } ?? []
-                    let merged = fromTrigram + fromBigram.filter { !fromTrigram.contains($0) }
-                    let rest = matched.filter { !merged.contains($0) }
-                    return (true, .show(candidates: merged + rest, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+                    let ngram = InputHandler.merged(fromTrigram, fromBigram)
+                    let ngramSet = Set(ngram)
+                    let rest = matched.filter { !ngramSet.contains($0) }
+                    return (true, .show(candidates: ngram + rest, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
                 }
             }
             // fast-path 非該当かつ N-gram 保留あり → 1打目で読み前方一致フィルタして表示
@@ -122,6 +122,7 @@ extension InputHandler {
                 if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
                    let last = lastCommittedOutput {
                     let kanas = InputHandler.romajiToInitialKana[char] ?? []
+                    var filteredSeen = Set<String>()
                     var filtered: [String] = []
                     for kana in kanas {
                         let fromTrigram: [String] = prev2Output.map {
@@ -131,9 +132,9 @@ extension InputHandler {
                         let fromSkip = mostRecentContentWord().map {
                             db.fetchSkipBigram(prev: $0, reading: kana)
                         } ?? []
-                        for s in fromTrigram where !filtered.contains(s) { filtered.append(s) }
-                        for s in fromBigram where !filtered.contains(s) { filtered.append(s) }
-                        for s in fromSkip where !filtered.contains(s) { filtered.append(s) }
+                        for s in fromTrigram where filteredSeen.insert(s).inserted { filtered.append(s) }
+                        for s in fromBigram where filteredSeen.insert(s).inserted { filtered.append(s) }
+                        for s in fromSkip where filteredSeen.insert(s).inserted { filtered.append(s) }
                     }
                     if !filtered.isEmpty {
                         pendingSuccessorCandidates = []

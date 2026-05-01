@@ -68,6 +68,8 @@ struct InputHandler {
     var bracketCandidates: [String]? = nil
     var isBracketMode: Bool { bracketCandidates != nil }
     var lastConfirmedPair: (input: String, output: String)? = nil
+    var lastAzooKeyInput: String = ""
+    var lastAzooKeyResults: [String] = []
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }
     var prev2Output: String? {
@@ -90,11 +92,11 @@ struct InputHandler {
         return nil
     }
     let db: DatabaseManager
-    let azooKeyConverter: AzooKeyConverter
+    let azooKeyConverter: any AzooKeyConverting
 
-    init(db: DatabaseManager = .shared) {
+    init(db: DatabaseManager = .shared, azooKeyConverter: (any AzooKeyConverting)? = nil) {
         self.db = db
-        self.azooKeyConverter = AzooKeyConverter()
+        self.azooKeyConverter = azooKeyConverter ?? AzooKeyConverter()
     }
 
     // MARK: - 公開インターフェース

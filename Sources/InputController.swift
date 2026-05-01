@@ -122,10 +122,12 @@ class InputController: IMKInputController {
         let chars = event.characters ?? ""
         let baseChars = event.charactersIgnoringModifiers ?? ""
         let mods = event.modifierFlags
+        #if DEBUG
         EventViewerWindow.shared.addEvent(
             keyCode: event.keyCode, chars: chars, baseChars: baseChars,
             mods: mods, bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         )
+        #endif
 
         let ctx = CandidateContext(
             isVisible: candidateWindow.isVisible,
@@ -146,14 +148,18 @@ class InputController: IMKInputController {
             client: adapter
         )
 
+        #if DEBUG
         let actionName = "\(action)".split(separator: "(").first.map(String.init) ?? "\(action)"
         EventViewerWindow.shared.updateResult(consumed: consumed, action: actionName)
+        #endif
 
         switch action {
         case .none:
             break
         case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
+            #if DEBUG
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
+            #endif
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
             if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。

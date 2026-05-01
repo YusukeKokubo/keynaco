@@ -22,6 +22,8 @@ extension InputHandler {
 
     // MARK: - 括弧候補マップ
 
+    static let punctuationMap: [String: String] = [",": "、", ".": "。"]
+
     static let bracketOptions: [String: [String]] = [
         "[": ["「", "【", "〔", "［", "〈", "《", "『"],
         "]": ["」", "】", "〕", "］", "〉", "》", "』"],
@@ -181,14 +183,23 @@ extension InputHandler {
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
         let h = state.composedHiragana
-        let azooKeyCandidates = h.allSatisfy({ $0.isASCII }) ? [] : azooKeyConverter.requestCandidates(hiragana: h)
+        let azooKeyCandidates: [String]
+        if h.allSatisfy({ $0.isASCII }) {
+            azooKeyCandidates = []
+            lastAzooKeyInput = ""; lastAzooKeyResults = []
+        } else if h == lastAzooKeyInput {
+            azooKeyCandidates = lastAzooKeyResults
+        } else {
+            azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: h)
+            lastAzooKeyInput = h; lastAzooKeyResults = azooKeyCandidates
+        }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
         let userDictExact = db.fetchUserDict(reading: historyKey)
         let userDictPrefix = db.fetchUserDictPrefix(reading: historyKey)
-        let userDictRaw = userDictExact + userDictPrefix.filter { !userDictExact.contains($0) }
+        let userDictRaw = Self.merged(userDictExact, userDictPrefix)
         let exactCandidates = db.fetchHistoryExact(reading: historyKey)
         let prefixCandidates = db.fetchHistoryPrefix(reading: historyKey)
-        let historyCandidates = exactCandidates + prefixCandidates.filter { !exactCandidates.contains($0) }
+        let historyCandidates = Self.merged(exactCandidates, prefixCandidates)
         let historyCount = historyCandidates.count
 
         let bigramRaw = lastCommittedOutput.map { db.fetchBigram(prev: $0, reading: state.composedHiragana) } ?? []
@@ -197,10 +208,13 @@ extension InputHandler {
             return db.fetchTrigram(prev2: p2, prev1: p1, reading: state.composedHiragana)
         }()
         let skipBigramRaw = mostRecentContentWord().map { db.fetchSkipBigram(prev: $0, reading: state.composedHiragana) } ?? []
-        let predictRaw = trigramRaw + bigramRaw.filter { !trigramRaw.contains($0) }
-            + skipBigramRaw.filter { !trigramRaw.contains($0) && !bigramRaw.contains($0) }
-        var candidates = historyCandidates + azooKeyCandidates.filter { !historyCandidates.contains($0) }
-        let uniquePredictions = predictRaw.filter { !candidates.contains($0) }
+        let predictRaw = Self.merged(trigramRaw, bigramRaw, skipBigramRaw)
+
+        let historySeen = Set(historyCandidates)
+        let azooKeyUniq = azooKeyCandidates.filter { !historySeen.contains($0) }
+        var candidates = historyCandidates + azooKeyUniq
+        let candidateSeen = historySeen.union(azooKeyUniq)
+        let uniquePredictions = predictRaw.filter { !candidateSeen.contains($0) }
         candidates.insert(contentsOf: uniquePredictions, at: 0)
         let predictCount = uniquePredictions.count
 
@@ -232,14 +246,16 @@ extension InputHandler {
 
         // ユーザー辞書エントリをカナ固定の直後（initialRow = fixedCount）に挿入する。
         // 予測・履歴より高優先で表示し、Shift+Delete の誤削除から守るため fixedEnd で追跡する。
-        let uniqueUserDict = userDictRaw.filter { !candidates.contains($0) }
+        var insertedSet = Set(candidates)
+        let uniqueUserDict = userDictRaw.filter { insertedSet.insert($0).inserted }
         candidates.insert(contentsOf: uniqueUserDict, at: fixedCount)
         let userDictCount = uniqueUserDict.count
         let fixedEnd = fixedCount + userDictCount
 
         let historyEnd = fixedEnd + predictCount + historyCount
         let predictionEnd = fixedEnd + predictCount
-        candidates.insert(contentsOf: dateTimeCandidates.filter { !candidates.contains($0) }, at: historyEnd)
+        let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
+        candidates.insert(contentsOf: uniqueDateTimeCandidates, at: historyEnd)
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
@@ -252,6 +268,7 @@ extension InputHandler {
     mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
         guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
               let prev = lastCommittedOutput else { return .dismiss }
+        var seen = Set<String>()
         var candidates: [String] = []
         for kana in kanas {
             let fromTrigram: [String] = prev2Output.map {
@@ -261,9 +278,9 @@ extension InputHandler {
             let fromSkip: [String] = mostRecentContentWord().map {
                 db.fetchSkipBigram(prev: $0, reading: kana)
             } ?? []
-            for s in fromTrigram where !candidates.contains(s) { candidates.append(s) }
-            for s in fromBigram where !candidates.contains(s) { candidates.append(s) }
-            for s in fromSkip where !candidates.contains(s) { candidates.append(s) }
+            for s in fromTrigram where seen.insert(s).inserted { candidates.append(s) }
+            for s in fromBigram where seen.insert(s).inserted { candidates.append(s) }
+            for s in fromSkip where seen.insert(s).inserted { candidates.append(s) }
         }
         guard !candidates.isEmpty else { return .dismiss }
         isSuccessorMode = true
@@ -271,7 +288,7 @@ extension InputHandler {
         pendingSuccessorCandidates = []
         client.setMarkedText(candidates[0], selectionRange: NSRange(location: candidates[0].count, length: 0))
         let fixedCandidates = kanas
-        let allCandidates = fixedCandidates + candidates.filter { !fixedCandidates.contains($0) }
+        let allCandidates = Self.merged(fixedCandidates, candidates)
         return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count, predictionEnd: 0, fixedEnd: 0)
     }
 
@@ -303,8 +320,7 @@ extension InputHandler {
     private mutating func handlePunctuation(
         base: String, modifiers: NSEvent.ModifierFlags, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        let punctuationMap: [String: String] = [",": "、", ".": "。"]
-        guard let mappedPunct = punctuationMap[base], !modifiers.contains(.shift) else { return nil }
+        guard let mappedPunct = Self.punctuationMap[base], !modifiers.contains(.shift) else { return nil }
         if state.composingText.isEmpty {
             client.insertText(mappedPunct)
             return (true, .dismiss)
@@ -394,5 +410,19 @@ extension InputHandler {
         }
         if !isSuccessorMode { applyMarkedText(candidateText: nil, client: client) }
         return (true, candidateAction)
+    }
+
+    // MARK: - Utility
+
+    /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。
+    static func merged(_ arrays: [String]...) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for arr in arrays {
+            for s in arr where seen.insert(s).inserted {
+                result.append(s)
+            }
+        }
+        return result
     }
 }

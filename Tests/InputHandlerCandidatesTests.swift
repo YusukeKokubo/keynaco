@@ -521,6 +521,50 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
     }
 
+    // MARK: - 重複排除
+
+    func testNoDuplicateCandidatesWhenTrigramAndBigramOverlap() {
+        // tri-gram と bi-gram に同じ候補があっても候補リストに重複が出ないこと
+        handler.db.recordBigram(prev: "東京", input: "に", output: "に")
+        handler.db.recordTrigram(prev2: "昨日", prev1: "東京", input: "に", output: "に")
+        handler.committedHistory = ["昨日", "東京"]
+        typeRomaji("ni")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        let count = candidates.filter { $0 == "に" }.count
+        XCTAssertEqual(count, 1, "同一候補は重複なく1件のみ現れるはず: \(candidates)")
+    }
+
+    func testNoDuplicatesAcrossHistoryAndBigram() {
+        // 履歴と bi-gram に同じ候補があっても重複なし
+        handler.db.record(input: "から", output: "から")
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        handler.committedHistory = ["て"]
+        typeRomaji("kara")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        let count = candidates.filter { $0 == "から" }.count
+        XCTAssertEqual(count, 1, "履歴と bi-gram に同じ候補があっても重複なし: \(candidates)")
+    }
+
+    func testTrigramCandidateAppearsBeforeBigramOnlyCandidate() {
+        // tri-gram 候補は bi-gram のみの候補より上位
+        handler.db.recordBigram(prev: "東京", input: "から", output: "から")
+        handler.db.recordTrigram(prev2: "昨日", prev1: "東京", input: "に", output: "に")
+        handler.committedHistory = ["昨日", "東京"]
+        typeRomaji("ni")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, let historyEnd, _, let predictionEnd, _) = action else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        let niIdx = candidates.prefix(predictionEnd).firstIndex(of: "に")
+        XCTAssertNotNil(niIdx, "tri-gram 由来「に」が予測ゾーンに含まれるはず: \(candidates)")
+    }
+
     // MARK: - 日時候補
 
     func testKyouIncludesDateCandidates() {

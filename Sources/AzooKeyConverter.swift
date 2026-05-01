@@ -4,7 +4,22 @@ import KanaKanjiConverterModuleWithDefaultDictionary
 final class AzooKeyConverter: @unchecked Sendable {
     private let converter = KanaKanjiConverter.withDefaultDictionary()
     private var candidateCache: [String: [Candidate]] = [:]
+    private var candidateCacheKeys: [String] = []
+    private let candidateCacheLimit = 50
     private let options: ConvertRequestOptions
+
+    var candidateCacheCount: Int { candidateCache.count }
+
+    private func insertCache(key: String, value: [Candidate]) {
+        if candidateCache[key] != nil {
+            candidateCacheKeys.removeAll { $0 == key }
+        } else if candidateCache.count >= candidateCacheLimit {
+            let evict = candidateCacheKeys.removeFirst()
+            candidateCache.removeValue(forKey: evict)
+        }
+        candidateCache[key] = value
+        candidateCacheKeys.append(key)
+    }
 
     init() {
         let memoryURL = FileManager.default
@@ -29,7 +44,7 @@ final class AzooKeyConverter: @unchecked Sendable {
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
         let result = converter.requestCandidates(text, options: options)
-        candidateCache[hiragana] = result.mainResults
+        insertCache(key: hiragana, value: result.mainResults)
         return result.mainResults.map { $0.text }
     }
 
@@ -37,7 +52,7 @@ final class AzooKeyConverter: @unchecked Sendable {
         var text = ComposingText()
         text.insertAtCursorPosition(reading, inputStyle: .direct)
         let result = converter.requestCandidates(text, options: options)
-        candidateCache[reading] = result.mainResults
+        insertCache(key: reading, value: result.mainResults)
         return result.mainResults.map { $0.text }
     }
 
@@ -71,7 +86,7 @@ final class AzooKeyConverter: @unchecked Sendable {
             }
             let safeCount = max(1, min(count, totalLen))
             let reading = String(remaining.prefix(safeCount))
-            candidateCache[reading] = clauseCandidates
+            insertCache(key: reading, value: clauseCandidates)
             segments.append((reading: reading, candidates: clauseCandidates.map { $0.text }))
             remaining = String(remaining.dropFirst(safeCount))
         }
