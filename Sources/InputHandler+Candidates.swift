@@ -232,15 +232,16 @@ extension InputHandler {
         let hiraganaInHistory = candidates.prefix(predictCount + historyCount).contains(hiragana)
         let katakanaInHistory = candidates.prefix(predictCount + historyCount).contains(katakana)
 
+        let allCandidatesSeen = candidateSeen.union(uniquePredictions)
         var fixedCount = 0
         if !katakanaInHistory {
-            candidates.removeAll { $0 == katakana }
+            if allCandidatesSeen.contains(katakana) { candidates.removeAll { $0 == katakana } }
             candidates.insert(katakana, at: 0)
             fixedCount += 1
         }
         // hiragana == katakana（非ひらがな文字）の場合は重複挿入しない
         if !hiraganaInHistory && hiragana != katakana {
-            candidates.removeAll { $0 == hiragana }
+            if allCandidatesSeen.contains(hiragana) { candidates.removeAll { $0 == hiragana } }
             candidates.insert(hiragana, at: 0)
             fixedCount += 1
         }
@@ -271,6 +272,7 @@ extension InputHandler {
     mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
         guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
               let prev = lastCommittedOutput else { return .dismiss }
+        let contentWord = mostRecentContentWord()
         var seen = Set<String>()
         var candidates: [String] = []
         for kana in kanas {
@@ -278,7 +280,7 @@ extension InputHandler {
                 db.fetchTrigram(prev2: $0, prev1: prev, reading: kana)
             } ?? []
             let fromBigram = db.fetchBigram(prev: prev, reading: kana)
-            let fromSkip: [String] = mostRecentContentWord().map {
+            let fromSkip: [String] = contentWord.map {
                 db.fetchSkipBigram(prev: $0, reading: kana)
             } ?? []
             for s in fromTrigram where seen.insert(s).inserted { candidates.append(s) }

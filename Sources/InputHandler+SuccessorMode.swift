@@ -122,6 +122,7 @@ extension InputHandler {
                 if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
                    let last = lastCommittedOutput {
                     let kanas = InputHandler.romajiToInitialKana[char] ?? []
+                    let contentWordForFilter = mostRecentContentWord()
                     var filteredSeen = Set<String>()
                     var filtered: [String] = []
                     for kana in kanas {
@@ -129,7 +130,7 @@ extension InputHandler {
                             db.fetchTrigram(prev2: $0, prev1: last, reading: kana)
                         } ?? []
                         let fromBigram = db.fetchBigram(prev: last, reading: kana)
-                        let fromSkip = mostRecentContentWord().map {
+                        let fromSkip = contentWordForFilter.map {
                             db.fetchSkipBigram(prev: $0, reading: kana)
                         } ?? []
                         for s in fromTrigram where filteredSeen.insert(s).inserted { filtered.append(s) }
