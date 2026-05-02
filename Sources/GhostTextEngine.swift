@@ -16,6 +16,9 @@ final class GhostTextEngine {
     var isAvailable: Bool { modelAvailable }
     var hasGhostText: Bool { ghostWindow.currentText != nil }
 
+    /// ゴーストテキストが表示されたときに呼ばれるコールバック（setMarkedText で IME をアクティブに保つ用途）
+    var onShow: (@MainActor (String) -> Void)?
+
     init(ghostWindow: GhostTextWindow) {
         self.ghostWindow = ghostWindow
         if case .available = SystemLanguageModel.default.availability {
@@ -88,6 +91,7 @@ final class GhostTextEngine {
                 #endif
                 guard !Task.isCancelled, !text.isEmpty else { return }
                 self.ghostWindow.show(text: text, composingText: composingText, near: rect)
+                self.onShow?(text)
                 #if DEBUG
                 os_log(.debug, "GhostText window shown at (%{public}.1f,%{public}.1f)",
                        rect.origin.x, rect.origin.y)
@@ -114,19 +118,11 @@ final class GhostTextEngine {
     }
 
     private static func buildPrompt(prefix: String, suffix: String) -> String {
-        if suffix.isEmpty {
             return """
-            次の日本語テキストの末尾を補完してください。末尾のみ回答して。
-
-            \(prefix)
-            """
-        } else {
-            return """
-            次の日本語テキストの末尾を補完してください。末尾のみ回答して。
+            次の日本語テキストの末尾を補完してください。末尾の文字列のみ回答して。
 
             \(prefix)[空白]\(suffix)
             """
-        }
     }
 
     private static func postProcess(_ text: String) -> String {

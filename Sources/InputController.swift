@@ -5,12 +5,17 @@ import InputMethodKit
 
 private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
     private let client: IMKTextInput?
+    private(set) var didInsertText = false
 
     init(_ sender: Any?) {
         self.client = sender as? IMKTextInput
     }
 
+    private(set) var lastInsertedText: String = ""
+
     func insertText(_ text: String) {
+        didInsertText = true
+        lastInsertedText = text
         // insertText は常に @MainActor の InputController 経由で呼ばれる
         #if DEBUG
         MainActor.assumeIsolated { EventViewerWindow.shared.addCommit(text) }
@@ -37,6 +42,16 @@ private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
     func cursorRect() -> NSRect {
         var rect = NSRect.zero
         client?.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
+        return rect
+    }
+
+    // マークドテキストなし（確定後）のカーソル位置を selectedRange から取得する
+    func cursorRectAtCursor() -> NSRect {
+        guard let c = client else { return .zero }
+        let sel = c.selectedRange()
+        guard sel.location != NSNotFound else { return .zero }
+        var rect = NSRect.zero
+        c.attributes(forCharacterIndex: sel.location, lineHeightRectangle: &rect)
         return rect
     }
 
@@ -81,6 +96,9 @@ class InputController: IMKInputController {
     @MainActor private static let _ghostTextEngine: GhostTextEngine = GhostTextEngine(ghostWindow: ghostWindow)
     private var ghostTextEngine: GhostTextEngine { Self._ghostTextEngine }
 
+    // ゴーストテキスト表示後の setMarkedText 用に最後の sender を保持する
+    private var lastSender: Any?
+
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
         candidateWindow.onDelete = { [weak self] (text: String, row: Int) in
@@ -124,6 +142,14 @@ class InputController: IMKInputController {
         handler.successorFirstChar = nil
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
+        // ゼロ幅スペースをマークドテキストにセットして IME をアクティブに保つ。
+        // これにより Tab がアプリに横取りされず IME に届くようになる。
+        ghostTextEngine.onShow = { [weak self] _ in
+            guard let self, let s = self.lastSender else { return }
+            IMKTextInputAdapter(s).setMarkedText(
+                "\u{200B}", selectionRange: NSRange(location: 1, length: 0)
+            )
+        }
     }
 
     override func deactivateServer(_ sender: Any!) {
@@ -135,6 +161,7 @@ class InputController: IMKInputController {
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event = event else { return false }
+        lastSender = sender
 
         // Caps Lock でモード切替（LED ON = 英字モード、LED OFF = 日本語モード）
         if event.type == .flagsChanged && event.keyCode == KeyCode.capsLock {
@@ -148,6 +175,12 @@ class InputController: IMKInputController {
         if event.keyCode == KeyCode.tab && ghostTextEngine.hasGhostText {
             candidateWindow.dismiss()
             return ghostTextEngine.confirm(into: IMKTextInputAdapter(sender))
+        }
+        // ゴーストテキストが表示中だった場合はマークドテキストもクリアする
+        if ghostTextEngine.hasGhostText {
+            IMKTextInputAdapter(sender).setMarkedText(
+                "", selectionRange: NSRange(location: 0, length: 0)
+            )
         }
         ghostTextEngine.cancel()
 
@@ -185,37 +218,27 @@ class InputController: IMKInputController {
         EventViewerWindow.shared.updateResult(consumed: consumed, action: actionName)
         #endif
 
+        // 確定直後（insertText が呼ばれた）にゴーストテキストをスケジュール
+        if adapter.didInsertText {
+            let engine = Self._ghostTextEngine
+            if engine.isAvailable && !InputHandler.isAsciiMode {
+                let (prefix, suffix) = adapter.surroundingText()
+                // Electron 系は surroundingText が空を返すため、確定テキスト自体を prefix にフォールバック
+                let effectivePrefix = prefix.isEmpty ? adapter.lastInsertedText : prefix
+                if !effectivePrefix.isEmpty {
+                    engine.schedule(prefix: effectivePrefix, suffix: suffix, composingText: "", near: adapter.cursorRectAtCursor())
+                }
+            }
+        }
+
         switch action {
         case .none:
-            // Swift 6.2 の region 分析制約により switch 内に配置して
-            // selectNext/selectPrev ケースとの "concurrent access" 誤検知を回避する
-            let engine = Self._ghostTextEngine
-            let composedHiragana = handler.state.composedHiragana
-            if engine.isAvailable
-                && !InputHandler.isAsciiMode
-                && !handler.isSuccessorMode
-                && !handler.isBracketMode
-                && !handler.state.isSegmentMode
-                && !composedHiragana.isEmpty {
-                let (prefix, suffix) = adapter.surroundingText()
-                engine.schedule(prefix: prefix + composedHiragana, suffix: suffix, composingText: composedHiragana, near: adapter.cursorRect())
-            }
+            break
         case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
             #if DEBUG
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
             #endif
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
-            let showEngine = Self._ghostTextEngine
-            let showComposedHiragana = handler.state.composedHiragana
-            if showEngine.isAvailable
-                && !InputHandler.isAsciiMode
-                && !handler.isSuccessorMode
-                && !handler.isBracketMode
-                && !handler.state.isSegmentMode
-                && !showComposedHiragana.isEmpty {
-                let (prefix, suffix) = adapter.surroundingText()
-                showEngine.schedule(prefix: prefix + showComposedHiragana, suffix: suffix, composingText: showComposedHiragana, near: adapter.cursorRect())
-            }
             if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。
                 // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
