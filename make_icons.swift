@@ -1,52 +1,81 @@
 #!/usr/bin/swift
 
 import Cocoa
+import CoreText
+import CoreGraphics
 
-func renderIcon(size: Int, text: String, template: Bool = false) -> NSImage {
-    let image = NSImage(size: NSSize(width: size, height: size))
-    image.lockFocus()
+func renderIcon(pixelSize: Int, text: String, withBox: Bool = true) -> CGImage {
+    let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+    let ctx = CGContext(
+        data: nil,
+        width: pixelSize,
+        height: pixelSize,
+        bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: cs,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )!
 
-    if !template {
-        // App icon: rounded rect background with gradient
-        let rect = NSRect(x: 0, y: 0, width: size, height: size)
-        let radius = CGFloat(size) * 0.225
-        let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+    let size = CGFloat(pixelSize)
 
-        let gradient = NSGradient(
-            colors: [
-                NSColor(red: 0.35, green: 0.55, blue: 0.95, alpha: 1),
-                NSColor(red: 0.20, green: 0.35, blue: 0.85, alpha: 1)
-            ],
-            atLocations: [0, 1],
-            colorSpace: .sRGB
-        )!
-        gradient.draw(in: path, angle: -60)
+    if withBox {
+        // Rounded rect background with blue gradient
+        let radius = size * 0.225
+        let path = CGMutablePath()
+        path.addRoundedRect(in: CGRect(x: 0, y: 0, width: size, height: size),
+                            cornerWidth: radius, cornerHeight: radius)
+        ctx.addPath(path)
+        ctx.clip()
+
+        let colors = [
+            CGColor(colorSpace: cs, components: [0.35, 0.55, 0.95, 1.0])!,
+            CGColor(colorSpace: cs, components: [0.20, 0.35, 0.85, 1.0])!
+        ] as CFArray
+        let gradient = CGGradient(colorsSpace: cs, colors: colors, locations: [0, 1])!
+        // angle -60 degrees: top-left → bottom-right
+        let angle = CGFloat(-60) * .pi / 180
+        let dx = cos(angle) * size * 0.5
+        let dy = sin(angle) * size * 0.5
+        let cx = size / 2, cy = size / 2
+        ctx.drawLinearGradient(gradient,
+            start: CGPoint(x: cx - dx, y: cy - dy),
+            end: CGPoint(x: cx + dx, y: cy + dy),
+            options: [.drawsAfterEndLocation, .drawsBeforeStartLocation])
+        ctx.resetClip()
     }
 
-    let fontSize = CGFloat(size) * (template ? 0.80 : 0.62)
-    let font = NSFont.systemFont(ofSize: fontSize, weight: template ? .regular : .medium)
-    let color = template ? NSColor.black : NSColor.white
+    // Draw text using Core Text
+    let fontSize = size * 0.62
+    let font = CTFontCreateWithName("HiraginoSans-W4" as CFString, fontSize, nil)
     let attrs: [NSAttributedString.Key: Any] = [
         .font: font,
-        .foregroundColor: color
+        .foregroundColor: withBox
+            ? CGColor(colorSpace: cs, components: [1, 1, 1, 1])!
+            : CGColor(colorSpace: cs, components: [0, 0, 0, 1])!
     ]
+    let attrStr = NSAttributedString(string: text, attributes: attrs)
+    let line = CTLineCreateWithAttributedString(attrStr)
 
-    let str = text as NSString
-    let textSize = str.size(withAttributes: attrs)
-    let x = (CGFloat(size) - textSize.width) / 2
-    let y = (CGFloat(size) - textSize.height) / 2 + (template ? 0 : CGFloat(size) * 0.02)
-    str.draw(at: NSPoint(x: x, y: y), withAttributes: attrs)
+    var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+    let width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
+    let textHeight = ascent + descent
 
-    image.unlockFocus()
-    return image
+    let x = (size - CGFloat(width)) / 2
+    let y = (size - textHeight) / 2 + descent + size * 0.02
+
+    ctx.textPosition = CGPoint(x: x, y: y)
+    CTLineDraw(line, ctx)
+
+    return ctx.makeImage()!
 }
 
-func savePNG(_ image: NSImage, to path: String) {
-    guard let tiff = image.tiffRepresentation,
-          let bitmap = NSBitmapImageRep(data: tiff),
-          let png = bitmap.representation(using: .png, properties: [:])
-    else { return }
-    try! png.write(to: URL(fileURLWithPath: path))
+func saveImage(_ image: CGImage, to path: String, dpi: CGFloat = 72) {
+    let url = URL(fileURLWithPath: path) as CFURL
+    let uti = path.hasSuffix(".tiff") ? "public.tiff" : "public.png"
+    guard let dest = CGImageDestinationCreateWithURL(url, uti as CFString, 1, nil) else { return }
+    let props = [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi] as CFDictionary
+    CGImageDestinationAddImage(dest, image, props)
+    CGImageDestinationFinalize(dest)
     print("  \(path)")
 }
 
@@ -56,14 +85,12 @@ let outDir = args.count > 1 ? args[1] : "."
 // App icon sizes
 let appSizes = [16, 32, 64, 128, 256, 512, 1024]
 for size in appSizes {
-    let img = renderIcon(size: size, text: "あ")
-    savePNG(img, to: "\(outDir)/app_\(size).png")
+    saveImage(renderIcon(pixelSize: size, text: "あ"), to: "\(outDir)/app_\(size).png")
 }
 
-// Input source icon (template: black on transparent)
-for size in [16, 32, 64] {
-    let img = renderIcon(size: size, text: "あ", template: true)
-    savePNG(img, to: "\(outDir)/input_\(size).png")
-}
+// Input source icon: template (black on transparent), TISIconIsTemplate=true lets macOS add the box
+// Use @2x naming convention (macOS auto-picks the right resolution)
+saveImage(renderIcon(pixelSize: 32, text: "あ", withBox: false), to: "\(outDir)/InputSource.tiff", dpi: 72)
+saveImage(renderIcon(pixelSize: 64, text: "あ", withBox: false), to: "\(outDir)/InputSource@2x.tiff", dpi: 144)
 
 print("Done.")
