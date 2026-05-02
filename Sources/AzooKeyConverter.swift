@@ -7,6 +7,8 @@ final class AzooKeyConverter: @unchecked Sendable {
     private var candidateCacheKeys: [String] = []
     private let candidateCacheLimit = 50
     private let options: ConvertRequestOptions
+    private let memoryURL: URL
+    private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }
 
     var candidateCacheCount: Int { candidateCache.count }
 
@@ -21,11 +23,28 @@ final class AzooKeyConverter: @unchecked Sendable {
         candidateCacheKeys.append(key)
     }
 
+    private static func clearLearningData(at url: URL) {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: url.path) else { return }
+        for file in files where file.hasPrefix("memory") {
+            try? fm.removeItem(at: url.appendingPathComponent(file))
+        }
+    }
+
     init() {
         let memoryURL = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first!.appendingPathComponent("keynaco")
+        self.memoryURL = memoryURL
         try? FileManager.default.createDirectory(at: memoryURL, withIntermediateDirectories: true)
+        // A commit_lock left over from a previous run means the process crashed mid-save.
+        // AzooKey's LOUDS binary and metadata are then out of sync, which triggers an
+        // assertion in LongTermLearningMemory.merge. Clear the memory files to recover.
+        let lockURL = memoryURL.appendingPathComponent(".commit_lock")
+        if FileManager.default.fileExists(atPath: lockURL.path) {
+            Self.clearLearningData(at: memoryURL)
+            try? FileManager.default.removeItem(at: lockURL)
+        }
         options = ConvertRequestOptions(
             N_best: 10,
             requireJapanesePrediction: false,
@@ -59,8 +78,10 @@ final class AzooKeyConverter: @unchecked Sendable {
     func commit(reading: String, text: String) {
         guard let candidates = candidateCache[reading],
               let candidate = candidates.first(where: { $0.text == text }) else { return }
+        FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
         converter.updateLearningData(candidate)
         converter.commitUpdateLearningData()
+        try? FileManager.default.removeItem(at: commitLockURL)
     }
 
     func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
