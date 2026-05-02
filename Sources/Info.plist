@@ -66,8 +66,6 @@
 				<string>InputSource.tiff</string>
 				<key>tsInputMethodAlternateIconFileKey</key>
 				<string>InputSource.tiff</string>
-				<key>TISIconIsTemplate</key>
-				<true/>
 			</dict>
 		</dict>
 	</dict>

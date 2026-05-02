@@ -32,7 +32,6 @@ func renderIcon(pixelSize: Int, text: String, withBox: Bool = true) -> CGImage {
             CGColor(colorSpace: cs, components: [0.20, 0.35, 0.85, 1.0])!
         ] as CFArray
         let gradient = CGGradient(colorsSpace: cs, colors: colors, locations: [0, 1])!
-        // angle -60 degrees: top-left → bottom-right
         let angle = CGFloat(-60) * .pi / 180
         let dx = cos(angle) * size * 0.5
         let dy = sin(angle) * size * 0.5
@@ -45,23 +44,21 @@ func renderIcon(pixelSize: Int, text: String, withBox: Bool = true) -> CGImage {
     }
 
     // Draw text using Core Text
+    // Use NSColor to avoid CGColor silent failure with .foregroundColor
     let fontSize = size * 0.62
     let font = CTFontCreateWithName("HiraginoSans-W4" as CFString, fontSize, nil)
+    let color: NSColor = withBox ? .white : .black
     let attrs: [NSAttributedString.Key: Any] = [
         .font: font,
-        .foregroundColor: withBox
-            ? CGColor(colorSpace: cs, components: [1, 1, 1, 1])!
-            : CGColor(colorSpace: cs, components: [0, 0, 0, 1])!
+        .foregroundColor: color
     ]
     let attrStr = NSAttributedString(string: text, attributes: attrs)
     let line = CTLineCreateWithAttributedString(attrStr)
 
-    var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
-    let width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
-    let textHeight = ascent + descent
-
-    let x = (size - CGFloat(width)) / 2
-    let y = (size - textHeight) / 2 + descent + size * 0.02
+    // Use glyph path bounds for optical centering
+    let glyphBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+    let x = (size - glyphBounds.width) / 2 - glyphBounds.minX
+    let y = (size - glyphBounds.height) / 2 - glyphBounds.minY
 
     ctx.textPosition = CGPoint(x: x, y: y)
     CTLineDraw(line, ctx)
@@ -88,9 +85,8 @@ for size in appSizes {
     saveImage(renderIcon(pixelSize: size, text: "あ"), to: "\(outDir)/app_\(size).png")
 }
 
-// Input source icon: template (black on transparent), TISIconIsTemplate=true lets macOS add the box
-// Use @2x naming convention (macOS auto-picks the right resolution)
-saveImage(renderIcon(pixelSize: 32, text: "あ", withBox: false), to: "\(outDir)/InputSource.tiff", dpi: 72)
-saveImage(renderIcon(pixelSize: 64, text: "あ", withBox: false), to: "\(outDir)/InputSource@2x.tiff", dpi: 144)
+// Input source icon: 16pt display size (@1x=16px@72dpi, @2x=32px@144dpi)
+saveImage(renderIcon(pixelSize: 16, text: "あ"), to: "\(outDir)/InputSource.tiff", dpi: 72)
+saveImage(renderIcon(pixelSize: 32, text: "あ"), to: "\(outDir)/InputSource@2x.tiff", dpi: 144)
 
 print("Done.")
