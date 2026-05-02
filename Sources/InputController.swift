@@ -3,7 +3,7 @@ import InputMethodKit
 
 // MARK: - IMKTextInput → TextInputClient アダプタ
 
-private final class IMKTextInputAdapter: TextInputClient {
+private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
     private let client: IMKTextInput?
 
     init(_ sender: Any?) {
@@ -36,8 +36,28 @@ private final class IMKTextInputAdapter: TextInputClient {
 
     func cursorRect() -> NSRect {
         var rect = NSRect.zero
-        client?.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
+        let loc = client?.selectedRange().location ?? 0
+        let idx = loc == NSNotFound ? 0 : loc
+        client?.attributes(forCharacterIndex: idx, lineHeightRectangle: &rect)
         return rect
+    }
+
+    func surroundingText(maxLength: Int = 200) -> (prefix: String, suffix: String) {
+        guard let c = client else { return ("", "") }
+        let sel = c.selectedRange()
+        guard sel.location != NSNotFound else { return ("", "") }
+        let prefixStart = max(0, sel.location - maxLength)
+        var prefixActual = NSRange()
+        let prefix = c.string(
+            from: NSRange(location: prefixStart, length: sel.location - prefixStart),
+            actualRange: &prefixActual
+        ) ?? ""
+        var suffixActual = NSRange()
+        let suffix = c.string(
+            from: NSRange(location: sel.location + sel.length, length: maxLength),
+            actualRange: &suffixActual
+        ) ?? ""
+        return (prefix, suffix)
     }
 }
 
@@ -59,9 +79,13 @@ class InputController: IMKInputController {
 
     private var candidateWindow: CandidateWindow { Self.candidateWindow }
 
+    @MainActor private static let ghostWindow: GhostTextWindow = GhostTextWindow()
+    @MainActor private static let _ghostTextEngine: GhostTextEngine = GhostTextEngine(ghostWindow: ghostWindow)
+    private var ghostTextEngine: GhostTextEngine { Self._ghostTextEngine }
+
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
-        candidateWindow.onDelete = { [weak self] text, row in
+        candidateWindow.onDelete = { [weak self] (text: String, row: Int) in
             self?.handler.db.deleteHistory(output: text)
             self?.candidateWindow.removeCandidate(at: row)
         }
@@ -94,6 +118,7 @@ class InputController: IMKInputController {
     }
 
     override func activateServer(_ sender: Any!) {
+        ghostTextEngine.cancel()
         super.activateServer(sender)
         handler.state = CompositionState()
         handler.committedHistory = []
@@ -120,6 +145,12 @@ class InputController: IMKInputController {
         }
 
         guard event.type == .keyDown else { return false }
+
+        // Ghost text: Tab で確定、その他のキーはキャンセル
+        if event.keyCode == KeyCode.tab && ghostTextEngine.hasGhostText {
+            return ghostTextEngine.confirm(into: IMKTextInputAdapter(sender))
+        }
+        ghostTextEngine.cancel()
 
         let chars = event.characters ?? ""
         let baseChars = event.charactersIgnoringModifiers ?? ""
@@ -157,12 +188,35 @@ class InputController: IMKInputController {
 
         switch action {
         case .none:
-            break
+            // Swift 6.2 の region 分析制約により switch 内に配置して
+            // selectNext/selectPrev ケースとの "concurrent access" 誤検知を回避する
+            let engine = Self._ghostTextEngine
+            let composedHiragana = handler.state.composedHiragana
+            if engine.isAvailable
+                && !InputHandler.isAsciiMode
+                && !handler.isSuccessorMode
+                && !handler.isBracketMode
+                && !handler.state.isSegmentMode
+                && !composedHiragana.isEmpty {
+                let (prefix, suffix) = adapter.surroundingText()
+                engine.schedule(prefix: prefix + composedHiragana, suffix: suffix, near: adapter.cursorRect())
+            }
         case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
             #if DEBUG
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
             #endif
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
+            let showEngine = Self._ghostTextEngine
+            let showComposedHiragana = handler.state.composedHiragana
+            if showEngine.isAvailable
+                && !InputHandler.isAsciiMode
+                && !handler.isSuccessorMode
+                && !handler.isBracketMode
+                && !handler.state.isSegmentMode
+                && !showComposedHiragana.isEmpty {
+                let (prefix, suffix) = adapter.surroundingText()
+                showEngine.schedule(prefix: prefix + showComposedHiragana, suffix: suffix, near: adapter.cursorRect())
+            }
             if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。
                 // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
@@ -202,6 +256,7 @@ class InputController: IMKInputController {
     // MARK: - 確定
 
     override func commitComposition(_ sender: Any!) {
+        ghostTextEngine.cancel()
         // Successor モード中で組成がない場合は system-triggered commit をスキップ
         // (insertText の副作用で system が commitComposition を呼ぶことがある)
         if handler.isSuccessorMode && handler.state.composingText.isEmpty && !handler.state.isSegmentMode {

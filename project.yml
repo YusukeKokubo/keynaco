@@ -3,7 +3,7 @@ name: keynaco
 options:
   bundleIdPrefix: com.yusuke
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "26.0"
   xcodeVersion: "16"
   generateEmptyDirectories: true
 
@@ -22,7 +22,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yusuke.inputmethod.keynaco
         SWIFT_VERSION: "6.0"
-        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
         # App Sandbox 有効
         ENABLE_APP_SANDBOX: YES
         CODE_SIGN_ENTITLEMENTS: Sources/keynaco.entitlements
@@ -34,6 +34,7 @@ targets:
         CURRENT_PROJECT_VERSION: 0
     dependencies:
       - sdk: InputMethodKit.framework
+      - sdk: FoundationModels.framework
       - sdk: libsqlite3.tbd
       - package: AzooKeyKanaKanjiConverter
         product: KanaKanjiConverterModuleWithDefaultDictionary
@@ -46,7 +47,7 @@ targets:
     settings:
       base:
         SWIFT_VERSION: "6.0"
-        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: keynaco
