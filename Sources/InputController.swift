@@ -36,9 +36,7 @@ private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
 
     func cursorRect() -> NSRect {
         var rect = NSRect.zero
-        let loc = client?.selectedRange().location ?? 0
-        let idx = loc == NSNotFound ? 0 : loc
-        client?.attributes(forCharacterIndex: idx, lineHeightRectangle: &rect)
+        client?.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
         return rect
     }
 

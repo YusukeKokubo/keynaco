@@ -5,7 +5,7 @@ import os
 @MainActor
 final class GhostTextEngine {
 
-    static let debounceInterval: TimeInterval = 0.4
+    static let debounceInterval: TimeInterval = 0.1
     static let maxTokens = 30
 
     private var debounceTimer: Timer?
@@ -116,14 +116,14 @@ final class GhostTextEngine {
     private static func buildPrompt(prefix: String, suffix: String) -> String {
         if suffix.isEmpty {
             return """
-            次の日本語テキストの続きを短く予測してください。日本語で返してください。
+            次の日本語テキストの末尾を補完してください。
             予測テキストのみを返してください（説明・改行・引用符は不要）。
 
             \(prefix)
             """
         } else {
             return """
-            次の日本語テキストの[空白]部分に入る適切なテキストを短く予測してください。日本語で返してください。
+            次の日本語テキストの末尾を補完してください。
             予測テキストのみを返してください（説明・改行・引用符は不要）。
 
             \(prefix)[空白]\(suffix)
