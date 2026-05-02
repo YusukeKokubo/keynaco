@@ -6,7 +6,8 @@ import os
 final class GhostTextEngine {
 
     static let debounceInterval: TimeInterval = 0.1
-    static let maxTokens = 30
+    static let maxTokens = 8
+    static let maxGhostChars = 5
 
     private var debounceTimer: Timer?
     private var currentTask: Task<Void, Never>?
@@ -81,9 +82,11 @@ final class GhostTextEngine {
         currentTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let session = LanguageModelSession()
+                let session = LanguageModelSession(instructions:
+                    "日本語IME補完。入力の末尾に続く助詞か名詞1語のみ出力。テキストを繰り返さない。"
+                )
                 let text = try await Self.fetchCompletion(
-                    session: session, prefix: prefix, suffix: suffix
+                    session: session, prefix: prefix
                 )
                 #if DEBUG
                 os_log(.debug, "GhostText response: '%{public}@' cancelled=%{public}@",
@@ -108,25 +111,51 @@ final class GhostTextEngine {
 
     private static func fetchCompletion(
         session: LanguageModelSession,
-        prefix: String,
-        suffix: String
+        prefix: String
     ) async throws -> String {
-        let prompt = buildPrompt(prefix: prefix, suffix: suffix)
+        let prompt = buildPrompt(prefix: prefix)
         let options = GenerationOptions(maximumResponseTokens: maxTokens)
         let response = try await session.respond(to: prompt, options: options)
-        return postProcess(response.content)
+        return postProcess(response.content, prefix: prefix)
     }
 
-    private static func buildPrompt(prefix: String, suffix: String) -> String {
-            return """
-            次の日本語テキストの末尾を補完してください。末尾の文字列のみ回答して。
-
-            \(prefix)[空白]\(suffix)
-            """
+    private static func buildPrompt(prefix: String) -> String {
+        // 末尾 30 文字 + "___" で fill-in-the-blank 形式にする
+        return "\(String(prefix.suffix(30)))___"
     }
 
-    private static func postProcess(_ text: String) -> String {
-        (text.components(separatedBy: "\n").first ?? "")
+    private static func postProcess(_ text: String, prefix: String) -> String {
+        let line = (text.components(separatedBy: "\n").first ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // prefix 末尾との重複を除去
+        var cleaned = line
+        let ctx = String(prefix.suffix(30))
+        for length in stride(from: min(ctx.count, cleaned.count), through: 1, by: -1) {
+            let tail = String(ctx.suffix(length))
+            if cleaned.hasPrefix(tail) {
+                cleaned = String(cleaned.dropFirst(tail.count))
+                break
+            }
+        }
+        // prefix 内にすでに含まれる語は不要
+        if !cleaned.isEmpty && prefix.contains(cleaned) { return "" }
+
+        let stopChars: Set<Character> = ["。", "、", "！", "？", "…", ".", ",", "!", "?"]
+        var result = ""
+        for ch in cleaned {
+            if stopChars.contains(ch) { break }
+            result.append(ch)
+        }
+        if result.isEmpty { return "" }
+
+        // 複合助詞はそのまま返す
+        let compound = ["から", "まで", "より", "には", "では", "への", "との", "にも", "でも"]
+        for cp in compound { if result.hasPrefix(cp) { return cp } }
+        // 単助詞は1文字
+        let particles: Set<Character> = ["が", "を", "に", "は", "で", "と", "の", "へ", "も", "か"]
+        if let first = result.first, particles.contains(first) { return String(result.prefix(1)) }
+        // 名詞等は4文字まで
+        return String(result.prefix(maxGhostChars - 1))
     }
 }
