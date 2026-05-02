@@ -27,7 +27,7 @@ final class GhostTextEngine {
 
     // MARK: - 公開 API
 
-    func schedule(prefix: String, suffix: String, near rect: NSRect) {
+    func schedule(prefix: String, suffix: String, composingText: String, near rect: NSRect) {
         guard isAvailable else {
             #if DEBUG
             os_log(.debug, "GhostText schedule skipped: model unavailable")
@@ -43,7 +43,7 @@ final class GhostTextEngine {
         debounceTimer = Timer.scheduledTimer(
             withTimeInterval: Self.debounceInterval, repeats: false
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.fire(prefix: prefix, suffix: suffix, near: rect) }
+            MainActor.assumeIsolated { self?.fire(prefix: prefix, suffix: suffix, composingText: composingText, near: rect) }
         }
     }
 
@@ -70,7 +70,7 @@ final class GhostTextEngine {
         currentTask = nil
     }
 
-    private func fire(prefix: String, suffix: String, near rect: NSRect) {
+    private func fire(prefix: String, suffix: String, composingText: String, near rect: NSRect) {
         guard modelAvailable else { return }
         #if DEBUG
         os_log(.debug, "GhostText fire: sending to Apple Intelligence")
@@ -87,7 +87,7 @@ final class GhostTextEngine {
                        text, "\(Task.isCancelled)")
                 #endif
                 guard !Task.isCancelled, !text.isEmpty else { return }
-                self.ghostWindow.show(text: text, near: rect)
+                self.ghostWindow.show(text: text, composingText: composingText, near: rect)
                 #if DEBUG
                 os_log(.debug, "GhostText window shown at (%{public}.1f,%{public}.1f)",
                        rect.origin.x, rect.origin.y)
@@ -116,15 +116,13 @@ final class GhostTextEngine {
     private static func buildPrompt(prefix: String, suffix: String) -> String {
         if suffix.isEmpty {
             return """
-            次の日本語テキストの末尾を補完してください。
-            予測テキストのみを返してください（説明・改行・引用符は不要）。
+            次の日本語テキストの末尾を補完してください。末尾のみ回答して。
 
             \(prefix)
             """
         } else {
             return """
-            次の日本語テキストの末尾を補完してください。
-            予測テキストのみを返してください（説明・改行・引用符は不要）。
+            次の日本語テキストの末尾を補完してください。末尾のみ回答して。
 
             \(prefix)[空白]\(suffix)
             """

@@ -31,14 +31,18 @@ final class GhostTextWindow: NSPanel {
         ])
     }
 
-    func show(text: String, near cursorRect: NSRect) {
+    func show(text: String, composingText: String, near cursorRect: NSRect) {
         currentText = text
         label.stringValue = text
         label.sizeToFit()
         let width = label.frame.width + 4
         let height: CGFloat = 20
+        // cursorRect は composition 先頭の位置。composingText の幅を計測して末尾へオフセットする。
+        let composingWidth = (composingText as NSString).size(
+            withAttributes: [.font: label.font as Any]
+        ).width
         let anchor = resolveAnchor(cursorRect: cursorRect)
-        var origin = NSPoint(x: anchor.x + 2, y: anchor.y)
+        var origin = NSPoint(x: anchor.x + composingWidth + 2, y: anchor.y)
         if let screen = NSScreen.main,
            origin.x + width > screen.visibleFrame.maxX {
             origin.x = anchor.x - width - 2

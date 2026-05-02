@@ -146,6 +146,7 @@ class InputController: IMKInputController {
 
         // Ghost text: Tab で確定、その他のキーはキャンセル
         if event.keyCode == KeyCode.tab && ghostTextEngine.hasGhostText {
+            candidateWindow.dismiss()
             return ghostTextEngine.confirm(into: IMKTextInputAdapter(sender))
         }
         ghostTextEngine.cancel()
@@ -197,7 +198,7 @@ class InputController: IMKInputController {
                 && !handler.state.isSegmentMode
                 && !composedHiragana.isEmpty {
                 let (prefix, suffix) = adapter.surroundingText()
-                engine.schedule(prefix: prefix + composedHiragana, suffix: suffix, near: adapter.cursorRect())
+                engine.schedule(prefix: prefix + composedHiragana, suffix: suffix, composingText: composedHiragana, near: adapter.cursorRect())
             }
         case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
             #if DEBUG
@@ -213,7 +214,7 @@ class InputController: IMKInputController {
                 && !handler.state.isSegmentMode
                 && !showComposedHiragana.isEmpty {
                 let (prefix, suffix) = adapter.surroundingText()
-                showEngine.schedule(prefix: prefix + showComposedHiragana, suffix: suffix, near: adapter.cursorRect())
+                showEngine.schedule(prefix: prefix + showComposedHiragana, suffix: suffix, composingText: showComposedHiragana, near: adapter.cursorRect())
             }
             if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。
