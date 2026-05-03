@@ -390,6 +390,56 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(results, ["東京", "東京都"], "登録順で返る")
     }
 
+    // MARK: - penalizeAll（訂正シグナル）
+
+    func testPenalizeAllDeletesHistoryWhenCountReachesZero() {
+        db.record(input: "あ", output: "阿")
+        db.penalizeAll(input: "あ", output: "阿", prev1: nil, prev2: nil, skipPrev: nil, fullReading: nil)
+        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").isEmpty)
+    }
+
+    func testPenalizeAllDecrementsBigramNonPreset() {
+        db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 2, usedAt: 0, isPreset: false)
+        db.penalizeAll(input: "きょう", output: "今日", prev1: "東京", prev2: nil, skipPrev: nil, fullReading: nil)
+        let row = db.fetchAllBigram().first { $0.prev == "東京" && $0.input == "きょう" && $0.output == "今日" }
+        XCTAssertEqual(row?.count, 1)
+        db.penalizeAll(input: "きょう", output: "今日", prev1: "東京", prev2: nil, skipPrev: nil, fullReading: nil)
+        let row2 = db.fetchAllBigram().first { $0.prev == "東京" && $0.input == "きょう" && $0.output == "今日" }
+        XCTAssertNil(row2)
+    }
+
+    func testPenalizeAllDoesNotDecrementPresetBigram() {
+        db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 2, usedAt: 0, isPreset: true)
+        db.penalizeAll(input: "きょう", output: "今日", prev1: "東京", prev2: nil, skipPrev: nil, fullReading: nil)
+        let row = db.fetchAllBigram().first { $0.prev == "東京" && $0.input == "きょう" && $0.output == "今日" }
+        XCTAssertEqual(row?.count, 2)
+    }
+
+    func testPenalizeAllDecrementsTrigram() {
+        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "い", output: "行った")
+        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "い", output: "行った")
+        db.penalizeAll(input: "い", output: "行った", prev1: "東京", prev2: "昨日", skipPrev: nil, fullReading: nil)
+        XCTAssertTrue(db.fetchTrigramTop(prev2: "昨日", prev1: "東京").contains("行った"))
+        db.penalizeAll(input: "い", output: "行った", prev1: "東京", prev2: "昨日", skipPrev: nil, fullReading: nil)
+        XCTAssertFalse(db.fetchTrigramTop(prev2: "昨日", prev1: "東京").contains("行った"))
+    }
+
+    func testPenalizeAllDecrementsSkipBigram() {
+        db.recordSkipBigram(prev: "今日", input: "いく", output: "行く")
+        db.recordSkipBigram(prev: "今日", input: "いく", output: "行く")
+        db.penalizeAll(input: "いく", output: "行く", prev1: nil, prev2: nil, skipPrev: "今日", fullReading: nil)
+        XCTAssertTrue(db.fetchSkipBigramTop(prev: "今日").contains("行く"))
+        db.penalizeAll(input: "いく", output: "行く", prev1: nil, prev2: nil, skipPrev: "今日", fullReading: nil)
+        XCTAssertFalse(db.fetchSkipBigramTop(prev: "今日").contains("行く"))
+    }
+
+    func testPenalizeAllDeletesBoundaryPref() {
+        db.saveBoundaryPref(fullReading: "あいうえ", segments: ["あい", "うえ"])
+        XCTAssertNotNil(db.fetchBoundaryPref(fullReading: "あいうえお"))
+        db.penalizeAll(input: "x", output: "y", prev1: nil, prev2: nil, skipPrev: nil, fullReading: "あいうえ")
+        XCTAssertNil(db.fetchBoundaryPref(fullReading: "あいうえお"))
+    }
+
     // MARK: - boundary_pref
 
     /// 入力が保存キーで始まれば、より長い別の文でも同じ境界を再利用する

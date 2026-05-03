@@ -401,14 +401,73 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    func penalizeHistory(input: String, output: String) {
+    /// 確定直後 Backspace（誤変換訂正）で history / bigram / trigram / skip_bigram / boundary_pref を一括ペナルティする。
+    func penalizeAll(
+        input: String,
+        output: String,
+        prev1: String?,
+        prev2: String?,
+        skipPrev: String?,
+        fullReading: String?
+    ) {
         dispatchWrite {
+            self.executeOnQueue("BEGIN")
             self.executeOnQueue("UPDATE history SET count = count - 1 WHERE input = ? AND output = ?") {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
             }
             self.executeOnQueue("DELETE FROM history WHERE input = ? AND output = ? AND count <= 0") {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
             }
+            if let p1 = prev1 {
+                self.executeOnQueue("""
+                    UPDATE bigram SET count = count - 1
+                    WHERE prev = ? AND input = ? AND output = ? AND is_preset = 0
+                    """) {
+                    self.bindText($0, 1, p1); self.bindText($0, 2, input); self.bindText($0, 3, output)
+                }
+                self.executeOnQueue("""
+                    DELETE FROM bigram
+                    WHERE prev = ? AND input = ? AND output = ? AND count <= 0 AND is_preset = 0
+                    """) {
+                    self.bindText($0, 1, p1); self.bindText($0, 2, input); self.bindText($0, 3, output)
+                }
+            }
+            if let p2 = prev2, let p1 = prev1 {
+                self.executeOnQueue("""
+                    UPDATE trigram SET count = count - 1
+                    WHERE prev2 = ? AND prev1 = ? AND input = ? AND output = ?
+                    """) {
+                    self.bindText($0, 1, p2); self.bindText($0, 2, p1)
+                    self.bindText($0, 3, input); self.bindText($0, 4, output)
+                }
+                self.executeOnQueue("""
+                    DELETE FROM trigram
+                    WHERE prev2 = ? AND prev1 = ? AND input = ? AND output = ? AND count <= 0
+                    """) {
+                    self.bindText($0, 1, p2); self.bindText($0, 2, p1)
+                    self.bindText($0, 3, input); self.bindText($0, 4, output)
+                }
+            }
+            if let sp = skipPrev {
+                self.executeOnQueue("""
+                    UPDATE skip_bigram SET count = count - 1
+                    WHERE prev = ? AND input = ? AND output = ?
+                    """) {
+                    self.bindText($0, 1, sp); self.bindText($0, 2, input); self.bindText($0, 3, output)
+                }
+                self.executeOnQueue("""
+                    DELETE FROM skip_bigram
+                    WHERE prev = ? AND input = ? AND output = ? AND count <= 0
+                    """) {
+                    self.bindText($0, 1, sp); self.bindText($0, 2, input); self.bindText($0, 3, output)
+                }
+            }
+            if let fr = fullReading {
+                self.executeOnQueue("DELETE FROM boundary_pref WHERE full_reading = ?") {
+                    self.bindText($0, 1, fr)
+                }
+            }
+            self.executeOnQueue("COMMIT")
         }
     }
 

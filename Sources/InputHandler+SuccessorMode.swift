@@ -84,13 +84,23 @@ extension InputHandler {
         isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
         clearSuccessorLLMAuxiliaryState()
         state.pendingRomaji = ""
-        if let p1 = lastCommittedOutput {
+        let capPrev1 = lastCommittedOutput
+        let capPrev2 = prev2Output
+        if let p1 = capPrev1 {
             db.recordBigram(prev: p1, input: particle, output: particle)
-            if let p2 = prev2Output {
+            if let p2 = capPrev2 {
                 db.recordTrigram(prev2: p2, prev1: p1, input: particle, output: particle)
             }
         }
         db.recordPrefixes(reading: particle, output: particle)
+        lastConfirmedContext = LastConfirmedContext(
+            input: particle,
+            output: particle,
+            prev1: capPrev1,
+            prev2: capPrev2,
+            skipPrev: nil,
+            fullReading: nil
+        )
         pushCommitted(particle)
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
         client.insertText(particle)
@@ -119,9 +129,16 @@ extension InputHandler {
         case KeyCode.upArrow:
             return (true, .selectPrev)
         case KeyCode.escape, KeyCode.backspace, KeyCode.rightArrow:
-            if keyCode == KeyCode.backspace, let pair = lastConfirmedPair {
-                db.penalizeHistory(input: pair.input, output: pair.output)
-                lastConfirmedPair = nil
+            if keyCode == KeyCode.backspace, let ctx = lastConfirmedContext {
+                db.penalizeAll(
+                    input: ctx.input,
+                    output: ctx.output,
+                    prev1: ctx.prev1,
+                    prev2: ctx.prev2,
+                    skipPrev: ctx.skipPrev,
+                    fullReading: ctx.fullReading
+                )
+                lastConfirmedContext = nil
             }
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             clearSuccessorLLMAuxiliaryState()

@@ -40,6 +40,16 @@ struct CandidateContext {
     static let hidden = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
 }
 
+/// 確定直後 Backspace で `penalizeAll` するための、直前確定の学習コンテキスト。
+struct LastConfirmedContext: Equatable {
+    let input: String
+    let output: String
+    let prev1: String?
+    let prev2: String?
+    let skipPrev: String?
+    let fullReading: String?
+}
+
 enum KeyCode {
     static let eisu:      UInt16 = 102
     static let kana:      UInt16 = 104
@@ -86,7 +96,7 @@ struct InputHandler {
     var segmentLLMTrigger: SegmentLLMTrigger = .none
     var bracketCandidates: [String]? = nil
     var isBracketMode: Bool { bracketCandidates != nil }
-    var lastConfirmedPair: (input: String, output: String)? = nil
+    var lastConfirmedContext: LastConfirmedContext? = nil
     var lastAzooKeyInput: String = ""
     var lastAzooKeyResults: [String] = []
     /// F1 文脈スコア: `buildCandidateList` が返す候補列でのグローバル行（`pendingF1Strings` と対応）
@@ -145,7 +155,7 @@ struct InputHandler {
         // 7. else              → handleNormalInput
 
         let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
-        if !isBackspace { lastConfirmedPair = nil }
+        if !isBackspace { lastConfirmedContext = nil }
 
         if isSuccessorMode {
             return handleSuccessorMode(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
@@ -237,7 +247,7 @@ struct InputHandler {
                 segmentLLMTrigger = .none
                 db.recordPrefixes(reading: fullReading, output: llmText)
                 azooKeyConverter.commit(reading: fullReading, text: llmText)
-                commitText(text: llmText, client: client)
+                commitText(text: llmText, fullReading: fullReading, client: client)
                 return
             }
             var confirmed = ""
@@ -254,7 +264,7 @@ struct InputHandler {
                 db.recordPrefixes(reading: fullReading, output: confirmed)
             }
             segmentLLMTrigger = .none
-            commitText(text: confirmed, client: client)
+            commitText(text: confirmed, fullReading: fullReading, client: client)
             return
         }
         guard !state.composingText.isEmpty else { return }
@@ -275,24 +285,35 @@ struct InputHandler {
 
     // MARK: - 共通ヘルパー（extension からも参照される）
 
-    mutating func commitText(text: String, skipHistory: Bool = false, client: TextInputClient) {
-        if !state.composingText.isEmpty && !skipHistory {
-            if let p1 = lastCommittedOutput {
-                let bigramInput = state.finalizedText
-                let trigramArg: (prev2: String, prev1: String, input: String, output: String)? =
-                    prev2Output.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) }
-                let skipArg: (prev: String, input: String, output: String)? =
-                    InputHandler.particles.contains(p1)
-                    ? mostRecentContentWord().map { (prev: $0, input: bigramInput, output: text) }
-                    : nil
-                db.recordNgrams(
-                    bigram: (prev: p1, input: bigramInput, output: text),
-                    trigram: trigramArg,
-                    skipBigram: skipArg
-                )
+    mutating func commitText(
+        text: String,
+        skipHistory: Bool = false,
+        fullReading: String? = nil,
+        client: TextInputClient
+    ) {
+        var capPrev1: String?
+        var capPrev2: String?
+        var capSkipPrev: String?
+        if !state.composingText.isEmpty && !skipHistory, let p1 = lastCommittedOutput {
+            capPrev1 = p1
+            capPrev2 = prev2Output
+            if InputHandler.particles.contains(p1) { capSkipPrev = mostRecentContentWord() }
+            let bigramInput = state.finalizedText
+            db.recordNgrams(
+                bigram: (prev: p1, input: bigramInput, output: text),
+                trigram: prev2Output.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) },
+                skipBigram: capSkipPrev.map { (prev: $0, input: bigramInput, output: text) }
+            )
             }
         }
-        lastConfirmedPair = (state.finalizedText, text)
+        lastConfirmedContext = LastConfirmedContext(
+            input: state.finalizedText,
+            output: text,
+            prev1: capPrev1,
+            prev2: capPrev2,
+            skipPrev: capSkipPrev,
+            fullReading: fullReading
+        )
         pushCommitted(text)
         client.insertText(text)
         state = CompositionState()
@@ -338,9 +359,16 @@ struct InputHandler {
 
     mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         let (handled, needsRefresh) = state.backspace()
-        if !handled, let pair = lastConfirmedPair {
-            db.penalizeHistory(input: pair.input, output: pair.output)
-            lastConfirmedPair = nil
+        if !handled, let ctx = lastConfirmedContext {
+            db.penalizeAll(
+                input: ctx.input,
+                output: ctx.output,
+                prev1: ctx.prev1,
+                prev2: ctx.prev2,
+                skipPrev: ctx.skipPrev,
+                fullReading: ctx.fullReading
+            )
+            lastConfirmedContext = nil
         }
         guard handled else { return (false, .none) }
         let action: CandidateAction = needsRefresh ? buildCandidateList() : .dismiss

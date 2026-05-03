@@ -291,7 +291,7 @@ extension InputHandler {
             segmentLLMTrigger = .none
             db.recordPrefixes(reading: fullReading, output: llmText)
             azooKeyConverter.commit(reading: fullReading, text: llmText)
-            commitText(text: llmText, client: client)
+            commitText(text: llmText, fullReading: fullReading, client: client)
             return suggestSuccessors()
         }
 
@@ -325,7 +325,7 @@ extension InputHandler {
             db.saveBoundaryPref(fullReading: fullReading, segments: segs.map { $0.reading })
         }
         segmentLLMTrigger = .none
-        commitText(text: confirmed, client: client)
+        commitText(text: confirmed, fullReading: fullReading, client: client)
         return suggestSuccessors()
     }
 

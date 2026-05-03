@@ -174,8 +174,12 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 ### prev2Output
 2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。
 
+### lastConfirmedContext
+確定直後の Backspace を「誤変換の訂正」として扱うために、`commitText` / `confirmSuccessor` が保持する直前 **1 件**の学習キー。`(input, output, prev1, prev2, skipPrev, fullReading)`。  
+**不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。セグメント全読み確定時のみ `fullReading` が非 `nil`（`boundary_pref` 削除用）。
+
 ### DatabaseManager
-変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・境界学習（`boundary_pref`）の **5 テーブル**を持つ SQLite ストア。  
+変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）の **6 テーブル**を持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。  
 **`clock` var** でエポック秒を注入可能（テスト用）。全 record/fetch で `nowEpoch()` を使うことで時系列が一貫する。
 
@@ -205,6 +209,9 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 #### skip-bigram
 助詞（`InputHandler.particles`）が直前に確定されたとき、`mostRecentContentWord`（直近の非助詞語）と現在の確定語のペアを `skip_bigram` テーブルに記録する。  
 `今日 → を → 行く` `今日 → が → 走る` のように助詞でバラけたペアが「今日 → 行く/走る」として統合される。
+
+#### penalizeAll（訂正シグナル）
+確定直後 Backspace 時に呼ばれる。`history` の該当行を count -1（0 以下で削除）、同じ確定に対応する `bigram`（**`is_preset = 0` のみ**）/`trigram`/`skip_bigram` も同様に -1、`fullReading` があればそのキーの `boundary_pref` 行を DELETE。`withTransaction` で一括実行。
 
 *Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/SkipBigramTests.swift`*
 

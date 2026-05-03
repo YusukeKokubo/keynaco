@@ -109,13 +109,13 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿")
 
-        // 確定直後 Backspace → penalizeHistory で count -1 → 1
+        // 確定直後 Backspace → penalizeAll で history count -1 → 1
         press(keyCode: 51)
 
         let entries = handler.db.fetchAllHistory()
         let entry = entries.first(where: { $0.input == "あ" && $0.output == "阿" })
         XCTAssertNotNil(entry, "ペナルティ後もエントリが残るはず")
-        XCTAssertEqual(entry?.count, 1, "penalizeHistory でカウントが 1 減るはず")
+        XCTAssertEqual(entry?.count, 1, "penalizeAll で history のカウントが 1 減るはず")
     }
 
     func testNegativeFeedbackDeletesWhenCountReachesZero() {
@@ -123,7 +123,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿")
 
-        // 確定直後 Backspace → penalizeHistory → count=0 → DELETE
+        // 確定直後 Backspace → penalizeAll → count=0 → DELETE
         press(keyCode: 51)
 
         let hist = handler.db.fetchHistoryExact(reading: "あ")
@@ -135,13 +135,52 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿")
 
-        // 別キー打鍵 → lastConfirmedPair をクリア
-        press(keyCode: 36)  // Enter（composingText なし → pass-through、かつ lastConfirmedPair = nil）
+        // 別キー打鍵 → lastConfirmedContext をクリア
+        press(keyCode: 36)  // Enter（composingText なし → pass-through、かつ lastConfirmedContext = nil）
 
         // Backspace → penalize されない
         press(keyCode: 51)
 
         let hist = handler.db.fetchHistoryExact(reading: "あ")
         XCTAssertTrue(hist.contains("阿"), "別キー後の Backspace では penalize されないはず")
+    }
+
+    /// 組成空で Backspace したとき、`lastConfirmedContext` に応じて bi-gram にペナルティする。
+    func testPenalizeAllRemovesBigramWhenBackspaceAfterSyntheticConfirm() {
+        handler.db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 1, usedAt: 0, isPreset: false)
+        handler.lastConfirmedContext = LastConfirmedContext(
+            input: "きょう", output: "今日",
+            prev1: "東京", prev2: nil, skipPrev: nil, fullReading: nil
+        )
+        let (_, _) = press(keyCode: 51)
+        XCTAssertNil(handler.lastConfirmedContext)
+        XCTAssertNil(
+            handler.db.fetchAllBigram().first { $0.prev == "東京" && $0.output == "今日" },
+            "count=1 をペナルティして削除されるはず"
+        )
+    }
+
+    func testPenalizeAllSkipsPresetBigramOnBackspace() {
+        handler.db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 1, usedAt: 0, isPreset: true)
+        handler.lastConfirmedContext = LastConfirmedContext(
+            input: "きょう", output: "今日",
+            prev1: "東京", prev2: nil, skipPrev: nil, fullReading: nil
+        )
+        _ = press(keyCode: 51)
+        let row = handler.db.fetchAllBigram().first { $0.prev == "東京" && $0.output == "今日" }
+        XCTAssertEqual(row?.count, 1, "プリセット行はペナルティ対象外")
+    }
+
+    func testSecondBackspaceDoesNotPenalizeAgain() {
+        handler.db.record(input: "あ", output: "阿")
+        handler.lastConfirmedContext = LastConfirmedContext(
+            input: "あ", output: "阿",
+            prev1: nil, prev2: nil, skipPrev: nil, fullReading: nil
+        )
+        _ = press(keyCode: 51)
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "あ").isEmpty)
+        // 1 回目で lastConfirmedContext は消えている
+        _ = press(keyCode: 51)
+        // 二重にエラーにならなければよい（空のペナルティ呼び出しはしない）
     }
 }
