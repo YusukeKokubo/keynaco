@@ -174,7 +174,13 @@ class InputController: IMKInputController {
         // Ghost text: Tab で確定、その他のキーはキャンセル
         if event.keyCode == KeyCode.tab && ghostTextEngine.hasGhostText {
             candidateWindow.dismiss()
-            return ghostTextEngine.confirm(into: IMKTextInputAdapter(sender))
+            if let confirmed = ghostTextEngine.confirm(into: IMKTextInputAdapter(sender)) {
+                // 文書に挿入された語として後続のコンテキスト（Successor・skip-bigram）に反映する。
+                // 学習 DB（bi-gram 等）には触れないため、変換履歴は汚染されない。
+                handler.pushCommitted(confirmed)
+                return true
+            }
+            return false
         }
         // ゴーストテキストが表示中だった場合はマークドテキストもクリアする
         if ghostTextEngine.hasGhostText {

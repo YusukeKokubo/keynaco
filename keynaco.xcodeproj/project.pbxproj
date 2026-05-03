@@ -42,6 +42,7 @@
 		BDF0B7CF569DBAF2532F1083 /* SkipBigramTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1AA964A2E0D8230BBA41CD7 /* SkipBigramTests.swift */; };
 		BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */; };
 		C2E14C85CC907A3ECFEF44E9 /* InputHandlerAsciiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B2F53FCF18FDAC7A79F92A /* InputHandlerAsciiTests.swift */; };
+		C8FB14F6DC26BC9A36880CB1 /* ScenarioRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9B215AFEA353E22981FF11B /* ScenarioRegressionTests.swift */; };
 		CA9DA0E228B3736FED19A8C7 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8870F701310164C98A33E /* BigramViewController.swift */; };
 		CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01349F1120E395B87FF8E96B /* DatabaseManager.swift */; };
 		CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565B8F19A5E192228B765163 /* KanaUtils.swift */; };
@@ -115,6 +116,7 @@
 		C8F905020C8A707920C53337 /* InputSource.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = InputSource.tiff; sourceTree = "<group>"; };
 		C9CE25A93E96E885615EB17A /* AzooKeyCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyCacheTests.swift; sourceTree = "<group>"; };
 		D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
+		D9B215AFEA353E22981FF11B /* ScenarioRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioRegressionTests.swift; sourceTree = "<group>"; };
 		E64029A8FFA3EFDC3B832BC2 /* EventViewerWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventViewerWindow.swift; sourceTree = "<group>"; };
 		E6A89E465235280624AF1A85 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
 		EF94F7FCC94B872938DE79A3 /* UserDictViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDictViewController.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 				A980CA73C689304375F976DD /* InputHandlerTestCase.swift */,
 				8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */,
 				7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */,
+				D9B215AFEA353E22981FF11B /* ScenarioRegressionTests.swift */,
 				BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */,
 				F1AA964A2E0D8230BBA41CD7 /* SkipBigramTests.swift */,
 			);
@@ -360,6 +363,7 @@
 				44BA7DAD02471D3C7678FD24 /* InputHandlerTestCase.swift in Sources */,
 				29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */,
 				7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */,
+				C8FB14F6DC26BC9A36880CB1 /* ScenarioRegressionTests.swift in Sources */,
 				E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */,
 				BDF0B7CF569DBAF2532F1083 /* SkipBigramTests.swift in Sources */,
 			);

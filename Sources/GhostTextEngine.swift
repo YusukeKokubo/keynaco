@@ -56,13 +56,13 @@ final class GhostTextEngine {
         ghostWindow.dismiss()
     }
 
-    /// Tab 確定時。true を返したら consumed = true にする。
-    func confirm(into client: TextInputClient) -> Bool {
-        guard let text = ghostWindow.currentText else { return false }
+    /// Tab 確定時。挿入したテキストを返す（nil なら未表示で何もしない）。
+    func confirm(into client: TextInputClient) -> String? {
+        guard let text = ghostWindow.currentText else { return nil }
         cancelInternal()
         ghostWindow.dismiss()
         client.insertText(text)
-        return true
+        return text
     }
 
     // MARK: - Private
