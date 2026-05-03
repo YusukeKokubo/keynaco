@@ -70,6 +70,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
 - `EventViewerWindow` = `Sources/Debug/EventViewerWindow.swift`。`AppDelegate` が NSStatusItem（⌨アイコン）として常駐し、メニューから起動。keyCode・chars・mods・consumed・action・app をリアルタイム表示。確定テキストと候補リストをキャプチャしてクリップボードにコピー可能。JSONL エクスポートで `~/Library/Application Support/keynaco/sessions/` に保存。デバッグ用途
+- `GhostTextEngine` / `GhostTextWindow` = `FoundationModels`（Apple Intelligence の `SystemLanguageModel`）を使ったゴーストテキスト補完。IME 確定後にカーソル位置へ薄いグレーで続きを表示し、Tab で確定する。`InputController` が静的インスタンスとして保持（`_ghostTextEngine`）。`committedHistory` を `recentIMEWords` としてコンテキストに渡す。`onShow` コールバックで `setMarkedText` を呼び IME をアクティブに保つ（Electron 系アプリ対策）。`SystemLanguageModel.default.availability` が `.available` でない環境（Apple Intelligence 非対応 Mac）では自動的に無効化される
 
 変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
