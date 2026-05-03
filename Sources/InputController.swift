@@ -338,7 +338,8 @@ class InputController: IMKInputController {
     /// F4: 確定 `insertText` 後にカーソル前文を検査（0.5 秒デバウンス）。
     private func scheduleMisconversionCheck(adapter: IMKTextInputAdapter) {
         let prefix = adapter.surroundingText(maxLength: 200).prefix
-        Self.misconversionChecker.check(surroundingPrefix: prefix)
+        let recentWords = Array(handler.committedHistory.suffix(5))
+        Self.misconversionChecker.check(surroundingPrefix: prefix, recentWords: recentWords)
     }
 
     /// 変換候補を直前文脈で並べ替える（F1）。文脈はこのキー処理内で同期取得したもののみ使う。

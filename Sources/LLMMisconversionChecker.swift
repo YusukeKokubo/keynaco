@@ -29,7 +29,8 @@ final class LLMMisconversionChecker {
     }
 
     /// カーソル直前の確定済みテキスト断片（最大 200 文字想定）を検査する。0.5 秒デバウンス。
-    func check(surroundingPrefix: String) {
+    /// `recentWords` は呼び出し時点のスナップショット（デバウンス中の履歴変化は反映しない）。
+    func check(surroundingPrefix: String, recentWords: [String] = []) {
         guard case .available = SystemLanguageModel.default.availability else { return }
 
         cancel(suppressClearNotification: true)
@@ -40,7 +41,8 @@ final class LLMMisconversionChecker {
             return
         }
 
-        let captured = trimmed
+        let capturedText = trimmed
+        let capturedWords = Array(recentWords)
         debounceTask = Task { @MainActor in
             do {
                 try await Task.sleep(for: .milliseconds(500))
@@ -48,15 +50,15 @@ final class LLMMisconversionChecker {
                 return
             }
             guard !Task.isCancelled else { return }
-            runLLMCheck(text: captured)
+            runLLMCheck(text: capturedText, recentWords: capturedWords)
         }
     }
 
-    private func runLLMCheck(text: String) {
+    private func runLLMCheck(text: String, recentWords: [String]) {
         llmTask?.cancel()
         llmTask = Task { @MainActor [session] in
             do {
-                let prompt = Self.buildPrompt(text: text)
+                let prompt = Self.buildPrompt(text: text, recentWords: recentWords)
                 let response = try await session.respond(to: prompt)
                 guard !Task.isCancelled else { return }
                 if let issue = Self.parseIssue(from: response), !issue.isEmpty {
@@ -82,8 +84,19 @@ final class LLMMisconversionChecker {
         NotificationCenter.default.post(name: .keynacoMisconversionCleared, object: nil)
     }
 
-    private static func buildPrompt(text: String) -> String {
-        """
+    internal static func buildPrompt(text: String, recentWords: [String]) -> String {
+        guard !recentWords.isEmpty else {
+            return """
+            次の日本語テキストに誤変換や不自然な表現があれば、箇所と修正案を指摘してください。
+            問題がなければ「OK」とだけ答えてください。
+            \(text)
+            """
+        }
+        let list = recentWords.joined(separator: "、")
+        return """
+        【このユーザーが使う語の例】
+        \(list)
+
         次の日本語テキストに誤変換や不自然な表現があれば、箇所と修正案を指摘してください。
         問題がなければ「OK」とだけ答えてください。
         \(text)

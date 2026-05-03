@@ -12,6 +12,7 @@
 		0521D725A698985598C0AEF1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = EB4429C5180AA3C30E50DD09 /* InfoPlist.strings */; };
 		087D83DB5E5BD1979F0BA0A5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558C3E35C47661D5D98A0A57 /* AppDelegate.swift */; };
 		0BCF20F606C0BB4B3CB45BD6 /* InputHandlerSegmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EA17261D3D888C032F5F102 /* InputHandlerSegmentTests.swift */; };
+		12171EF18F9FC4DA0E3561E9 /* LLMMisconversionCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 186C2D2AA47E6E2E6E57082F /* LLMMisconversionCheckerTests.swift */; };
 		19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */; };
 		1A270494B5AA24DBDB23DD47 /* UserDictViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF94F7FCC94B872938DE79A3 /* UserDictViewController.swift */; };
 		25A7798A7237BDF2124782E0 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54631F84EB0B2E3208C05023 /* SettingsWindowController.swift */; };
@@ -91,6 +92,7 @@
 		0EA17261D3D888C032F5F102 /* InputHandlerSegmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerSegmentTests.swift; sourceTree = "<group>"; };
 		15033BFDFA6A888F753B0666 /* keynacoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = keynacoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		18510F685A5861F194EBA987 /* AzooKeyConverting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyConverting.swift; sourceTree = "<group>"; };
+		186C2D2AA47E6E2E6E57082F /* LLMMisconversionCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMMisconversionCheckerTests.swift; sourceTree = "<group>"; };
 		1F64A49C480649A108EF3D19 /* LLMFallbackForcingMockAzooKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMFallbackForcingMockAzooKey.swift; sourceTree = "<group>"; };
 		21A8870F701310164C98A33E /* BigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigramViewController.swift; sourceTree = "<group>"; };
 		2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMSuccessorFetcher.swift; sourceTree = "<group>"; };
@@ -183,6 +185,7 @@
 				8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */,
 				0761267E295ED3D1435CB337 /* LLMCandidateScorerTests.swift */,
 				1F64A49C480649A108EF3D19 /* LLMFallbackForcingMockAzooKey.swift */,
+				186C2D2AA47E6E2E6E57082F /* LLMMisconversionCheckerTests.swift */,
 				0786D4E26B8D8248C3F45C53 /* LLMSuccessorFetcherTests.swift */,
 				7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */,
 				D9B215AFEA353E22981FF11B /* ScenarioRegressionTests.swift */,
@@ -405,6 +408,7 @@
 				29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */,
 				D409F8F4E5AB01C4ECC7EB16 /* LLMCandidateScorerTests.swift in Sources */,
 				389A5B8EF38437CC61404E23 /* LLMFallbackForcingMockAzooKey.swift in Sources */,
+				12171EF18F9FC4DA0E3561E9 /* LLMMisconversionCheckerTests.swift in Sources */,
 				78BDC8DEF0CADA081EA99F2D /* LLMSuccessorFetcherTests.swift in Sources */,
 				7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */,
 				C8FB14F6DC26BC9A36880CB1 /* ScenarioRegressionTests.swift in Sources */,
