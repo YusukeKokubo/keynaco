@@ -88,6 +88,16 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 
 *Tests: `Tests/InputHandlerSegmentTests.swift`*
 
+### SegmentState.llmWholeText（セグメント LLM 全文候補）
+読み全体（`composedHiragana`）をオンデバイス LLM で一括変換した候補テキスト。`InputController` が `LLMSegmentConverter` の非同期結果を受け取ったとき、`segments[0].candidates` の先頭に挿入し、このプロパティに同じ文字列を保持する。  
+**不変条件（短絡確定）**: `doConfirmSegments` で LLM 全文のみ確定するのは `focusedIndex == 0` かつ `segments[0].selectedIndex == 0` かつ `segments[0].candidates.first == llmWholeText` のときのみ（Shift+矢印で先頭候補が差し替わったあと `llmWholeText` だけが残る誤確定を防ぐ）。確定時は全文節を破棄し `commitText(llmWholeText)` のみ行う。  
+挿入時は `segments[0].historyEnd` を 1 増やし、既存の履歴ブロック境界を維持する。`segments[0].selectedIndex` は先頭挿入に合わせて 1 増やし、リフレッシュ前の視覚選択を維持する。
+
+### LLMSegmentConverter
+セグメントモード用の FoundationModels ラッパー。`SystemLanguageModel.default` が利用可能なときのみ `convert(hiragana:onResult:)` が推論を走らせる。失敗時は空文字でコールバックし既存 UX を壊さない。
+
+*Tests: `Tests/InputHandlerSegmentLLMTests.swift`*
+
 ### boundary_pref（境界学習）
 手動調整した境界を保存する `boundary_pref` テーブルのエントリ。  
 `enterSegmentMode()` は `azooKeyConverter.segmentize()` を呼ぶ前に `fetchBoundaryPref` を確認し、

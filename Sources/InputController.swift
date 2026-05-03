@@ -88,6 +88,7 @@ class InputController: IMKInputController {
     private lazy var handler: InputHandler = InputHandler()
     /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
     private static let successorLLM = LLMSuccessorFetcher()
+    private static let segmentLLM = LLMSegmentConverter()
 
     private static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -142,10 +143,15 @@ class InputController: IMKInputController {
         handler.pendingSuccessorCandidates = []
         handler.successorLLMTrigger = .none
         handler.successorLLMBaseCandidates = nil
+        handler.segmentLLMTrigger = .none
         if Thread.isMainThread {
             Self.successorLLM.cancel()
+            Self.segmentLLM.cancel()
         } else {
-            DispatchQueue.main.sync { Self.successorLLM.cancel() }
+            DispatchQueue.main.sync {
+                Self.successorLLM.cancel()
+                Self.segmentLLM.cancel()
+            }
         }
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
@@ -248,6 +254,7 @@ class InputController: IMKInputController {
                 }
             }
             applySuccessorLLMScheduling(adapter: adapter)
+            applySegmentLLMScheduling(adapter: adapter)
             return !handler.pendingSuccessorCandidates.isEmpty
         }
         DispatchQueue.main.async {
@@ -279,11 +286,16 @@ class InputController: IMKInputController {
         handler.pendingSuccessorCandidates = []
         handler.successorLLMTrigger = .none
         handler.successorLLMBaseCandidates = nil
+        handler.segmentLLMTrigger = .none
         handler.bracketCandidates = nil
         if Thread.isMainThread {
             Self.successorLLM.cancel()
+            Self.segmentLLM.cancel()
         } else {
-            DispatchQueue.main.sync { Self.successorLLM.cancel() }
+            DispatchQueue.main.sync {
+                Self.successorLLM.cancel()
+                Self.segmentLLM.cancel()
+            }
         }
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
@@ -334,6 +346,32 @@ class InputController: IMKInputController {
                    let markedText = self.candidateWindow.selectedText(), !markedText.isEmpty {
                     adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
                 }
+            }
+        }
+    }
+
+    /// `enterSegmentMode()` が立てた `segmentLLMTrigger` に応じてオンデバイス LLM で読み全体を一括変換する。
+    private func applySegmentLLMScheduling(adapter: IMKTextInputAdapter) {
+        let trigger = handler.segmentLLMTrigger
+        guard case .start(let hiragana) = trigger else { return }
+        handler.segmentLLMTrigger = .none
+        Self.segmentLLM.convert(hiragana: hiragana) { [weak self] text in
+            guard let self else { return }
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  let segState = self.handler.state.segmentState,
+                  segState.segments.map(\.reading).joined() == hiragana else { return }
+            self.handler.applyLLMSegmentResult(text: trimmed)
+            guard let updated = self.handler.state.segmentState,
+                  updated.llmWholeText != nil,
+                  !updated.segments.isEmpty else { return }
+            let action = self.handler.makeCandidateActionForFocusedSegment()
+            if case .show(let cands, let historyEnd, let initialRow, let predictionEnd, let fixedEnd) = action {
+                self.candidateWindow.show(
+                    candidates: cands, historySectionEnd: historyEnd, initialRow: initialRow,
+                    predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect()
+                )
+                self.handler.applySegmentMarkedText(client: adapter)
             }
         }
     }

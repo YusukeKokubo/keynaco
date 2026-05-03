@@ -21,8 +21,9 @@ extension InputHandler {
             return buildCandidateList()
         }
 
+        let segments: [Segment]
         if let stored = db.fetchBoundaryPref(fullReading: fullReading), stored.count >= 2 {
-            var segments: [Segment] = []
+            var built: [Segment] = []
             var prevText: String? = lastCommittedOutput
             for reading in stored {
                 let seg = buildSegmentCandidates(
@@ -30,26 +31,48 @@ extension InputHandler {
                     dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading),
                     prev: prevText
                 )
-                segments.append(seg)
+                built.append(seg)
                 prevText = seg.selectedText
             }
-            state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
-            return makeCandidateActionForFocusedSegment()
+            segments = built
+        } else {
+            let rawSegments = azooKeyConverter.segmentize(fullReading)
+            guard rawSegments.count >= 2 else {
+                return buildCandidateList()
+            }
+            var built: [Segment] = []
+            var prevText: String? = lastCommittedOutput
+            for raw in rawSegments {
+                let seg = buildSegmentCandidates(reading: raw.reading, dictCandidates: raw.candidates, prev: prevText)
+                built.append(seg)
+                prevText = seg.selectedText
+            }
+            segments = built
         }
 
-        let rawSegments = azooKeyConverter.segmentize(fullReading)
-        guard rawSegments.count >= 2 else {
-            return buildCandidateList()
-        }
-        var segments: [Segment] = []
-        var prevText: String? = lastCommittedOutput
-        for raw in rawSegments {
-            let seg = buildSegmentCandidates(reading: raw.reading, dictCandidates: raw.candidates, prev: prevText)
-            segments.append(seg)
-            prevText = seg.selectedText
-        }
         state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
+        segmentLLMTrigger = .start(hiragana: fullReading)
         return makeCandidateActionForFocusedSegment()
+    }
+
+    /// `LLMSegmentConverter` の結果を `segments[0]` 先頭に差し込む（`InputController` から呼ぶ）。
+    mutating func applyLLMSegmentResult(text raw: String) {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        guard var ss = state.segmentState, ss.llmWholeText == nil else { return }
+        let fullReading = ss.segments.map(\.reading).joined()
+        guard fullReading == state.composedHiragana else { return }
+        if text == fullReading { return }
+        if text == ss.allSelectedText { return }
+        guard !ss.segments.isEmpty else { return }
+        if ss.segments[0].candidates.contains(text) { return }
+
+        ss.segments[0].candidates.insert(text, at: 0)
+        ss.segments[0].historyEnd += 1
+        let newCount = ss.segments[0].candidates.count
+        ss.segments[0].selectedIndex = min(ss.segments[0].selectedIndex + 1, newCount - 1)
+        ss.llmWholeText = text
+        state.segmentState = ss
     }
 
     func buildSegmentCandidates(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
@@ -154,6 +177,7 @@ extension InputHandler {
         case KeyCode.escape:
             state.segmentState = nil
             segmentCandidateCache.removeAll()
+            segmentLLMTrigger = .none
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
 
@@ -161,12 +185,14 @@ extension InputHandler {
             if keyCode == KeyCode.backspace {
                 state.segmentState = nil
                 segmentCandidateCache.removeAll()
+                segmentLLMTrigger = .none
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, .dismiss)
             }
             // その他のキー → セグメントモード解除してそのキーをスルー
             state.segmentState = nil
             segmentCandidateCache.removeAll()
+            segmentLLMTrigger = .none
             return (false, .dismiss)
         }
     }
@@ -253,6 +279,21 @@ extension InputHandler {
     mutating func doConfirmSegments(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         syncFocusedSegmentSelection(from: candidate)
         guard let segmentState = state.segmentState else { return .none }
+
+        if let llmText = segmentState.llmWholeText,
+           segmentState.focusedIndex == 0,
+           segmentState.segments[0].selectedIndex == 0,
+           segmentState.segments[0].candidates.first == llmText {
+            let fullReading = segmentState.segments.map(\.reading).joined()
+            state.segmentState = nil
+            segmentCandidateCache.removeAll()
+            segmentLLMTrigger = .none
+            db.recordPrefixes(reading: fullReading, output: llmText)
+            azooKeyConverter.commit(reading: fullReading, text: llmText)
+            commitText(text: llmText, client: client)
+            return suggestSuccessors()
+        }
+
         var confirmed = ""
         var fullReading = ""
         for seg in segmentState.segments {
@@ -282,6 +323,7 @@ extension InputHandler {
         if segs.contains(where: { $0.isManuallyAdjusted }) {
             db.saveBoundaryPref(fullReading: fullReading, segments: segs.map { $0.reading })
         }
+        segmentLLMTrigger = .none
         commitText(text: confirmed, client: client)
         return suggestSuccessors()
     }
