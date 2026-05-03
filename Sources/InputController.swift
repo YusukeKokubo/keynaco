@@ -1,6 +1,11 @@
 import Cocoa
 import InputMethodKit
 
+extension Notification.Name {
+    /// Successor の N-gram 保留（`pendingSuccessorCandidates`）の有無が変わったときに送る。
+    static let keynacoSuccessorPendingChanged = Notification.Name("keynacoSuccessorPendingChanged")
+}
+
 // MARK: - IMKTextInput → TextInputClient アダプタ
 
 private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
@@ -140,8 +145,10 @@ class InputController: IMKInputController {
         handler.committedHistory = []
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
+        handler.pendingSuccessorCandidates = []
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
+        Self.postSuccessorPendingNotification(pending: false)
         // ゼロ幅スペースをマークドテキストにセットして IME をアクティブに保つ。
         // これにより Tab がアプリに横取りされず IME に届くようになる。
         ghostTextEngine.onShow = { [weak self] _ in
@@ -249,47 +256,54 @@ class InputController: IMKInputController {
             }
         }
 
-        switch action {
-        case .none:
-            break
-        case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
-            #if DEBUG
-            EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
-            #endif
-            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
-            if handler.isSuccessorMode {
-                // 格助詞を選択候補としてマークドテキストに設定する。
-                // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
-                // Enter を IME に転送するようになる。
-                let markedText = candidates.isEmpty ? "" : candidates[min(initialRow, candidates.count - 1)]
-                adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
+        // IMK の `handle` は nonisolated。候補ウィンドウ操作は従来どおり MainActor 前提（assumeIsolated はメイン以外では実行時クラッシュしうる）。
+        // ステータス通知だけは assumeIsolated の外で値を取り、`DispatchQueue.main.async` に寄せて投稿する（post 自体は nonisolated static）。
+        let successorPendingForMenuBar = MainActor.assumeIsolated {
+            switch action {
+            case .none:
+                break
+            case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
+                #if DEBUG
+                EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
+                #endif
+                candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
+                if handler.isSuccessorMode {
+                    // 格助詞を選択候補としてマークドテキストに設定する。
+                    // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
+                    // Enter を IME に転送するようになる。
+                    let markedText = candidates.isEmpty ? "" : candidates[min(initialRow, candidates.count - 1)]
+                    adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
+                }
+            case .dismiss:
+                candidateWindow.dismiss()
+            case .selectNext:
+                candidateWindow.selectNext()
+                if handler.isSuccessorMode || handler.isBracketMode {
+                    let text = candidateWindow.selectedText() ?? ""
+                    adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+                } else {
+                    updateMarkedText(client: adapter)
+                }
+            case .selectPrev:
+                candidateWindow.selectPrev()
+                if handler.isSuccessorMode || handler.isBracketMode {
+                    let text = candidateWindow.selectedText() ?? ""
+                    adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+                } else {
+                    updateMarkedText(client: adapter)
+                }
+            case .deleteSelected:
+                let row = candidateWindow.selectedRow
+                if let text = candidateWindow.selectedText() {
+                    handler.db.deleteHistory(output: text)
+                    candidateWindow.removeCandidate(at: row)
+                }
             }
-        case .dismiss:
-            candidateWindow.dismiss()
-        case .selectNext:
-            candidateWindow.selectNext()
-            if handler.isSuccessorMode || handler.isBracketMode {
-                let text = candidateWindow.selectedText() ?? ""
-                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            } else {
-                updateMarkedText(client: adapter)
-            }
-        case .selectPrev:
-            candidateWindow.selectPrev()
-            if handler.isSuccessorMode || handler.isBracketMode {
-                let text = candidateWindow.selectedText() ?? ""
-                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            } else {
-                updateMarkedText(client: adapter)
-            }
-        case .deleteSelected:
-            let row = candidateWindow.selectedRow
-            if let text = candidateWindow.selectedText() {
-                handler.db.deleteHistory(output: text)
-                candidateWindow.removeCandidate(at: row)
-            }
+            return !handler.pendingSuccessorCandidates.isEmpty
         }
-
+        DispatchQueue.main.async {
+            Self.postSuccessorPendingNotification(pending: successorPendingForMenuBar)
+        }
         return consumed
     }
 
@@ -314,11 +328,22 @@ class InputController: IMKInputController {
         handler.commitComposition(client: adapter, candidate: ctx)
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
+        handler.pendingSuccessorCandidates = []
         handler.bracketCandidates = nil
         candidateWindow.dismiss()
+        Self.postSuccessorPendingNotification(pending: false)
     }
 
     // MARK: - プライベートヘルパー
+
+    /// IMK の `handle` / `activateServer` は nonisolated のため、通知だけ static で送る（MainActor の `self` を捕らない）。
+    private nonisolated static func postSuccessorPendingNotification(pending: Bool) {
+        NotificationCenter.default.post(
+            name: .keynacoSuccessorPendingChanged,
+            object: nil,
+            userInfo: ["pending": pending]
+        )
+    }
 
     private func updateMarkedText(client: TextInputClient) {
         if let ss = handler.state.segmentState {

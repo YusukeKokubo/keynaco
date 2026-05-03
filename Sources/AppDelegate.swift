@@ -7,6 +7,7 @@ nonisolated(unsafe) var gServer: IMKServer?
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    private var successorPendingObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
@@ -55,8 +56,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem?.button?.title = "⌨"
+
+        successorPendingObserver = NotificationCenter.default.addObserver(
+            forName: .keynacoSuccessorPendingChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let pending = (note.userInfo?["pending"] as? Bool) ?? false
+            self?.applySuccessorPendingToStatusItem(pending: pending)
+        }
 
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -70,6 +80,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(userDictItem)
 
         statusItem?.menu = menu
+    }
+
+    private func applySuccessorPendingToStatusItem(pending: Bool) {
+        statusItem?.button?.title = pending ? "⌨…" : "⌨"
     }
 
     @objc private func openEventViewer() {
