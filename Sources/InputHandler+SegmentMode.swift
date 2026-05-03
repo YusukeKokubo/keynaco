@@ -55,7 +55,9 @@ extension InputHandler {
     func buildSegmentCandidates(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
         let hiragana = reading
         let katakana = KanaUtils.hiraganaToKatakana(reading)
-        let historyCandidates = db.fetchHistoryExact(reading: reading)
+        let exactCandidates = db.fetchHistoryExact(reading: reading)
+        let prefixCandidates = db.fetchHistoryPrefix(reading: reading)
+        let historyCandidates = InputHandler.merged(exactCandidates, prefixCandidates)
 
         var candidates: [String] = []
         var seen = Set<String>()

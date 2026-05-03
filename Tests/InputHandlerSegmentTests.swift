@@ -234,6 +234,17 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
                       "lastCommittedOutput を prev とする bigram 候補が第1セグメントに含まれるはず")
     }
 
+    func testHistoryPrefixAppearsInSegmentCandidates() {
+        handler.db.recordPrefixes(reading: "わたしたち", output: "私たち")
+        let seg = handler.buildSegmentCandidates(
+            reading: "わたし",
+            dictCandidates: [],
+            prev: nil
+        )
+        XCTAssertTrue(seg.candidates.contains("私たち"),
+                      "読み前方一致の履歴がセグメント候補に含まれるはず")
+    }
+
     func testBigramCandidatePrecedesHistoryInSegment() {
         // bigram 候補は固定候補（ひらがな・カタカナ）の直後、履歴より前に挿入される
         handler.db.recordBigram(prev: "前語", input: "わたし", output: "私")
