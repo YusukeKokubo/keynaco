@@ -97,13 +97,6 @@ class InputController: IMKInputController {
 
     private var candidateWindow: CandidateWindow { Self.candidateWindow }
 
-    @MainActor private static let ghostWindow: GhostTextWindow = GhostTextWindow()
-    @MainActor private static let _ghostTextEngine: GhostTextEngine = GhostTextEngine(ghostWindow: ghostWindow)
-    private var ghostTextEngine: GhostTextEngine { Self._ghostTextEngine }
-
-    // ゴーストテキスト表示後の setMarkedText 用に最後の sender を保持する
-    private var lastSender: Any?
-
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
         candidateWindow.onDelete = { [weak self] (text: String, row: Int) in
@@ -139,7 +132,6 @@ class InputController: IMKInputController {
     }
 
     override func activateServer(_ sender: Any!) {
-        ghostTextEngine.cancel()
         super.activateServer(sender)
         handler.state = CompositionState()
         handler.committedHistory = []
@@ -149,14 +141,6 @@ class InputController: IMKInputController {
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
-        // ゼロ幅スペースをマークドテキストにセットして IME をアクティブに保つ。
-        // これにより Tab がアプリに横取りされず IME に届くようになる。
-        ghostTextEngine.onShow = { [weak self] _ in
-            guard let self, let s = self.lastSender else { return }
-            IMKTextInputAdapter(s).setMarkedText(
-                "\u{200B}", selectionRange: NSRange(location: 1, length: 0)
-            )
-        }
     }
 
     override func deactivateServer(_ sender: Any!) {
@@ -168,7 +152,6 @@ class InputController: IMKInputController {
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event = event else { return false }
-        lastSender = sender
 
         // Caps Lock でモード切替（LED ON = 英字モード、LED OFF = 日本語モード）
         if event.type == .flagsChanged && event.keyCode == KeyCode.capsLock {
@@ -177,37 +160,6 @@ class InputController: IMKInputController {
         }
 
         guard event.type == .keyDown else { return false }
-
-        // Ghost text: Tab で確定、その他のキーはキャンセル
-        if event.keyCode == KeyCode.tab && ghostTextEngine.hasGhostText {
-            candidateWindow.dismiss()
-            let tabAdapter = IMKTextInputAdapter(sender)
-            if let confirmed = ghostTextEngine.confirm(into: tabAdapter) {
-                // 文書に挿入された語として後続のコンテキスト（Successor・skip-bigram）に反映する。
-                // 学習 DB（bi-gram 等）には触れないため、変換履歴は汚染されない。
-                handler.pushCommitted(confirmed)
-                // 確定後に続けてゴーストを走らせる（通常の insertText と同じ経路）。
-                let engine = ghostTextEngine
-                if engine.isAvailable && !InputHandler.isAsciiMode {
-                    let (prefix, suffix) = tabAdapter.surroundingText()
-                    let effectivePrefix = prefix.isEmpty ? confirmed : prefix
-                    if !effectivePrefix.isEmpty {
-                        engine.schedule(prefix: effectivePrefix, suffix: suffix, composingText: "",
-                                        recentIMEWords: handler.committedHistory,
-                                        near: tabAdapter.cursorRectAtCursor())
-                    }
-                }
-                return true
-            }
-            return false
-        }
-        // ゴーストテキストが表示中だった場合はマークドテキストもクリアする
-        if ghostTextEngine.hasGhostText {
-            IMKTextInputAdapter(sender).setMarkedText(
-                "", selectionRange: NSRange(location: 0, length: 0)
-            )
-        }
-        ghostTextEngine.cancel()
 
         let chars = event.characters ?? ""
         let baseChars = event.charactersIgnoringModifiers ?? ""
@@ -242,19 +194,6 @@ class InputController: IMKInputController {
         let actionName = "\(action)".split(separator: "(").first.map(String.init) ?? "\(action)"
         EventViewerWindow.shared.updateResult(consumed: consumed, action: actionName)
         #endif
-
-        // 確定直後（insertText が呼ばれた）にゴーストテキストをスケジュール
-        if adapter.didInsertText {
-            let engine = Self._ghostTextEngine
-            if engine.isAvailable && !InputHandler.isAsciiMode {
-                let (prefix, suffix) = adapter.surroundingText()
-                // Electron 系は surroundingText が空を返すため、確定テキスト自体を prefix にフォールバック
-                let effectivePrefix = prefix.isEmpty ? adapter.lastInsertedText : prefix
-                if !effectivePrefix.isEmpty {
-                    engine.schedule(prefix: effectivePrefix, suffix: suffix, composingText: "", recentIMEWords: handler.committedHistory, near: adapter.cursorRectAtCursor())
-                }
-            }
-        }
 
         // IMK の `handle` は nonisolated。候補ウィンドウ操作は従来どおり MainActor 前提（assumeIsolated はメイン以外では実行時クラッシュしうる）。
         // ステータス通知だけは assumeIsolated の外で値を取り、`DispatchQueue.main.async` に寄せて投稿する（post 自体は nonisolated static）。
@@ -310,7 +249,6 @@ class InputController: IMKInputController {
     // MARK: - 確定
 
     override func commitComposition(_ sender: Any!) {
-        ghostTextEngine.cancel()
         // Successor モード中で組成がない場合は system-triggered commit をスキップ
         // (insertText の副作用で system が commitComposition を呼ぶことがある)
         if handler.isSuccessorMode && handler.state.composingText.isEmpty && !handler.state.isSegmentMode {

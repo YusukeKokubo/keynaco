@@ -21,7 +21,6 @@
 		417423818A8C02627A56F0D9 /* KanaKanjiConverterModuleWithDefaultDictionary in Frameworks */ = {isa = PBXBuildFile; productRef = 4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */; };
 		449322D03ACDF2D3EDBE3EEF /* TextInputClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A60998D2E36F9EBDF51923 /* TextInputClient.swift */; };
 		44BA7DAD02471D3C7678FD24 /* InputHandlerTestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A980CA73C689304375F976DD /* InputHandlerTestCase.swift */; };
-		4736BA391EAD4D3731BBB436 /* GhostTextEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDF33665C6CFBEC6B1DB20B /* GhostTextEngine.swift */; };
 		497FC36A92BC2D68915117E3 /* InputHandler+SegmentMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85697F1F7C185DA4A05FFAA5 /* InputHandler+SegmentMode.swift */; };
 		4D2A168DE48D8E47E75049BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */; };
 		4EE90AF2E1605DEEEA8214D6 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */; };
@@ -56,7 +55,6 @@
 		F1613C56A9ED3B9A3C6E306D /* InputHandler+DateTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = F297E74682C7CFA426D897D3 /* InputHandler+DateTime.swift */; };
 		F317D8234DE824CA1056CE5C /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD350111182091DBDE4ECE9B /* CandidateWindow.swift */; };
 		F45270D2194C49A44A85E5DE /* AzooKeyConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720662401A20928261F985FB /* AzooKeyConverterTests.swift */; };
-		F60F536D6A7359E681221E9C /* GhostTextWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B54E891061DBB117A35EA7F7 /* GhostTextWindow.swift */; };
 		F7C6F412438DD4540CD3E396 /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */; };
 		F94BC09038BABB5AFFD7ECD1 /* InputHandlerCandidatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A6DFC3B8F3D8A9AE50AF8C2 /* InputHandlerCandidatesTests.swift */; };
 		FC361366E3DE4C6B91491F28 /* RomajiConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */; };
@@ -110,12 +108,10 @@
 		A980CA73C689304375F976DD /* InputHandlerTestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerTestCase.swift; sourceTree = "<group>"; };
 		AAB2A7FAC57151FBB78619D7 /* InputHandler+Numbers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Numbers.swift"; sourceTree = "<group>"; };
 		AD350111182091DBDE4ECE9B /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
-		B54E891061DBB117A35EA7F7 /* GhostTextWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostTextWindow.swift; sourceTree = "<group>"; };
 		B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B6CB521B2B5C2E5690C75C8B /* InputHandlerNumberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerNumberTests.swift; sourceTree = "<group>"; };
 		B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Candidates.swift"; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		BEDF33665C6CFBEC6B1DB20B /* GhostTextEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostTextEngine.swift; sourceTree = "<group>"; };
 		BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftInputTests.swift; sourceTree = "<group>"; };
 		C8F905020C8A707920C53337 /* InputSource.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = InputSource.tiff; sourceTree = "<group>"; };
 		C9CE25A93E96E885615EB17A /* AzooKeyCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyCacheTests.swift; sourceTree = "<group>"; };
@@ -237,8 +233,6 @@
 				AD350111182091DBDE4ECE9B /* CandidateWindow.swift */,
 				47A63EA4E6329AB0A60E30A8 /* CompositionState.swift */,
 				01349F1120E395B87FF8E96B /* DatabaseManager.swift */,
-				BEDF33665C6CFBEC6B1DB20B /* GhostTextEngine.swift */,
-				B54E891061DBB117A35EA7F7 /* GhostTextWindow.swift */,
 				59721E10162EA851CA8CB8B2 /* Info.plist */,
 				A7EA5A03205A3A4B861980E8 /* InputController.swift */,
 				34144C2DA730A7CFDC7B4149 /* InputHandler.swift */,
@@ -396,8 +390,6 @@
 				A1CA0C0EB56C14AAB5A87BDA /* CompositionState.swift in Sources */,
 				CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */,
 				5917774CE753E3E9301D7A9A /* EventViewerWindow.swift in Sources */,
-				4736BA391EAD4D3731BBB436 /* GhostTextEngine.swift in Sources */,
-				F60F536D6A7359E681221E9C /* GhostTextWindow.swift in Sources */,
 				4EE90AF2E1605DEEEA8214D6 /* HistoryViewController.swift in Sources */,
 				E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */,
 				9DAE303C0C92DC6BE8675EBE /* InputHandler+Candidates.swift in Sources */,
