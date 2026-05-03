@@ -69,6 +69,11 @@ Apple Intelligence（FoundationModels）で、**高スコア履歴 + AzooKey** �
 
 *Tests: `Tests/CandidateWindowMoveRowTests.swift`*（ウィンドウ並べ替え）
 
+### F4（誤変換検出）
+確定直後（`insertText`）、カーソル直前最大 200 文字をオンデバイス LLM で検査するオプション機能。前文が 5 文字未満ならスキップ。0.5 秒デバウンス後に起動。  
+**メニューバー**: 指摘あり時はタイトルを `⌨?` にし、左クリックでポップオーバーに全文を表示（問題なし時・クリア時は通常の `⌨` または Successor 保留の `⌨…`）。  
+**不変条件**: 次の通常組成（ひらがな入力）が始まると通知でポップオーバーを閉じステータスをクリア。入力ソースの非アクティブ化（`activateServer`）でもキャンセル。
+
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
 2. ユーザー辞書（完全一致 + 前方一致。`fixedEnd = fixedCount + userDictCount`）

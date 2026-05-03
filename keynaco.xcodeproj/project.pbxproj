@@ -47,6 +47,7 @@
 		CA9DA0E228B3736FED19A8C7 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8870F701310164C98A33E /* BigramViewController.swift */; };
 		CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01349F1120E395B87FF8E96B /* DatabaseManager.swift */; };
 		CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565B8F19A5E192228B765163 /* KanaUtils.swift */; };
+		D1CD01D4314FCDBA9560C225 /* LLMMisconversionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7FDD9C43C3468AA64B4A3AE /* LLMMisconversionChecker.swift */; };
 		D439FBEBA07A2C0963F95C81 /* preset_bigram.csv in Resources */ = {isa = PBXBuildFile; fileRef = 5ACD1FF22B030C477F2AD6D8 /* preset_bigram.csv */; };
 		D871446F4F529C47659FF444 /* AzooKeyCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CE25A93E96E885615EB17A /* AzooKeyCacheTests.swift */; };
 		DA70AED84EC9CF8F8F8B2AC5 /* LLMSuccessorFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */; };
@@ -123,6 +124,7 @@
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF1F8A0DAB043461E9258811 /* InputHandlerSegmentLLMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerSegmentLLMTests.swift; sourceTree = "<group>"; };
 		BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftInputTests.swift; sourceTree = "<group>"; };
+		C7FDD9C43C3468AA64B4A3AE /* LLMMisconversionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMMisconversionChecker.swift; sourceTree = "<group>"; };
 		C8F905020C8A707920C53337 /* InputSource.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = InputSource.tiff; sourceTree = "<group>"; };
 		C9CE25A93E96E885615EB17A /* AzooKeyCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyCacheTests.swift; sourceTree = "<group>"; };
 		D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
@@ -259,6 +261,7 @@
 				F2289452FE1578194147B535 /* keynaco.entitlements */,
 				5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */,
 				B6AA8FBD916EC73515A05304 /* LLMCandidateScorer.swift */,
+				C7FDD9C43C3468AA64B4A3AE /* LLMMisconversionChecker.swift */,
 				8419DC906F8FD9391F800807 /* LLMSegmentConverter.swift */,
 				2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */,
 				8FECEC3CBD864BE0FA7202F3 /* main.swift */,
@@ -417,6 +420,7 @@
 				840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */,
 				CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */,
 				EC91436633AD115C484C002C /* LLMCandidateScorer.swift in Sources */,
+				D1CD01D4314FCDBA9560C225 /* LLMMisconversionChecker.swift in Sources */,
 				C3DCC6E0C95F6AAD408C085B /* LLMSegmentConverter.swift in Sources */,
 				DA70AED84EC9CF8F8F8B2AC5 /* LLMSuccessorFetcher.swift in Sources */,
 				E0BA07B7DA86A1F019D5E2E4 /* LearningThresholds.swift in Sources */,

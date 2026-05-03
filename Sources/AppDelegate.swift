@@ -7,7 +7,16 @@ nonisolated(unsafe) var gServer: IMKServer?
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    private var statusMenu: NSMenu?
     private var successorPendingObserver: NSObjectProtocol?
+    private var misconversionIssueObserver: NSObjectProtocol?
+    private var misconversionClearObserver: NSObjectProtocol?
+
+    private var successorPending = false
+    private var misconversionDetail: String?
+
+    private var misconversionPopover: NSPopover?
+    private var misconversionTextView: NSTextView?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
@@ -65,7 +74,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] note in
             let pending = (note.userInfo?["pending"] as? Bool) ?? false
-            self?.applySuccessorPendingToStatusItem(pending: pending)
+            self?.applySuccessorPending(pending: pending)
+        }
+
+        misconversionIssueObserver = NotificationCenter.default.addObserver(
+            forName: .keynacoMisconversionIssueFound,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            if let s = note.userInfo?["detail"] as? String, !s.isEmpty {
+                self?.applyMisconversionIssue(detail: s)
+            }
+        }
+
+        misconversionClearObserver = NotificationCenter.default.addObserver(
+            forName: .keynacoMisconversionCleared,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyMisconversionCleared()
         }
 
         let menu = NSMenu()
@@ -79,11 +106,105 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         userDictItem.isEnabled = true
         menu.addItem(userDictItem)
 
-        statusItem?.menu = menu
+        statusMenu = menu
+        statusItem?.menu = nil
+        statusItem?.button?.target = self
+        statusItem?.button?.action = #selector(statusBarButtonClicked(_:))
+        statusItem?.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
+
+        setupMisconversionPopover()
     }
 
-    private func applySuccessorPendingToStatusItem(pending: Bool) {
-        statusItem?.button?.title = pending ? "⌨…" : "⌨"
+    private func setupMisconversionPopover() {
+        let pop = NSPopover()
+        pop.behavior = .transient
+
+        let sv = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
+        sv.hasVerticalScroller = true
+        sv.borderType = .noBorder
+        sv.drawsBackground = true
+        sv.autoresizingMask = [.width, .height]
+
+        let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
+        tv.isEditable = false
+        tv.isSelectable = true
+        tv.isVerticallyResizable = true
+        tv.isHorizontallyResizable = false
+        tv.autoresizingMask = [.width]
+        tv.drawsBackground = true
+        tv.font = .systemFont(ofSize: NSFont.systemFontSize)
+        tv.textContainerInset = NSSize(width: 8, height: 8)
+        tv.minSize = NSSize(width: 300, height: 0)
+        tv.maxSize = NSSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        tv.textContainer?.containerSize = NSSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
+        tv.textContainer?.widthTracksTextView = true
+
+        sv.documentView = tv
+
+        let vc = NSViewController()
+        vc.view = sv
+        pop.contentViewController = vc
+        pop.contentSize = NSSize(width: 320, height: 200)
+
+        misconversionPopover = pop
+        misconversionTextView = tv
+    }
+
+    private func applySuccessorPending(pending: Bool) {
+        successorPending = pending
+        updateStatusItemTitle()
+    }
+
+    private func applyMisconversionIssue(detail: String) {
+        misconversionDetail = detail
+        misconversionTextView?.string = detail
+        updateStatusItemTitle()
+    }
+
+    private func applyMisconversionCleared() {
+        misconversionDetail = nil
+        misconversionPopover?.performClose(nil)
+        updateStatusItemTitle()
+    }
+
+    private func updateStatusItemTitle() {
+        guard let button = statusItem?.button else { return }
+        if misconversionDetail != nil {
+            button.title = "⌨?"
+        } else if successorPending {
+            button.title = "⌨…"
+        } else {
+            button.title = "⌨"
+        }
+    }
+
+    @objc private func statusBarButtonClicked(_ sender: Any?) {
+        guard let event = NSApp.currentEvent,
+              let button = statusItem?.button,
+              let menu = statusMenu else { return }
+
+        if event.type == .rightMouseDown {
+            NSMenu.popUpContextMenu(menu, with: event, for: button)
+            return
+        }
+
+        if misconversionDetail != nil {
+            toggleMisconversionPopover(relativeTo: button)
+        } else {
+            NSMenu.popUpContextMenu(menu, with: event, for: button)
+        }
+    }
+
+    private func toggleMisconversionPopover(relativeTo button: NSStatusBarButton) {
+        guard let popover = misconversionPopover else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            if let detail = misconversionDetail {
+                misconversionTextView?.string = detail
+            }
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
     }
 
     @objc private func openEventViewer() {

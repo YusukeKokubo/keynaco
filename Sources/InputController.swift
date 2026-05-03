@@ -4,6 +4,10 @@ import InputMethodKit
 extension Notification.Name {
     /// Successor の N-gram 保留（`pendingSuccessorCandidates`）の有無が変わったときに送る。
     static let keynacoSuccessorPendingChanged = Notification.Name("keynacoSuccessorPendingChanged")
+    /// F4 誤変換検出で LLM が指摘を返したとき。`userInfo["detail"]` に全文。
+    static let keynacoMisconversionIssueFound = Notification.Name("keynacoMisconversionIssueFound")
+    /// F4 の指摘状態をクリアするとき（新しい組成開始・チェック結果 OK・サーバ非アクティブ化など）。
+    static let keynacoMisconversionCleared = Notification.Name("keynacoMisconversionCleared")
 }
 
 // MARK: - IMKTextInput → TextInputClient アダプタ
@@ -90,6 +94,7 @@ class InputController: IMKInputController {
     private static let successorLLM = LLMSuccessorFetcher()
     private static let segmentLLM = LLMSegmentConverter()
     private static let candidateScorer = LLMCandidateScorer()
+    private static let misconversionChecker = LLMMisconversionChecker()
 
     private static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -150,11 +155,13 @@ class InputController: IMKInputController {
             Self.successorLLM.cancel()
             Self.segmentLLM.cancel()
             Self.candidateScorer.cancel()
+            Self.misconversionChecker.cancel()
         } else {
             DispatchQueue.main.sync {
                 Self.successorLLM.cancel()
                 Self.segmentLLM.cancel()
                 Self.candidateScorer.cancel()
+                Self.misconversionChecker.cancel()
             }
         }
         handler.ignoreNextModeSwitch = true
@@ -199,6 +206,8 @@ class InputController: IMKInputController {
             fixedEnd: candidateWindow.fixedRowCount
         )
         let adapter = IMKTextInputAdapter(sender)
+
+        let composingWasEmpty = handler.state.composingText.isEmpty
 
         let (consumed, action) = handler.handle(
             keyCode: event.keyCode,
@@ -260,6 +269,15 @@ class InputController: IMKInputController {
             applySuccessorLLMScheduling(adapter: adapter)
             applySegmentLLMScheduling(adapter: adapter)
             applyCandidateF1Scheduling(adapter: adapter)
+
+            if adapter.didInsertText {
+                scheduleMisconversionCheck(adapter: adapter)
+            }
+            if !self.handler.isSuccessorMode, !self.handler.isBracketMode,
+               composingWasEmpty, !self.handler.state.composingText.isEmpty {
+                Self.misconversionChecker.cancel(suppressClearNotification: false)
+            }
+
             return !handler.pendingSuccessorCandidates.isEmpty
         }
         DispatchQueue.main.async {
@@ -307,9 +325,19 @@ class InputController: IMKInputController {
         handler.resetF1Pending()
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
+
+        if adapter.didInsertText {
+            scheduleMisconversionCheck(adapter: adapter)
+        }
     }
 
     // MARK: - プライベートヘルパー
+
+    /// F4: 確定 `insertText` 後にカーソル前文を検査（0.5 秒デバウンス）。
+    private func scheduleMisconversionCheck(adapter: IMKTextInputAdapter) {
+        let prefix = adapter.surroundingText(maxLength: 200).prefix
+        Self.misconversionChecker.check(surroundingPrefix: prefix)
+    }
 
     /// 変換候補を直前文脈で並べ替える（F1）。文脈はこのキー処理内で同期取得したもののみ使う。
     private func applyCandidateF1Scheduling(adapter: IMKTextInputAdapter) {
