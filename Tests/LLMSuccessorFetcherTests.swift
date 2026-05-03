@@ -37,11 +37,34 @@ final class LLMSuccessorFetcherTests: XCTestCase {
     }
 
     func testBuildPromptJoinsContextPhrase() {
-        let p = LLMSuccessorFetcher.buildPrompt(words: ["報告", "資料", "会議"])
+        let p = LLMSuccessorFetcher.buildPrompt(words: ["報告", "資料", "会議"], examples: [])
         XCTAssertTrue(p.contains("報告、資料、会議"))
         XCTAssertTrue(p.contains("に続く語"))
-        let p2 = LLMSuccessorFetcher.buildPrompt(words: ["東京"])
+        XCTAssertFalse(p.contains("よく使う語"))
+        let p2 = LLMSuccessorFetcher.buildPrompt(words: ["東京"], examples: [])
         XCTAssertTrue(p2.contains("東京"))
         XCTAssertTrue(p2.contains("に続く語"))
+        XCTAssertFalse(p2.contains("よく使う語"))
+    }
+
+    func testBuildPromptIncludesTendencyWhenExamplesNonEmpty() {
+        let examples: [(prev: String, next: String)] = [
+            (prev: "会議", next: "資料"),
+            (prev: "会議", next: "議事録"),
+        ]
+        let p = LLMSuccessorFetcher.buildPrompt(words: ["報告", "資料", "会議"], examples: examples)
+        XCTAssertTrue(p.contains("よく使う語"))
+        XCTAssertTrue(p.contains("【このユーザーが「会議」の後によく使う語】"))
+        XCTAssertTrue(p.contains("資料、議事録"))
+        XCTAssertTrue(p.contains("報告、資料、会議"))
+        XCTAssertTrue(p.contains("に続く語"))
+    }
+
+    func testBuildPromptMismatchedPrevStillRendersBothSections() {
+        let examples: [(prev: String, next: String)] = [(prev: "単独語", next: "候補")]
+        let p = LLMSuccessorFetcher.buildPrompt(words: ["報告", "資料", "会議"], examples: examples)
+        XCTAssertTrue(p.contains("【このユーザーが「単独語」の後によく使う語】"))
+        XCTAssertTrue(p.contains("候補"))
+        XCTAssertTrue(p.contains("報告、資料、会議"))
     }
 }

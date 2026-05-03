@@ -389,11 +389,26 @@ class InputController: IMKInputController {
         guard trigger != .none else { return }
         handler.successorLLMTrigger = .none
 
+        let triggerContextOpt: [String]? = {
+            switch trigger {
+            case .pendingLowConfidence(let ctx), .particlesOnly(let ctx): return ctx
+            // 直前の guard で .none は除外済み（列挙の網羅性のため残す）
+            case .none: return nil
+            }
+        }()
+        let examples: [(prev: String, next: String)] = triggerContextOpt.flatMap { tc in
+            tc.last.map { lw in
+                handler.db.fetchBigramTop(prev: lw, limit: 5)
+                    .filter { !InputHandler.particles.contains($0) }
+                    .map { (prev: lw, next: $0) }
+            }
+        } ?? []
+
         switch trigger {
         case .none:
             break
         case .pendingLowConfidence(let triggerContext):
-            Self.successorLLM.fetch(context: triggerContext) { [weak self] words in
+            Self.successorLLM.fetch(context: triggerContext, examples: examples) { [weak self] words in
                 guard let self else { return }
                 guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
                 guard self.handler.isSuccessorMode else { return }
@@ -408,7 +423,7 @@ class InputController: IMKInputController {
                 }
             }
         case .particlesOnly(let triggerContext):
-            Self.successorLLM.fetch(context: triggerContext) { [weak self] words in
+            Self.successorLLM.fetch(context: triggerContext, examples: examples) { [weak self] words in
                 guard let self else { return }
                 guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
                 guard self.handler.isSuccessorMode,
