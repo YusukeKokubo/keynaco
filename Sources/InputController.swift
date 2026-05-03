@@ -226,7 +226,7 @@ class InputController: IMKInputController {
                 // Electron 系は surroundingText が空を返すため、確定テキスト自体を prefix にフォールバック
                 let effectivePrefix = prefix.isEmpty ? adapter.lastInsertedText : prefix
                 if !effectivePrefix.isEmpty {
-                    engine.schedule(prefix: effectivePrefix, suffix: suffix, composingText: "", near: adapter.cursorRectAtCursor())
+                    engine.schedule(prefix: effectivePrefix, suffix: suffix, composingText: "", recentIMEWords: handler.committedHistory, near: adapter.cursorRectAtCursor())
                 }
             }
         }

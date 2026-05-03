@@ -31,7 +31,7 @@ final class GhostTextEngine {
 
     // MARK: - 公開 API
 
-    func schedule(prefix: String, suffix: String, composingText: String, near rect: NSRect) {
+    func schedule(prefix: String, suffix: String, composingText: String, recentIMEWords: [String] = [], near rect: NSRect) {
         guard isAvailable else {
             #if DEBUG
             os_log(.debug, "GhostText schedule skipped: model unavailable")
@@ -47,7 +47,7 @@ final class GhostTextEngine {
         debounceTimer = Timer.scheduledTimer(
             withTimeInterval: Self.debounceInterval, repeats: false
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.fire(prefix: prefix, suffix: suffix, composingText: composingText, near: rect) }
+            MainActor.assumeIsolated { self?.fire(prefix: prefix, suffix: suffix, composingText: composingText, recentIMEWords: recentIMEWords, near: rect) }
         }
     }
 
@@ -74,7 +74,7 @@ final class GhostTextEngine {
         currentTask = nil
     }
 
-    private func fire(prefix: String, suffix: String, composingText: String, near rect: NSRect) {
+    private func fire(prefix: String, suffix: String, composingText: String, recentIMEWords: [String], near rect: NSRect) {
         guard modelAvailable else { return }
         #if DEBUG
         os_log(.debug, "GhostText fire: sending to Apple Intelligence")
@@ -86,7 +86,7 @@ final class GhostTextEngine {
                     "日本語IME補完。入力の末尾に続く助詞か名詞1語のみ出力。テキストを繰り返さない。"
                 )
                 let text = try await Self.fetchCompletion(
-                    session: session, prefix: prefix
+                    session: session, prefix: prefix, recentIMEWords: recentIMEWords
                 )
                 #if DEBUG
                 os_log(.debug, "GhostText response: '%{public}@' cancelled=%{public}@",
@@ -111,26 +111,31 @@ final class GhostTextEngine {
 
     private static func fetchCompletion(
         session: LanguageModelSession,
-        prefix: String
+        prefix: String,
+        recentIMEWords: [String]
     ) async throws -> String {
-        let prompt = buildPrompt(prefix: prefix)
+        let prompt = buildPrompt(prefix: prefix, recentIMEWords: recentIMEWords)
         let options = GenerationOptions(maximumResponseTokens: maxTokens)
         let response = try await session.respond(to: prompt, options: options)
-        return postProcess(response.content, prefix: prefix)
+        return postProcess(response.content, prefix: prefix, recentIMEWords: recentIMEWords)
     }
 
-    private static func buildPrompt(prefix: String) -> String {
-        // 末尾 30 文字 + "___" で fill-in-the-blank 形式にする
-        return "\(String(prefix.suffix(30)))___"
+    private static func buildPrompt(prefix: String, recentIMEWords: [String]) -> String {
+        // surroundingText が十分長ければそちらを優先、短ければ IME 確定履歴で補完
+        let imeHistory = recentIMEWords.joined()
+        let ctx = prefix.count >= imeHistory.count ? prefix : imeHistory
+        return "\(String(ctx.suffix(30)))___"
     }
 
-    private static func postProcess(_ text: String, prefix: String) -> String {
+    private static func postProcess(_ text: String, prefix: String, recentIMEWords: [String]) -> String {
         let line = (text.components(separatedBy: "\n").first ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // prefix 末尾との重複を除去
+        // プロンプトに使ったコンテキスト末尾との重複を除去
         var cleaned = line
-        let ctx = String(prefix.suffix(30))
+        let imeHistory = recentIMEWords.joined()
+        let effective = prefix.count >= imeHistory.count ? prefix : imeHistory
+        let ctx = String(effective.suffix(30))
         for length in stride(from: min(ctx.count, cleaned.count), through: 1, by: -1) {
             let tail = String(ctx.suffix(length))
             if cleaned.hasPrefix(tail) {
