@@ -55,6 +55,8 @@
 		E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EA5A03205A3A4B861980E8 /* InputController.swift */; };
 		E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */; };
 		E9D9EF1D96F61A715009F278 /* InputHandlerSuccessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC3622F0AAB2993C7A4DD5A /* InputHandlerSuccessorTests.swift */; };
+		EC91436633AD115C484C002C /* LLMCandidateScorer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6AA8FBD916EC73515A05304 /* LLMCandidateScorer.swift */; };
+		EF1A28AD44B6E78FA5778624 /* CandidateWindowMoveRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9338B628EF426D49019810A7 /* CandidateWindowMoveRowTests.swift */; };
 		F1613C56A9ED3B9A3C6E306D /* InputHandler+DateTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = F297E74682C7CFA426D897D3 /* InputHandler+DateTime.swift */; };
 		F317D8234DE824CA1056CE5C /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD350111182091DBDE4ECE9B /* CandidateWindow.swift */; };
 		F45270D2194C49A44A85E5DE /* AzooKeyConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720662401A20928261F985FB /* AzooKeyConverterTests.swift */; };
@@ -108,11 +110,13 @@
 		8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerZSequenceTests.swift; sourceTree = "<group>"; };
 		8FECEC3CBD864BE0FA7202F3 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		97499B0FBB6D364291045346 /* InputSource@2x.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = "InputSource@2x.tiff"; sourceTree = "<group>"; };
+		9338B628EF426D49019810A7 /* CandidateWindowMoveRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowMoveRowTests.swift; sourceTree = "<group>"; };
 		9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+SuccessorMode.swift"; sourceTree = "<group>"; };
 		A7EA5A03205A3A4B861980E8 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		A980CA73C689304375F976DD /* InputHandlerTestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerTestCase.swift; sourceTree = "<group>"; };
 		AAB2A7FAC57151FBB78619D7 /* InputHandler+Numbers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Numbers.swift"; sourceTree = "<group>"; };
 		AD350111182091DBDE4ECE9B /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
+		B6AA8FBD916EC73515A05304 /* LLMCandidateScorer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMCandidateScorer.swift; sourceTree = "<group>"; };
 		B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B6CB521B2B5C2E5690C75C8B /* InputHandlerNumberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerNumberTests.swift; sourceTree = "<group>"; };
 		B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Candidates.swift"; sourceTree = "<group>"; };
@@ -153,6 +157,7 @@
 			children = (
 				C9CE25A93E96E885615EB17A /* AzooKeyCacheTests.swift */,
 				720662401A20928261F985FB /* AzooKeyConverterTests.swift */,
+				9338B628EF426D49019810A7 /* CandidateWindowMoveRowTests.swift */,
 				52B2777B55743611F1112961 /* CompositionStateTests.swift */,
 				D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */,
 				00B2F53FCF18FDAC7A79F92A /* InputHandlerAsciiTests.swift */,
@@ -253,6 +258,7 @@
 				565B8F19A5E192228B765163 /* KanaUtils.swift */,
 				F2289452FE1578194147B535 /* keynaco.entitlements */,
 				5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */,
+				B6AA8FBD916EC73515A05304 /* LLMCandidateScorer.swift */,
 				8419DC906F8FD9391F800807 /* LLMSegmentConverter.swift */,
 				2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */,
 				8FECEC3CBD864BE0FA7202F3 /* main.swift */,
@@ -368,6 +374,7 @@
 			files = (
 				D871446F4F529C47659FF444 /* AzooKeyCacheTests.swift in Sources */,
 				F45270D2194C49A44A85E5DE /* AzooKeyConverterTests.swift in Sources */,
+				EF1A28AD44B6E78FA5778624 /* CandidateWindowMoveRowTests.swift in Sources */,
 				014E93622F1E490E3CADC108 /* CompositionStateTests.swift in Sources */,
 				32AA887B33A030356BA62078 /* DatabaseManagerTests.swift in Sources */,
 				C2E14C85CC907A3ECFEF44E9 /* InputHandlerAsciiTests.swift in Sources */,
@@ -409,6 +416,7 @@
 				19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */,
 				840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */,
 				CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */,
+				EC91436633AD115C484C002C /* LLMCandidateScorer.swift in Sources */,
 				C3DCC6E0C95F6AAD408C085B /* LLMSegmentConverter.swift in Sources */,
 				DA70AED84EC9CF8F8F8B2AC5 /* LLMSuccessorFetcher.swift in Sources */,
 				E0BA07B7DA86A1F019D5E2E4 /* LearningThresholds.swift in Sources */,

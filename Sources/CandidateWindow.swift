@@ -210,6 +210,40 @@ final class CandidateWindow: NSPanel {
         tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
     }
 
+    /// F1 文脈スコア: 1 行を「履歴先頭」（`show` 時の `predictionEnd` 行）へ持ち上げる。
+    /// - Precondition: `from` は F1 用 `pendingF1GlobalIndices` 由来（高スコア履歴または AzooKey）。数値・日時行を渡さないこと。
+    /// 挿入先は常に現在の `predictionSectionEnd`（本クラスでは `show` の `predictionEnd` と同じ値）。
+    func moveRow(from: Int) {
+        guard candidates.indices.contains(from) else { return }
+        let destBefore = predictionSectionEnd
+        if from == destBefore { return }
+        // F1 は予測行をスコアしない。誤呼び出し時は何もしない。
+        guard from >= predictionSectionEnd else { return }
+
+        let fromHistoryBand = from >= predictionSectionEnd && from < historySectionEnd
+        let fromAzooBand = from >= historySectionEnd
+
+        let keepText = selectedText()
+        let item = candidates.remove(at: from)
+        // `from >= predictionSectionEnd` のため常に `from >= destBefore`。remove 後も挿入インデックスは destBefore のまま。
+        candidates.insert(item, at: destBefore)
+
+        if fromHistoryBand {
+            predictionSectionEnd += 1
+        } else if fromAzooBand {
+            predictionSectionEnd += 1
+            historySectionEnd += 1
+        }
+
+        if let t = keepText, let newRow = candidates.firstIndex(of: t) {
+            selectedRow = newRow
+        } else {
+            selectedRow = min(selectedRow, candidates.count - 1)
+        }
+        tableView.reloadData()
+        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
+    }
+
     @objc private func deleteButtonClicked(_ sender: NSButton) {
         let row = sender.tag
         guard row >= 0, row < candidates.count else { return }

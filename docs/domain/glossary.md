@@ -63,6 +63,12 @@
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
+### F1（文脈スコアリング）
+Apple Intelligence（FoundationModels）で、**高スコア履歴 + AzooKey** の上位最大 10 件を直前文脈・読みと照らして並べ替えるオプション機能。  
+**不変条件**: 即時表示後に非同期で順序のみ更新する。`isExplicitlySelected == true`（↑↓ 済み）のときはリフレッシュしない。`composedHiragana` が変わったら進行中のスコアタスクはキャンセル。セグメント・Successor・括弧モードでは起動しない。
+
+*Tests: `Tests/CandidateWindowMoveRowTests.swift`*（ウィンドウ並べ替え）
+
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
 2. ユーザー辞書（完全一致 + 前方一致。`fixedEnd = fixedCount + userDictCount`）

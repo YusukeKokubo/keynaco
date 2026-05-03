@@ -89,6 +89,7 @@ class InputController: IMKInputController {
     /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
     private static let successorLLM = LLMSuccessorFetcher()
     private static let segmentLLM = LLMSegmentConverter()
+    private static let candidateScorer = LLMCandidateScorer()
 
     private static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -144,13 +145,16 @@ class InputController: IMKInputController {
         handler.successorLLMTrigger = .none
         handler.successorLLMBaseCandidates = nil
         handler.segmentLLMTrigger = .none
+        handler.resetF1Pending()
         if Thread.isMainThread {
             Self.successorLLM.cancel()
             Self.segmentLLM.cancel()
+            Self.candidateScorer.cancel()
         } else {
             DispatchQueue.main.sync {
                 Self.successorLLM.cancel()
                 Self.segmentLLM.cancel()
+                Self.candidateScorer.cancel()
             }
         }
         handler.ignoreNextModeSwitch = true
@@ -255,6 +259,7 @@ class InputController: IMKInputController {
             }
             applySuccessorLLMScheduling(adapter: adapter)
             applySegmentLLMScheduling(adapter: adapter)
+            applyCandidateF1Scheduling(adapter: adapter)
             return !handler.pendingSuccessorCandidates.isEmpty
         }
         DispatchQueue.main.async {
@@ -291,17 +296,52 @@ class InputController: IMKInputController {
         if Thread.isMainThread {
             Self.successorLLM.cancel()
             Self.segmentLLM.cancel()
+            Self.candidateScorer.cancel()
         } else {
             DispatchQueue.main.sync {
                 Self.successorLLM.cancel()
                 Self.segmentLLM.cancel()
+                Self.candidateScorer.cancel()
             }
         }
+        handler.resetF1Pending()
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
     }
 
     // MARK: - プライベートヘルパー
+
+    /// 変換候補を直前文脈で並べ替える（F1）。文脈はこのキー処理内で同期取得したもののみ使う。
+    private func applyCandidateF1Scheduling(adapter: IMKTextInputAdapter) {
+        // 読みが変わった・ユーザーが操作した場合どちらも前タスクを破棄（↑↓ 後は guard で score しないが cancel は先行）。
+        Self.candidateScorer.cancel()
+        guard handler.lastF1Eligible else { return }
+        guard !handler.pendingF1GlobalIndices.isEmpty else { return }
+        guard !candidateWindow.isExplicitlySelected else { return }
+        guard !handler.state.isSegmentMode else { return }
+        guard !handler.isSuccessorMode else { return }
+        guard !handler.isBracketMode else { return }
+
+        let rawPrefix = adapter.surroundingText(maxLength: 100).prefix
+        let contextPrefix = rawPrefix.count > 100 ? String(rawPrefix.suffix(100)) : String(rawPrefix)
+        let reading = handler.state.composedHiragana
+        let opts = handler.pendingF1Strings
+
+        Self.candidateScorer.score(candidates: opts, context: contextPrefix, reading: reading) { [weak self] idx in
+            guard let self else { return }
+            guard idx >= 0, idx < self.handler.pendingF1GlobalIndices.count else { return }
+            guard self.candidateWindow.isVisible else { return }
+            guard !self.candidateWindow.isExplicitlySelected else { return }
+            guard !self.handler.state.isSegmentMode else { return }
+            guard !self.handler.isSuccessorMode else { return }
+            guard !self.handler.isBracketMode else { return }
+            guard self.handler.state.composedHiragana == reading else { return }
+
+            let g = self.handler.pendingF1GlobalIndices[idx]
+            self.candidateWindow.moveRow(from: g)
+            self.updateMarkedText(client: adapter)
+        }
+    }
 
     /// `suggestSuccessors()` が立てた `successorLLMTrigger` に応じてオンデバイス LLM で後続語を補完する。
     private func applySuccessorLLMScheduling(adapter: IMKTextInputAdapter) {

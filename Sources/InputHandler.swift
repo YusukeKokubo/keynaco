@@ -89,6 +89,11 @@ struct InputHandler {
     var lastConfirmedPair: (input: String, output: String)? = nil
     var lastAzooKeyInput: String = ""
     var lastAzooKeyResults: [String] = []
+    /// F1 文脈スコア: `buildCandidateList` が返す候補列でのグローバル行（`pendingF1Strings` と対応）
+    var pendingF1GlobalIndices: [Int] = []
+    var pendingF1Strings: [String] = []
+    /// 直近の `buildCandidateList` で F1 を起動してよいか
+    var lastF1Eligible: Bool = false
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }
     var segmentCandidateCache: [String: Segment] = [:]
