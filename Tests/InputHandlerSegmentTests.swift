@@ -527,6 +527,9 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
     }
 
     func testBoundaryPrefNotSavedAfterLlmFallbackSingleSegmentInsert() {
+        // 実 AzooKey だと辞書更新で infer が成功しうるため、LLM テストと同じスタブでフォールバック挿入を固定する
+        handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: LLMFallbackForcingMockAzoo())
+        client = MockTextClient()
         typeRomaji("watashihagakusei")
         _ = press(keyCode: KeyCode.space)
         guard handler.state.isSegmentMode else { return }

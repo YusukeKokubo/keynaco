@@ -19,6 +19,7 @@
 		2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */; };
 		2E69B03CE6E525A6FF5137AC /* SegmentBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B6435A6EF44E2E6A977C6B /* SegmentBoundaryTests.swift */; };
 		32AA887B33A030356BA62078 /* DatabaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */; };
+		389A5B8EF38437CC61404E23 /* LLMFallbackForcingMockAzooKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F64A49C480649A108EF3D19 /* LLMFallbackForcingMockAzooKey.swift */; };
 		401AA7C9F3EF7FD17748BF18 /* InputHandlerSegmentLLMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF1F8A0DAB043461E9258811 /* InputHandlerSegmentLLMTests.swift */; };
 		417423818A8C02627A56F0D9 /* KanaKanjiConverterModuleWithDefaultDictionary in Frameworks */ = {isa = PBXBuildFile; productRef = 4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */; };
 		449322D03ACDF2D3EDBE3EEF /* TextInputClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A60998D2E36F9EBDF51923 /* TextInputClient.swift */; };
@@ -86,6 +87,7 @@
 		0EA17261D3D888C032F5F102 /* InputHandlerSegmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerSegmentTests.swift; sourceTree = "<group>"; };
 		15033BFDFA6A888F753B0666 /* keynacoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = keynacoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		18510F685A5861F194EBA987 /* AzooKeyConverting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyConverting.swift; sourceTree = "<group>"; };
+		1F64A49C480649A108EF3D19 /* LLMFallbackForcingMockAzooKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMFallbackForcingMockAzooKey.swift; sourceTree = "<group>"; };
 		21A8870F701310164C98A33E /* BigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigramViewController.swift; sourceTree = "<group>"; };
 		2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMSuccessorFetcher.swift; sourceTree = "<group>"; };
 		32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverter.swift; sourceTree = "<group>"; };
@@ -175,6 +177,7 @@
 				8DC3622F0AAB2993C7A4DD5A /* InputHandlerSuccessorTests.swift */,
 				A980CA73C689304375F976DD /* InputHandlerTestCase.swift */,
 				8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */,
+				1F64A49C480649A108EF3D19 /* LLMFallbackForcingMockAzooKey.swift */,
 				7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */,
 				D9B215AFEA353E22981FF11B /* ScenarioRegressionTests.swift */,
 				B8B6435A6EF44E2E6A977C6B /* SegmentBoundaryTests.swift */,
@@ -394,6 +397,7 @@
 				E9D9EF1D96F61A715009F278 /* InputHandlerSuccessorTests.swift in Sources */,
 				44BA7DAD02471D3C7678FD24 /* InputHandlerTestCase.swift in Sources */,
 				29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */,
+				389A5B8EF38437CC61404E23 /* LLMFallbackForcingMockAzooKey.swift in Sources */,
 				7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */,
 				C8FB14F6DC26BC9A36880CB1 /* ScenarioRegressionTests.swift in Sources */,
 				2E69B03CE6E525A6FF5137AC /* SegmentBoundaryTests.swift in Sources */,

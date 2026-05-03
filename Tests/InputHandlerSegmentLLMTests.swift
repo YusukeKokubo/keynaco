@@ -118,19 +118,3 @@ final class InputHandlerSegmentLLMTests: InputHandlerTestCase {
         _ = result
     }
 }
-
-/// `candidatesForSegment` を常に空にし `inferSegmentBoundaries` を必ず失敗させる（セグメント分割のみ提供）
-private final class LLMFallbackForcingMockAzoo: AzooKeyConverting, @unchecked Sendable {
-    func requestCandidates(hiragana: String) -> [String] { [] }
-    func commit(reading: String, text: String) {}
-    func candidatesForSegment(reading: String) -> [String] { [] }
-    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
-        guard hiragana == "わたしはがくせい" else { return [] }
-        // 辞書候補は空（`candidatesForSegment` と一致）にし、先頭文節の先頭候補が固定でテストしやすいようにする
-        return [
-            ("わたし", []),
-            ("は", []),
-            ("がくせい", [])
-        ]
-    }
-}
