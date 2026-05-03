@@ -102,12 +102,13 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 1. ひらがな / カタカナ固定候補（`fixedCount` 件、スクロール外の先頭に挿入）
 2. **ユーザー辞書**候補（完全一致のみ、`fixedCount` の直後に挿入。`fixedEnd = fixedCount + userDictCount`）
 3. tri-gram → bi-gram 候補（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先、重複除去後にユーザー辞書の直後に挿入）
-4. 履歴 exact（入力に完全一致）+ prefix（前方一致、完全一致を除外）
+4. 履歴（`fetchHistoryScoredMerged`：exact + prefix をマージ。時間減衰スコアが閾値 **以上**の行のみ。このブロックの件数が `historyEnd` 計算の履歴件数）
 5. 数字候補（`generateNumberCandidates`：全角数字 + 桁区切り。数字のみ入力時に生成、`historyEnd` の直後に挿入。変換履歴には記録しない）
 6. 日時候補（`generateDateTimeCandidates`：きょう/いま/ことし等、数字候補の直後に挿入。変換履歴には記録しない）
 7. AzooKey 辞書候補
+8. 低スコア履歴（閾値 **未満**の履歴行を AzooKey の後ろに追記。`historyEnd` には含めない）
 
-`autoShow=true`（文字入力中の自動表示）のとき、履歴・辞書・bi-gram・ユーザー辞書が0件なら表示しない。
+`autoShow=true`（文字入力中の自動表示）のとき、履歴（高+低のいずれか）・辞書・bi-gram・ユーザー辞書がすべて 0 件なら表示しない。
 
 Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（ユーザー辞書行 `fixedCount <= row < fixedEnd` は削除不可）。
 

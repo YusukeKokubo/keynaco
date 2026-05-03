@@ -231,6 +231,20 @@ final class DatabaseManager: @unchecked Sendable {
         return results
     }
 
+    private func queryOutputScorePairsOnQueue(
+        _ sql: String,
+        bind: ((OpaquePointer?) -> Void)? = nil
+    ) -> [(String, Double)] {
+        guard let stmt = cachedStmt(for: sql) else { return [] }
+        bind?(stmt)
+        var results: [(String, Double)] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let ptr = sqlite3_column_text(stmt, 0) else { continue }
+            results.append((String(cString: ptr), sqlite3_column_double(stmt, 1)))
+        }
+        return results
+    }
+
     private func executeOnQueue(_ sql: String, bind: ((OpaquePointer?) -> Void)? = nil) {
         guard let stmt = cachedStmt(for: sql) else { return }
         bind?(stmt)
@@ -272,36 +286,43 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    /// 完全一致・前方一致の履歴候補を 1 クエリで返す（buildCandidateList ホットパス用）。
-    func fetchHistoryCombined(reading: String) -> (exact: [String], prefix: [String]) {
-        let prefix = reading + "%"
-        let pairs = dbQueue.sync {
+    /// 完全一致を先に、前方一致は重複 output を除いて続ける（`merged(exact,prefix)` と同じ順序）。
+    /// スコアは exact の行ごとの recency、prefix は `GROUP BY output` ごとの **MAX(recencyExpr)**（閾値が exact と同尺度）。
+    func fetchHistoryScoredMerged(reading: String) -> [(output: String, score: Double)] {
+        return dbQueue.sync {
             let now = self.nowEpoch()
-            return self.queryStringKindPairsOnQueue("""
-            SELECT output, kind FROM (
-              SELECT output, 0 AS kind,
-                     (\(Self.recencyExpr)) AS score
-              FROM history WHERE input = ? COLLATE NOCASE
-              UNION ALL
-              SELECT output, 1 AS kind,
-                     SUM(\(Self.recencyExpr)) AS score
-              FROM history WHERE input LIKE ? AND input != ?
-              GROUP BY output
-            ) ORDER BY kind ASC, score DESC LIMIT 20
+            let exactRows = self.queryOutputScorePairsOnQueue("""
+            SELECT output, (\(Self.recencyExpr)) AS s FROM history
+            WHERE input = ? COLLATE NOCASE
+            ORDER BY s DESC, used_at DESC
+            LIMIT 10
             """) {
                 self.bindRecency($0, at: 1, now: now)
                 self.bindText($0, 3, reading)
-                self.bindRecency($0, at: 4, now: now)
-                self.bindText($0, 6, prefix)
-                self.bindText($0, 7, reading)
             }
+            let prefixRows = self.queryOutputScorePairsOnQueue("""
+            SELECT output, MAX((\(Self.recencyExpr))) AS s FROM history
+            WHERE input LIKE ? AND input != ?
+            GROUP BY output
+            ORDER BY s DESC, MAX(used_at) DESC
+            LIMIT 10
+            """) {
+                self.bindRecency($0, at: 1, now: now)
+                self.bindText($0, 3, reading + "%")
+                self.bindText($0, 4, reading)
+            }
+            var seen = Set<String>()
+            var merged: [(output: String, score: Double)] = []
+            for row in exactRows {
+                guard seen.insert(row.0).inserted else { continue }
+                merged.append((output: row.0, score: row.1))
+            }
+            for row in prefixRows {
+                guard seen.insert(row.0).inserted else { continue }
+                merged.append((output: row.0, score: row.1))
+            }
+            return merged
         }
-        var exact: [String] = []
-        var pfx: [String] = []
-        for (output, kind) in pairs {
-            if kind == 0 { exact.append(output) } else { pfx.append(output) }
-        }
-        return (exact, pfx)
     }
 
     // MARK: - 設定画面用

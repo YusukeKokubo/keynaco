@@ -565,6 +565,36 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertNotNil(niIdx, "tri-gram 由来「に」が予測ゾーンに含まれるはず: \(candidates)")
     }
 
+    // MARK: - 低スコア履歴の AzooKey 後ろ回し（P4）
+
+    func testLowScoreHistoryAppendedAfterAzooKey() {
+        let t0: Int64 = 2_000_000_000
+        handler.db.clock = { t0 }
+        let marker = "⌘P4LowScore"
+        handler.db.record(input: "あい", output: marker)
+        // count=1 かつ age > τ(30日) なら recencyExpr < 0.5
+        handler.db.clock = { t0 + 40 * 86400 }
+        typeRomaji("ai")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains(marker), "低スコアも候補に含まれるはず")
+        XCTAssertEqual(candidates.last, marker, "低スコア履歴はリスト末尾（AzooKey・数値・日時の後）")
+    }
+
+    func testAutoShowShowsWhenOnlyLowScoreHistoryAndAzooKeyExists() {
+        let t0: Int64 = 2_010_000_000
+        handler.db.clock = { t0 }
+        handler.db.record(input: "あい", output: "⌘lowOnlyAutoShow")
+        handler.db.clock = { t0 + 40 * 86400 }
+        type(chars: "a", base: "a")
+        let (_, action) = type(chars: "i", base: "i")
+        guard case .show = action else {
+            XCTFail("高スコア 0 でも履歴行が残り AzooKey があれば autoShow は .show のはず: \(action)"); return
+        }
+    }
+
     // MARK: - 日時候補
 
     func testKyouIncludesDateCandidates() {

@@ -47,9 +47,10 @@
 `fixedEnd` 未満の行は Shift+Delete 削除不可（ユーザー辞書は誤削除から保護）。
 
 ### historyEnd
-候補リスト内の「カナ固定 + ユーザー辞書 + 予測候補 + 履歴候補」セクションの末尾インデックス。
-`historyEnd = fixedEnd + predictCount + historyCount`（= `fixedCount + userDictCount + predictCount + historyCount`）。
-`fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。これ以降は AzooKey 専用候補・日時候補（削除不可）。
+候補リスト内の「カナ固定 + ユーザー辞書 + 予測候補 + **高スコア**履歴候補」セクションの末尾インデックス（時間減衰スコア `recencyExpr` が閾値 **未満**の履歴は含めない）。
+`historyEnd = fixedEnd + predictCount + highHistoryCount`（`highHistoryCount` は閾値以上の履歴件数）。
+`fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。
+閾値未満の履歴は数値・日時・AzooKey の**後**に続くため、この範囲外になり Shift+Delete 不可（辞書候補と同様の扱い）。
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
@@ -66,9 +67,11 @@
 1. ひらがな / カタカナ（`fixedCount` 件）
 2. ユーザー辞書（完全一致 + 前方一致。`fixedEnd = fixedCount + userDictCount`）
 3. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWord` × 現読みで skip-bigram を引き、trigram・bigram にない候補を末尾に追加）
-4. 履歴 exact → 履歴 prefix
-5. AzooKey 辞書候補
-6. **日時候補**（読みが `きょう` / `きのう` / `あした` / `あす` / `いま` / `ことし` / `きょねん` / `らいねん` / `こんげつ` / `せんげつ` / `らいげつ` のとき、動的に生成した日付・時刻・年の文字列を末尾に追加。`InputHandler.generateDateTimeCandidates(for:)` が生成）
+4. 履歴（`fetchHistoryScoredMerged`：exact → prefix 重複除去。スコアが閾値**以上**の行のみこのブロックに置く。閾値**未満**は 7 の直前に回す）
+5. 数字候補（`generateNumberCandidates`、数字のみ読みのとき。`historyEnd` 直後に挿入）
+6. 日時候補（`きょう` / `いま` 等のとき。数字候補の直後に挿入）
+7. AzooKey 辞書候補
+8. 低スコア履歴（同じく `fetchHistoryScoredMerged` 由来。閾値未満の行を重複除外して末尾に追記）
 
 ### 括弧モード（isBracketMode）
 `[` / `(` 等の括弧キーを**待機中**（組成空）に入力したとき、対応する全角括弧の候補ウィンドウを表示するモード（`bracketCandidates != nil`）。  

@@ -198,9 +198,18 @@ extension InputHandler {
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
-        let (exactCandidates, prefixCandidates) = db.fetchHistoryCombined(reading: historyKey)
-        let historyCandidates = Self.merged(exactCandidates, prefixCandidates)
-        let historyCount = historyCandidates.count
+        let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
+        var highHistory: [String] = []
+        var lowHistory: [String] = []
+        for row in historyScored {
+            if row.score >= Self.historyRecencyScoreCutoff {
+                highHistory.append(row.output)
+            } else {
+                lowHistory.append(row.output)
+            }
+        }
+        let totalHistoryCount = historyScored.count
+        let highHistoryCount = highHistory.count
 
         let bigramRaw = lastCommittedOutput.map { db.fetchBigram(prev: $0, reading: state.composedHiragana) } ?? []
         let trigramRaw: [String] = {
@@ -210,9 +219,9 @@ extension InputHandler {
         let skipBigramRaw = mostRecentContentWord().map { db.fetchSkipBigram(prev: $0, reading: state.composedHiragana) } ?? []
         let predictRaw = Self.merged(trigramRaw, bigramRaw, skipBigramRaw)
 
-        let historySeen = Set(historyCandidates)
+        let historySeen = Set(historyScored.map(\.output))
         let azooKeyUniq = azooKeyCandidates.filter { !historySeen.contains($0) }
-        var candidates = historyCandidates + azooKeyUniq
+        var candidates = highHistory + azooKeyUniq
         let candidateSeen = historySeen.union(azooKeyUniq)
         let uniquePredictions = predictRaw.filter { !candidateSeen.contains($0) }
         candidates.insert(contentsOf: uniquePredictions, at: 0)
@@ -220,7 +229,7 @@ extension InputHandler {
 
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
-        if autoShow && historyCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0
+        if autoShow && totalHistoryCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0
             && userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty { return .dismiss }
 
         let hiragana = state.composedHiragana
@@ -229,8 +238,11 @@ extension InputHandler {
         // 履歴にひらがな・カタカナが含まれるかを確認する
         // 履歴にある場合 → 履歴エントリとして可視範囲に残す（固定位置に追加しない）
         // 履歴にない場合 → スクロール範囲外の固定位置に追加し、↑ キーで到達できるようにする
-        let hiraganaInHistory = candidates.prefix(predictCount + historyCount).contains(hiragana)
-        let katakanaInHistory = candidates.prefix(predictCount + historyCount).contains(katakana)
+        // lowHistory はこの時点では candidates に未挿入のため集合で明示する。
+        let hiraganaInHistory = candidates.prefix(predictCount + highHistoryCount).contains(hiragana)
+            || lowHistory.contains(hiragana)
+        let katakanaInHistory = candidates.prefix(predictCount + highHistoryCount).contains(katakana)
+            || lowHistory.contains(katakana)
 
         let allCandidatesSeen = candidateSeen.union(uniquePredictions)
         var fixedCount = 0
@@ -254,12 +266,15 @@ extension InputHandler {
         let userDictCount = uniqueUserDict.count
         let fixedEnd = fixedCount + userDictCount
 
-        let historyEnd = fixedEnd + predictCount + historyCount
+        let historyEnd = fixedEnd + predictCount + highHistoryCount
         let predictionEnd = fixedEnd + predictCount
         let uniqueNumberCandidates = numberCandidates.filter { insertedSet.insert($0).inserted }
         let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
         candidates.insert(contentsOf: uniqueNumberCandidates, at: historyEnd)
         candidates.insert(contentsOf: uniqueDateTimeCandidates, at: historyEnd + uniqueNumberCandidates.count)
+        insertedSet = Set(candidates)
+        let uniqueLowHistory = lowHistory.filter { insertedSet.insert($0).inserted }
+        candidates.append(contentsOf: uniqueLowHistory)
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
@@ -418,6 +433,9 @@ extension InputHandler {
     }
 
     // MARK: - Utility
+
+    /// これ未満の履歴スコアは AzooKey・数値・日時の後ろに回す（DB の `recencyExpr` と同じ尺度）。
+    private static let historyRecencyScoreCutoff = 0.5
 
     /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。
     static func merged(_ arrays: [String]...) -> [String] {
