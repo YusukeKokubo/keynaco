@@ -86,6 +86,8 @@ private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
 class InputController: IMKInputController {
 
     private lazy var handler: InputHandler = InputHandler()
+    /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
+    private static let successorLLM = LLMSuccessorFetcher()
 
     private static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -138,6 +140,13 @@ class InputController: IMKInputController {
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
         handler.pendingSuccessorCandidates = []
+        handler.successorLLMTrigger = .none
+        handler.successorLLMBaseCandidates = nil
+        if Thread.isMainThread {
+            Self.successorLLM.cancel()
+        } else {
+            DispatchQueue.main.sync { Self.successorLLM.cancel() }
+        }
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
@@ -238,6 +247,7 @@ class InputController: IMKInputController {
                     candidateWindow.removeCandidate(at: row)
                 }
             }
+            applySuccessorLLMScheduling(adapter: adapter)
             return !handler.pendingSuccessorCandidates.isEmpty
         }
         DispatchQueue.main.async {
@@ -267,12 +277,66 @@ class InputController: IMKInputController {
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
         handler.pendingSuccessorCandidates = []
+        handler.successorLLMTrigger = .none
+        handler.successorLLMBaseCandidates = nil
         handler.bracketCandidates = nil
+        if Thread.isMainThread {
+            Self.successorLLM.cancel()
+        } else {
+            DispatchQueue.main.sync { Self.successorLLM.cancel() }
+        }
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
     }
 
     // MARK: - プライベートヘルパー
+
+    /// `suggestSuccessors()` が立てた `successorLLMTrigger` に応じてオンデバイス LLM で後続語を補完する。
+    private func applySuccessorLLMScheduling(adapter: IMKTextInputAdapter) {
+        let trigger = handler.successorLLMTrigger
+        guard trigger != .none else { return }
+        handler.successorLLMTrigger = .none
+
+        switch trigger {
+        case .none:
+            break
+        case .pendingLowConfidence(let lastWord):
+            Self.successorLLM.fetch(after: lastWord) { [weak self] words in
+                guard let self else { return }
+                guard self.handler.isSuccessorMode,
+                      !self.handler.pendingSuccessorCandidates.isEmpty,
+                      self.handler.lastCommittedOutput == lastWord else { return }
+                let existing = Set(self.handler.pendingSuccessorCandidates)
+                let extra = words.filter { !existing.contains($0) }
+                guard !extra.isEmpty else { return }
+                self.handler.pendingSuccessorCandidates.append(contentsOf: extra)
+                Self.postSuccessorPendingNotification(pending: true)
+            }
+        case .particlesOnly(let lastWord):
+            Self.successorLLM.fetch(after: lastWord) { [weak self] words in
+                guard let self else { return }
+                guard self.handler.isSuccessorMode,
+                      self.handler.lastCommittedOutput == lastWord,
+                      self.candidateWindow.isVisible,
+                      let base = self.handler.successorLLMBaseCandidates else { return }
+                let existing = Set(base)
+                let extra = words.filter { !existing.contains($0) }
+                guard !extra.isEmpty else { return }
+                let merged = base + extra
+                self.handler.successorLLMBaseCandidates = merged
+                let rowCap = max(0, merged.count - 1)
+                let initialRow = min(self.candidateWindow.selectedRow, rowCap)
+                self.candidateWindow.show(
+                    candidates: merged, historySectionEnd: 0, initialRow: initialRow,
+                    predictionEnd: 0, fixedSectionEnd: 0, near: adapter.cursorRect()
+                )
+                if self.handler.isSuccessorMode, !merged.isEmpty,
+                   let markedText = self.candidateWindow.selectedText(), !markedText.isEmpty {
+                    adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
+                }
+            }
+        }
+    }
 
     /// IMK の `handle` / `activateServer` は nonisolated のため、通知だけ static で送る（MainActor の `self` を捕らない）。
     private nonisolated static func postSuccessorPendingNotification(pending: Bool) {

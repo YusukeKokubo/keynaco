@@ -306,6 +306,7 @@ extension InputHandler {
         isSuccessorMode = true
         successorFirstChar = nil
         pendingSuccessorCandidates = []
+        clearSuccessorLLMAuxiliaryState()
         client.setMarkedText(candidates[0], selectionRange: NSRange(location: candidates[0].count, length: 0))
         let fixedCandidates = kanas
         let allCandidates = Self.merged(fixedCandidates, candidates)

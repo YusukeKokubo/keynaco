@@ -47,6 +47,7 @@
 		CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565B8F19A5E192228B765163 /* KanaUtils.swift */; };
 		D439FBEBA07A2C0963F95C81 /* preset_bigram.csv in Resources */ = {isa = PBXBuildFile; fileRef = 5ACD1FF22B030C477F2AD6D8 /* preset_bigram.csv */; };
 		D871446F4F529C47659FF444 /* AzooKeyCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CE25A93E96E885615EB17A /* AzooKeyCacheTests.swift */; };
+		DA70AED84EC9CF8F8F8B2AC5 /* LLMSuccessorFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */; };
 		E0BA07B7DA86A1F019D5E2E4 /* LearningThresholds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */; };
 		E1471B2D246CBEFC6740F9F1 /* InputHandlerCompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 713FA4DA358BC346E58691F1 /* InputHandlerCompositionTests.swift */; };
 		E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EA5A03205A3A4B861980E8 /* InputController.swift */; };
@@ -80,6 +81,7 @@
 		15033BFDFA6A888F753B0666 /* keynacoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = keynacoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		18510F685A5861F194EBA987 /* AzooKeyConverting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyConverting.swift; sourceTree = "<group>"; };
 		21A8870F701310164C98A33E /* BigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigramViewController.swift; sourceTree = "<group>"; };
+		2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMSuccessorFetcher.swift; sourceTree = "<group>"; };
 		32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomajiConverter.swift; sourceTree = "<group>"; };
 		34144C2DA730A7CFDC7B4149 /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
 		36A60998D2E36F9EBDF51923 /* TextInputClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInputClient.swift; sourceTree = "<group>"; };
@@ -246,6 +248,7 @@
 				565B8F19A5E192228B765163 /* KanaUtils.swift */,
 				F2289452FE1578194147B535 /* keynaco.entitlements */,
 				5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */,
+				2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */,
 				8FECEC3CBD864BE0FA7202F3 /* main.swift */,
 				86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */,
 				32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */,
@@ -399,6 +402,7 @@
 				19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */,
 				840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */,
 				CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */,
+				DA70AED84EC9CF8F8F8B2AC5 /* LLMSuccessorFetcher.swift in Sources */,
 				E0BA07B7DA86A1F019D5E2E4 /* LearningThresholds.swift in Sources */,
 				BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */,
 				FC361366E3DE4C6B91491F28 /* RomajiConverter.swift in Sources */,

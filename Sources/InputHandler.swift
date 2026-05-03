@@ -11,6 +11,15 @@ enum CandidateAction {
 }
 
 /// 候補ウィンドウの現在状態スナップショット（読み取り専用）
+/// Successor 用：オンデバイス LLM で後続語を補完するタイミング（`InputController` が参照してフェッチを開始する）。
+enum SuccessorLLMTrigger: Equatable {
+    case none
+    /// N-gram あり・閾値未満で保留（`.dismiss`）になった直後。
+    case pendingLowConfidence(lastWord: String)
+    /// 格助詞のみ即時表示になった直後。
+    case particlesOnly(lastWord: String)
+}
+
 struct CandidateContext {
     var isVisible: Bool
     var selectedRow: Int
@@ -65,6 +74,9 @@ struct InputHandler {
     var isSuccessorMode = false
     var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
     var pendingSuccessorCandidates: [String] = []
+    /// `particlesOnly` のとき即時表示した候補（LLM 結果を末尾に足すときのベース）。
+    var successorLLMBaseCandidates: [String]? = nil
+    var successorLLMTrigger: SuccessorLLMTrigger = .none
     var bracketCandidates: [String]? = nil
     var isBracketMode: Bool { bracketCandidates != nil }
     var lastConfirmedPair: (input: String, output: String)? = nil

@@ -58,7 +58,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 
 ## コンポーネント構成
 
-- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` もここで管理
+- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` と `LLMSuccessorFetcher`（Successor のオンデバイス後続語補完）もここで管理
 - `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+Candidates.swift`（候補リスト・通常入力）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+Numbers.swift`（数字入力時の全角・桁区切り候補生成）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`等の括弧キー入力時に対応する全角括弧の候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII → 全角候補列に変換）。`sentenceTerminators`（`。！？\n`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包。`hiddenPendingN` フラグで "nn" → "ん" 後の pending "n" を不可視化（標準 IME 準拠）。Backspace 時は "ん" + hidden n をまとめて1操作で削除する
@@ -86,7 +86,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 
 bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。
 
-**N-gram 候補の遅延表示と読みフィルタ**: N-gram 由来の候補がある場合、`suggestSuccessors()` は まず `fetchBigramTopCount(prev: last)` で前語に対する bi-gram 上位使用回数を取得する（直近 90 日の行の `MAX(count)`。**プリセット行** `is_preset=1` は日付窓外でも集計に含まれる）。`successorImmediateThreshold`（デフォルト 5。`LearningThresholds`）以上なら「高信頼ペア」とみなして即時表示（`.show`）。閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリして一致する候補のみ `.show` する（読みが一致しなければモード解除）。格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。
+**N-gram 候補の遅延表示と読みフィルタ**: N-gram 由来の候補がある場合、`suggestSuccessors()` は まず `fetchBigramTopCount(prev: last)` で前語に対する bi-gram 上位使用回数を取得する（直近 90 日の行の `MAX(count)`。**プリセット行** `is_preset=1` は日付窓外でも集計に含まれる）。`successorImmediateThreshold`（デフォルト 5。`LearningThresholds`）以上なら「高信頼ペア」とみなして即時表示（`.show`）。閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` して `.show` する（いずれにも一致しなければモード解除）。格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。利用可能なら `LLMSuccessorFetcher`（`InputController` 保持）が非同期でひらがなの後続語候補を `pending` または即時表示列の末尾に足す（冷スタート補完）。
 
 - `successorFirstChar`: 頭文字 1 打目のバッファリング。`particleRomajiMap` による格助詞 fast-path が効くのは `isNounLike` のときのみ。N-gram 保留表示後の 2 打目でモード解除する際にも使用する。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。

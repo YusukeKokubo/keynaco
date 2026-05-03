@@ -7,12 +7,34 @@ import AppKit
 
 extension InputHandler {
 
+    mutating func clearSuccessorLLMAuxiliaryState() {
+        successorLLMTrigger = .none
+        successorLLMBaseCandidates = nil
+    }
+
+    /// DB で得た候補の並びを保ち、`pending` からローマ字1文字に対応する読み前方一致の語を末尾に追加する（単体テスト可）。
+    static func mergePendingSuccessorMatches(dbOrdered: [String], pending: [String], romajiKey: String) -> [String] {
+        let key = romajiKey.lowercased()
+        guard key.count == 1, let c = key.first, c.isLetter, c.isASCII,
+              let kanas = romajiToInitialKana[String(c)], !kanas.isEmpty else {
+            return dbOrdered
+        }
+        var seen = Set(dbOrdered)
+        var out = dbOrdered
+        for word in pending {
+            guard kanas.contains(where: { word.hasPrefix($0) }) else { continue }
+            if seen.insert(word).inserted { out.append(word) }
+        }
+        return out
+    }
+
     /// 後続語候補を組み立ててモードに入る／出る判定をする。
     /// N-gram 候補がある場合は `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目まで表示を遅延）。
     /// 格助詞のみの場合（名詞末尾 + N-gram なし）は従来通り `.show` を返す。
     mutating func suggestSuccessors() -> CandidateAction {
         guard let last = lastCommittedOutput else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            clearSuccessorLLMAuxiliaryState()
             return .dismiss
         }
         let bigramTop = db.fetchBigramTop(prev: last)
@@ -27,6 +49,7 @@ extension InputHandler {
 
         guard !candidates.isEmpty else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            clearSuccessorLLMAuxiliaryState()
             return .dismiss
         }
 
@@ -36,16 +59,21 @@ extension InputHandler {
         if predictTop.isEmpty {
             // 格助詞 fallback のみ（N-gram なし）→ 従来通りすぐ表示
             pendingSuccessorCandidates = []
+            successorLLMBaseCandidates = candidates
+            successorLLMTrigger = .particlesOnly(lastWord: last)
             return .show(candidates: candidates, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
         } else {
             // 高信頼チェック：直近90日以内に閾値回数以上使ったペアは即時表示
             let topCount = db.fetchBigramTopCount(prev: last)
             if topCount >= InputHandler.successorImmediateThreshold {
                 pendingSuccessorCandidates = []
+                clearSuccessorLLMAuxiliaryState()
                 return .show(candidates: candidates, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
             } else {
                 // 通常 → 保存して1打目まで待つ
                 pendingSuccessorCandidates = candidates
+                successorLLMBaseCandidates = nil
+                successorLLMTrigger = .pendingLowConfidence(lastWord: last)
                 return .dismiss
             }
         }
@@ -53,6 +81,7 @@ extension InputHandler {
 
     mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
         isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+        clearSuccessorLLMAuxiliaryState()
         state.pendingRomaji = ""
         if let p1 = lastCommittedOutput {
             db.recordBigram(prev: p1, input: particle, output: particle)
@@ -78,6 +107,7 @@ extension InputHandler {
         case KeyCode.space, KeyCode.enter:
             guard let selected = candidate.selectedText else {
                 isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+                clearSuccessorLLMAuxiliaryState()
                 client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
                 return (true, .dismiss)
             }
@@ -93,6 +123,7 @@ extension InputHandler {
                 lastConfirmedPair = nil
             }
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            clearSuccessorLLMAuxiliaryState()
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         default:
@@ -137,8 +168,12 @@ extension InputHandler {
                         for s in fromBigram where filteredSeen.insert(s).inserted { filtered.append(s) }
                         for s in fromSkip where filteredSeen.insert(s).inserted { filtered.append(s) }
                     }
+                    filtered = InputHandler.mergePendingSuccessorMatches(
+                        dbOrdered: filtered, pending: pendingSuccessorCandidates, romajiKey: char
+                    )
                     if !filtered.isEmpty {
                         pendingSuccessorCandidates = []
+                        clearSuccessorLLMAuxiliaryState()
                         successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
                         return (true, .show(candidates: filtered, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
                     }
@@ -147,6 +182,7 @@ extension InputHandler {
             }
             // モード解除、バッファがあれば先に通常入力に流す
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            clearSuccessorLLMAuxiliaryState()
             if let first {
                 _ = handle(keyCode: first.keyCode, characters: first.characters, baseCharacters: first.baseCharacters,
                            modifiers: modifiers, candidate: .hidden, client: client)

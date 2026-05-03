@@ -117,17 +117,23 @@ N-gram 由来の候補（tri-gram + bi-gram + skip-bigram）がある場合、`s
 `successorImmediateThreshold`（デフォルト 5。`LearningThresholds.successorImmediateThreshold` と一致）以上なら「高信頼ペア」とみなして即時表示（`.show`）。なお `fetchBigramTopCount` は直近 **90 日以内**の bi-gram の `MAX(count)` を取るが、**プリセット行**（`is_preset = 1`）は `used_at` に関係なく常に集計に含まれる（閾値判定から外れない）。
 閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。
 1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、
-DB を再クエリして一致する候補のみ `.show` する（読みが一致しなければモード解除）。  
+DB を再クエリして一致する候補に加え、**同一条件で** `pendingSuccessorCandidates` 内の語を読み前方一致で併合して `.show` する（DB 候補の後ろに追加。読みがいずれにも一致しなければモード解除）。  
 格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。
+
+**オンデバイス LLM 補完**（`LLMSuccessorFetcher`、Foundation Models / Apple Intelligence 利用可能時のみ）:
+N-gram あり・閾値未満（保留）の直後、または格助詞のみ即時表示の直後に、前語に続くひらがな語を非同期取得し、
+前者では `pendingSuccessorCandidates` 末尾へ重複除外で追記、後者では候補ウィンドウの末尾へ追記する。
+LLM 語は **ひらがな表記**のまま候補に混ざり得る（学習由来の表記形と併存しうる）。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
 ### pendingSuccessorCandidates
 Successor モードで N-gram 候補を1打目まで遅延表示するためのバッファ。  
 **不変条件**: `suggestSuccessors()` が N-gram 候補を計算した際に設定され、1打目の入力時に
-`romajiToInitialKana` で読み前方一致フィルタを行い `.show` して空になる。
+`romajiToInitialKana` で読み前方一致フィルタを行い（併せて本バッファ内の語を DB 結果と merge）、`.show` して空になる。
 読みが一致しない場合はモード解除して空になる。
-`isSuccessorMode = false` になるすべての経路でクリアされる。
+`isSuccessorMode = false` になるすべての経路でクリアされる。  
+遅延表示中に LLM 補完が届いた場合、重複のない限り末尾に追記され得る。
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。  

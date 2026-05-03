@@ -501,4 +501,22 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
             XCTAssertLessThan(ni, n, "kana 配列順（に が の より前）で表示されるはず")
         }
     }
+
+    // MARK: - F3: pending と DB の読み前方一致 merge（LLM 追記前提）
+
+    func testMergePendingSuccessorMatchesAppendsHiraganaWhenDbHasMatches() {
+        let db = ["資料"]
+        let pending = ["しりょう", "きかく"]
+        let merged = InputHandler.mergePendingSuccessorMatches(dbOrdered: db, pending: pending, romajiKey: "k")
+        XCTAssertEqual(merged.first, "資料", "DB 由来を先に保つ")
+        XCTAssertTrue(merged.contains("きかく"), "か行にマッチする保留語が末尾に追加される")
+        XCTAssertFalse(merged.contains("しりょう"), "さ行の保留語は k 打鍵では除外")
+    }
+
+    func testMergePendingSuccessorMatchesShowsPendingWhenDbEmpty() {
+        let merged = InputHandler.mergePendingSuccessorMatches(
+            dbOrdered: [], pending: ["しりょう", "えいご"], romajiKey: "s"
+        )
+        XCTAssertEqual(merged, ["しりょう"], "DB が空でも保留から読み一致する語だけ表示")
+    }
 }
