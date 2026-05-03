@@ -150,7 +150,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         handler.db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 1, usedAt: 0, isPreset: false)
         handler.lastConfirmedContext = LastConfirmedContext(
             input: "きょう", output: "今日",
-            prev1: "東京", prev2: nil, skipPrev: nil, fullReading: nil
+            prev1: "東京", prev2: nil, skipPrevs: [], fullReading: nil
         )
         let (_, _) = press(keyCode: 51)
         XCTAssertNil(handler.lastConfirmedContext)
@@ -164,7 +164,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         handler.db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 1, usedAt: 0, isPreset: true)
         handler.lastConfirmedContext = LastConfirmedContext(
             input: "きょう", output: "今日",
-            prev1: "東京", prev2: nil, skipPrev: nil, fullReading: nil
+            prev1: "東京", prev2: nil, skipPrevs: [], fullReading: nil
         )
         _ = press(keyCode: 51)
         let row = handler.db.fetchAllBigram().first { $0.prev == "東京" && $0.output == "今日" }
@@ -175,7 +175,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         handler.db.record(input: "あ", output: "阿")
         handler.lastConfirmedContext = LastConfirmedContext(
             input: "あ", output: "阿",
-            prev1: nil, prev2: nil, skipPrev: nil, fullReading: nil
+            prev1: nil, prev2: nil, skipPrevs: [], fullReading: nil
         )
         _ = press(keyCode: 51)
         XCTAssertTrue(handler.db.fetchHistoryExact(reading: "あ").isEmpty)

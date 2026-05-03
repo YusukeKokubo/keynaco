@@ -41,7 +41,9 @@ extension InputHandler {
         }
         let bigramTop = db.fetchBigramTop(prev: last)
         let trigramTop: [String] = prev2Output.map { db.fetchTrigramTop(prev2: $0, prev1: last) } ?? []
-        let skipBigramTop = mostRecentContentWord().map { db.fetchSkipBigramTop(prev: $0) } ?? []
+        let skipBigramTop = mostRecentContentWords(n: 2)
+            .map { db.fetchSkipBigramTop(prev: $0) }
+            .reduce([]) { InputHandler.merged($0, $1) }
         let predictTop = InputHandler.merged(trigramTop, bigramTop, skipBigramTop)
         // 名詞末尾のとき限定で格助詞 fallback を tail に追加
         let particlesFallback = isNounLike(last)
@@ -101,7 +103,7 @@ extension InputHandler {
             output: particle,
             prev1: capPrev1,
             prev2: capPrev2,
-            skipPrev: nil,
+            skipPrevs: [],
             fullReading: nil
         )
         pushCommitted(particle)
@@ -138,7 +140,7 @@ extension InputHandler {
                     output: ctx.output,
                     prev1: ctx.prev1,
                     prev2: ctx.prev2,
-                    skipPrev: ctx.skipPrev,
+                    skipPrevs: ctx.skipPrevs,
                     fullReading: ctx.fullReading
                 )
                 lastConfirmedContext = nil
@@ -174,7 +176,6 @@ extension InputHandler {
                 if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
                    let last = lastCommittedOutput {
                     let kanas = InputHandler.romajiToInitialKana[char] ?? []
-                    let contentWordForFilter = mostRecentContentWord()
                     var filteredSeen = Set<String>()
                     var filtered: [String] = []
                     for kana in kanas {
@@ -182,9 +183,9 @@ extension InputHandler {
                             db.fetchTrigram(prev2: $0, prev1: last, reading: kana)
                         } ?? []
                         let fromBigram = db.fetchBigram(prev: last, reading: kana)
-                        let fromSkip = contentWordForFilter.map {
+                        let fromSkip = mostRecentContentWords(n: 2).flatMap {
                             db.fetchSkipBigram(prev: $0, reading: kana)
-                        } ?? []
+                        }
                         for s in fromTrigram where filteredSeen.insert(s).inserted { filtered.append(s) }
                         for s in fromBigram where filteredSeen.insert(s).inserted { filtered.append(s) }
                         for s in fromSkip where filteredSeen.insert(s).inserted { filtered.append(s) }

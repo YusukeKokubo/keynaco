@@ -77,7 +77,7 @@ Apple Intelligence（FoundationModels）で、**高スコア履歴 + AzooKey** �
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
 2. ユーザー辞書（完全一致 + 前方一致。`fixedEnd = fixedCount + userDictCount`）
-3. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWord` × 現読みで skip-bigram を引き、trigram・bigram にない候補を末尾に追加）
+3. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWords(n: 2)` の各語 × 現読みで skip-bigram を引き（近い内容語の結果を先）、`merged` で重複除去のうえ trigram・bigram にない候補を末尾に追加）
 4. 履歴（`fetchHistoryScoredMerged`：exact → prefix 重複除去。スコアが閾値**以上**の行のみこのブロックに置く。閾値**未満**は 7 の直前に回す）
 5. 数字候補（`generateNumberCandidates`、数字のみ読みのとき。`historyEnd` 直後に挿入）
 6. 日時候補（`きょう` / `いま` 等のとき。数字候補の直後に挿入）
@@ -126,7 +126,7 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 
 ### isSuccessorMode
 確定直後に学習済みの後続語候補を自動表示する状態。  
-候補は `fetchTrigramTop(prev2:prev1:)` + `fetchBigramTop(prev:)` の組み合わせで引く。
+候補は `fetchTrigramTop(prev2:prev1:)` + `fetchBigramTop(prev:)` + `mostRecentContentWords(n: 2)` ごとの `fetchSkipBigramTop`（`merged` で重複除去、近い内容語を優先）で引く。
 2語前文脈（trigram）を優先し、trigram にない候補を bigram で補完する。  
 漢字・カタカナ末尾（`isNounLike`）のときのみ、固定格助詞リスト（`InputHandler.particles`）を
 tail に fallback として並べる。ひらがな末尾の語では格助詞 fallback は出さず、予測候補のみ表示する。
@@ -183,7 +183,7 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。
 
 ### lastConfirmedContext
-確定直後の Backspace を「誤変換の訂正」として扱うために、`commitText` / `confirmSuccessor` が保持する直前 **1 件**の学習キー。`(input, output, prev1, prev2, skipPrev, fullReading)`。  
+確定直後の Backspace を「誤変換の訂正」として扱うために、`commitText` / `confirmSuccessor` が保持する直前 **1 件**の学習キー。`(input, output, prev1, prev2, skipPrevs, fullReading)`。`skipPrevs` は助詞直前確定時に記録した skip-bigram の `prev` 語の列（最大 2 語。格助詞のみ確定パスでは空配列）。  
 **不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。セグメント全読み確定時のみ `fullReading` が非 `nil`（`boundary_pref` 削除用）。
 
 ### DatabaseManager
@@ -208,14 +208,14 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 テストでは `db.clock = { fixedEpoch }` で時刻を固定して検証する。
 
 #### committedHistory
-直近に確定した変換出力のリスト。`mostRecentContentWord` および skip-bigram 記録で参照される。  
+直近に確定した変換出力のリスト。`mostRecentContentWord` / `mostRecentContentWords` および skip-bigram 記録で参照される。  
 **不変条件**: 上限は **5 件**。6 件目が追加されると先頭がドロップされる。  
-**注意**: `mostRecentContentWord` は `committedHistory` の末尾から助詞をスキップして最初の内容語を返す。履歴が 1 件以下（直前語のみ）または全て助詞の場合は `nil`。
+**注意**: `mostRecentContentWord()` は `mostRecentContentWords(n: 1).first` と同じ。`mostRecentContentWords(n:)` は末尾から 2 語目以降を遡り、助詞をスキップして最大 `n` 件の内容語を**近い順**に返す。履歴が 2 件未満、または内容語が 1 件もない場合は空配列（単一取得 API では `nil`）。
 
 *Tests: `Tests/SkipBigramTests.swift` — `testCommittedHistoryCapAt5`, `testMostRecentContentWordSkipsParticle`*
 
 #### skip-bigram
-助詞（`InputHandler.particles`）が直前に確定されたとき、`mostRecentContentWord`（直近の非助詞語）と現在の確定語のペアを `skip_bigram` テーブルに記録する。  
+助詞（`InputHandler.particles`）が直前に確定されたとき、`mostRecentContentWords(n: 2)` が返す各内容語（最大 2 語）と現在の確定語のペアを `skip_bigram` テーブルに記録する（同一トランザクションで複数行になりうる）。  
 `今日 → を → 行く` `今日 → が → 走る` のように助詞でバラけたペアが「今日 → 行く/走る」として統合される。
 
 #### penalizeAll（訂正シグナル）

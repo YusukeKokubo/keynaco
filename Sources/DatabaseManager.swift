@@ -407,7 +407,7 @@ final class DatabaseManager: @unchecked Sendable {
         output: String,
         prev1: String?,
         prev2: String?,
-        skipPrev: String?,
+        skipPrevs: [String],
         fullReading: String?
     ) {
         dispatchWrite {
@@ -448,7 +448,7 @@ final class DatabaseManager: @unchecked Sendable {
                     self.bindText($0, 3, input); self.bindText($0, 4, output)
                 }
             }
-            if let sp = skipPrev {
+            for sp in skipPrevs {
                 self.executeOnQueue("""
                     UPDATE skip_bigram SET count = count - 1
                     WHERE prev = ? AND input = ? AND output = ?
@@ -785,7 +785,7 @@ final class DatabaseManager: @unchecked Sendable {
     func recordNgrams(
         bigram: (prev: String, input: String, output: String),
         trigram: (prev2: String, prev1: String, input: String, output: String)?,
-        skipBigram: (prev: String, input: String, output: String)?
+        skipBigrams: [(prev: String, input: String, output: String)]
     ) {
         dispatchWrite {
             let t = self.nowEpoch()
@@ -813,7 +813,7 @@ final class DatabaseManager: @unchecked Sendable {
                     sqlite3_bind_int64($0, 5, t)
                 }
             }
-            if let skip = skipBigram {
+            for skip in skipBigrams {
                 self.executeOnQueue("""
                 INSERT INTO skip_bigram (prev, input, output, count, used_at)
                 VALUES (?, ?, ?, 1, ?)

@@ -46,7 +46,7 @@ struct LastConfirmedContext: Equatable {
     let output: String
     let prev1: String?
     let prev2: String?
-    let skipPrev: String?
+    let skipPrevs: [String]
     let fullReading: String?
 }
 
@@ -122,11 +122,19 @@ struct InputHandler {
     }
 
     func mostRecentContentWord() -> String? {
-        guard committedHistory.count >= 2 else { return nil }
+        mostRecentContentWords(n: 1).first
+    }
+
+    func mostRecentContentWords(n: Int) -> [String] {
+        guard committedHistory.count >= 2 else { return [] }
+        var result: [String] = []
         for i in stride(from: committedHistory.count - 2, through: 0, by: -1) {
-            if !InputHandler.particles.contains(committedHistory[i]) { return committedHistory[i] }
+            if !InputHandler.particles.contains(committedHistory[i]) {
+                result.append(committedHistory[i])
+                if result.count >= n { break }
+            }
         }
-        return nil
+        return result
     }
     let db: DatabaseManager
     let azooKeyConverter: any AzooKeyConverting
@@ -293,16 +301,16 @@ struct InputHandler {
     ) {
         var capPrev1: String?
         var capPrev2: String?
-        var capSkipPrev: String?
+        var capSkipPrevs: [String] = []
         if !state.composingText.isEmpty && !skipHistory, let p1 = lastCommittedOutput {
             capPrev1 = p1
             capPrev2 = prev2Output
-            if InputHandler.particles.contains(p1) { capSkipPrev = mostRecentContentWord() }
+            if InputHandler.particles.contains(p1) { capSkipPrevs = mostRecentContentWords(n: 2) }
             let bigramInput = state.finalizedText
             db.recordNgrams(
                 bigram: (prev: p1, input: bigramInput, output: text),
                 trigram: prev2Output.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) },
-                skipBigram: capSkipPrev.map { (prev: $0, input: bigramInput, output: text) }
+                skipBigrams: capSkipPrevs.map { (prev: $0, input: bigramInput, output: text) }
             )
         }
         lastConfirmedContext = LastConfirmedContext(
@@ -310,7 +318,7 @@ struct InputHandler {
             output: text,
             prev1: capPrev1,
             prev2: capPrev2,
-            skipPrev: capSkipPrev,
+            skipPrevs: capSkipPrevs,
             fullReading: fullReading
         )
         pushCommitted(text)
@@ -364,7 +372,7 @@ struct InputHandler {
                 output: ctx.output,
                 prev1: ctx.prev1,
                 prev2: ctx.prev2,
-                skipPrev: ctx.skipPrev,
+                skipPrevs: ctx.skipPrevs,
                 fullReading: ctx.fullReading
             )
             lastConfirmedContext = nil

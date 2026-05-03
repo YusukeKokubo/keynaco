@@ -85,7 +85,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 
 1. `db.fetchTrigramTop(prev2:prev1:)` の上位（2語前コンテキスト優先）
 2. `db.fetchBigramTop(prev:)` の上位（tri-gram に含まれないもの）
-3. `db.fetchSkipBigramTop(prev:)` の上位（`mostRecentContentWord` を prev として、tri-gram・bi-gram にない候補を追加）
+3. `mostRecentContentWords(n: 2)` ごとの `db.fetchSkipBigramTop(prev:)` を `merged` で連結した上位（近い内容語を優先。tri-gram・bi-gram にない候補を追加）
 4. `isNounLike(last)` が真のときのみ、格助詞固定リスト（`InputHandler.particles`）を tail に fallback として並べる
 
 bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。
@@ -104,7 +104,7 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 
 1. ひらがな / カタカナ固定候補（`fixedCount` 件、スクロール外の先頭に挿入）
 2. **ユーザー辞書**候補（完全一致のみ、`fixedCount` の直後に挿入。`fixedEnd = fixedCount + userDictCount`）
-3. tri-gram → bi-gram 候補（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先、重複除去後にユーザー辞書の直後に挿入）
+3. tri-gram → bi-gram → skip-bigram 予測（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先し、`mostRecentContentWords(n: 2)` × 読みの skip-bigram を `merged` で重複除去のうえ連結。ユーザー辞書の直後に挿入）
 4. 履歴（`fetchHistoryScoredMerged`：exact + prefix をマージ。時間減衰スコアが閾値 **以上**の行のみ。このブロックの件数が `historyEnd` 計算の履歴件数）
 5. 数字候補（`generateNumberCandidates`：全角数字 + 桁区切り。数字のみ入力時に生成、`historyEnd` の直後に挿入。変換履歴には記録しない）
 6. 日時候補（`generateDateTimeCandidates`：きょう/いま/ことし等、数字候補の直後に挿入。変換履歴には記録しない）

@@ -89,6 +89,60 @@ final class SkipBigramTests: InputHandlerTestCase {
         XCTAssertNil(result, "履歴が1件以下なら nil")
     }
 
+    // MARK: - mostRecentContentWords(n:)
+
+    func testMostRecentContentWordsEmptyWhenHistoryTooShort() {
+        handler.commitText(text: "今日", client: client)
+        XCTAssertTrue(handler.mostRecentContentWords(n: 2).isEmpty)
+    }
+
+    func testMostRecentContentWordsN1MatchesMostRecentContentWord() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        XCTAssertEqual(handler.mostRecentContentWords(n: 1).first, handler.mostRecentContentWord())
+    }
+
+    func testMostRecentContentWordsN2SkipsConsecutiveParticles() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        handler.commitText(text: "駅", client: client)
+        handler.commitText(text: "へ", client: client)
+        let words = handler.mostRecentContentWords(n: 2)
+        XCTAssertEqual(words, ["駅", "今日"], "助詞をまたいで近い順に2語")
+    }
+
+    func testMostRecentContentWordsN2ReturnsOneWhenOnlyOneContentWord() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["今日"])
+    }
+
+    func testRecordNgramsMultipleSkipBigrams() {
+        let mem = DatabaseManager(inMemory: true)
+        mem.recordNgrams(
+            bigram: (prev: "を", input: "いく", output: "行く"),
+            trigram: nil,
+            skipBigrams: [
+                (prev: "今日", input: "いく", output: "行く"),
+                (prev: "昨日", input: "いく", output: "行く"),
+            ]
+        )
+        XCTAssertTrue(mem.fetchSkipBigramTop(prev: "今日").contains("行く"))
+        XCTAssertTrue(mem.fetchSkipBigramTop(prev: "昨日").contains("行く"))
+    }
+
+    func testPenalizeAllMultipleSkipPrevs() {
+        let mem = DatabaseManager(inMemory: true)
+        mem.recordSkipBigram(prev: "今日", input: "いく", output: "行く")
+        mem.recordSkipBigram(prev: "昨日", input: "いく", output: "行く")
+        mem.penalizeAll(
+            input: "いく", output: "行く", prev1: nil, prev2: nil,
+            skipPrevs: ["今日", "昨日"], fullReading: nil
+        )
+        XCTAssertFalse(mem.fetchSkipBigramTop(prev: "今日").contains("行く"))
+        XCTAssertFalse(mem.fetchSkipBigramTop(prev: "昨日").contains("行く"))
+    }
+
     // MARK: - 文脈リセット（A-1）
 
     func testSentenceTerminatorClearsHistory() {
