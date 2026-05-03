@@ -110,8 +110,8 @@
 		8DC3622F0AAB2993C7A4DD5A /* InputHandlerSuccessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerSuccessorTests.swift; sourceTree = "<group>"; };
 		8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerZSequenceTests.swift; sourceTree = "<group>"; };
 		8FECEC3CBD864BE0FA7202F3 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		97499B0FBB6D364291045346 /* InputSource@2x.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = "InputSource@2x.tiff"; sourceTree = "<group>"; };
 		9338B628EF426D49019810A7 /* CandidateWindowMoveRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowMoveRowTests.swift; sourceTree = "<group>"; };
+		97499B0FBB6D364291045346 /* InputSource@2x.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = "InputSource@2x.tiff"; sourceTree = "<group>"; };
 		9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+SuccessorMode.swift"; sourceTree = "<group>"; };
 		A7EA5A03205A3A4B861980E8 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		A980CA73C689304375F976DD /* InputHandlerTestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerTestCase.swift; sourceTree = "<group>"; };

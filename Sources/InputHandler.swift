@@ -304,7 +304,6 @@ struct InputHandler {
                 trigram: prev2Output.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) },
                 skipBigram: capSkipPrev.map { (prev: $0, input: bigramInput, output: text) }
             )
-            }
         }
         lastConfirmedContext = LastConfirmedContext(
             input: state.finalizedText,
