@@ -236,7 +236,7 @@ skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加され
 
 **制約**:
 - 完全一致のみ。`きょうはよいてんきです` の保存は `きょうはてんきです` 入力には適用されない
-- 手動調整なしで確定しても `boundary_pref` に保存されない
+- AzooKey 初期分割のまま（LLM の多文節再構築もない）で手動調整もなく確定した場合は `boundary_pref` に保存されない
 
 *Tests: `Tests/InputHandlerSegmentTests.swift` — `testBoundaryPrefSavedOnManualAdjust`, `testBoundaryPrefReproducedOnReenter`*
 
@@ -252,17 +252,17 @@ skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加され
 |---------|-----------|-------------------------|
 | 1 | （突入直後） | AzooKey 初期境界のまま |
 | 2 | LLM が `機械学習をする` を返す | 読みが `きかいがくしゅう` / `を` / `する` に対応するよう境界が置き換わり、各文節の先頭候補に LLM トークンが並ぶ |
-| 3 | Enter（各行先頭選択のまま） | LLM 全文を 1 回確定 → 待機 |
+| 3 | Enter（各行先頭選択のまま） | LLM 全文を 1 回確定 → 待機。多文節再構築済みなら `boundary_pref` に当該読み境界を保存 |
 
 **アライメント失敗**（推論が `nil`）:
 
 | ステップ | イベント | 動作 |
 |---------|-----------|------|
-| 1 | LLM が返すが読みと整合しない | 先頭文節の候補先頭に全文テキストのみ挿入（境界は AzooKey のまま） |
+| 1 | LLM が返すが読みと整合しない | 先頭文節の候補先頭に全文テキストのみ挿入（境界は AzooKey のまま）。`boundary_pref` には保存しない |
 
-LLM 自動境界は `boundary_pref` に保存されない（手動 Shift+矢印調整後の確定のみ保存）。
+**1 ペアのみ整合**（`inferSegmentBoundaries` が 1 文節に収まる）: `applyLLMBoundaries` は走るが `boundary_pref` には保存しない（多文節再構築ではない）。
 
-*Tests: `Tests/SegmentBoundaryTests.swift`、`Tests/InputHandlerSegmentLLMTests.swift`*
+*Tests: `Tests/SegmentBoundaryTests.swift`、`Tests/InputHandlerSegmentLLMTests.swift`、`Tests/InputHandlerSegmentTests.swift`（LLM 境界の `boundary_pref` 保存）*
 
 ---
 

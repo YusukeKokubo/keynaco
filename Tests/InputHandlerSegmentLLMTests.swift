@@ -24,6 +24,9 @@ final class InputHandlerSegmentLLMTests: InputHandlerTestCase {
     }
 
     func testApplyLLMSegmentResultInsertsAtHeadAndBumpsSelection() {
+        // 実辞書では `inferSegmentBoundaries` が成功しうるため、辞書を空にしたスタブでフォールバック挿入のみを固定する
+        handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: LLMFallbackForcingMockAzoo())
+        client = MockTextClient()
         typeRomaji("watashihagakusei")
         _ = press(keyCode: KeyCode.space)
         guard handler.state.isSegmentMode else { return }
@@ -113,5 +116,21 @@ final class InputHandlerSegmentLLMTests: InputHandlerTestCase {
         XCTAssertNotEqual(client.inserted.last, llm)
         XCTAssertFalse(client.inserted.isEmpty)
         _ = result
+    }
+}
+
+/// `candidatesForSegment` を常に空にし `inferSegmentBoundaries` を必ず失敗させる（セグメント分割のみ提供）
+private final class LLMFallbackForcingMockAzoo: AzooKeyConverting, @unchecked Sendable {
+    func requestCandidates(hiragana: String) -> [String] { [] }
+    func commit(reading: String, text: String) {}
+    func candidatesForSegment(reading: String) -> [String] { [] }
+    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
+        guard hiragana == "わたしはがくせい" else { return [] }
+        // 辞書候補は空（`candidatesForSegment` と一致）にし、先頭文節の先頭候補が固定でテストしやすいようにする
+        return [
+            ("わたし", []),
+            ("は", []),
+            ("がくせい", [])
+        ]
     }
 }

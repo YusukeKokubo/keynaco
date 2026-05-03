@@ -119,6 +119,7 @@ extension InputHandler {
         }
         var newState = SegmentState(segments: built, focusedIndex: 0)
         newState.llmWholeText = llmWholeText
+        newState.isLlmBoundaryInferred = pairs.count >= 2
         state.segmentState = newState
         segmentCandidateCache.removeAll()
     }
@@ -356,6 +357,12 @@ extension InputHandler {
         if let llmText = segmentState.llmWholeText,
            isLlmWholeTextShortcut(segmentState: segmentState, candidateSelectedText: candidate.selectedText) {
             let fullReading = segmentState.segments.map(\.reading).joined()
+            if segmentState.isLlmBoundaryInferred {
+                db.saveBoundaryPref(
+                    fullReading: fullReading,
+                    segments: segmentState.segments.map(\.reading)
+                )
+            }
             state.segmentState = nil
             segmentCandidateCache.removeAll()
             segmentLLMTrigger = .none
@@ -391,7 +398,7 @@ extension InputHandler {
                 db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
             }
         }
-        if segs.contains(where: { $0.isManuallyAdjusted }) {
+        if segs.contains(where: { $0.isManuallyAdjusted }) || segmentState.isLlmBoundaryInferred {
             db.saveBoundaryPref(fullReading: fullReading, segments: segs.map { $0.reading })
         }
         segmentLLMTrigger = .none

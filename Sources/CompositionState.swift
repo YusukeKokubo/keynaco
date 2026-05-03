@@ -107,6 +107,8 @@ struct SegmentState {
     var focusedIndex: Int
     /// LLM による読み全体の一括変換テキスト。各文節先頭候補の連結がこの文字列と一致しうる（推論失敗時は先頭文節のみ挿入）。
     var llmWholeText: String? = nil
+    /// `inferSegmentBoundaries` が 2 ペア以上返し `applyLLMBoundaries` で多文節に再構築されたとき true（1 ペアのみ・フォールバック挿入は false）。
+    var isLlmBoundaryInferred: Bool = false
 
     var focusedSegment: Segment {
         get { segments[focusedIndex] }

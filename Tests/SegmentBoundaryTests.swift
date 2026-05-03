@@ -3,7 +3,7 @@ import XCTest
 
 /// `inferSegmentBoundaries` の単体テスト。`candidatesForSegment` は最短一致の前提を満たすよう、
 /// **短い読みでは長いトークンを返さない**スタブで固定する。
-private final class SegmentBoundaryMockAzooKey: AzooKeyConverting {
+private final class SegmentBoundaryMockAzooKey: AzooKeyConverting, @unchecked Sendable {
     var segmentCandidates: [String: [String]] = [:]
 
     func requestCandidates(hiragana: String) -> [String] { [] }
@@ -53,8 +53,9 @@ final class SegmentBoundaryTests: XCTestCase {
             azooKey: mock,
             baselineSegmentReadings: ["きかいがくしゅう", "を", "する"]
         )
-        XCTAssertEqual(out?.map(\.reading), ["きかいがくしゅう", "を", "する"])
-        XCTAssertEqual(out?.map(\.token), ["機械学習", "を", "する"])
+        // `tokenizeByScript` は連続するひらがなを1トークンにまとめるため「を」「する」は「をする」になる
+        XCTAssertEqual(out?.map(\.reading), ["きかいがくしゅう", "をする"])
+        XCTAssertEqual(out?.map(\.token), ["機械学習", "をする"])
     }
 
     func testKatakanaWordJudo() {
