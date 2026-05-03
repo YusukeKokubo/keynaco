@@ -20,10 +20,14 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | パス | 内容 |
 |------|------|
 | `Sources/` | アプリ本体（Swift ソース + Info.plist + entitlements） |
+| `Sources/Settings/` | 設定画面（`SettingsWindowController` 等 4 ファイル） |
+| `Sources/PresetBigram/` | `preset_bigram.csv`（プリセット Bi-gram バンドルリソース） |
 | `Sources/Debug/` | デバッグ用ツール（`EventViewerWindow` 等、本番動作には影響しない） |
 | `Tests/` | ユニットテスト（XCTest） |
 | `docs/domain/` | ドメイン知識ドキュメント（用語・状態遷移・シナリオ） |
 | `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` 形式） |
+| `scripts/` | 開発用スクリプト（`generate_preset_bigram_csv.py` 等） |
+| `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
 | `project.yml` | XcodeGen 設定 |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
 
@@ -121,7 +125,7 @@ IME はバックグラウンドエージェントとして動作するため、`
 
 `InputController` のロジックを `InputHandler`（純粋 Swift struct）に抽出し、テキスト操作の出力先を `TextInputClient` プロトコルで抽象化する。テストでは `MockTextClient` を渡して `insertText` / `setMarkedText` の呼び出しを検証する。
 
-### Shift キー入力の挙動
+## キー入力の挙動（特殊ケース）
 
 - **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始。以降の小文字も `composedHiragana` に直接蓄積（ローマ字変換しない）。AzooKey は呼ばず、履歴検索キーは小文字正規化。`GitHub` 等の混在ケース入力に対応。
 - **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
