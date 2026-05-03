@@ -841,6 +841,7 @@ final class DatabaseManager: @unchecked Sendable {
     // MARK: - 境界学習
 
     func saveBoundaryPref(fullReading: String, segments: [String]) {
+        guard fullReading.count >= 4 else { return }
         let boundaries = segments.joined(separator: ",")
         dispatchWrite {
             let t = self.nowEpoch()
@@ -861,7 +862,12 @@ final class DatabaseManager: @unchecked Sendable {
     func fetchBoundaryPref(fullReading: String) -> [String]? {
         let rows = dbQueue.sync {
             self.queryStringsOnQueue(
-                "SELECT boundaries FROM boundary_pref WHERE full_reading = ?",
+                """
+                SELECT boundaries FROM boundary_pref
+                WHERE ? LIKE full_reading || '%'
+                ORDER BY length(full_reading) DESC
+                LIMIT 1
+                """,
                 bind: { self.bindText($0, 1, fullReading) }
             )
         }

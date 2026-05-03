@@ -89,6 +89,8 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 手動調整した境界を保存する `boundary_pref` テーブルのエントリ。  
 `enterSegmentMode()` は `azooKeyConverter.segmentize()` を呼ぶ前に `fetchBoundaryPref` を確認し、
 ヒットすれば保存済み境界を優先して使う。ヒットしなければ AzooKey の初期分割にフォールバック。  
+**取得の前方一致**: 完全一致だけでなく、入力のフル読みが保存キー（`full_reading`）で始まる行のうち、**最長の `full_reading`** を 1 件選んでその `boundaries` を使う（より長い読みへの入力でも、短いキーで学習した境界を再利用できる）。  
+**保存の最短長**: `full_reading` の Swift `String.count` が 4 未満のときは `saveBoundaryPref` が保存しない（一律ガード）。  
 **保存条件**: `doConfirmSegments()` 時に `isManuallyAdjusted` なセグメントが 1 つ以上ある場合のみ記録する（デフォルト境界のまま確定した場合は記録しない）。  
 **上書きポリシー**: 同じ `full_reading` に対して再調整・確定すると前回エントリが上書きされる（`ON CONFLICT DO UPDATE`）。  
 **GC**: 180日未使用のエントリを `performGCIfNeeded()` で削除する（`count` カラムなし、`used_at` のみで判定）。

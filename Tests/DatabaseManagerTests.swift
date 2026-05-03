@@ -389,4 +389,33 @@ final class DatabaseManagerTests: XCTestCase {
         let results = db.fetchUserDictPrefix(reading: "とうきょうとちょう")
         XCTAssertEqual(results, ["東京", "東京都"], "登録順で返る")
     }
+
+    // MARK: - boundary_pref
+
+    /// 入力が保存キーで始まれば、より長い別の文でも同じ境界を再利用する
+    func testFetchBoundaryPrefPrefixMatchReusesShorterKey() {
+        db.saveBoundaryPref(fullReading: "きょうは", segments: ["きょう", "は"])
+        let got = db.fetchBoundaryPref(fullReading: "きょうはさむい")
+        XCTAssertEqual(got, ["きょう", "は"])
+    }
+
+    /// 複数キーが前方一致するときは full_reading が最長の行を返す
+    func testFetchBoundaryPrefPrefersLongestMatchingKey() {
+        db.saveBoundaryPref(fullReading: "きょうは", segments: ["短い", "前半"])
+        db.saveBoundaryPref(fullReading: "きょうはよいてんきです", segments: ["きょう", "はよいてんき", "です"])
+        let got = db.fetchBoundaryPref(fullReading: "きょうはよいてんきです")
+        XCTAssertEqual(got, ["きょう", "はよいてんき", "です"])
+    }
+
+    /// 入力が保存キーより短いときはヒットしない（入力がキーで始まる必要がある）
+    func testFetchBoundaryPrefNoHitWhenInputDoesNotStartWithKey() {
+        db.saveBoundaryPref(fullReading: "きょうは", segments: ["きょう", "は"])
+        XCTAssertNil(db.fetchBoundaryPref(fullReading: "きょう"))
+    }
+
+    /// full_reading が 4 文字未満のときは保存しない・取得もしない
+    func testSaveBoundaryPrefIgnoresShortReading() {
+        db.saveBoundaryPref(fullReading: "きょ", segments: ["きょ"])
+        XCTAssertNil(db.fetchBoundaryPref(fullReading: "きょ"), "4文字未満は保存されない")
+    }
 }
