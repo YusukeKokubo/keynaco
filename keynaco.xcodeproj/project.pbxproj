@@ -46,7 +46,9 @@
 		CA9DA0E228B3736FED19A8C7 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8870F701310164C98A33E /* BigramViewController.swift */; };
 		CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01349F1120E395B87FF8E96B /* DatabaseManager.swift */; };
 		CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565B8F19A5E192228B765163 /* KanaUtils.swift */; };
+		D439FBEBA07A2C0963F95C81 /* preset_bigram.csv in Resources */ = {isa = PBXBuildFile; fileRef = 5ACD1FF22B030C477F2AD6D8 /* preset_bigram.csv */; };
 		D871446F4F529C47659FF444 /* AzooKeyCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CE25A93E96E885615EB17A /* AzooKeyCacheTests.swift */; };
+		E0BA07B7DA86A1F019D5E2E4 /* LearningThresholds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */; };
 		E1471B2D246CBEFC6740F9F1 /* InputHandlerCompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 713FA4DA358BC346E58691F1 /* InputHandlerCompositionTests.swift */; };
 		E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EA5A03205A3A4B861980E8 /* InputController.swift */; };
 		E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */; };
@@ -89,6 +91,8 @@
 		558C3E35C47661D5D98A0A57 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		565B8F19A5E192228B765163 /* KanaUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanaUtils.swift; sourceTree = "<group>"; };
 		59721E10162EA851CA8CB8B2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5ACD1FF22B030C477F2AD6D8 /* preset_bigram.csv */ = {isa = PBXFileReference; path = preset_bigram.csv; sourceTree = "<group>"; };
+		5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningThresholds.swift; sourceTree = "<group>"; };
 		6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = System/Library/Frameworks/InputMethodKit.framework; sourceTree = SDKROOT; };
 		713FA4DA358BC346E58691F1 /* InputHandlerCompositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerCompositionTests.swift; sourceTree = "<group>"; };
 		720662401A20928261F985FB /* AzooKeyConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyConverterTests.swift; sourceTree = "<group>"; };
@@ -215,6 +219,14 @@
 			);
 			sourceTree = "<group>";
 		};
+		C18E5B21329747C29A8CB4C7 /* PresetBigram */ = {
+			isa = PBXGroup;
+			children = (
+				5ACD1FF22B030C477F2AD6D8 /* preset_bigram.csv */,
+			);
+			path = PresetBigram;
+			sourceTree = "<group>";
+		};
 		D6BCE65CF99E4CE014C96720 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
@@ -239,12 +251,14 @@
 				97499B0FBB6D364291045346 /* InputSource@2x.tiff */,
 				565B8F19A5E192228B765163 /* KanaUtils.swift */,
 				F2289452FE1578194147B535 /* keynaco.entitlements */,
+				5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */,
 				8FECEC3CBD864BE0FA7202F3 /* main.swift */,
 				86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */,
 				32E2E8FFF644AB611CD06409 /* RomajiConverter.swift */,
 				36A60998D2E36F9EBDF51923 /* TextInputClient.swift */,
 				3838034E722D05384CEB1002 /* Debug */,
 				EB4429C5180AA3C30E50DD09 /* InfoPlist.strings */,
+				C18E5B21329747C29A8CB4C7 /* PresetBigram */,
 				57A482A0166D4F5605EB6818 /* Settings */,
 			);
 			path = Sources;
@@ -338,6 +352,7 @@
 				0521D725A698985598C0AEF1 /* InfoPlist.strings in Resources */,
 				A6E40259CBFDB1F7925D8EAD /* InputSource.tiff in Resources */,
 				AE34C7307F7BDC74EED094FE /* InputSource@2x.tiff in Resources */,
+				D439FBEBA07A2C0963F95C81 /* preset_bigram.csv in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -392,6 +407,7 @@
 				19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */,
 				840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */,
 				CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */,
+				E0BA07B7DA86A1F019D5E2E4 /* LearningThresholds.swift in Sources */,
 				BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */,
 				FC361366E3DE4C6B91491F28 /* RomajiConverter.swift in Sources */,
 				25A7798A7237BDF2124782E0 /* SettingsWindowController.swift in Sources */,

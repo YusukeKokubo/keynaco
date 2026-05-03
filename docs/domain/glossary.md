@@ -109,7 +109,7 @@ tail に fallback として並べる。ひらがな末尾の語では格助詞 f
 **N-gram 候補の遅延表示と読みフィルタ**:
 N-gram 由来の候補（tri-gram + bi-gram + skip-bigram）がある場合、`suggestSuccessors()` は
 まず `fetchBigramTopCount(prev: last)` で前語に対する bi-gram 上位使用回数を取得する。
-`successorImmediateThreshold`（デフォルト 5）以上なら「高信頼ペア」とみなして即時表示（`.show`）。なお `fetchBigramTopCount` は直近 **90 日以内**のエントリのみを集計する（古い学習が閾値に寄与しないようにする）。
+`successorImmediateThreshold`（デフォルト 5。`LearningThresholds.successorImmediateThreshold` と一致）以上なら「高信頼ペア」とみなして即時表示（`.show`）。なお `fetchBigramTopCount` は直近 **90 日以内**の bi-gram の `MAX(count)` を取るが、**プリセット行**（`is_preset = 1`）は `used_at` に関係なく常に集計に含まれる（閾値判定から外れない）。
 閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。
 1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、
 DB を再クエリして一致する候補のみ `.show` する（読みが一致しなければモード解除）。  
@@ -146,6 +146,12 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・境界学習（`boundary_pref`）の **5 テーブル**を持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。  
 **`clock` var** でエポック秒を注入可能（テスト用）。全 record/fetch で `nowEpoch()` を使うことで時系列が一貫する。
+
+#### プリセット bi-gram（`is_preset`）
+冷スタートでも後続予測が効くよう、アプリバンドル内の `preset_bigram.csv`（`prev,input,output`）から **初回起動時のみ**（`UserDefaults` の `preset_seeded_v1` が未セットのとき。保存先は `DatabaseManager.presetSeedUserDefaults`、既定は `standard`）`bigram` に投入する。各行は `is_preset = 1`・初期 `count = successorImmediateThreshold`・`INSERT OR IGNORE`（ユーザー既存行と衝突したら無視）。  
+設定画面の Bi-gram **インポート**（`replaceBigram`）では `is_preset = 0` の行のみ全削除し、プリセット行は残す。**GC**（`performGCIfNeeded`）でもプリセット行は削除しない。ユーザーが `recordBigram` で同じ `(prev,input,output)` に学習した場合、`ON CONFLICT` で `count` / `used_at` のみ更新され、`is_preset` は変わらない。
+
+**データ出典**: `Sources/PresetBigram/preset_bigram.csv` はリポジトリ内スクリプト `scripts/generate_preset_bigram_csv.py` で生成した汎用連語リストであり、**プロジェクトオリジナル（独自編集）**。第三者コーパスの転載ではない。
 
 #### recordPrefixes
 読みが **3 文字以上**のひらがなを確定するとき、len=2 から N-1 までの前方一致パターンも同時に `history` に記録する。  

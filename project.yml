@@ -18,6 +18,8 @@ targets:
     platform: macOS
     sources:
       - path: Sources
+    resources:
+      - path: Sources/PresetBigram/preset_bigram.csv
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.yusuke.inputmethod.keynaco

@@ -285,6 +285,51 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("古い"), "7日以内は GC を実行しない")
     }
 
+    // MARK: - プリセット bi-gram（is_preset）
+
+    func testFetchBigramTopCountIncludesStalePresetRows() {
+        let base: Int64 = 1_700_000_000
+        let stale = base - 100 * 86400
+        db.clock = { stale }
+        db.testInsertBigram(
+            prev: "東京", input: "へ", output: "行く", count: 5, usedAt: stale, isPreset: true
+        )
+        db.clock = { base }
+        XCTAssertEqual(db.fetchBigramTopCount(prev: "東京"), 5, "90日超のプリセットも閾値に乗る")
+    }
+
+    func testReplaceBigramKeepsPresetRows() {
+        let t = db.clock()
+        db.testInsertBigram(prev: "保持", input: "あ", output: "ア", count: 5, usedAt: t, isPreset: true)
+        db.testInsertBigram(prev: "削除対象", input: "い", output: "イ", count: 2, usedAt: t, isPreset: false)
+        db.replaceBigram([
+            DatabaseManager.BigramEntry(prev: "新規", input: "う", output: "ウ", count: 3),
+        ])
+        XCTAssertFalse(db.fetchBigram(prev: "保持", reading: "あ").isEmpty, "プリセット行は残る")
+        XCTAssertTrue(db.fetchBigram(prev: "削除対象", reading: "い").isEmpty, "非プリセットはインポートで消える")
+        XCTAssertFalse(db.fetchBigram(prev: "新規", reading: "う").isEmpty, "インポート行が入る")
+    }
+
+    func testGCDoesNotDeleteStalePresetBigram() {
+        UserDefaults.standard.removeObject(forKey: "lastGCDate")
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.testInsertBigram(prev: "P", input: "x", output: "X", count: 1, usedAt: base, isPreset: true)
+        db.clock = { base + 181 * 86400 }
+        db.performGCIfNeeded()
+        XCTAssertFalse(db.fetchBigram(prev: "P", reading: "x").isEmpty, "プリセットは GC 対象外")
+    }
+
+    func testGCDeletesStaleNonPresetBigram() {
+        UserDefaults.standard.removeObject(forKey: "lastGCDate")
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.testInsertBigram(prev: "U", input: "y", output: "Y", count: 1, usedAt: base, isPreset: false)
+        db.clock = { base + 181 * 86400 }
+        db.performGCIfNeeded()
+        XCTAssertTrue(db.fetchBigram(prev: "U", reading: "y").isEmpty, "非プリセットの count=1 古い行は削除")
+    }
+
     // MARK: - ユーザー辞書
 
     func testUserDictAddAndFetch() {
