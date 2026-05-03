@@ -174,10 +174,22 @@ class InputController: IMKInputController {
         // Ghost text: Tab で確定、その他のキーはキャンセル
         if event.keyCode == KeyCode.tab && ghostTextEngine.hasGhostText {
             candidateWindow.dismiss()
-            if let confirmed = ghostTextEngine.confirm(into: IMKTextInputAdapter(sender)) {
+            let tabAdapter = IMKTextInputAdapter(sender)
+            if let confirmed = ghostTextEngine.confirm(into: tabAdapter) {
                 // 文書に挿入された語として後続のコンテキスト（Successor・skip-bigram）に反映する。
                 // 学習 DB（bi-gram 等）には触れないため、変換履歴は汚染されない。
                 handler.pushCommitted(confirmed)
+                // 確定後に続けてゴーストを走らせる（通常の insertText と同じ経路）。
+                let engine = ghostTextEngine
+                if engine.isAvailable && !InputHandler.isAsciiMode {
+                    let (prefix, suffix) = tabAdapter.surroundingText()
+                    let effectivePrefix = prefix.isEmpty ? confirmed : prefix
+                    if !effectivePrefix.isEmpty {
+                        engine.schedule(prefix: effectivePrefix, suffix: suffix, composingText: "",
+                                        recentIMEWords: handler.committedHistory,
+                                        near: tabAdapter.cursorRectAtCursor())
+                    }
+                }
                 return true
             }
             return false
