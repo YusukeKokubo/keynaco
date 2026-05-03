@@ -100,14 +100,15 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 *Tests: `Tests/InputHandlerSegmentTests.swift`*
 
 ### SegmentState.llmWholeText（セグメント LLM 全文候補）
-読み全体（`composedHiragana`）をオンデバイス LLM で一括変換した候補テキスト。`InputController` が `LLMSegmentConverter` の非同期結果を受け取ったとき、`segments[0].candidates` の先頭に挿入し、このプロパティに同じ文字列を保持する。  
-**不変条件（短絡確定）**: `doConfirmSegments` で LLM 全文のみ確定するのは `focusedIndex == 0` かつ `segments[0].selectedIndex == 0` かつ `segments[0].candidates.first == llmWholeText` のときのみ（Shift+矢印で先頭候補が差し替わったあと `llmWholeText` だけが残る誤確定を防ぐ）。確定時は全文節を破棄し `commitText(llmWholeText)` のみ行う。  
-挿入時は `segments[0].historyEnd` を 1 増やし、既存の履歴ブロック境界を維持する。`segments[0].selectedIndex` は先頭挿入に合わせて 1 増やし、リフレッシュ前の視覚選択を維持する。
+読み全体（`composedHiragana`）をオンデバイス LLM で一括変換した全文テキスト。`inferSegmentBoundaries` が成功した場合は各文節の `candidates` 先頭にその文節の LLM トークンが入り、連結がこの文字列になる。失敗時のフォールバックでは先頭文節のみに全文を先頭挿入する。  
+**不変条件（短絡確定）**: `doConfirmSegments` / `commitComposition` で LLM 全文のみ確定するのは `focusedIndex == 0` のうえ、**(A) 多文節再構築後**: 全文節が先頭行選択かつ各行先頭の連結が `llmWholeText` で、かつフォーカス文節の確定テキストがその文節の `candidates[0]` と一致するとき、または **(B) 旧フォールバック**: `segments[0].candidates[0] == llmWholeText` かつ先頭行選択で確定テキストが `llmWholeText` そのものとき。LLM による自動境界は **`boundary_pref` に保存されない**（手動調整由来の境界学習のみが対象）。確定時は全文節を破棄し `commitText(llmWholeText)` のみ行う。  
+フォールバック挿入時は `segments[0].historyEnd` を 1 増やし、`segments[0].selectedIndex` は先頭挿入に合わせて 1 増やす（リフレッシュ前の視覚選択を維持）。
 
 ### LLMSegmentConverter
-セグメントモード用の FoundationModels ラッパー。`SystemLanguageModel.default` が利用可能なときのみ `convert(hiragana:onResult:)` が推論を走らせる。失敗時は空文字でコールバックし既存 UX を壊さない。
+セグメントモード用の FoundationModels ラッパー。`SystemLanguageModel.default` が利用可能なときのみ `convert(hiragana:onResult:)` が推論を走らせる。失敗時は空文字でコールバックし既存 UX を壊さない。  
+静的メソッド `inferSegmentBoundaries` は LLM 出力と読みのアライメントを試みる（辞書は `candidatesForSegment` のみ利用）。
 
-*Tests: `Tests/InputHandlerSegmentLLMTests.swift`*
+*Tests: `Tests/InputHandlerSegmentLLMTests.swift`、`Tests/SegmentBoundaryTests.swift`*
 
 ### boundary_pref（境界学習）
 手動調整した境界を保存する `boundary_pref` テーブルのエントリ。  

@@ -115,12 +115,12 @@ stateDiagram-v2
 | ↑ | フォーカス文節の前候補へ |
 | Shift+→ | フォーカス文節を右に1文字拡張（次文節の先頭1文字を奪う） |
 | Shift+← | フォーカス文節を左に1文字縮小（末尾1文字を次文節の先頭に渡す） |
-| Enter | 通常は全文節の選択候補を連結確定 → 待機。例外として `SegmentState.llmWholeText` が設定済みかつ `focusedIndex == 0` かつ先頭候補がその文字列を選択しているときは、文節連結ではなく **LLM 全文のみ**を 1 回確定する（`candidates.first == llmWholeText` でない場合は通常確定にフォールスルーし、境界リサイズ後の stale `llmWholeText` による誤確定を防ぐ） |
+| Enter | 通常は全文節の選択候補を連結確定 → 待機。例外として `llmWholeText` 設定済みかつ `focusedIndex == 0` で **多文節パス**（全文節が先頭行選択かつ連結が `llmWholeText`）または **フォールバックパス**（先頭文節の `candidates[0]` が `llmWholeText` 全文かつ先頭行選択）を満たすときは **LLM 全文のみ**を 1 回確定する（どちらでもない場合は通常確定へフォールスルーし、stale `llmWholeText` の誤確定を防ぐ） |
 | Escape / Backspace | セグメントモード解除 → 組成に戻す |
 
-セグメント突入時（`boundary_pref` ヒットでも `segmentize` でも）、`InputController` がオンデバイス LLM で読み全体の一括変換を非同期開始し、結果が返れば `segments[0]` の候補先頭に挿入して候補ウィンドウをリフレッシュする（AzooKey 分割結果は従来どおり即時表示）。
+セグメント突入時（`boundary_pref` ヒットでも `segmentize` でも）、`InputController` がオンデバイス LLM で読み全体の一括変換を非同期開始する。結果が返れば `inferSegmentBoundaries` で読みと整合する場合は文節境界と候補列を再構築し、整合しない場合は従来どおり先頭文節の候補先頭に全文を挿入する（いずれも候補ウィンドウをリフレッシュ）。AzooKey の初期分割は突入直後にそのまま表示される。
 
-*Tests: `Tests/InputHandlerSegmentTests.swift`、`Tests/InputHandlerSegmentLLMTests.swift`*
+*Tests: `Tests/InputHandlerSegmentTests.swift`、`Tests/InputHandlerSegmentLLMTests.swift`、`Tests/SegmentBoundaryTests.swift`*
 
 ### Successor モード
 

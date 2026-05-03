@@ -56,7 +56,7 @@ extension InputHandler {
         return makeCandidateActionForFocusedSegment()
     }
 
-    /// `LLMSegmentConverter` の結果を `segments[0]` 先頭に差し込む（`InputController` から呼ぶ）。
+    /// `LLMSegmentConverter` の結果を文節境界推定に成功すれば再構築、失敗時は先頭文節に全文候補を挿入（`InputController` から呼ぶ）。
     mutating func applyLLMSegmentResult(text raw: String) {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
@@ -66,6 +66,18 @@ extension InputHandler {
         if text == fullReading { return }
         if text == ss.allSelectedText { return }
         guard !ss.segments.isEmpty else { return }
+
+        let baseline = ss.segments.map(\.reading)
+        if let pairs = LLMSegmentConverter.inferSegmentBoundaries(
+            hiragana: fullReading,
+            llmText: text,
+            azooKey: azooKeyConverter,
+            baselineSegmentReadings: baseline
+        ) {
+            applyLLMBoundaries(pairs: pairs, llmWholeText: text)
+            return
+        }
+
         if ss.segments[0].candidates.contains(text) { return }
 
         ss.segments[0].candidates.insert(text, at: 0)
@@ -74,6 +86,66 @@ extension InputHandler {
         ss.segments[0].selectedIndex = min(ss.segments[0].selectedIndex + 1, newCount - 1)
         ss.llmWholeText = text
         state.segmentState = ss
+    }
+
+    private mutating func applyLLMBoundaries(pairs: [(reading: String, token: String)], llmWholeText: String) {
+        var built: [Segment] = []
+        for i in pairs.indices {
+            let reading = pairs[i].reading
+            let token = pairs[i].token
+            let prev: String? = (i == 0) ? lastCommittedOutput : pairs[i - 1].token
+            var seg = buildSegmentCandidates(
+                reading: reading,
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading),
+                prev: prev
+            )
+            if let idx = seg.candidates.firstIndex(of: token) {
+                if idx != 0 {
+                    seg.candidates.remove(at: idx)
+                    seg.candidates.insert(token, at: 0)
+                }
+            } else {
+                seg.candidates.insert(token, at: 0)
+                seg.historyEnd += 1
+            }
+            let newCount = seg.candidates.count
+            seg.selectedIndex = min(seg.selectedIndex + 1, newCount - 1)
+            built.append(seg)
+        }
+        if pairs.count >= 2 {
+            for i in built.indices {
+                built[i].selectedIndex = 0
+            }
+        }
+        var newState = SegmentState(segments: built, focusedIndex: 0)
+        newState.llmWholeText = llmWholeText
+        state.segmentState = newState
+        segmentCandidateCache.removeAll()
+    }
+
+    /// LLM 全文一発確定: 以下のいずれかを満たすとき。
+    /// - 多文節境界パス: 全文節が先頭候補選択かつ連結が llmWholeText と一致
+    /// - 旧フォールバックパス: focusedSegment の candidates[0] が llmWholeText そのもの
+    func isLlmWholeTextShortcut(segmentState: SegmentState, candidateSelectedText: String?) -> Bool {
+        guard let whole = segmentState.llmWholeText else { return false }
+        guard segmentState.focusedIndex == 0 else { return false }
+        guard !segmentState.segments.isEmpty else { return false }
+        let focused = segmentState.focusedSegment
+        guard !focused.candidates.isEmpty else { return false }
+        let effective = candidateSelectedText ?? focused.selectedText
+
+        // 多文節境界パス: applyLLMBoundaries が全文節を再構築している
+        if segmentState.segments.allSatisfy({ !$0.candidates.isEmpty && $0.selectedIndex == 0 }),
+           segmentState.segments.map({ $0.candidates[0] }).joined() == whole {
+            return effective == focused.candidates[0]
+        }
+
+        // 旧フォールバックパス: LLM 全文が segments[0].candidates[0] にのみ挿入されている
+        if focused.candidates[0] == whole {
+            return focused.selectedIndex == 0 && effective == whole
+        }
+
+        return false
     }
 
     func buildSegmentCandidates(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
@@ -282,9 +354,7 @@ extension InputHandler {
         guard let segmentState = state.segmentState else { return .none }
 
         if let llmText = segmentState.llmWholeText,
-           segmentState.focusedIndex == 0,
-           segmentState.segments[0].selectedIndex == 0,
-           segmentState.segments[0].candidates.first == llmText {
+           isLlmWholeTextShortcut(segmentState: segmentState, candidateSelectedText: candidate.selectedText) {
             let fullReading = segmentState.segments.map(\.reading).joined()
             state.segmentState = nil
             segmentCandidateCache.removeAll()

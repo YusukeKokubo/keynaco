@@ -17,6 +17,7 @@
 		25A7798A7237BDF2124782E0 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54631F84EB0B2E3208C05023 /* SettingsWindowController.swift */; };
 		29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */; };
 		2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */; };
+		2E69B03CE6E525A6FF5137AC /* SegmentBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B6435A6EF44E2E6A977C6B /* SegmentBoundaryTests.swift */; };
 		32AA887B33A030356BA62078 /* DatabaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4649D9013CD877E76776C56 /* DatabaseManagerTests.swift */; };
 		401AA7C9F3EF7FD17748BF18 /* InputHandlerSegmentLLMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF1F8A0DAB043461E9258811 /* InputHandlerSegmentLLMTests.swift */; };
 		417423818A8C02627A56F0D9 /* KanaKanjiConverterModuleWithDefaultDictionary in Frameworks */ = {isa = PBXBuildFile; productRef = 4E949B70C60A849A6760E097 /* KanaKanjiConverterModuleWithDefaultDictionary */; };
@@ -121,6 +122,7 @@
 		B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B6CB521B2B5C2E5690C75C8B /* InputHandlerNumberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerNumberTests.swift; sourceTree = "<group>"; };
 		B7D543581B48064BB6D28E70 /* InputHandler+Candidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Candidates.swift"; sourceTree = "<group>"; };
+		B8B6435A6EF44E2E6A977C6B /* SegmentBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmentBoundaryTests.swift; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF1F8A0DAB043461E9258811 /* InputHandlerSegmentLLMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerSegmentLLMTests.swift; sourceTree = "<group>"; };
 		BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftInputTests.swift; sourceTree = "<group>"; };
@@ -175,6 +177,7 @@
 				8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */,
 				7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */,
 				D9B215AFEA353E22981FF11B /* ScenarioRegressionTests.swift */,
+				B8B6435A6EF44E2E6A977C6B /* SegmentBoundaryTests.swift */,
 				BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */,
 				F1AA964A2E0D8230BBA41CD7 /* SkipBigramTests.swift */,
 			);
@@ -393,6 +396,7 @@
 				29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */,
 				7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */,
 				C8FB14F6DC26BC9A36880CB1 /* ScenarioRegressionTests.swift in Sources */,
+				2E69B03CE6E525A6FF5137AC /* SegmentBoundaryTests.swift in Sources */,
 				E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */,
 				BDF0B7CF569DBAF2532F1083 /* SkipBigramTests.swift in Sources */,
 			);

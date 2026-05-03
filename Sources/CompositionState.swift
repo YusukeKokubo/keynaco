@@ -105,7 +105,7 @@ struct Segment {
 struct SegmentState {
     var segments: [Segment]
     var focusedIndex: Int
-    /// LLM による読み全体の一括変換テキスト。`segments[0].candidates[0]` に挿入済みのとき非 nil。
+    /// LLM による読み全体の一括変換テキスト。各文節先頭候補の連結がこの文字列と一致しうる（推論失敗時は先頭文節のみ挿入）。
     var llmWholeText: String? = nil
 
     var focusedSegment: Segment {

@@ -238,9 +238,7 @@ struct InputHandler {
         if let segmentState = state.segmentState {
             let selectedText = candidate.selectedText ?? segmentState.focusedSegment.selectedText
             if let llmText = segmentState.llmWholeText,
-               segmentState.focusedIndex == 0,
-               segmentState.segments[0].candidates.first == llmText,
-               selectedText == llmText {
+               isLlmWholeTextShortcut(segmentState: segmentState, candidateSelectedText: candidate.selectedText) {
                 let fullReading = segmentState.segments.map(\.reading).joined()
                 state.segmentState = nil
                 segmentCandidateCache.removeAll()
