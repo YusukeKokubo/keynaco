@@ -1,7 +1,7 @@
 import Foundation
 import FoundationModels
 
-/// Successor モード用：確定直後の語に続くひらがな候補をオンデバイス LLM で補完する。
+/// Successor モード用：確定直後の文脈に続く語をオンデバイス LLM で補完する（表層形）。
 @MainActor
 final class LLMSuccessorFetcher {
     private var task: Task<Void, Never>?
@@ -16,14 +16,18 @@ final class LLMSuccessorFetcher {
         task = nil
     }
 
-    /// `after` に続く語をひらがなで最大5語返す（失敗時は空配列）。
-    func fetch(after word: String, onResult: @escaping ([String]) -> Void) {
+    /// `words` は確定語の直近順（末尾が最新）、最大3語。失敗時は空配列。
+    func fetch(context words: [String], onResult: @escaping ([String]) -> Void) {
+        guard !words.isEmpty else {
+            onResult([])
+            return
+        }
         guard case .available = SystemLanguageModel.default.availability else {
             onResult([])
             return
         }
         cancel()
-        let prompt = Self.buildPrompt(word: word)
+        let prompt = Self.buildPrompt(words: words)
         task = Task { @MainActor [session] in
             do {
                 let response = try await session.respond(to: prompt)
@@ -35,11 +39,11 @@ final class LLMSuccessorFetcher {
         }
     }
 
-    private static func buildPrompt(word: String) -> String {
-        """
-        「\(word)」の直後に来る日本語の語（名詞・動詞・形容詞）を5つ挙げてください。
+    nonisolated internal static func buildPrompt(words: [String]) -> String {
+        let contextPhrase = words.joined(separator: "、")
+        return """
+        「\(contextPhrase)」に続く語を5つ挙げてください。
         1語ずつ改行で出力してください。助詞は含めないでください。
-        各語はひらがなだけで書いてください（漢字・カタカナは使わないでください）。
         """
     }
 
@@ -51,24 +55,40 @@ final class LLMSuccessorFetcher {
         } else {
             text = ""
         }
-        return splitAndFilterHiraganaLines(text)
+        return splitAndFilterLines(text)
     }
 
-    /// 行分割・重複除去・ひらがなのみ・最大5件。
-    static func splitAndFilterHiraganaLines(_ raw: String) -> [String] {
+    /// 行分割・重複除去・日本語語素を含む行のみ・数字のみ行除外・最大5件。
+    nonisolated static func splitAndFilterLines(_ raw: String) -> [String] {
         var seen = Set<String>()
         var out: [String] = []
         for line in raw.split(whereSeparator: { $0.isNewline }) {
             let t = line.trimmingCharacters(in: .whitespaces)
-            guard !t.isEmpty, t.unicodeScalars.allSatisfy(Self.isHiraganaScalar), seen.insert(String(t)).inserted else { continue }
-            out.append(String(t))
+            guard !t.isEmpty else { continue }
+            guard hasJapaneseWordScalar(t) else { continue }
+            guard !isDigitsOnly(t) else { continue }
+            guard seen.insert(t).inserted else { continue }
+            out.append(t)
             if out.count >= 5 { break }
         }
         return out
     }
 
-    private static func isHiraganaScalar(_ s: Unicode.Scalar) -> Bool {
-        let v = s.value
-        return (v >= 0x3041 && v <= 0x3096) || v == 0x309D || v == 0x309E
+    nonisolated private static func hasJapaneseWordScalar(_ s: String) -> Bool {
+        s.unicodeScalars.contains { u in
+            let v = u.value
+            let hiragana = (v >= 0x3041 && v <= 0x3096) || v == 0x309D || v == 0x309E
+            // 全角カタカナ（中黒「・」のみの行は記号扱いで除外）
+            let katakana = (v >= 0x30A1 && v <= 0x30FF) && v != 0x30FB
+            let cjk = (v >= 0x4E00 && v <= 0x9FFF) || (v >= 0x3400 && v <= 0x4DBF) || (v >= 0xF900 && v <= 0xFAFF)
+            return hiragana || katakana || cjk
+        }
+    }
+
+    nonisolated private static func isDigitsOnly(_ s: String) -> Bool {
+        s.unicodeScalars.allSatisfy { u in
+            let v = u.value
+            return (v >= 0x30 && v <= 0x39) || (v >= 0xFF10 && v <= 0xFF19)
+        }
     }
 }

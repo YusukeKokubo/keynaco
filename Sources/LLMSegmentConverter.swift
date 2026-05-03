@@ -66,6 +66,8 @@ final class LLMSegmentConverter {
         var pairs: [(reading: String, token: String)] = []
 
         for token in tokens {
+            guard !remaining.isEmpty else { return nil }
+
             func consumedPrefix() -> String {
                 String(hiragana.prefix(hiragana.count - remaining.count))
             }

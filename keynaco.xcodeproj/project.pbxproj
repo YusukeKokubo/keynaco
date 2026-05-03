@@ -32,6 +32,7 @@
 		6095BA557731F8320F694AF8 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A89E465235280624AF1A85 /* FoundationModels.framework */; };
 		68B55839DBAF7EA388D32A91 /* AzooKeyConverting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18510F685A5861F194EBA987 /* AzooKeyConverting.swift */; };
 		69677FCF9F1426F96E28A047 /* InputHandlerDateTimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10118D688929D09D7ECE26B /* InputHandlerDateTimeTests.swift */; };
+		78BDC8DEF0CADA081EA99F2D /* LLMSuccessorFetcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0786D4E26B8D8248C3F45C53 /* LLMSuccessorFetcherTests.swift */; };
 		7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */; };
 		840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34144C2DA730A7CFDC7B4149 /* InputHandler.swift */; };
 		97506D2D83D03ABF9DF72361 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FECEC3CBD864BE0FA7202F3 /* main.swift */; };
@@ -81,6 +82,7 @@
 /* Begin PBXFileReference section */
 		00B2F53FCF18FDAC7A79F92A /* InputHandlerAsciiTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerAsciiTests.swift; sourceTree = "<group>"; };
 		01349F1120E395B87FF8E96B /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
+		0786D4E26B8D8248C3F45C53 /* LLMSuccessorFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMSuccessorFetcherTests.swift; sourceTree = "<group>"; };
 		0A6DFC3B8F3D8A9AE50AF8C2 /* InputHandlerCandidatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerCandidatesTests.swift; sourceTree = "<group>"; };
 		0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
 		0DF633BBF3C756509E09F05A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -178,6 +180,7 @@
 				A980CA73C689304375F976DD /* InputHandlerTestCase.swift */,
 				8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */,
 				1F64A49C480649A108EF3D19 /* LLMFallbackForcingMockAzooKey.swift */,
+				0786D4E26B8D8248C3F45C53 /* LLMSuccessorFetcherTests.swift */,
 				7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */,
 				D9B215AFEA353E22981FF11B /* ScenarioRegressionTests.swift */,
 				B8B6435A6EF44E2E6A977C6B /* SegmentBoundaryTests.swift */,
@@ -398,6 +401,7 @@
 				44BA7DAD02471D3C7678FD24 /* InputHandlerTestCase.swift in Sources */,
 				29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */,
 				389A5B8EF38437CC61404E23 /* LLMFallbackForcingMockAzooKey.swift in Sources */,
+				78BDC8DEF0CADA081EA99F2D /* LLMSuccessorFetcherTests.swift in Sources */,
 				7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */,
 				C8FB14F6DC26BC9A36880CB1 /* ScenarioRegressionTests.swift in Sources */,
 				2E69B03CE6E525A6FF5137AC /* SegmentBoundaryTests.swift in Sources */,

@@ -147,6 +147,7 @@ class InputController: IMKInputController {
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
         handler.pendingSuccessorCandidates = []
+        handler.successorLLMSurfaceExtras = []
         handler.successorLLMTrigger = .none
         handler.successorLLMBaseCandidates = nil
         handler.segmentLLMTrigger = .none
@@ -307,6 +308,7 @@ class InputController: IMKInputController {
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
         handler.pendingSuccessorCandidates = []
+        handler.successorLLMSurfaceExtras = []
         handler.successorLLMTrigger = .none
         handler.successorLLMBaseCandidates = nil
         handler.segmentLLMTrigger = .none
@@ -380,30 +382,40 @@ class InputController: IMKInputController {
         switch trigger {
         case .none:
             break
-        case .pendingLowConfidence(let lastWord):
-            Self.successorLLM.fetch(after: lastWord) { [weak self] words in
+        case .pendingLowConfidence(let triggerContext):
+            Self.successorLLM.fetch(context: triggerContext) { [weak self] words in
                 guard let self else { return }
-                guard self.handler.isSuccessorMode,
-                      !self.handler.pendingSuccessorCandidates.isEmpty,
-                      self.handler.lastCommittedOutput == lastWord else { return }
-                let existing = Set(self.handler.pendingSuccessorCandidates)
-                let extra = words.filter { !existing.contains($0) }
+                guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
+                guard self.handler.isSuccessorMode else { return }
+                // LLM が遅延到着しても、既に1打目表示済みなら UI は更新しない（extras にのみ溜まりうる）。
+                var seen = Set(self.handler.pendingSuccessorCandidates)
+                seen.formUnion(self.handler.successorLLMSurfaceExtras)
+                let extra = words.filter { !seen.contains($0) }
                 guard !extra.isEmpty else { return }
-                self.handler.pendingSuccessorCandidates.append(contentsOf: extra)
-                Self.postSuccessorPendingNotification(pending: true)
+                self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
+                if !self.handler.pendingSuccessorCandidates.isEmpty {
+                    Self.postSuccessorPendingNotification(pending: true)
+                }
             }
-        case .particlesOnly(let lastWord):
-            Self.successorLLM.fetch(after: lastWord) { [weak self] words in
+        case .particlesOnly(let triggerContext):
+            Self.successorLLM.fetch(context: triggerContext) { [weak self] words in
                 guard let self else { return }
+                guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
                 guard self.handler.isSuccessorMode,
-                      self.handler.lastCommittedOutput == lastWord,
                       self.candidateWindow.isVisible,
                       let base = self.handler.successorLLMBaseCandidates else { return }
-                let existing = Set(base)
-                let extra = words.filter { !existing.contains($0) }
+                var seen = Set(base)
+                seen.formUnion(self.handler.successorLLMSurfaceExtras)
+                let extra = words.filter { !seen.contains($0) }
                 guard !extra.isEmpty else { return }
-                let merged = base + extra
-                self.handler.successorLLMBaseCandidates = merged
+                for w in extra where seen.insert(w).inserted {
+                    self.handler.successorLLMSurfaceExtras.append(w)
+                }
+                var merged = base
+                var tailSeen = Set(base)
+                for w in self.handler.successorLLMSurfaceExtras where tailSeen.insert(w).inserted {
+                    merged.append(w)
+                }
                 let rowCap = max(0, merged.count - 1)
                 let initialRow = min(self.candidateWindow.selectedRow, rowCap)
                 self.candidateWindow.show(

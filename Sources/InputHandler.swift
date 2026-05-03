@@ -14,10 +14,10 @@ enum CandidateAction {
 /// Successor 用：オンデバイス LLM で後続語を補完するタイミング（`InputController` が参照してフェッチを開始する）。
 enum SuccessorLLMTrigger: Equatable {
     case none
-    /// N-gram あり・閾値未満で保留（`.dismiss`）になった直後。
-    case pendingLowConfidence(lastWord: String)
+    /// N-gram あり・閾値未満で保留（`.dismiss`）になった直後。`context` は `committedHistory.suffix(3)` のスナップショット。
+    case pendingLowConfidence(context: [String])
     /// 格助詞のみ即時表示になった直後。
-    case particlesOnly(lastWord: String)
+    case particlesOnly(context: [String])
 }
 
 /// セグメントモード用：`InputController` が `LLMSegmentConverter` を起動するタイミング。
@@ -90,7 +90,9 @@ struct InputHandler {
     var isSuccessorMode = false
     var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
     var pendingSuccessorCandidates: [String] = []
-    /// `particlesOnly` のとき即時表示した候補（LLM 結果を末尾に足すときのベース）。
+    /// LLM が返した表層形のみ。`mergePendingSuccessorMatches` の `pending` には渡さない。
+    var successorLLMSurfaceExtras: [String] = []
+    /// `particlesOnly` のとき即時表示した候補（LLM の表層形は `successorLLMSurfaceExtras`）。
     var successorLLMBaseCandidates: [String]? = nil
     var successorLLMTrigger: SuccessorLLMTrigger = .none
     var segmentLLMTrigger: SegmentLLMTrigger = .none

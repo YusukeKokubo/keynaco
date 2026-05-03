@@ -10,6 +10,7 @@ extension InputHandler {
     mutating func clearSuccessorLLMAuxiliaryState() {
         successorLLMTrigger = .none
         successorLLMBaseCandidates = nil
+        successorLLMSurfaceExtras.removeAll()
     }
 
     /// DB で得た候補の並びを保ち、`pending` からローマ字1文字に対応する読み前方一致の語を末尾に追加する（単体テスト可）。
@@ -54,14 +55,16 @@ extension InputHandler {
             return .dismiss
         }
 
+        successorLLMSurfaceExtras = []
         isSuccessorMode = true
         successorFirstChar = nil
+        let llmContext = Array(committedHistory.suffix(3))
 
         if predictTop.isEmpty {
             // 格助詞 fallback のみ（N-gram なし）→ 従来通りすぐ表示
             pendingSuccessorCandidates = []
             successorLLMBaseCandidates = candidates
-            successorLLMTrigger = .particlesOnly(lastWord: last)
+            successorLLMTrigger = .particlesOnly(context: llmContext)
             return .show(candidates: candidates, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
         } else {
             // 高信頼チェック：直近90日以内に閾値回数以上使ったペアは即時表示
@@ -74,7 +77,7 @@ extension InputHandler {
                 // 通常 → 保存して1打目まで待つ
                 pendingSuccessorCandidates = candidates
                 successorLLMBaseCandidates = nil
-                successorLLMTrigger = .pendingLowConfidence(lastWord: last)
+                successorLLMTrigger = .pendingLowConfidence(context: llmContext)
                 return .dismiss
             }
         }
@@ -190,10 +193,16 @@ extension InputHandler {
                         dbOrdered: filtered, pending: pendingSuccessorCandidates, romajiKey: char
                     )
                     if !filtered.isEmpty {
+                        var merged = filtered
+                        var mergeSeen = Set(filtered)
+                        for w in successorLLMSurfaceExtras where mergeSeen.insert(w).inserted {
+                            merged.append(w)
+                        }
                         pendingSuccessorCandidates = []
+                        successorLLMSurfaceExtras = []
                         clearSuccessorLLMAuxiliaryState()
                         successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                        return (true, .show(candidates: filtered, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+                        return (true, .show(candidates: merged, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
                     }
                 }
                 pendingSuccessorCandidates = []

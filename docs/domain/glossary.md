@@ -143,19 +143,26 @@ DB を再クエリして一致する候補に加え、**同一条件で** `pendi
 格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。
 
 **オンデバイス LLM 補完**（`LLMSuccessorFetcher`、Foundation Models / Apple Intelligence 利用可能時のみ）:
-N-gram あり・閾値未満（保留）の直後、または格助詞のみ即時表示の直後に、前語に続くひらがな語を非同期取得し、
-前者では `pendingSuccessorCandidates` 末尾へ重複除外で追記、後者では候補ウィンドウの末尾へ追記する。
-LLM 語は **ひらがな表記**のまま候補に混ざり得る（学習由来の表記形と併存しうる）。
+N-gram あり・閾値未満（保留）の直後、または格助詞のみ即時表示の直後に、`committedHistory` の末尾最大3語（`"、"` 結合した文脈）を渡して続く語を非同期取得する。
+返答は **表層形**（漢字・カタカナ・ひらがな）とし、別バッファ **`successorLLMSurfaceExtras`** に蓄える（`pendingSuccessorCandidates` には混ぜない。読み前方一致は N-gram 側のみ）。
+保留（`.dismiss`）から1打目で候補を開くときは、DB 照会＋`mergePendingSuccessorMatches` の結果の **末尾**に `successorLLMSurfaceExtras` を重複除外で連結する。
+格助詞のみ即時表示のときは、格助詞列を `successorLLMBaseCandidates` に保持し、LLM 語だけを `successorLLMSurfaceExtras` に足してウィンドウを更新する。
+非同期コールバックは `Array(committedHistory.suffix(3))` がフェッチ開始時のスナップショットと一致するときだけ反映する。
+LLM が1打目表示より遅れて届いた場合、**画面は更新しない**（extras にのみ溜まりうる仕様）。
 
-*Tests: `Tests/InputHandlerSuccessorTests.swift`*
+*Tests: `Tests/InputHandlerSuccessorTests.swift`、`Tests/LLMSuccessorFetcherTests.swift`*
 
 ### pendingSuccessorCandidates
-Successor モードで N-gram 候補を1打目まで遅延表示するためのバッファ。  
+Successor モードで N-gram 候補を1打目まで遅延表示するためのバッファ（**学習由来の語のみ**。オンデバイス LLM の表層形は含めない）。  
 **不変条件**: `suggestSuccessors()` が N-gram 候補を計算した際に設定され、1打目の入力時に
 `romajiToInitialKana` で読み前方一致フィルタを行い（併せて本バッファ内の語を DB 結果と merge）、`.show` して空になる。
 読みが一致しない場合はモード解除して空になる。
 `isSuccessorMode = false` になるすべての経路でクリアされる。  
-遅延表示中に LLM 補完が届いた場合、重複のない限り末尾に追記され得る。
+LLM 由来の語は `successorLLMSurfaceExtras` を参照する。
+
+### successorLLMSurfaceExtras
+オンデバイス LLM が返した **表層形**の後続語候補。`mergePendingSuccessorMatches` の `pending` には渡さない。
+`suggestSuccessors()` が Successor に入るたびにクリアされ、補助状態クリア時にも空になる。
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。  
