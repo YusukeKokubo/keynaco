@@ -357,7 +357,17 @@ class InputController: IMKInputController {
         let reading = handler.state.composedHiragana
         let opts = handler.pendingF1Strings
 
-        Self.candidateScorer.score(candidates: opts, context: contextPrefix, reading: reading) { [weak self] idx in
+        let examples: [(prev: String, next: String)] =
+            handler.committedHistory.last.map { lastWord in
+                handler.db.fetchBigramTop(prev: lastWord, limit: 5).map { (prev: lastWord, next: $0) }
+            } ?? []
+
+        Self.candidateScorer.score(
+            candidates: opts,
+            context: contextPrefix,
+            reading: reading,
+            examples: examples
+        ) { [weak self] idx in
             guard let self else { return }
             guard idx >= 0, idx < self.handler.pendingF1GlobalIndices.count else { return }
             guard self.candidateWindow.isVisible else { return }

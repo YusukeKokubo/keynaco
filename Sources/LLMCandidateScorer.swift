@@ -17,18 +17,25 @@ final class LLMCandidateScorer {
     }
 
     /// - Parameter candidates: プロンプトに並べる候補文字列（最大10件想定）。
+    /// - Parameter examples: N-gram DB の bi-gram 上位を few-shot として注入（最大5件想定）。
     /// - Parameter onResult: 成功時のみ呼ぶ。**引数は `candidates` 配列の 0-based インデックス**。
     ///   呼び出し側はこれを `pendingF1GlobalIndices` でグローバル行へ写像する。
     func score(
         candidates: [String],
         context: String,
         reading: String,
+        examples: [(prev: String, next: String)] = [],
         onResult: @escaping (Int) -> Void
     ) {
         guard case .available = SystemLanguageModel.default.availability else { return }
         guard !candidates.isEmpty else { return }
         cancel()
-        let prompt = Self.buildPrompt(context: context, reading: reading, candidates: candidates)
+        let prompt = Self.buildPrompt(
+            context: context,
+            reading: reading,
+            candidates: candidates,
+            examples: examples
+        )
         let n = candidates.count
         task = Task { @MainActor [session] in
             do {
@@ -39,8 +46,21 @@ final class LLMCandidateScorer {
         }
     }
 
-    private static func buildPrompt(context: String, reading: String, candidates: [String]) -> String {
-        var lines = """
+    internal static func buildPrompt(
+        context: String,
+        reading: String,
+        candidates: [String],
+        examples: [(prev: String, next: String)]
+    ) -> String {
+        var lines = ""
+        if !examples.isEmpty {
+            lines += "【このユーザーの変換傾向】\n"
+            for (prev, next) in examples {
+                lines += "- 「\(prev)」の後 → 「\(next)」\n"
+            }
+            lines += "\n"
+        }
+        lines += """
         【文脈】\(context)
         【読み】\(reading)
         【候補】

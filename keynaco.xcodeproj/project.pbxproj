@@ -51,6 +51,7 @@
 		CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01349F1120E395B87FF8E96B /* DatabaseManager.swift */; };
 		CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565B8F19A5E192228B765163 /* KanaUtils.swift */; };
 		D1CD01D4314FCDBA9560C225 /* LLMMisconversionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7FDD9C43C3468AA64B4A3AE /* LLMMisconversionChecker.swift */; };
+		D409F8F4E5AB01C4ECC7EB16 /* LLMCandidateScorerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0761267E295ED3D1435CB337 /* LLMCandidateScorerTests.swift */; };
 		D439FBEBA07A2C0963F95C81 /* preset_bigram.csv in Resources */ = {isa = PBXBuildFile; fileRef = 5ACD1FF22B030C477F2AD6D8 /* preset_bigram.csv */; };
 		D871446F4F529C47659FF444 /* AzooKeyCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9CE25A93E96E885615EB17A /* AzooKeyCacheTests.swift */; };
 		DA70AED84EC9CF8F8F8B2AC5 /* LLMSuccessorFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */; };
@@ -82,6 +83,7 @@
 /* Begin PBXFileReference section */
 		00B2F53FCF18FDAC7A79F92A /* InputHandlerAsciiTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerAsciiTests.swift; sourceTree = "<group>"; };
 		01349F1120E395B87FF8E96B /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
+		0761267E295ED3D1435CB337 /* LLMCandidateScorerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMCandidateScorerTests.swift; sourceTree = "<group>"; };
 		0786D4E26B8D8248C3F45C53 /* LLMSuccessorFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMSuccessorFetcherTests.swift; sourceTree = "<group>"; };
 		0A6DFC3B8F3D8A9AE50AF8C2 /* InputHandlerCandidatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerCandidatesTests.swift; sourceTree = "<group>"; };
 		0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
@@ -179,6 +181,7 @@
 				8DC3622F0AAB2993C7A4DD5A /* InputHandlerSuccessorTests.swift */,
 				A980CA73C689304375F976DD /* InputHandlerTestCase.swift */,
 				8E7BD22DF90E1C14AEC6F381 /* InputHandlerZSequenceTests.swift */,
+				0761267E295ED3D1435CB337 /* LLMCandidateScorerTests.swift */,
 				1F64A49C480649A108EF3D19 /* LLMFallbackForcingMockAzooKey.swift */,
 				0786D4E26B8D8248C3F45C53 /* LLMSuccessorFetcherTests.swift */,
 				7DF674D3BB40259F226263CA /* RomajiConverterTests.swift */,
@@ -400,6 +403,7 @@
 				E9D9EF1D96F61A715009F278 /* InputHandlerSuccessorTests.swift in Sources */,
 				44BA7DAD02471D3C7678FD24 /* InputHandlerTestCase.swift in Sources */,
 				29B3BE296A91927724A146CC /* InputHandlerZSequenceTests.swift in Sources */,
+				D409F8F4E5AB01C4ECC7EB16 /* LLMCandidateScorerTests.swift in Sources */,
 				389A5B8EF38437CC61404E23 /* LLMFallbackForcingMockAzooKey.swift in Sources */,
 				78BDC8DEF0CADA081EA99F2D /* LLMSuccessorFetcherTests.swift in Sources */,
 				7F1A1AC5FA0D436172136BD7 /* RomajiConverterTests.swift in Sources */,
