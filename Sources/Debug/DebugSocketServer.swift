@@ -24,6 +24,10 @@ final class DebugSocketServer: @unchecked Sendable {
     private let mockClient = SocketMockClient()
     private var candidateWindow = DebugCandidateWindow()
 
+    private let successorLLM = LLMSuccessorFetcher()
+    private let segmentLLM = LLMSegmentConverter()
+    private let candidateScorer = LLMCandidateScorer()
+
     /// `deinit` から参照するため `nonisolated(unsafe)`。書き込みは MainActor のみ。
     nonisolated(unsafe) private var snapshotURL: URL?
 
@@ -131,6 +135,10 @@ final class DebugSocketServer: @unchecked Sendable {
     private func processCommand(_ cmd: [String: Any]) -> [String: Any] {
         if cmd["reset"] != nil {
             cleanupSnapshot()
+            successorLLM.cancel()
+            segmentLLM.cancel()
+            candidateScorer.cancel()
+            handler.resetScorerPending()
             let useRealDB = cmd["useRealDB"] as? Bool ?? false
             if useRealDB, let db = makeRealDBSnapshot() {
                 handler = InputHandler(db: db)
@@ -167,6 +175,7 @@ final class DebugSocketServer: @unchecked Sendable {
             client: mockClient
         )
         candidateWindow.apply(action: action)
+        applyLLMScheduling()
 
         return makeResponse(inserted: mockClient.consume())
     }
@@ -201,9 +210,190 @@ final class DebugSocketServer: @unchecked Sendable {
             "committedHistory":   snap.committedHistory,
             "segmentTexts":       snap.segmentTexts,
             "focusedSegmentIndex": snap.focusedSegmentIndex,
+            "successorLLMSurfaceExtras": handler.successorLLMSurfaceExtras,
         ]
         if let st = snap.selectedText { dict["selectedText"] = st }
         return dict
+    }
+
+    // MARK: - LLM スケジューリング（InputController と同順・文脈は committedHistory のみ）
+
+    private func llmDocumentContextPrefix() -> String {
+        handler.committedHistory.suffix(5).joined()
+    }
+
+    private func applyLLMScheduling() {
+        applySuccessorLLMScheduling()
+        applySegmentLLMScheduling()
+        applyCandidateScorerScheduling()
+    }
+
+    private func applySuccessorLLMScheduling() {
+        let trigger = handler.successorLLMTrigger
+        guard trigger != .none else { return }
+        handler.successorLLMTrigger = .none
+
+        let triggerContextOpt: [String]? = {
+            switch trigger {
+            case .pendingLowConfidence(let ctx), .particlesOnly(let ctx): return ctx
+            case .none: return nil
+            }
+        }()
+        let examples: [(prev: String, next: String)] = triggerContextOpt.flatMap { tc in
+            tc.last.map { lw in
+                handler.db.fetchBigramTop(prev: lw, limit: 5)
+                    .filter { !InputHandler.particles.contains($0) }
+                    .map { (prev: lw, next: $0) }
+            }
+        } ?? []
+
+        let docPrefix = llmDocumentContextPrefix()
+
+        switch trigger {
+        case .none:
+            break
+        case .pendingLowConfidence(let triggerContext):
+            successorLLM.fetch(
+                context: triggerContext, documentContextPrefix: docPrefix, examples: examples
+            ) { [weak self] words in
+                guard let self else { return }
+                guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
+                guard self.handler.isSuccessorMode else { return }
+                var seen = Set(self.handler.pendingSuccessorCandidates)
+                seen.formUnion(self.handler.successorLLMSurfaceExtras)
+                let extra = words.filter { !seen.contains($0) }
+                guard !extra.isEmpty else { return }
+                self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
+            }
+        case .particlesOnly(let triggerContext):
+            successorLLM.fetch(
+                context: triggerContext, documentContextPrefix: docPrefix, examples: examples
+            ) { [weak self] words in
+                guard let self else { return }
+                guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
+                guard self.handler.isSuccessorMode,
+                      self.candidateWindow.isVisible,
+                      let base = self.handler.successorLLMBaseCandidates else { return }
+                var seen = Set(base)
+                seen.formUnion(self.handler.successorLLMSurfaceExtras)
+                let extra = words.filter { !seen.contains($0) }
+                guard !extra.isEmpty else { return }
+                for w in extra where seen.insert(w).inserted {
+                    self.handler.successorLLMSurfaceExtras.append(w)
+                }
+                var merged = base
+                var tailSeen = Set(base)
+                for w in self.handler.successorLLMSurfaceExtras where tailSeen.insert(w).inserted {
+                    merged.append(w)
+                }
+                let rowCap = max(0, merged.count - 1)
+                let initialRow = min(self.candidateWindow.selectedRow, rowCap)
+                self.candidateWindow.apply(
+                    action: .show(
+                        candidates: merged,
+                        historyEnd: 0,
+                        initialRow: initialRow,
+                        predictionEnd: 0,
+                        fixedEnd: 0
+                    )
+                )
+                if self.handler.isSuccessorMode, !merged.isEmpty,
+                   let markedText = self.candidateWindow.selectedText, !markedText.isEmpty {
+                    self.mockClient.setMarkedText(
+                        markedText,
+                        selectionRange: NSRange(location: markedText.count, length: 0)
+                    )
+                }
+            }
+        }
+    }
+
+    private func applySegmentLLMScheduling() {
+        let trigger = handler.segmentLLMTrigger
+        guard case .start(let hiragana) = trigger else { return }
+        handler.segmentLLMTrigger = .none
+        segmentLLM.convert(hiragana: hiragana) { [weak self] text in
+            guard let self else { return }
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  let segState = self.handler.state.segmentState,
+                  segState.segments.map(\.reading).joined() == hiragana else { return }
+            self.handler.applyLLMSegmentResult(text: trimmed)
+            guard let updated = self.handler.state.segmentState,
+                  updated.llmWholeText != nil,
+                  !updated.segments.isEmpty else { return }
+            let action = self.handler.makeCandidateActionForFocusedSegment()
+            if case .show(let cands, let historyEnd, let initialRow, let predictionEnd, let fixedEnd) = action {
+                self.candidateWindow.apply(
+                    action: .show(
+                        candidates: cands,
+                        historyEnd: historyEnd,
+                        initialRow: initialRow,
+                        predictionEnd: predictionEnd,
+                        fixedEnd: fixedEnd
+                    )
+                )
+                self.handler.applySegmentMarkedText(client: self.mockClient)
+            }
+        }
+    }
+
+    private func applyCandidateScorerScheduling() {
+        candidateScorer.cancel()
+        guard handler.lastScorerEligible else { return }
+        guard !handler.pendingScorerGlobalIndices.isEmpty else { return }
+        guard !candidateWindow.isExplicitlySelected else { return }
+        guard !handler.state.isSegmentMode else { return }
+        guard !handler.isSuccessorMode else { return }
+        guard !handler.isBracketMode else { return }
+
+        let contextForScore = llmDocumentContextPrefix()
+        let reading = handler.state.composedHiragana
+        let opts = handler.pendingScorerStrings
+        let wasAutoShow = handler.lastCandidateListAutoShow
+
+        let examples: [(prev: String, next: String)] =
+            handler.committedHistory.last.map { lastWord in
+                handler.db.fetchBigramTop(prev: lastWord, limit: 5).map { (prev: lastWord, next: $0) }
+            } ?? []
+
+        candidateScorer.score(
+            candidates: opts,
+            context: contextForScore,
+            reading: reading,
+            examples: examples
+        ) { [weak self] result in
+            guard let self else { return }
+            guard result.confidence == .high || !wasAutoShow else { return }
+            guard result.index != 0 || !wasAutoShow else { return }
+            let idx = result.index
+            guard idx >= 0, idx < self.handler.pendingScorerGlobalIndices.count else { return }
+            guard self.candidateWindow.isVisible else { return }
+            guard !self.candidateWindow.isExplicitlySelected else { return }
+            guard !self.handler.state.isSegmentMode else { return }
+            guard !self.handler.isSuccessorMode else { return }
+            guard !self.handler.isBracketMode else { return }
+            guard self.handler.state.composedHiragana == reading else { return }
+
+            let g = self.handler.pendingScorerGlobalIndices[idx]
+            self.candidateWindow.moveRow(from: g)
+            self.updateMockMarkedText()
+        }
+    }
+
+    private func updateMockMarkedText() {
+        if let ss = handler.state.segmentState {
+            let str = ss.attributedString(overrideFocusedText: candidateWindow.selectedText)
+            mockClient.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
+        } else {
+            let text: String
+            if candidateWindow.isVisible, let selected = candidateWindow.selectedText {
+                text = selected + handler.state.pendingRomaji
+            } else {
+                text = handler.state.composingText
+            }
+            mockClient.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+        }
     }
 
     // MARK: - 実 DB スナップショット（デバッグ用）
@@ -365,6 +555,35 @@ struct DebugCandidateWindow {
             if row < historyEnd    { historyEnd -= 1 }
             if candidates.isEmpty { isVisible = false; selectedRow = 0 }
             else { selectedRow = min(selectedRow, candidates.count - 1) }
+        }
+    }
+
+    /// `CandidateWindow.moveRow(from:)` と同等（候補スコアラー用）。
+    mutating func moveRow(from: Int) {
+        guard candidates.indices.contains(from) else { return }
+        let destBefore = predictionEnd
+        if from == destBefore { return }
+        guard from >= predictionEnd else { return }
+
+        let keepText = selectedText
+
+        let fromHistoryBand = from >= predictionEnd && from < historyEnd
+        let fromAzooBand = from >= historyEnd
+
+        let item = candidates.remove(at: from)
+        candidates.insert(item, at: destBefore)
+
+        if fromHistoryBand {
+            predictionEnd += 1
+        } else if fromAzooBand {
+            predictionEnd += 1
+            historyEnd += 1
+        }
+
+        if let t = keepText, let newRow = candidates.firstIndex(of: t) {
+            selectedRow = newRow
+        } else {
+            selectedRow = min(selectedRow, candidates.count - 1)
         }
     }
 }
