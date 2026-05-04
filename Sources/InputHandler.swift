@@ -109,6 +109,8 @@ struct InputHandler {
     /// 直近の `buildCandidateList` が `.show` になったときの `autoShow` 引数（スコアラー確信度 guard 用）
     var lastCandidateListAutoShow: Bool = false
     var committedHistory: [String] = []
+    /// `pushCommitted` で文末記号により `committedHistory` を消した直後に立て、`InputController` が IMK 文脈キャッシュを捨てる。
+    var documentSurroundingContextInvalidated = false
     var lastCommittedOutput: String? { committedHistory.last }
     var segmentCandidateCache: [String: Segment] = [:]
     var prev2Output: String? {
@@ -117,6 +119,7 @@ struct InputHandler {
     mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
             committedHistory.removeAll()
+            documentSurroundingContextInvalidated = true
             return
         }
         committedHistory.append(text)

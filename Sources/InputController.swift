@@ -69,16 +69,26 @@ private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
         let sel = c.selectedRange()
         guard sel.location != NSNotFound else { return ("", "") }
         let prefixStart = max(0, sel.location - maxLength)
+        let prefixLength = sel.location - prefixStart
         var prefixActual = NSRange()
         let prefix = c.string(
-            from: NSRange(location: prefixStart, length: sel.location - prefixStart),
+            from: NSRange(location: prefixStart, length: prefixLength),
             actualRange: &prefixActual
         ) ?? ""
-        var suffixActual = NSRange()
-        let suffix = c.string(
-            from: NSRange(location: sel.location + sel.length, length: maxLength),
-            actualRange: &suffixActual
-        ) ?? ""
+
+        let totalLength = c.length()
+        var suffix = ""
+        if totalLength != NSNotFound, totalLength >= sel.location + sel.length {
+            let suffixStart = sel.location + sel.length
+            let suffixLength = min(maxLength, totalLength - suffixStart)
+            if suffixLength > 0 {
+                var suffixActual = NSRange()
+                suffix = c.string(
+                    from: NSRange(location: suffixStart, length: suffixLength),
+                    actualRange: &suffixActual
+                ) ?? ""
+            }
+        }
         return (prefix, suffix)
     }
 }
@@ -105,6 +115,9 @@ class InputController: IMKInputController {
     }()
 
     private var candidateWindow: CandidateWindow { Self.candidateWindow }
+
+    /// `composedHiragana` が空→非空になったタイミングで `SurroundingIMKContext.fetch` 済み。`selectedRange().location` が一致するときだけ LLM 文脈に使う（Space 再取得は location 無効化で代替）。
+    private var cachedSurroundingContext: (location: Int, text: (before: String, after: String))?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
@@ -152,6 +165,7 @@ class InputController: IMKInputController {
         handler.successorLLMBaseCandidates = nil
         handler.segmentLLMTrigger = .none
         handler.resetScorerPending()
+        cachedSurroundingContext = nil
         if Thread.isMainThread {
             Self.successorLLM.cancel()
             Self.segmentLLM.cancel()
@@ -209,6 +223,7 @@ class InputController: IMKInputController {
         let adapter = IMKTextInputAdapter(sender)
 
         let composingWasEmpty = handler.state.composingText.isEmpty
+        let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
 
         let (consumed, action) = handler.handle(
             keyCode: event.keyCode,
@@ -225,6 +240,9 @@ class InputController: IMKInputController {
         #endif
 
         // IMK の `handle` は nonisolated。候補ウィンドウ操作は従来どおり MainActor 前提（assumeIsolated はメイン以外では実行時クラッシュしうる）。
+        // `sender` / `self` は IMK ブリッジ上 nonisolated から MainActor 島へ渡すため nonisolated(unsafe) とする（Swift 6 sending）。
+        nonisolated(unsafe) let imkSenderForSurrounding: Any? = sender
+        nonisolated(unsafe) let ic: InputController = self
         // ステータス通知だけは assumeIsolated の外で値を取り、`DispatchQueue.main.async` に寄せて投稿する（post 自体は nonisolated static）。
         let successorPendingForMenuBar = MainActor.assumeIsolated {
             switch action {
@@ -234,8 +252,8 @@ class InputController: IMKInputController {
                 #if DEBUG
                 EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
                 #endif
-                candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
-                if handler.isSuccessorMode {
+                ic.candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
+                if ic.handler.isSuccessorMode {
                     // 格助詞を選択候補としてマークドテキストに設定する。
                     // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
                     // Enter を IME に転送するようになる。
@@ -243,43 +261,60 @@ class InputController: IMKInputController {
                     adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
                 }
             case .dismiss:
-                candidateWindow.dismiss()
+                ic.candidateWindow.dismiss()
             case .selectNext:
-                candidateWindow.selectNext()
-                if handler.isSuccessorMode || handler.isBracketMode {
-                    let text = candidateWindow.selectedText() ?? ""
+                ic.candidateWindow.selectNext()
+                if ic.handler.isSuccessorMode || ic.handler.isBracketMode {
+                    let text = ic.candidateWindow.selectedText() ?? ""
                     adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
                 } else {
-                    updateMarkedText(client: adapter)
+                    ic.updateMarkedText(client: adapter)
                 }
             case .selectPrev:
-                candidateWindow.selectPrev()
-                if handler.isSuccessorMode || handler.isBracketMode {
-                    let text = candidateWindow.selectedText() ?? ""
+                ic.candidateWindow.selectPrev()
+                if ic.handler.isSuccessorMode || ic.handler.isBracketMode {
+                    let text = ic.candidateWindow.selectedText() ?? ""
                     adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
                 } else {
-                    updateMarkedText(client: adapter)
+                    ic.updateMarkedText(client: adapter)
                 }
             case .deleteSelected:
-                let row = candidateWindow.selectedRow
-                if let text = candidateWindow.selectedText() {
-                    handler.db.deleteHistory(output: text)
-                    candidateWindow.removeCandidate(at: row)
+                let row = ic.candidateWindow.selectedRow
+                if let text = ic.candidateWindow.selectedText() {
+                    ic.handler.db.deleteHistory(output: text)
+                    ic.candidateWindow.removeCandidate(at: row)
                 }
             }
-            applySuccessorLLMScheduling(adapter: adapter)
-            applySegmentLLMScheduling(adapter: adapter)
-            applyCandidateScorerScheduling(adapter: adapter)
+
+            if ic.handler.documentSurroundingContextInvalidated {
+                ic.cachedSurroundingContext = nil
+                ic.handler.documentSurroundingContextInvalidated = false
+            }
+            if ic.handler.state.composedHiragana.isEmpty {
+                ic.cachedSurroundingContext = nil
+            } else if composedHiraganaWasEmpty && !ic.handler.state.composedHiragana.isEmpty {
+                // Space での再取得は冗長のため行わない（カーソル移動は location 不一致で無効化）。
+                if let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding) {
+                    let loc = adapter.selectedRange().location
+                    if loc != NSNotFound {
+                        ic.cachedSurroundingContext = (loc, ctx)
+                    }
+                }
+            }
+
+            ic.applySuccessorLLMScheduling(adapter: adapter)
+            ic.applySegmentLLMScheduling(adapter: adapter)
+            ic.applyCandidateScorerScheduling(adapter: adapter)
 
             if adapter.didInsertText {
-                scheduleMisconversionCheck(adapter: adapter)
+                ic.scheduleMisconversionCheck(adapter: adapter)
             }
-            if !self.handler.isSuccessorMode, !self.handler.isBracketMode,
-               composingWasEmpty, !self.handler.state.composingText.isEmpty {
+            if !ic.handler.isSuccessorMode, !ic.handler.isBracketMode,
+               composingWasEmpty, !ic.handler.state.composingText.isEmpty {
                 Self.misconversionChecker.cancel(suppressClearNotification: false)
             }
 
-            return !handler.pendingSuccessorCandidates.isEmpty
+            return !ic.handler.pendingSuccessorCandidates.isEmpty
         }
         DispatchQueue.main.async {
             Self.postSuccessorPendingNotification(pending: successorPendingForMenuBar)
@@ -325,6 +360,7 @@ class InputController: IMKInputController {
             }
         }
         handler.resetScorerPending()
+        cachedSurroundingContext = nil
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
 
@@ -334,6 +370,23 @@ class InputController: IMKInputController {
     }
 
     // MARK: - プライベートヘルパー
+
+    /// LLM 用の文脈プレフィックス。IMK の `before`（キャッシュ・location 一致時）が非空なら最大 300 字のみ。それ以外は `committedHistory.suffix(5)` のみ。
+    private func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
+        let historyJoined = handler.committedHistory.suffix(5).joined()
+        let loc = adapter.selectedRange().location
+        guard loc != NSNotFound else { return historyJoined }
+
+        if let cache = cachedSurroundingContext, cache.location == loc, !cache.text.before.isEmpty {
+            let b = cache.text.before
+            return b.count > 300 ? String(b.suffix(300)) : b
+        }
+
+        if cachedSurroundingContext != nil {
+            cachedSurroundingContext = nil
+        }
+        return historyJoined
+    }
 
     /// 確定 `insertText` 後にカーソル前文を誤変換検出で検査（0.5 秒デバウンス）。
     private func scheduleMisconversionCheck(adapter: IMKTextInputAdapter) {
@@ -353,10 +406,7 @@ class InputController: IMKInputController {
         guard !handler.isSuccessorMode else { return }
         guard !handler.isBracketMode else { return }
 
-        let rawPrefix = adapter.surroundingText(maxLength: 300).prefix
-        let clippedPrefix = rawPrefix.count > 300 ? String(rawPrefix.suffix(300)) : String(rawPrefix)
-        let historyContext = handler.committedHistory.suffix(5).joined(separator: "")
-        let contextForScore = rawPrefix.isEmpty ? historyContext : historyContext + clippedPrefix
+        let contextForScore = resolvedLLMDocumentContextPrefix(adapter: adapter)
         let reading = handler.state.composedHiragana
         let opts = handler.pendingScorerStrings
         let wasAutoShow = handler.lastCandidateListAutoShow
@@ -415,7 +465,10 @@ class InputController: IMKInputController {
         case .none:
             break
         case .pendingLowConfidence(let triggerContext):
-            Self.successorLLM.fetch(context: triggerContext, examples: examples) { [weak self] words in
+            let docPrefix = resolvedLLMDocumentContextPrefix(adapter: adapter)
+            Self.successorLLM.fetch(
+                context: triggerContext, documentContextPrefix: docPrefix, examples: examples
+            ) { [weak self] words in
                 guard let self else { return }
                 guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
                 guard self.handler.isSuccessorMode else { return }
@@ -430,7 +483,10 @@ class InputController: IMKInputController {
                 }
             }
         case .particlesOnly(let triggerContext):
-            Self.successorLLM.fetch(context: triggerContext, examples: examples) { [weak self] words in
+            let docPrefix = resolvedLLMDocumentContextPrefix(adapter: adapter)
+            Self.successorLLM.fetch(
+                context: triggerContext, documentContextPrefix: docPrefix, examples: examples
+            ) { [weak self] words in
                 guard let self else { return }
                 guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
                 guard self.handler.isSuccessorMode,

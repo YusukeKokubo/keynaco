@@ -16,9 +16,10 @@ final class LLMSuccessorFetcher {
         task = nil
     }
 
-    /// `words` は確定語の直近順（末尾が最新）、最大3語。`examples` は同一 `prev` に対する bi-gram 上位などの few-shot。失敗時は空配列。
+    /// `words` は確定語の直近順（末尾が最新）、最大3語。`documentContextPrefix` は IMK 前文または `committedHistory` フォールバック。`examples` は few-shot。失敗時は空配列。
     func fetch(
         context words: [String],
+        documentContextPrefix: String,
         examples: [(prev: String, next: String)],
         onResult: @escaping ([String]) -> Void
     ) {
@@ -31,7 +32,8 @@ final class LLMSuccessorFetcher {
             return
         }
         cancel()
-        let prompt = Self.buildPrompt(words: words, examples: examples)
+        let prompt = Self.buildPrompt(
+            words: words, documentContextPrefix: documentContextPrefix, examples: examples)
         task = Task { @MainActor [session] in
             do {
                 let response = try await session.respond(to: prompt)
@@ -45,18 +47,25 @@ final class LLMSuccessorFetcher {
 
     nonisolated internal static func buildPrompt(
         words: [String],
+        documentContextPrefix: String,
         examples: [(prev: String, next: String)]
     ) -> String {
         let contextPhrase = words.joined(separator: "、")
+        let docBlock: String
+        if documentContextPrefix.isEmpty {
+            docBlock = ""
+        } else {
+            docBlock = "【文脈】\(documentContextPrefix)\n\n"
+        }
         guard !examples.isEmpty, let prevHead = examples.first?.prev else {
             return """
-            「\(contextPhrase)」に続く語を5つ挙げてください。
+            \(docBlock)「\(contextPhrase)」に続く語を5つ挙げてください。
             1語ずつ改行で出力してください。助詞は含めないでください。
             """
         }
         let nextList = examples.map(\.next).joined(separator: "、")
         return """
-        【このユーザーが「\(prevHead)」の後によく使う語】
+        \(docBlock)【このユーザーが「\(prevHead)」の後によく使う語】
         \(nextList)
 
         「\(contextPhrase)」に続く語を5つ挙げてください。
