@@ -4,9 +4,9 @@ import InputMethodKit
 extension Notification.Name {
     /// Successor の N-gram 保留（`pendingSuccessorCandidates`）の有無が変わったときに送る。
     static let keynacoSuccessorPendingChanged = Notification.Name("keynacoSuccessorPendingChanged")
-    /// F4 誤変換検出で LLM が指摘を返したとき。`userInfo["detail"]` に全文。
+    /// 誤変換検出で LLM が指摘を返したとき。`userInfo["detail"]` に全文。
     static let keynacoMisconversionIssueFound = Notification.Name("keynacoMisconversionIssueFound")
-    /// F4 の指摘状態をクリアするとき（新しい組成開始・チェック結果 OK・サーバ非アクティブ化など）。
+    /// 誤変換検出の指摘状態をクリアするとき（新しい組成開始・チェック結果 OK・サーバ非アクティブ化など）。
     static let keynacoMisconversionCleared = Notification.Name("keynacoMisconversionCleared")
 }
 
@@ -151,7 +151,7 @@ class InputController: IMKInputController {
         handler.successorLLMTrigger = .none
         handler.successorLLMBaseCandidates = nil
         handler.segmentLLMTrigger = .none
-        handler.resetF1Pending()
+        handler.resetScorerPending()
         if Thread.isMainThread {
             Self.successorLLM.cancel()
             Self.segmentLLM.cancel()
@@ -269,7 +269,7 @@ class InputController: IMKInputController {
             }
             applySuccessorLLMScheduling(adapter: adapter)
             applySegmentLLMScheduling(adapter: adapter)
-            applyCandidateF1Scheduling(adapter: adapter)
+            applyCandidateScorerScheduling(adapter: adapter)
 
             if adapter.didInsertText {
                 scheduleMisconversionCheck(adapter: adapter)
@@ -324,7 +324,7 @@ class InputController: IMKInputController {
                 Self.candidateScorer.cancel()
             }
         }
-        handler.resetF1Pending()
+        handler.resetScorerPending()
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
 
@@ -335,19 +335,19 @@ class InputController: IMKInputController {
 
     // MARK: - プライベートヘルパー
 
-    /// F4: 確定 `insertText` 後にカーソル前文を検査（0.5 秒デバウンス）。
+    /// 確定 `insertText` 後にカーソル前文を誤変換検出で検査（0.5 秒デバウンス）。
     private func scheduleMisconversionCheck(adapter: IMKTextInputAdapter) {
         let prefix = adapter.surroundingText(maxLength: 200).prefix
         let recentWords = Array(handler.committedHistory.suffix(5))
         Self.misconversionChecker.check(surroundingPrefix: prefix, recentWords: recentWords)
     }
 
-    /// 変換候補を直前文脈で並べ替える（F1）。文脈はこのキー処理内で同期取得したもののみ使う。
-    private func applyCandidateF1Scheduling(adapter: IMKTextInputAdapter) {
+    /// 変換候補を直前文脈でスコアリングして並べ替える。文脈はこのキー処理内で同期取得したもののみ使う。
+    private func applyCandidateScorerScheduling(adapter: IMKTextInputAdapter) {
         // 読みが変わった・ユーザーが操作した場合どちらも前タスクを破棄（↑↓ 後は guard で score しないが cancel は先行）。
         Self.candidateScorer.cancel()
-        guard handler.lastF1Eligible else { return }
-        guard !handler.pendingF1GlobalIndices.isEmpty else { return }
+        guard handler.lastScorerEligible else { return }
+        guard !handler.pendingScorerGlobalIndices.isEmpty else { return }
         guard !candidateWindow.isExplicitlySelected else { return }
         guard !handler.state.isSegmentMode else { return }
         guard !handler.isSuccessorMode else { return }
@@ -358,7 +358,7 @@ class InputController: IMKInputController {
         let historyContext = handler.committedHistory.suffix(5).joined(separator: "")
         let contextForScore = rawPrefix.isEmpty ? historyContext : historyContext + clippedPrefix
         let reading = handler.state.composedHiragana
-        let opts = handler.pendingF1Strings
+        let opts = handler.pendingScorerStrings
         let wasAutoShow = handler.lastCandidateListAutoShow
 
         let examples: [(prev: String, next: String)] =
@@ -376,7 +376,7 @@ class InputController: IMKInputController {
             guard result.confidence == .high || !wasAutoShow else { return }
             guard result.index != 0 || !wasAutoShow else { return }
             let idx = result.index
-            guard idx >= 0, idx < self.handler.pendingF1GlobalIndices.count else { return }
+            guard idx >= 0, idx < self.handler.pendingScorerGlobalIndices.count else { return }
             guard self.candidateWindow.isVisible else { return }
             guard !self.candidateWindow.isExplicitlySelected else { return }
             guard !self.handler.state.isSegmentMode else { return }
@@ -384,7 +384,7 @@ class InputController: IMKInputController {
             guard !self.handler.isBracketMode else { return }
             guard self.handler.state.composedHiragana == reading else { return }
 
-            let g = self.handler.pendingF1GlobalIndices[idx]
+            let g = self.handler.pendingScorerGlobalIndices[idx]
             self.candidateWindow.moveRow(from: g)
             self.updateMarkedText(client: adapter)
         }

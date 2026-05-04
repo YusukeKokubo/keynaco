@@ -101,12 +101,12 @@ struct InputHandler {
     var lastConfirmedContext: LastConfirmedContext? = nil
     var lastAzooKeyInput: String = ""
     var lastAzooKeyResults: [String] = []
-    /// F1 文脈スコア: `buildCandidateList` が返す候補列でのグローバル行（`pendingF1Strings` と対応）
-    var pendingF1GlobalIndices: [Int] = []
-    var pendingF1Strings: [String] = []
-    /// 直近の `buildCandidateList` で F1 を起動してよいか
-    var lastF1Eligible: Bool = false
-    /// 直近の `buildCandidateList` が `.show` になったときの `autoShow` 引数（F1 確信度 guard 用）
+    /// 候補スコアラー: `buildCandidateList` が返す候補列でのグローバル行（`pendingScorerStrings` と対応）
+    var pendingScorerGlobalIndices: [Int] = []
+    var pendingScorerStrings: [String] = []
+    /// 直近の `buildCandidateList` でスコアラーを起動してよいか
+    var lastScorerEligible: Bool = false
+    /// 直近の `buildCandidateList` が `.show` になったときの `autoShow` 引数（スコアラー確信度 guard 用）
     var lastCandidateListAutoShow: Bool = false
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }

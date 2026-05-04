@@ -1,7 +1,7 @@
 import Foundation
 import FoundationModels
 
-/// F4: 確定直後のカーソル前文をオンデバイス LLM で検査し、誤変換の可能性を通知する。
+/// 確定直後のカーソル前文をオンデバイス LLM で検査し、誤変換の可能性を通知する。
 @MainActor
 final class LLMMisconversionChecker {
     private var debounceTask: Task<Void, Never>?

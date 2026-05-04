@@ -1,7 +1,7 @@
 import XCTest
 @testable import keynaco
 
-/// `CandidateWindow.moveRow(from:)` のセクション境界更新（F1 並べ替え）
+/// `CandidateWindow.moveRow(from:)` のセクション境界更新（候補スコアラー並べ替え）
 @MainActor
 final class CandidateWindowMoveRowTests: XCTestCase {
 

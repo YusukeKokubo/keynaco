@@ -210,14 +210,14 @@ final class CandidateWindow: NSPanel {
         tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
     }
 
-    /// F1 文脈スコア: 1 行を「履歴先頭」（`show` 時の `predictionEnd` 行）へ持ち上げる。
-    /// - Precondition: `from` は F1 用 `pendingF1GlobalIndices` 由来（高スコア履歴または AzooKey）。数値・日時行を渡さないこと。
+    /// 候補スコアラー: 1 行を「履歴先頭」（`show` 時の `predictionEnd` 行）へ持ち上げる。
+    /// - Precondition: `from` は `pendingScorerGlobalIndices` 由来（高スコア履歴または AzooKey）。数値・日時行を渡さないこと。
     /// 挿入先は常に現在の `predictionSectionEnd`（本クラスでは `show` の `predictionEnd` と同じ値）。
     func moveRow(from: Int) {
         guard candidates.indices.contains(from) else { return }
         let destBefore = predictionSectionEnd
         if from == destBefore { return }
-        // F1 は予測行をスコアしない。誤呼び出し時は何もしない。
+        // スコアラーは予測行をスコアしない。誤呼び出し時は何もしない。
         guard from >= predictionSectionEnd else { return }
 
         let fromHistoryBand = from >= predictionSectionEnd && from < historySectionEnd

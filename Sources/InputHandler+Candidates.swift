@@ -184,7 +184,7 @@ extension InputHandler {
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
-        clearPendingF1ForDismiss()
+        clearPendingScorerForDismiss()
         let h = state.composedHiragana
         let azooKeyCandidates: [String]
         if h.allSatisfy({ $0.isASCII }) {
@@ -284,17 +284,17 @@ extension InputHandler {
         let dtCount = uniqueDateTimeCandidates.count
         let azooStart = historyEnd + numCount + dtCount
         let azooEnd = candidates.count
-        var f1GlobalIndices: [Int] = []
+        var scorerGlobalIndices: [Int] = []
         if predictionEnd < historyEnd {
             for r in predictionEnd..<historyEnd {
-                guard f1GlobalIndices.count < 10 else { break }
-                f1GlobalIndices.append(r)
+                guard scorerGlobalIndices.count < 10 else { break }
+                scorerGlobalIndices.append(r)
             }
         }
-        if f1GlobalIndices.count < 10, azooStart < azooEnd {
+        if scorerGlobalIndices.count < 10, azooStart < azooEnd {
             for r in azooStart..<azooEnd {
-                guard f1GlobalIndices.count < 10 else { break }
-                f1GlobalIndices.append(r)
+                guard scorerGlobalIndices.count < 10 else { break }
+                scorerGlobalIndices.append(r)
             }
         }
 
@@ -303,33 +303,33 @@ extension InputHandler {
         let initialRow = candidates.count > fixedCount ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
 
-        pendingF1GlobalIndices = f1GlobalIndices
-        pendingF1Strings = f1GlobalIndices.map { candidates[$0] }
-        lastF1Eligible = Self.isComposedHiraganaEligibleForF1(h)
+        pendingScorerGlobalIndices = scorerGlobalIndices
+        pendingScorerStrings = scorerGlobalIndices.map { candidates[$0] }
+        lastScorerEligible = Self.isComposedHiraganaEligibleForScorer(h)
             && !state.isSegmentMode
             && !isSuccessorMode
             && !isBracketMode
-            && f1GlobalIndices.count >= 2
+            && scorerGlobalIndices.count >= 2
         lastCandidateListAutoShow = autoShow
 
         return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
                      predictionEnd: predictionEnd, fixedEnd: fixedEnd)
     }
 
-    private mutating func clearPendingF1ForDismiss() {
-        pendingF1GlobalIndices = []
-        pendingF1Strings = []
-        lastF1Eligible = false
+    private mutating func clearPendingScorerForDismiss() {
+        pendingScorerGlobalIndices = []
+        pendingScorerStrings = []
+        lastScorerEligible = false
         lastCandidateListAutoShow = false
     }
 
     /// `InputController` のライフサイクル（サーバ再有効化など）用
-    mutating func resetF1Pending() {
-        clearPendingF1ForDismiss()
+    mutating func resetScorerPending() {
+        clearPendingScorerForDismiss()
     }
 
-    /// F1 起動用: 2 文字以上かつひらがなのみ（記号・ASCII 混在の `buildCandidateList` 経路を除外）
-    static func isComposedHiraganaEligibleForF1(_ s: String) -> Bool {
+    /// スコアラー起動用: 2 文字以上かつひらがなのみ（記号・ASCII 混在の `buildCandidateList` 経路を除外）
+    static func isComposedHiraganaEligibleForScorer(_ s: String) -> Bool {
         guard s.count >= 2 else { return false }
         return s.unicodeScalars.allSatisfy { u in
             let v = u.value
@@ -340,7 +340,7 @@ extension InputHandler {
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
     /// 候補が存在すれば isSuccessorMode = true を立てて返す。pendingRomaji は confirmSuccessor() で破棄される。
     mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
-        resetF1Pending()
+        resetScorerPending()
         guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
               let prev = lastCommittedOutput else { return .dismiss }
         var seen = Set<String>()
@@ -413,7 +413,7 @@ extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if state.composingText.isEmpty {
-            resetF1Pending()
+            resetScorerPending()
             bracketCandidates = options
             client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
             return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))

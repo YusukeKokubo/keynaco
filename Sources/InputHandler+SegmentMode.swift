@@ -8,7 +8,7 @@ import AppKit
 extension InputHandler {
 
     mutating func enterSegmentMode() -> CandidateAction {
-        resetF1Pending()
+        resetScorerPending()
         if !state.pendingRomaji.isEmpty {
             state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
             state.pendingRomaji = ""

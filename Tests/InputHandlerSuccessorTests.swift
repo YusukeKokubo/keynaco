@@ -502,7 +502,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         }
     }
 
-    // MARK: - F3: pending と DB の読み前方一致 merge（LLM 追記前提）
+    // MARK: - pending と DB の読み前方一致 merge（LLM 追記前提）
 
     func testMergePendingSuccessorMatchesAppendsHiraganaWhenDbHasMatches() {
         let db = ["資料"]
