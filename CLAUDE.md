@@ -73,7 +73,11 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 - `SettingsWindowController` / `BigramViewController` / `HistoryViewController` / `UserDictViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「ユーザー辞書」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
+- `SurroundingIMKContext` = カーソル前後テキストの取得ユーティリティ（enum + static func）。`IMKTextInput` の `attributedSubstring(from:)` / `length` / `selectedRange` をラップし、LLM 系コンポーネント（`LLMMisconversionChecker` 等）が文脈テキストを取得するために使用
+- `InputHandlerSnapshot`（`#if DEBUG`）= `InputController` が `InputHandler` と候補ウィンドウから組み立てるデバッグ用スナップショット（`InputHandlerSnapshot.swift` + `InputHandler+Snapshot.swift`）。`DebugSocketServer` が JSON レスポンスのペイロードとして送信
 - `EventViewerWindow` = `Sources/Debug/EventViewerWindow.swift`。`AppDelegate` が NSStatusItem（⌨アイコン）として常駐し、メニューから起動。keyCode・chars・mods・consumed・action・app をリアルタイム表示。確定テキストと候補リストをキャプチャしてクリップボードにコピー可能。JSONL エクスポートで `~/Library/Application Support/keynaco/sessions/` に保存。デバッグ用途
+- `IMESandboxWindow` = `Sources/Debug/IMESandboxWindow.swift`。GUI 上でキーシーケンスを手動送信し `DebugSocketServer` の状態スナップショットを表示するサンドボックス画面。`AppDelegate` からメニュー経由で起動
+- `DebugSocketServer` = `Sources/Debug/DebugSocketServer.swift`（`#if DEBUG`）。Unix ドメインソケット（`$TMPDIR/keynaco-debug.sock`）経由でキー入力コマンドを受け取り、専用 `InputHandler`（`DatabaseManager(inMemory: true, seedPresets: true)`）で処理して JSON を返す対話デバッグサーバー。IMK パイプラインをバイパスするため本番アプリとは独立。`/keynaco-ime-sandbox` スキルが使用
 
 変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
