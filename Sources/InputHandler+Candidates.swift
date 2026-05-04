@@ -299,8 +299,11 @@ extension InputHandler {
         }
 
         candidates.append(contentsOf: uniqueLowHistory)
+        // 助動詞・接続助詞等（ほぼひらがな表記のみ）は学習ゼロでもひらがなを初期選択する。
+        // hiraganaInHistory の場合は固定位置にひらがながないため通常どおり fixedCount から。
+        let preferHiragana = !hiraganaInHistory && Self.isHiraganaPreferred(h)
         // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
-        let initialRow = candidates.count > fixedCount ? fixedCount : 0
+        let initialRow = (candidates.count > fixedCount && !preferHiragana) ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
 
         pendingScorerGlobalIndices = scorerGlobalIndices
@@ -495,6 +498,38 @@ extension InputHandler {
 
     /// これ未満の履歴スコアは AzooKey・数値・日時の後ろに回す（DB の `recencyExpr` と同じ尺度）。
     private static let historyRecencyScoreCutoff = 0.5
+
+    /// 現代日本語でほぼひらがな表記のみが使われる語（助動詞・形式名詞・副助詞等）の末尾パターン。
+    /// 学習ゼロ状態でもひらがな候補を初期選択にするために使用する。
+    /// 静的プロパティとして一度だけコンパイルし、末尾マッチ（$）で判定する。
+    private static let hiraganaPreferredRegex: NSRegularExpression = {
+        let parts: [String] = [
+            // て/で + 補助動詞（活用形をまとめて吸収）
+            "[てで](いる|いた|いく|くる|おく|ある|しまう|しまった|しまって|みる|みた|ほしい" +
+                "|います|いました|おきます|おきました|あります|ありました" +
+                "|しまいます|しまいました|いきます|いきました|きます|きました" +
+                "|みます|みました|くれます|くれました|あげます|あげました)",
+            // 丁寧体助動詞・推量・勧誘
+            "(ます|ました|ません|ませんでした|まして|ましょう|ませ)(が|ね|よ|か|けど|けれど)?",
+            "(です|でした|でして|でしょう)(が|ね|よ|か|けど|けれど)?",
+            // 接続助詞・接続詞
+            "(な)?ので", "けれ?ど(も)?", "だから", "ながら", "つつ", "たり",
+            // 形式名詞（公用文でひらがな表記が推奨されるもの）
+            "(な|の)?(こと|もの|ところ|わけ|はず|つもり|ため|とおり|ほう)",
+            // 推量・様態・比況・当為
+            "らしい", "みたい(だ|に|な|です)?", "そう(だ|です|に|な)?",
+            "よう(だ|です|に|な)?", "かもしれ(ない|ません)", "べき(だ|です)",
+            // 副助詞
+            "(く|ぐ)らい", "ばかり", "など", "まで", "だけ", "ほど",
+        ]
+        // swiftlint:disable:next force_try
+        return try! NSRegularExpression(pattern: "(" + parts.joined(separator: "|") + ")$")
+    }()
+
+    static func isHiraganaPreferred(_ h: String) -> Bool {
+        let range = NSRange(h.startIndex..., in: h)
+        return hiraganaPreferredRegex.firstMatch(in: h, range: range) != nil
+    }
 
     /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。
     static func merged(_ arrays: [String]...) -> [String] {
