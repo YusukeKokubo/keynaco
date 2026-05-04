@@ -183,4 +183,42 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         _ = press(keyCode: 51)
         // 二重にエラーにならなければよい（空のペナルティ呼び出しはしない）
     }
+
+    // MARK: - 改行による committedHistory クリア
+
+    func testEnterWithoutCompositionClearsCommittedHistory() {
+        // 単語を確定して history を積む
+        typeRomaji("kyou")
+        press(keyCode: 36, candidateVisible: true, selectedText: "今日")
+        press(keyCode: 53)  // Escape でSuccessor モード解除
+        XCTAssertFalse(handler.committedHistory.isEmpty, "確定後は committedHistory に積まれているはず")
+
+        // 組成なしで Enter（改行）→ クリアされる
+        press(keyCode: 36)
+        XCTAssertTrue(handler.committedHistory.isEmpty, "組成なし Enter で committedHistory がクリアされるはず")
+    }
+
+    func testEnterWithCompositionDoesNotClearCommittedHistory() {
+        // 先に1語確定しておく
+        typeRomaji("kyou")
+        press(keyCode: 36, candidateVisible: true, selectedText: "今日")
+        press(keyCode: 53)
+
+        // 組成中に Enter → 組成を確定するだけで history はクリアしない
+        typeRomaji("ha")
+        press(keyCode: 36)
+        XCTAssertFalse(handler.committedHistory.isEmpty, "組成あり Enter は文区切りではないので history を残すはず")
+    }
+
+    func testLastCommittedOutputNilAfterNewline() {
+        // 「今日」を確定 → lastCommittedOutput が設定される
+        typeRomaji("kyou")
+        press(keyCode: 36, candidateVisible: true, selectedText: "今日")
+        press(keyCode: 53)
+        XCTAssertEqual(handler.lastCommittedOutput, "今日")
+
+        // 組成なし Enter（改行）→ committedHistory がクリアされ lastCommittedOutput が nil になる
+        press(keyCode: 36)
+        XCTAssertNil(handler.lastCommittedOutput, "改行後は lastCommittedOutput が nil になるはず")
+    }
 }

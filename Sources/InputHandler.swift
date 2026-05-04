@@ -82,7 +82,7 @@ struct InputHandler {
     nonisolated(unsafe) static var isAsciiMode = false
 
     static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
-    static let sentenceTerminators: Set<String> = ["。", "！", "？", "\n"]
+    static let sentenceTerminators: Set<String> = ["。", "！", "？"]
     static let successorImmediateThreshold = LearningThresholds.successorImmediateThreshold
 
     var state = CompositionState()
@@ -231,7 +231,11 @@ struct InputHandler {
         } else {
             switch keyCode {
             case KeyCode.enter:
-                guard !state.composingText.isEmpty else { return (false, .none) }
+                guard !state.composingText.isEmpty else {
+                    committedHistory.removeAll()
+                    documentSurroundingContextInvalidated = true
+                    return (false, .none)
+                }
                 commitComposition(client: client)
                 return (true, suggestSuccessors())
             case KeyCode.escape:
