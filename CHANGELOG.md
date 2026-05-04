@@ -17,6 +17,18 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 
 ---
 
+## 2026-05-04 — IMKTextInput 経由の文書文脈取得
+
+### 追加
+- **`SurroundingIMKContext`** — `IMKTextInput.attributedSubstring(from:)` / `length()` を使い、カーソル前後のテキストを安全に取得するユーティリティを新設。`NSNotFound` ガード・`beforeLength` 実長計算・`totalLength` クランプの3点を徹底し、クライアントアプリのクラッシュを防ぐ
+- **文書文脈キャッシュ** — `InputController` に `cachedSurroundingContext(location:text:)` を追加。`composedHiragana` が空→非空になったタイミングで1回だけ取得し、`selectedRange().location` 変化時に自動無効化（カーソル移動対策）
+- **`resolvedLLMDocumentContextPrefix`** — `LLMCandidateScorer` / `LLMSuccessorFetcher` に渡す文脈を「`before` 非空 → 末尾300字」「`before` 空 or `nil` → `committedHistory.suffix(5)`」の優先順で解決するヘルパーを追加
+- **テスト** — `MockIMKTextInputForSurrounding`（テストダブル）を使った境界テスト6件（`NSNotFound`・文頭・文頭付近・`totalLength == NSNotFound`・文末・通常ケース）を追加
+
+> 関連: [PLAN260504b](plans/PLAN260504b.md)
+
+---
+
 ## 2026-05-03 — オンデバイス LLM（候補・後続語・セグメント・誤変換）・プリセット Bi-gram・学習ペナルティ
 
 ### 追加
