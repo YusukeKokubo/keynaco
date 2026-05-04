@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         gServer = IMKServer(name: connectionName, bundleIdentifier: bundleID)
         #if DEBUG
         NSLog("keynaco: IMKServer started connection=\(connectionName) bundle=\(bundleID)")
+        DebugSocketServer.shared.start()
         #endif
         setupMainMenu()
         setupStatusItem()
