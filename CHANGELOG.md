@@ -4,6 +4,19 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 
 ---
 
+## 2026-05-04 — F1 同音異義語自動選択の精度向上
+
+### 変更
+- **F1 文脈窓拡大** — `surroundingText` の取得・切り詰め上限を 100 → 300 文字に拡大し、段落レベルの話題を LLM に渡せるようにした
+- **F1 文脈補強** — `committedHistory.suffix(5)` を文脈の先頭に付加。`surroundingText` が空になる Electron 系アプリでもフォールバックとして機能する
+- **F1 確信度フラグ** — `LLMCandidateScorer` の返答フォーマットを `番号:high/mid/low` に変更し `ScorerResult(index:confidence:)` を返すよう拡張。`low` はコールバック非呼び出し、`mid` は非 autoShow 時のみ候補を移動する
+- **F1 autoShow 対応** — `lastF1Eligible` から `!autoShow` 条件を撤廃し、文字入力中（autoShow）でも F1 が起動するように。`high` 確信度の場合のみ autoShow 中に `moveRow` を実行する
+- **テスト** — `parseChosenIndexWithConfidence` の境界例（スペース入り・大文字混在・`2:unknown`・コロンなし・範囲外）を追加
+
+> 関連: [PLAN260504a](plans/PLAN260504a.md)
+
+---
+
 ## 2026-05-03 — オンデバイス LLM（候補・後続語・セグメント・誤変換）・プリセット Bi-gram・学習ペナルティ
 
 ### 追加
