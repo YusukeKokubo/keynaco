@@ -9,17 +9,18 @@ extension Notification.Name {
 
 /// 左ペインで通常入力し、右ペインに IME 内部状態を表示するデバッグ用ウィンドウ。
 @MainActor
-final class IMESandboxWindow: NSWindow {
+final class IMESandboxWindow: NSWindow, NSSplitViewDelegate {
     static let shared = IMESandboxWindow()
 
     private var stateObserver: NSObjectProtocol?
-
+    private let splitView = NSSplitView()
     private let leftTextView = NSTextView(frame: .zero)
     private let rightTextView = NSTextView(frame: .zero)
+    private var didSetInitialDivider = false
 
     private init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 440),
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -43,27 +44,36 @@ final class IMESandboxWindow: NSWindow {
         root.translatesAutoresizingMaskIntoConstraints = false
         contentView = root
 
-        let split = NSSplitView()
-        split.dividerStyle = .thin
-        split.isVertical = true
-        split.translatesAutoresizingMaskIntoConstraints = false
-        split.autosaveName = "IMESandboxSplit"
+        splitView.dividerStyle = .thin
+        splitView.isVertical = true
+        splitView.translatesAutoresizingMaskIntoConstraints = false
+        splitView.delegate = self
 
         let leftScroll = NSScrollView()
         configureEditorScroll(leftScroll, textView: leftTextView, editable: true)
         let rightScroll = NSScrollView()
         configureEditorScroll(rightScroll, textView: rightTextView, editable: false)
 
-        split.addSubview(leftScroll)
-        split.addSubview(rightScroll)
+        splitView.addSubview(leftScroll)
+        splitView.addSubview(rightScroll)
 
-        root.addSubview(split)
+        root.addSubview(splitView)
         NSLayoutConstraint.activate([
-            split.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            split.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            split.topAnchor.constraint(equalTo: root.topAnchor),
-            split.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            splitView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            splitView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            splitView.topAnchor.constraint(equalTo: root.topAnchor),
+            splitView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
+    }
+
+    // MARK: - NSSplitViewDelegate
+
+    func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMin: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+        return 180
+    }
+
+    func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMax: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+        return splitView.bounds.width - 200
     }
 
     private func configureEditorScroll(_ scroll: NSScrollView, textView: NSTextView, editable: Bool) {
@@ -92,6 +102,14 @@ final class IMESandboxWindow: NSWindow {
         level = .floating
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        // NSSplitView は初回レイアウト完了後でないと setPosition が効かないため 1 run loop 遅らせる
+        if !didSetInitialDivider {
+            didSetInitialDivider = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.splitView.setPosition(self.splitView.bounds.width * 0.5, ofDividerAt: 0)
+            }
+        }
     }
 
     private nonisolated static func formatSnapshot(_ snap: InputHandlerSnapshot) -> String {
