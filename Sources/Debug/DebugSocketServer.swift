@@ -28,6 +28,9 @@ final class DebugSocketServer: @unchecked Sendable {
     private let segmentLLM = LLMSegmentConverter()
     private let candidateScorer = LLMCandidateScorer()
 
+    /// `reset` のたびに増やし、直前のキー処理で飛ばした LLM 完了コールバックを無効化する。
+    private var llmEpoch: UInt64 = 0
+
     /// `deinit` から参照するため `nonisolated(unsafe)`。書き込みは MainActor のみ。
     nonisolated(unsafe) private var snapshotURL: URL?
 
@@ -139,6 +142,7 @@ final class DebugSocketServer: @unchecked Sendable {
             segmentLLM.cancel()
             candidateScorer.cancel()
             handler.resetScorerPending()
+            llmEpoch &+= 1
             let useRealDB = cmd["useRealDB"] as? Bool ?? false
             if useRealDB, let db = makeRealDBSnapshot() {
                 handler = InputHandler(db: db)
@@ -232,6 +236,7 @@ final class DebugSocketServer: @unchecked Sendable {
         let trigger = handler.successorLLMTrigger
         guard trigger != .none else { return }
         handler.successorLLMTrigger = .none
+        let schedulingEpoch = llmEpoch
 
         let triggerContextOpt: [String]? = {
             switch trigger {
@@ -257,6 +262,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 context: triggerContext, documentContextPrefix: docPrefix, examples: examples
             ) { [weak self] words in
                 guard let self else { return }
+                guard schedulingEpoch == self.llmEpoch else { return }
                 guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
                 guard self.handler.isSuccessorMode else { return }
                 var seen = Set(self.handler.pendingSuccessorCandidates)
@@ -270,6 +276,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 context: triggerContext, documentContextPrefix: docPrefix, examples: examples
             ) { [weak self] words in
                 guard let self else { return }
+                guard schedulingEpoch == self.llmEpoch else { return }
                 guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
                 guard self.handler.isSuccessorMode,
                       self.candidateWindow.isVisible,
@@ -312,8 +319,10 @@ final class DebugSocketServer: @unchecked Sendable {
         let trigger = handler.segmentLLMTrigger
         guard case .start(let hiragana) = trigger else { return }
         handler.segmentLLMTrigger = .none
+        let schedulingEpoch = llmEpoch
         segmentLLM.convert(hiragana: hiragana) { [weak self] text in
             guard let self else { return }
+            guard schedulingEpoch == self.llmEpoch else { return }
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty,
                   let segState = self.handler.state.segmentState,
@@ -357,6 +366,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 handler.db.fetchBigramTop(prev: lastWord, limit: 5).map { (prev: lastWord, next: $0) }
             } ?? []
 
+        let schedulingEpoch = llmEpoch
         candidateScorer.score(
             candidates: opts,
             context: contextForScore,
@@ -364,6 +374,7 @@ final class DebugSocketServer: @unchecked Sendable {
             examples: examples
         ) { [weak self] result in
             guard let self else { return }
+            guard schedulingEpoch == self.llmEpoch else { return }
             guard result.confidence == .high || !wasAutoShow else { return }
             guard result.index != 0 || !wasAutoShow else { return }
             let idx = result.index

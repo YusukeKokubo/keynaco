@@ -128,9 +128,20 @@ eisu(英数)=102  kana(かな)=104
   "candidates": ["漢字", "感じ", ...],
   "committedHistory": ["今日", "は"],
   "segmentTexts": [],            // セグメントモード中の文節テキスト
-  "focusedSegmentIndex": 0
+  "focusedSegmentIndex": 0,
+  "predictionEnd": 0,            // 予測ブロック末尾（本番の CandidateWindow と同様）
+  "successorLLMSurfaceExtras": [] // 後続語 LLM が返した表層形（コールバック後に増える）
 }
 ```
+
+## LLM（Debug ビルド）
+
+`Sources/Debug/DebugSocketServer.swift` は **`InputController` と同順**で `LLMSuccessorFetcher` / `LLMSegmentConverter` / `LLMCandidateScorer` をスケジュールする（キー処理の直後に `applyLLMScheduling()`）。
+
+- **非同期**: 1 行の JSON 応答は、そのキー処理直後の状態。LLM の推論完了は後から届く。
+- **観察方法**: 同一ソケットで `{"state": true}` を送り **ポーリング**する。`successorLLMSurfaceExtras` の増加、セグメント全文の更新、`candidates` の並べ替え（候補スコアラー）が反映されたか確認できる。
+- **Successor の extras**: `pendingLowConfidence` 経路では、オンデバイス LLM の表層形はまず `successorLLMSurfaceExtras` にだけ溜まる。`candidates` へ載るのは **次のキー処理で `mergePendingSuccessorMatches` が走ったとき**（本番と同じ）。ポーリングだけでは extras は増えても一覧が変わらない場合がある。
+- 設計メモ: `plans/PLAN260504f.md`
 
 **候補リストの構造:**
 - `[0, fixedEnd)` — ひらがな・カタカナ固定候補
@@ -192,7 +203,7 @@ print(f"segments: {r['segmentTexts']}")
 ## 注意点
 
 - **IMK パイプラインをバイパス**するため、クライアントアプリ依存の挙動（Electron の Enter 問題など）は再現しない
-- ソケットサーバーは**独立した in-memory DB** を持つ。実際の使用履歴（`~/Library/Application Support/keynaco/history.db`）は参照しない
-- LLM による候補スコアリング・後続語 LLM は**起動しない**（`InputController` の非同期処理に依存するため）
-- セッションをまたぐときは必ず `{"reset": True}` を送信して状態をリセットすること
+- デフォルトのリセットではソケットサーバーは**インメモリ DB**（`preset_bigram.csv` シード済み）。本番の `history.db` は **`{"reset": true, "useRealDB": true}`** を使ったときのみ一時コピーで参照する
+- **LLM は Debug ビルドのサーバー上で動く**（上記「LLM（Debug ビルド）」）。完了タイミングを見るときは `{"state": true}` ポーリング
+- セッションをまたぐときは必ず `{"reset": true}` を送信して状態をリセットすること（`reset` で LLM フェッチもキャンセルされ `llmEpoch` が進む）
 - 調査結果を報告するときは、各キー入力後の状態を表形式か箇条書きで整理して示すと読みやすい
