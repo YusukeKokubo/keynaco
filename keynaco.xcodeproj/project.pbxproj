@@ -31,6 +31,7 @@
 		4D2A168DE48D8E47E75049BE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B6BB1FB0EB43E407006F2F87 /* Assets.xcassets */; };
 		4EE90AF2E1605DEEEA8214D6 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */; };
 		5917774CE753E3E9301D7A9A /* EventViewerWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E64029A8FFA3EFDC3B832BC2 /* EventViewerWindow.swift */; };
+		6002AFC99620FDE16F2235D3 /* InputHandler+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BB4CDB227A4D86BA4E684EB /* InputHandler+Snapshot.swift */; };
 		604402489F5D5169589FEF35 /* InputHandlerHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81BA89C29FD9249A960FDF7F /* InputHandlerHistoryTests.swift */; };
 		6095BA557731F8320F694AF8 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A89E465235280624AF1A85 /* FoundationModels.framework */; };
 		68B55839DBAF7EA388D32A91 /* AzooKeyConverting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18510F685A5861F194EBA987 /* AzooKeyConverting.swift */; };
@@ -45,6 +46,7 @@
 		ABC6F7A690113BABA647A714 /* InputHandlerNumberTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6CB521B2B5C2E5690C75C8B /* InputHandlerNumberTests.swift */; };
 		AE34C7307F7BDC74EED094FE /* InputSource@2x.tiff in Resources */ = {isa = PBXBuildFile; fileRef = 97499B0FBB6D364291045346 /* InputSource@2x.tiff */; };
 		B6A394F4C8CEFE7B98992E12 /* AzooKeyConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF9F530E0864CAE2CF02AA43 /* AzooKeyConverter.swift */; };
+		BBD7F35AB80DC74B53C00852 /* IMESandboxWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 683F8AA992526EEBF04309BE /* IMESandboxWindow.swift */; };
 		BDF0B7CF569DBAF2532F1083 /* SkipBigramTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1AA964A2E0D8230BBA41CD7 /* SkipBigramTests.swift */; };
 		BE57B73D9F58C1E8F0604C44 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FEF63E6B61E3DBF250CD6E /* NSManualApplication.swift */; };
 		C2E14C85CC907A3ECFEF44E9 /* InputHandlerAsciiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B2F53FCF18FDAC7A79F92A /* InputHandlerAsciiTests.swift */; };
@@ -60,6 +62,7 @@
 		DA70AED84EC9CF8F8F8B2AC5 /* LLMSuccessorFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF6FE3DD9401D6F243860F2 /* LLMSuccessorFetcher.swift */; };
 		E0BA07B7DA86A1F019D5E2E4 /* LearningThresholds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */; };
 		E1471B2D246CBEFC6740F9F1 /* InputHandlerCompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 713FA4DA358BC346E58691F1 /* InputHandlerCompositionTests.swift */; };
+		E37EE25671409D7C3A9BD205 /* InputHandlerSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 047797C5EAA99D1EAC045C9D /* InputHandlerSnapshot.swift */; };
 		E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EA5A03205A3A4B861980E8 /* InputController.swift */; };
 		E94EFDD20206A448E6726BF0 /* ShiftInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9E737DE26D2FE672C6E967 /* ShiftInputTests.swift */; };
 		E9D9EF1D96F61A715009F278 /* InputHandlerSuccessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC3622F0AAB2993C7A4DD5A /* InputHandlerSuccessorTests.swift */; };
@@ -86,9 +89,11 @@
 /* Begin PBXFileReference section */
 		00B2F53FCF18FDAC7A79F92A /* InputHandlerAsciiTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerAsciiTests.swift; sourceTree = "<group>"; };
 		01349F1120E395B87FF8E96B /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
+		047797C5EAA99D1EAC045C9D /* InputHandlerSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerSnapshot.swift; sourceTree = "<group>"; };
 		0761267E295ED3D1435CB337 /* LLMCandidateScorerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMCandidateScorerTests.swift; sourceTree = "<group>"; };
 		0786D4E26B8D8248C3F45C53 /* LLMSuccessorFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMSuccessorFetcherTests.swift; sourceTree = "<group>"; };
 		0A6DFC3B8F3D8A9AE50AF8C2 /* InputHandlerCandidatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerCandidatesTests.swift; sourceTree = "<group>"; };
+		0BB4CDB227A4D86BA4E684EB /* InputHandler+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputHandler+Snapshot.swift"; sourceTree = "<group>"; };
 		0CC971D8CF8531007A3A1F24 /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
 		0DF633BBF3C756509E09F05A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		0EA17261D3D888C032F5F102 /* InputHandlerSegmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerSegmentTests.swift; sourceTree = "<group>"; };
@@ -110,6 +115,7 @@
 		59721E10162EA851CA8CB8B2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5ACD1FF22B030C477F2AD6D8 /* preset_bigram.csv */ = {isa = PBXFileReference; path = preset_bigram.csv; sourceTree = "<group>"; };
 		5C5457923EC5CDAF591F32D4 /* LearningThresholds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningThresholds.swift; sourceTree = "<group>"; };
+		683F8AA992526EEBF04309BE /* IMESandboxWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMESandboxWindow.swift; sourceTree = "<group>"; };
 		6D03FBAC574C8438B48DD57B /* SurroundingIMKContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundingIMKContext.swift; sourceTree = "<group>"; };
 		6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = System/Library/Frameworks/InputMethodKit.framework; sourceTree = SDKROOT; };
 		713FA4DA358BC346E58691F1 /* InputHandlerCompositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandlerCompositionTests.swift; sourceTree = "<group>"; };
@@ -224,6 +230,7 @@
 			isa = PBXGroup;
 			children = (
 				E64029A8FFA3EFDC3B832BC2 /* EventViewerWindow.swift */,
+				683F8AA992526EEBF04309BE /* IMESandboxWindow.swift */,
 			);
 			path = Debug;
 			sourceTree = "<group>";
@@ -274,7 +281,9 @@
 				F297E74682C7CFA426D897D3 /* InputHandler+DateTime.swift */,
 				AAB2A7FAC57151FBB78619D7 /* InputHandler+Numbers.swift */,
 				85697F1F7C185DA4A05FFAA5 /* InputHandler+SegmentMode.swift */,
+				0BB4CDB227A4D86BA4E684EB /* InputHandler+Snapshot.swift */,
 				9DAAF1950A1AC6CD767EAFD6 /* InputHandler+SuccessorMode.swift */,
+				047797C5EAA99D1EAC045C9D /* InputHandlerSnapshot.swift */,
 				C8F905020C8A707920C53337 /* InputSource.tiff */,
 				97499B0FBB6D364291045346 /* InputSource@2x.tiff */,
 				565B8F19A5E192228B765163 /* KanaUtils.swift */,
@@ -438,13 +447,16 @@
 				CD050043FA9BF0ED10CD8053 /* DatabaseManager.swift in Sources */,
 				5917774CE753E3E9301D7A9A /* EventViewerWindow.swift in Sources */,
 				4EE90AF2E1605DEEEA8214D6 /* HistoryViewController.swift in Sources */,
+				BBD7F35AB80DC74B53C00852 /* IMESandboxWindow.swift in Sources */,
 				E6B0C97F21D7D69F11DF87B7 /* InputController.swift in Sources */,
 				9DAE303C0C92DC6BE8675EBE /* InputHandler+Candidates.swift in Sources */,
 				F1613C56A9ED3B9A3C6E306D /* InputHandler+DateTime.swift in Sources */,
 				027212FC0A63FC71D6BC4A94 /* InputHandler+Numbers.swift in Sources */,
 				497FC36A92BC2D68915117E3 /* InputHandler+SegmentMode.swift in Sources */,
+				6002AFC99620FDE16F2235D3 /* InputHandler+Snapshot.swift in Sources */,
 				19E175BC35D67AF9782D72FB /* InputHandler+SuccessorMode.swift in Sources */,
 				840ED66C2ACAD3A4508E00FB /* InputHandler.swift in Sources */,
+				E37EE25671409D7C3A9BD205 /* InputHandlerSnapshot.swift in Sources */,
 				CF7D9BDAAB0D3FA92A6D1B05 /* KanaUtils.swift in Sources */,
 				EC91436633AD115C484C002C /* LLMCandidateScorer.swift in Sources */,
 				D1CD01D4314FCDBA9560C225 /* LLMMisconversionChecker.swift in Sources */,

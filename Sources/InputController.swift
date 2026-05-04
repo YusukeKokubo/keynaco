@@ -15,6 +15,10 @@ extension Notification.Name {
 private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
     private let client: IMKTextInput?
     private(set) var didInsertText = false
+    #if DEBUG
+    /// 直近の `setMarkedText` に渡したプレーンテキスト（IME サンドボックス用）。
+    private(set) var lastMarkedText: String = ""
+    #endif
 
     init(_ sender: Any?) {
         self.client = sender as? IMKTextInput
@@ -33,10 +37,16 @@ private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
     }
 
     func setMarkedText(_ text: String, selectionRange: NSRange) {
+        #if DEBUG
+        lastMarkedText = text
+        #endif
         client?.setMarkedText(text, selectionRange: selectionRange, replacementRange: .notFound)
     }
 
     func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange) {
+        #if DEBUG
+        lastMarkedText = text.string
+        #endif
         client?.setMarkedText(text, selectionRange: selectionRange, replacementRange: .notFound)
     }
 
@@ -45,6 +55,9 @@ private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
     }
 
     func setMarkedText(_ text: String, selectionRange: NSRange, replacementRange: NSRange) {
+        #if DEBUG
+        lastMarkedText = text
+        #endif
         client?.setMarkedText(text, selectionRange: selectionRange, replacementRange: replacementRange)
     }
 
@@ -189,6 +202,86 @@ class InputController: IMKInputController {
         super.deactivateServer(sender)
     }
 
+    /// `handle` 内の `handler.handle` 成功後、候補ウィンドウ更新・周辺文脈・LLM 補助・誤変換のスケジュールまでを一括で行う。戻り値はメニューバー用 Successor 保留フラグ。
+    @MainActor
+    private func applyPostKeyDownEffects(
+        action: CandidateAction,
+        adapter: IMKTextInputAdapter,
+        composedHiraganaWasEmpty: Bool,
+        composingWasEmpty: Bool,
+        imkSenderForSurrounding: Any?
+    ) -> Bool {
+        switch action {
+        case .none:
+            break
+        case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
+            #if DEBUG
+            EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
+            #endif
+            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
+            if handler.isSuccessorMode {
+                // 格助詞を選択候補としてマークドテキストに設定する。
+                // 空文字ではなく実際のテキストを持つことで Electron 系アプリが Enter を IME に転送するようになる。
+                let markedText = candidates.isEmpty ? "" : candidates[min(initialRow, candidates.count - 1)]
+                adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
+            }
+        case .dismiss:
+            candidateWindow.dismiss()
+        case .selectNext:
+            candidateWindow.selectNext()
+            if handler.isSuccessorMode || handler.isBracketMode {
+                let text = candidateWindow.selectedText() ?? ""
+                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            } else {
+                updateMarkedText(client: adapter)
+            }
+        case .selectPrev:
+            candidateWindow.selectPrev()
+            if handler.isSuccessorMode || handler.isBracketMode {
+                let text = candidateWindow.selectedText() ?? ""
+                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            } else {
+                updateMarkedText(client: adapter)
+            }
+        case .deleteSelected:
+            let row = candidateWindow.selectedRow
+            if let text = candidateWindow.selectedText() {
+                handler.db.deleteHistory(output: text)
+                candidateWindow.removeCandidate(at: row)
+            }
+        }
+
+        if handler.documentSurroundingContextInvalidated {
+            cachedSurroundingContext = nil
+            handler.documentSurroundingContextInvalidated = false
+        }
+        if handler.state.composedHiragana.isEmpty {
+            cachedSurroundingContext = nil
+        } else if composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty {
+            // Space での再取得は冗長のため行わない（カーソル移動は location 不一致で無効化）。
+            if let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding) {
+                let loc = adapter.selectedRange().location
+                if loc != NSNotFound {
+                    cachedSurroundingContext = (loc, ctx)
+                }
+            }
+        }
+
+        applySuccessorLLMScheduling(adapter: adapter)
+        applySegmentLLMScheduling(adapter: adapter)
+        applyCandidateScorerScheduling(adapter: adapter)
+
+        if adapter.didInsertText {
+            scheduleMisconversionCheck(adapter: adapter)
+        }
+        if !handler.isSuccessorMode, !handler.isBracketMode,
+           composingWasEmpty, !handler.state.composingText.isEmpty {
+            Self.misconversionChecker.cancel(suppressClearNotification: false)
+        }
+
+        return !handler.pendingSuccessorCandidates.isEmpty
+    }
+
     // MARK: - イベントハンドリング
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
@@ -243,81 +336,46 @@ class InputController: IMKInputController {
         // `sender` / `self` は IMK ブリッジ上 nonisolated から MainActor 島へ渡すため nonisolated(unsafe) とする（Swift 6 sending）。
         nonisolated(unsafe) let imkSenderForSurrounding: Any? = sender
         nonisolated(unsafe) let ic: InputController = self
-        // ステータス通知だけは assumeIsolated の外で値を取り、`DispatchQueue.main.async` に寄せて投稿する（post 自体は nonisolated static）。
-        let successorPendingForMenuBar = MainActor.assumeIsolated {
-            switch action {
-            case .none:
-                break
-            case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
-                #if DEBUG
-                EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
-                #endif
-                ic.candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect())
-                if ic.handler.isSuccessorMode {
-                    // 格助詞を選択候補としてマークドテキストに設定する。
-                    // 空文字ではなく実際のテキストを持つことで Electron 系アプリが
-                    // Enter を IME に転送するようになる。
-                    let markedText = candidates.isEmpty ? "" : candidates[min(initialRow, candidates.count - 1)]
-                    adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
-                }
-            case .dismiss:
-                ic.candidateWindow.dismiss()
-            case .selectNext:
-                ic.candidateWindow.selectNext()
-                if ic.handler.isSuccessorMode || ic.handler.isBracketMode {
-                    let text = ic.candidateWindow.selectedText() ?? ""
-                    adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-                } else {
-                    ic.updateMarkedText(client: adapter)
-                }
-            case .selectPrev:
-                ic.candidateWindow.selectPrev()
-                if ic.handler.isSuccessorMode || ic.handler.isBracketMode {
-                    let text = ic.candidateWindow.selectedText() ?? ""
-                    adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-                } else {
-                    ic.updateMarkedText(client: adapter)
-                }
-            case .deleteSelected:
-                let row = ic.candidateWindow.selectedRow
-                if let text = ic.candidateWindow.selectedText() {
-                    ic.handler.db.deleteHistory(output: text)
-                    ic.candidateWindow.removeCandidate(at: row)
-                }
-            }
-
-            if ic.handler.documentSurroundingContextInvalidated {
-                ic.cachedSurroundingContext = nil
-                ic.handler.documentSurroundingContextInvalidated = false
-            }
-            if ic.handler.state.composedHiragana.isEmpty {
-                ic.cachedSurroundingContext = nil
-            } else if composedHiraganaWasEmpty && !ic.handler.state.composedHiragana.isEmpty {
-                // Space での再取得は冗長のため行わない（カーソル移動は location 不一致で無効化）。
-                if let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding) {
-                    let loc = adapter.selectedRange().location
-                    if loc != NSNotFound {
-                        ic.cachedSurroundingContext = (loc, ctx)
-                    }
-                }
-            }
-
-            ic.applySuccessorLLMScheduling(adapter: adapter)
-            ic.applySegmentLLMScheduling(adapter: adapter)
-            ic.applyCandidateScorerScheduling(adapter: adapter)
-
-            if adapter.didInsertText {
-                ic.scheduleMisconversionCheck(adapter: adapter)
-            }
-            if !ic.handler.isSuccessorMode, !ic.handler.isBracketMode,
-               composingWasEmpty, !ic.handler.state.composingText.isEmpty {
-                Self.misconversionChecker.cancel(suppressClearNotification: false)
-            }
-
-            return !ic.handler.pendingSuccessorCandidates.isEmpty
+        // ステータス通知は島から値を返し、`DispatchQueue.main.async` で投稿する（post 自体は nonisolated static）。
+        #if DEBUG
+        let (successorPendingForMenuBar, imeStateSnapshot) = MainActor.assumeIsolated {
+            let pending = ic.applyPostKeyDownEffects(
+                action: action,
+                adapter: adapter,
+                composedHiraganaWasEmpty: composedHiraganaWasEmpty,
+                composingWasEmpty: composingWasEmpty,
+                imkSenderForSurrounding: imkSenderForSurrounding
+            )
+            var snap = ic.handler.snapshot(markedText: adapter.lastMarkedText)
+            snap.candidateVisible = ic.candidateWindow.isVisible
+            snap.selectedRow = ic.candidateWindow.selectedRow
+            snap.selectedText = ic.candidateWindow.selectedText()
+            snap.isExplicitlySelected = ic.candidateWindow.isExplicitlySelected
+            snap.historyEnd = ic.candidateWindow.historySectionEnd
+            snap.fixedEnd = ic.candidateWindow.fixedRowCount
+            snap.candidates = Array(ic.candidateWindow.candidates.prefix(30))
+            return (pending, snap)
         }
+        #else
+        let successorPendingForMenuBar = MainActor.assumeIsolated {
+            ic.applyPostKeyDownEffects(
+                action: action,
+                adapter: adapter,
+                composedHiraganaWasEmpty: composedHiraganaWasEmpty,
+                composingWasEmpty: composingWasEmpty,
+                imkSenderForSurrounding: imkSenderForSurrounding
+            )
+        }
+        #endif
         DispatchQueue.main.async {
             Self.postSuccessorPendingNotification(pending: successorPendingForMenuBar)
+            #if DEBUG
+            NotificationCenter.default.post(
+                name: .imeStateDidUpdate,
+                object: nil,
+                userInfo: ["snapshot": imeStateSnapshot]
+            )
+            #endif
         }
         return consumed
     }

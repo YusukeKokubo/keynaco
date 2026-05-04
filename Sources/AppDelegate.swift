@@ -102,6 +102,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         viewerItem.isEnabled = true
         menu.addItem(viewerItem)
 
+        #if DEBUG
+        let sandboxItem = NSMenuItem(title: "サンドボックス…", action: #selector(openIMESandbox), keyEquivalent: "")
+        sandboxItem.isEnabled = true
+        menu.addItem(sandboxItem)
+        #endif
+
         let userDictItem = NSMenuItem(title: "ユーザー辞書...", action: #selector(openUserDict), keyEquivalent: "")
         userDictItem.isEnabled = true
         menu.addItem(userDictItem)
@@ -210,6 +216,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openEventViewer() {
         EventViewerWindow.shared.show()
     }
+
+    #if DEBUG
+    @objc private func openIMESandbox() {
+        IMESandboxWindow.shared.show()
+    }
+    #endif
 
     @objc private func openUserDict() {
         SettingsWindowController.shared.showSettings(selectingTab: 1)
