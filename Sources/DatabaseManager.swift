@@ -31,9 +31,19 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     /// テスト用: インメモリ DB で初期化
-    init(inMemory: Bool) {
+    /// - Parameter seedPresets: `true` のとき UserDefaults を踏まず `preset_bigram.csv` を投入（デバッグサンドボックス用）
+    init(inMemory: Bool, seedPresets: Bool = false) {
         writeAsync = false
         guard sqlite3_open(":memory:", &db) == SQLITE_OK else { return }
+        createTables()
+        ensureBigramIsPresetColumn()
+        if seedPresets { forceSeedPresets() }
+    }
+
+    /// デバッグ用: 既存ファイル DB を開く（一時スナップショット等）。`CREATE` は付けず、誤った空ファイル生成を避ける。
+    init(snapshotPath: String) {
+        writeAsync = false
+        guard sqlite3_open_v2(snapshotPath, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { return }
         createTables()
         ensureBigramIsPresetColumn()
     }
@@ -141,6 +151,12 @@ final class DatabaseManager: @unchecked Sendable {
     /// バンドル内 `preset_bigram.csv` を初回のみ投入（`init(inMemory:)` では呼ばない）。
     private func seedPresetBigramsIfNeeded() {
         guard presetSeedUserDefaults.object(forKey: Self.presetSeededUserDefaultsKey) == nil else { return }
+        forceSeedPresets()
+        presetSeedUserDefaults.set(true, forKey: Self.presetSeededUserDefaultsKey)
+    }
+
+    /// UserDefaults チェックなしで `preset_bigram.csv` を投入する（デバッグサンドボックス専用）。
+    private func forceSeedPresets() {
         guard let url = Bundle.main.url(forResource: "preset_bigram", withExtension: "csv") else {
             NSLog("keynaco: preset_bigram.csv がバンドルに含まれていません")
             return
@@ -173,7 +189,6 @@ final class DatabaseManager: @unchecked Sendable {
             }
         }
         executeOnQueue("COMMIT")
-        presetSeedUserDefaults.set(true, forKey: Self.presetSeededUserDefaultsKey)
     }
 
     // MARK: - SQLite ヘルパー（dbQueue 上でのみ呼び出す）

@@ -84,8 +84,17 @@ send({"reset": True})
 | →（右矢印） | `{"keyCode": 124, "chars": "", "base": "", "mods": 0}` |
 | Tab | `{"keyCode": 48, "chars": "\t", "base": "\t", "mods": 0}` |
 | Shift+Delete | `{"keyCode": 51, "chars": "\x08", "base": "\x08", "mods": 131072}` |
-| リセット | `{"reset": True}` |
+| リセット | `{"reset": True}`（下表のオプション可） |
 | 現在状態取得 | `{"state": True}` |
+
+### リセットオプション
+
+| コマンド | 説明 |
+|---------|------|
+| `{"reset": true}` | インメモリ DB（`preset_bigram.csv` シード済み）でリセット。Successor の preset 候補が本番に近い。 |
+| `{"reset": true, "useRealDB": true}` | 実体の `~/Library/Application Support/keynaco/history.db` を一時コピーして開く。変換履歴・ユーザー辞書・`boundary_pref`・学習 bigram などがそのまま使える。 |
+
+`history.db` が存在しない、またはコピー失敗（DB ロック等）のときは `useRealDB` は無視され、上と同じインメモリ（preset シード済み）にフォールバックする。スナップショットにはユーザーの変換履歴・語彙が含まれるため、ログ共有時は取り扱いに注意する。
 
 **modifier フラグ（mods）:** Shift=131072、Command=1048576、Option=524288。複数は OR で合成。
 
