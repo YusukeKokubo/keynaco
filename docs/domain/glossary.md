@@ -65,9 +65,10 @@
 
 ### F1（文脈スコアリング）
 Apple Intelligence（FoundationModels）で、**高スコア履歴 + AzooKey** の上位最大 10 件を直前文脈・読みと照らして並べ替えるオプション機能。  
+カーソル直前は最大 **300** 文字（`surroundingText`）に加え、直近確定語 **最大 5 語**（`committedHistory`）を文脈の先頭に連結して注入する（アプリが前文を返さない場合のフォールバック兼補強）。LLM は `番号:high` / `mid` / `low` で回答し、**`low` は並べ替えない**。**autoShow**（文字入力中の自動候補）でもスコアリングは起動するが、並べ替えは **`high` のみ**（`mid` は Space 等の明示表示後のみ反映）。  
 **不変条件**: 即時表示後に非同期で順序のみ更新する。`isExplicitlySelected == true`（↑↓ 済み）のときはリフレッシュしない。`composedHiragana` が変わったら進行中のスコアタスクはキャンセル。セグメント・Successor・括弧モードでは起動しない。
 
-*Tests: `Tests/CandidateWindowMoveRowTests.swift`*（ウィンドウ並べ替え）
+*Tests: `Tests/CandidateWindowMoveRowTests.swift`*（ウィンドウ並べ替え）、`Tests/LLMCandidateScorerTests.swift`
 
 ### F4（誤変換検出）
 確定直後（`insertText`）、カーソル直前最大 200 文字をオンデバイス LLM で検査するオプション機能。前文が 5 文字未満ならスキップ。0.5 秒デバウンス後に起動。  

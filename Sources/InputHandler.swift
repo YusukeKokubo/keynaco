@@ -106,6 +106,8 @@ struct InputHandler {
     var pendingF1Strings: [String] = []
     /// 直近の `buildCandidateList` で F1 を起動してよいか
     var lastF1Eligible: Bool = false
+    /// 直近の `buildCandidateList` が `.show` になったときの `autoShow` 引数（F1 確信度 guard 用）
+    var lastCandidateListAutoShow: Bool = false
     var committedHistory: [String] = []
     var lastCommittedOutput: String? { committedHistory.last }
     var segmentCandidateCache: [String: Segment] = [:]

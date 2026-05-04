@@ -305,12 +305,12 @@ extension InputHandler {
 
         pendingF1GlobalIndices = f1GlobalIndices
         pendingF1Strings = f1GlobalIndices.map { candidates[$0] }
-        lastF1Eligible = !autoShow
-            && Self.isComposedHiraganaEligibleForF1(h)
+        lastF1Eligible = Self.isComposedHiraganaEligibleForF1(h)
             && !state.isSegmentMode
             && !isSuccessorMode
             && !isBracketMode
             && f1GlobalIndices.count >= 2
+        lastCandidateListAutoShow = autoShow
 
         return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
                      predictionEnd: predictionEnd, fixedEnd: fixedEnd)
@@ -320,6 +320,7 @@ extension InputHandler {
         pendingF1GlobalIndices = []
         pendingF1Strings = []
         lastF1Eligible = false
+        lastCandidateListAutoShow = false
     }
 
     /// `InputController` のライフサイクル（サーバ再有効化など）用

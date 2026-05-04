@@ -353,10 +353,13 @@ class InputController: IMKInputController {
         guard !handler.isSuccessorMode else { return }
         guard !handler.isBracketMode else { return }
 
-        let rawPrefix = adapter.surroundingText(maxLength: 100).prefix
-        let contextPrefix = rawPrefix.count > 100 ? String(rawPrefix.suffix(100)) : String(rawPrefix)
+        let rawPrefix = adapter.surroundingText(maxLength: 300).prefix
+        let clippedPrefix = rawPrefix.count > 300 ? String(rawPrefix.suffix(300)) : String(rawPrefix)
+        let historyContext = handler.committedHistory.suffix(5).joined(separator: "")
+        let contextForScore = rawPrefix.isEmpty ? historyContext : historyContext + clippedPrefix
         let reading = handler.state.composedHiragana
         let opts = handler.pendingF1Strings
+        let wasAutoShow = handler.lastCandidateListAutoShow
 
         let examples: [(prev: String, next: String)] =
             handler.committedHistory.last.map { lastWord in
@@ -365,11 +368,14 @@ class InputController: IMKInputController {
 
         Self.candidateScorer.score(
             candidates: opts,
-            context: contextPrefix,
+            context: contextForScore,
             reading: reading,
             examples: examples
-        ) { [weak self] idx in
+        ) { [weak self] result in
             guard let self else { return }
+            guard result.confidence == .high || !wasAutoShow else { return }
+            guard result.index != 0 || !wasAutoShow else { return }
+            let idx = result.index
             guard idx >= 0, idx < self.handler.pendingF1GlobalIndices.count else { return }
             guard self.candidateWindow.isVisible else { return }
             guard !self.candidateWindow.isExplicitlySelected else { return }

@@ -51,6 +51,43 @@ final class LLMCandidateScorerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("1. 候補1"))
         XCTAssertTrue(prompt.contains("2. 候補2"))
         XCTAssertTrue(prompt.contains("3. 候補3"))
-        XCTAssertTrue(prompt.contains("最も自然な候補の番号を1つだけ答えてください。"))
+        XCTAssertTrue(prompt.contains("「番号:high」「番号:mid」「番号:low」"))
+        XCTAssertTrue(prompt.contains("例: 2:high"))
+    }
+
+    func testParseChosenIndexWithConfidence_colonHigh() {
+        let r = LLMCandidateScorer.parseChosenIndexWithConfidence(from: "2:high", maxCount: 3)!
+        XCTAssertEqual(r.index, 1)
+        XCTAssertEqual(r.confidence, .high)
+    }
+
+    func testParseChosenIndexWithConfidence_spacesAroundColonMid() {
+        let r = LLMCandidateScorer.parseChosenIndexWithConfidence(from: "2 : mid", maxCount: 3)!
+        XCTAssertEqual(r.index, 1)
+        XCTAssertEqual(r.confidence, .mid)
+    }
+
+    func testParseChosenIndexWithConfidence_embeddedInSentence() {
+        let r = LLMCandidateScorer.parseChosenIndexWithConfidence(from: "答えは 1:low です", maxCount: 2)!
+        XCTAssertEqual(r.index, 0)
+        XCTAssertEqual(r.confidence, .low)
+    }
+
+    func testParseChosenIndexWithConfidence_caseInsensitiveConfidence() {
+        let r = LLMCandidateScorer.parseChosenIndexWithConfidence(from: "3:MiD", maxCount: 5)!
+        XCTAssertEqual(r.index, 2)
+        XCTAssertEqual(r.confidence, .mid)
+    }
+
+    func testParseChosenIndexWithConfidence_unknownTokenReturnsNil() {
+        XCTAssertNil(LLMCandidateScorer.parseChosenIndexWithConfidence(from: "2:unknown", maxCount: 3))
+    }
+
+    func testParseChosenIndexWithConfidence_numberOnlyReturnsNil() {
+        XCTAssertNil(LLMCandidateScorer.parseChosenIndexWithConfidence(from: "2", maxCount: 3))
+    }
+
+    func testParseChosenIndexWithConfidence_outOfRangeReturnsNil() {
+        XCTAssertNil(LLMCandidateScorer.parseChosenIndexWithConfidence(from: "4:high", maxCount: 3))
     }
 }
