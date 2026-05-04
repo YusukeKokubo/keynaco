@@ -215,6 +215,11 @@ struct InputHandler {
         // 英字モード
         if InputHandler.isAsciiMode {
             if keyCode == KeyCode.escape { InputHandler.isAsciiMode = false; return (true, .none) }
+            if keyCode == KeyCode.enter {
+                committedHistory.removeAll()
+                documentSurroundingContextInvalidated = true
+                return (false, .none)
+            }
             guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
             guard let chars = characters, !chars.isEmpty,
                   chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return (false, .none) }

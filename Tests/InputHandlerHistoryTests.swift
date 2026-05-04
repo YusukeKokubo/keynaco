@@ -221,4 +221,58 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         press(keyCode: 36)
         XCTAssertNil(handler.lastCommittedOutput, "改行後は lastCommittedOutput が nil になるはず")
     }
+
+    // MARK: - 句読点確定による committedHistory クリア
+
+    func testPeriodDirectInputClearsCommittedHistory() {
+        // 「今日」を確定して history を積む
+        typeRomaji("kyou")
+        press(keyCode: 36, candidateVisible: true, selectedText: "今日")
+        press(keyCode: 53)
+        XCTAssertFalse(handler.committedHistory.isEmpty)
+
+        // 全角「。」を直接入力（handleNonAsciiChar 経由）→ sentenceTerminator でクリアされるはず
+        type(chars: "。", base: "。")
+        XCTAssertTrue(handler.committedHistory.isEmpty, "「。」直接入力で committedHistory がクリアされるはず")
+    }
+
+    func testPeriodViaRomajiMappingClearsCommittedHistory() {
+        // 「今日」を確定して history を積む
+        typeRomaji("kyou")
+        press(keyCode: 36, candidateVisible: true, selectedText: "今日")
+        press(keyCode: 53)
+        XCTAssertFalse(handler.committedHistory.isEmpty)
+
+        // "." → "。"（handlePunctuation 経由）→ clears
+        type(chars: ".", base: ".")
+        XCTAssertTrue(handler.committedHistory.isEmpty, "「.」→「。」変換で committedHistory がクリアされるはず")
+    }
+
+    func testCommaViaRomajiMappingDoesNotClearCommittedHistory() {
+        // 「今日」を確定して history を積む
+        typeRomaji("kyou")
+        press(keyCode: 36, candidateVisible: true, selectedText: "今日")
+        press(keyCode: 53)
+        XCTAssertFalse(handler.committedHistory.isEmpty)
+
+        // "," → "、"（読点は sentenceTerminator ではない）→ history は残る
+        type(chars: ",", base: ",")
+        XCTAssertFalse(handler.committedHistory.isEmpty, "「、」は文区切りではないので history を残すはず")
+    }
+
+    func testEnterInAsciiModeClearsCommittedHistory() {
+        // 「今日」を確定して history を積む
+        typeRomaji("kyou")
+        press(keyCode: 36, candidateVisible: true, selectedText: "今日")
+        press(keyCode: 53)
+        XCTAssertFalse(handler.committedHistory.isEmpty)
+
+        // 英数キー（keyCode 102）で ASCII モードへ
+        press(keyCode: 102)
+        XCTAssertTrue(InputHandler.isAsciiMode)
+
+        // ASCII モード中に Enter → committedHistory がクリアされるはず
+        press(keyCode: 36)
+        XCTAssertTrue(handler.committedHistory.isEmpty, "ASCII モード中の Enter で committedHistory がクリアされるはず")
+    }
 }

@@ -398,6 +398,7 @@ extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard let mappedPunct = Self.punctuationMap[base], !modifiers.contains(.shift) else { return nil }
         if state.composingText.isEmpty {
+            pushCommitted(mappedPunct)
             client.insertText(mappedPunct)
             return (true, .dismiss)
         }
@@ -443,6 +444,7 @@ extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard isNonAscii else { return nil }
         if state.composingText.isEmpty {
+            pushCommitted(chars)
             client.insertText(chars)
         } else {
             flushPendingRomaji()
