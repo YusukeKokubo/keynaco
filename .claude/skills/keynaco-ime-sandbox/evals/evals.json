@@ -1,0 +1,20 @@
+{
+  "skill_name": "keynaco-ime-sandbox",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "IMEサンドボックスを使って「kanzi」と入力したときの候補リストを調べて。特に historyEnd と fixedEnd の値、および上位5候補を教えて。",
+      "expected_output": "kanzi 入力後の候補リスト（上位5件）、historyEnd・fixedEnd の値が明示されていること"
+    },
+    {
+      "id": 2,
+      "prompt": "「kyou」と入力して Enter で確定した後、Successor モードに入っているか、入っているなら後続語候補は何かをサンドボックスで確認して。",
+      "expected_output": "isSuccessorMode の値と後続語候補リストが報告されること"
+    },
+    {
+      "id": 3,
+      "prompt": "IMEサンドボックスで「nn」と入力すると pendingRomaji はどう変化する？「ん」になるタイミングと hiddenPendingN の挙動を確認して。",
+      "expected_output": "n → nn の各ステップでの composedHiragana と pendingRomaji の変化が説明されること"
+    }
+  ]
+}

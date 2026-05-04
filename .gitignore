@@ -5,3 +5,4 @@ DerivedData/
 .DS_Store
 .claude/*
 !.claude/commands/
+!.claude/skills/
