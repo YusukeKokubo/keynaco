@@ -19,10 +19,14 @@ description: |
 - `$TMPDIR/keynaco-debug.sock` にソケットが存在すること
 - Python 3 が使えること
 
-起動確認:
+起動確認（**必ず最初に実行**。ファイルの有無だけでなくプロセスの生死を確認すること）:
 ```bash
-ls "${TMPDIR}keynaco-debug.sock" && echo "OK" || echo "keynaco を起動してください"
+pgrep -x keynaco && echo "keynaco running" || echo "keynaco not running — Debug ビルドを起動してください"
 ```
+
+ソケットファイルは前回の起動時のものが残る場合がある。`pgrep` が "not running" を返したら、ユーザーに `xcodebuild` でビルド＆起動を促してスクリプトを終了すること。
+
+接続エラー（`Connection refused` / `ECONNREFUSED`）が出た場合も同様に keynaco 未起動が原因。ソケットファイルの有無は関係ない。
 
 ## ソケットクライアント
 
@@ -35,11 +39,22 @@ python3 scripts/debug_ime.py kanzi
 
 **Python スクリプトで直接操作する（推奨）:**
 ```python
-import socket, json, os
+import socket, json, os, subprocess, sys
 
 SOCKET_PATH = os.path.join(os.environ.get("TMPDIR", "/tmp"), "keynaco-debug.sock")
+
+# プロセス確認（ソケットファイルが残っていても誰も listen していない場合がある）
+result = subprocess.run(["pgrep", "-x", "keynaco"], capture_output=True)
+if result.returncode != 0:
+    print("ERROR: keynaco is not running. Please build and launch it first.")
+    sys.exit(1)
+
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-sock.connect(SOCKET_PATH)
+try:
+    sock.connect(SOCKET_PATH)
+except ConnectionRefusedError:
+    print("ERROR: Connection refused. keynaco may have just started — retry in a moment.")
+    sys.exit(1)
 buf = b""
 
 def send(cmd):
