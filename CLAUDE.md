@@ -46,6 +46,7 @@ xcodebuild build -scheme keynaco -configuration Debug
 ```
 
 - Build Post-action（`keynaco` scheme の Build Post-action、`keynaco.xcodeproj` 内）により `/Library/Input Methods/` への自動コピーとプロセス再起動が行われる
+- ビルド後の `Warning: unknown environment variable SWIFT_DEBUG_INFORMATION_FORMAT` は無害。`rm: /Library/Input Methods/keynaco.app: Permission denied` も正常（post-action は sudo なしでは Copy できないが BUILD SUCCEEDED は正しい）
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
 - バージョン番号は git tag で管理。`git tag v0.1.0` → ビルド時に `CFBundleShortVersionString` / `CFBundleVersion` に自動注入（post-action が `PlistBuddy` で書き換え）。`PlistBuddy` 後は署名が無効化されるため、post-action の最後で `codesign --force --deep --sign` による再署名が必須（無いと macOS 26 が SIGKILL でプロセスを落とす）
 - 初回セットアップ: `sudo chmod -R +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_child,delete,read,write,execute" "/Library/Input Methods"` が必要（所有者を root のまま ACL で自分にだけ権限を付与）
@@ -67,6 +68,8 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 ```bash
 cd Core && swift test
 ```
+
+末尾に `✔ Test run with 0 tests in 0 suites passed` が出るが正常（Swift Testing framework のノイズ）。XCTest の結果は `Executed N tests` として別途出力される。
 
 ## コンポーネント構成
 
@@ -129,6 +132,10 @@ Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（ユーザー辞�
 
 ## テスト方針
 
+### Core モジュール（KeynacoCore）への型追加
+
+`Core/` は独立 SPM ライブラリ。App（`keynaco/`）から参照する型・イニシャライザ・メソッド・プロパティはすべて `public`（必要なら `open`）が必須。`@testable import KeynacoCore` でテストからは `internal` でもアクセスできるが App からは見えないため注意。
+
 ### XCUITest / CGEvent による E2E テストは採用しない
 
 IME はバックグラウンドエージェントとして動作するため、`XCUIElement.typeText()` はカスタム IME をバイパスする。`CGEvent` を用いた物理的なキー送信は Accessibility 権限に依存し CI で不安定になる。
@@ -155,10 +162,6 @@ IME はバックグラウンドエージェントとして動作するため、`
 ### Bundle ID に "inputmethod" が必須（InputMethodKit 全般の仕様）
 
 TIS がサードパーティ IME を認識するために Bundle ID に `inputmethod` の文字列が必要（macOS 26 固有ではなく InputMethodKit 長年の仕様）。これがないと `TISRegisterInputSource` は成功を返すが `TISCreateInputSourceList` に現れない。サイレントに失敗するため原因特定が極めて困難。
-
-### Info.plist は xcodegen に上書きさせない
-
-`project.yml` に `info:` セクションを入れると xcodegen が Info.plist を上書きする。`INFOPLIST_FILE` 設定のみで参照すること。
 
 ### inputText より handle(event:client:) を使う
 
