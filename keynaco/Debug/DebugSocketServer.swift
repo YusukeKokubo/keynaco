@@ -21,7 +21,7 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     private var serverFd: Int32 = -1
-    private var handler = InputHandler(db: DatabaseManager(inMemory: true, seedPresets: true))
+    private var handler = InputHandler(db: DatabaseManager(inMemory: true, seedPresets: true), azooKeyConverter: ZenzaiSettings.makeConverter())
     private let mockClient = SocketMockClient()
     private var candidateWindow = DebugCandidateWindow()
 
@@ -145,10 +145,11 @@ final class DebugSocketServer: @unchecked Sendable {
             handler.resetScorerPending()
             llmEpoch &+= 1
             let useRealDB = cmd["useRealDB"] as? Bool ?? false
+            let converter = ZenzaiSettings.makeConverter()
             if useRealDB, let db = makeRealDBSnapshot() {
-                handler = InputHandler(db: db)
+                handler = InputHandler(db: db, azooKeyConverter: converter)
             } else {
-                handler = InputHandler(db: DatabaseManager(inMemory: true, seedPresets: true))
+                handler = InputHandler(db: DatabaseManager(inMemory: true, seedPresets: true), azooKeyConverter: converter)
             }
             InputHandler.isAsciiMode = false
             candidateWindow = DebugCandidateWindow()
