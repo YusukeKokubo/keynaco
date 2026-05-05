@@ -93,6 +93,7 @@ cd Core && swift test
 変換エンジンは `AzooKeyKanaKanjiConverter`（`Core/Package.swift` の依存）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 `KanaUtils` = ひらがな↔カタカナ変換ユーティリティ（`hiraganaToKatakana` / `hiraganaToHankakuKatakana` / `toZenkakuAscii`）。F7–F9 変換確定とカタカナ候補生成で使用。
+`NotificationNames` = `KeynacoCore` 公開の通知名定義（`Core/Sources/Core/NotificationNames.swift`）。`keynacoSuccessorPendingChanged`（N-gram 保留状態変化）、`keynacoMisconversionIssueFound`（LLM 誤変換指摘。`userInfo["detail"]` に全文）、`keynacoMisconversionCleared`（誤変換状態クリア）の3通知。`AppDelegate` がステータスバー表示更新に購読し、`InputController` が送信する。
 
 ### Successor モード（isSuccessorMode / successorFirstChar / pendingSuccessorCandidates / successorLLMSurfaceExtras）
 
