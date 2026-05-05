@@ -110,7 +110,6 @@ class InputController: IMKInputController {
     /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
     private static let successorLLM = LLMSuccessorFetcher()
     private static let segmentLLM = LLMSegmentConverter()
-    private static let candidateScorer = LLMCandidateScorer()
     private static let misconversionChecker = LLMMisconversionChecker()
 
     private static let candidateWindow: CandidateWindow = {
@@ -189,19 +188,16 @@ class InputController: IMKInputController {
         handler.successorLLMTrigger = .none
         handler.successorLLMBaseCandidates = nil
         handler.segmentLLMTrigger = .none
-        handler.resetScorerPending()
         cachedSurroundingContext = nil
         handler.leftSideContext = ""
         if Thread.isMainThread {
             Self.successorLLM.cancel()
             Self.segmentLLM.cancel()
-            Self.candidateScorer.cancel()
             Self.misconversionChecker.cancel()
         } else {
             DispatchQueue.main.sync {
                 Self.successorLLM.cancel()
                 Self.segmentLLM.cancel()
-                Self.candidateScorer.cancel()
                 Self.misconversionChecker.cancel()
             }
         }
@@ -282,7 +278,6 @@ class InputController: IMKInputController {
 
         applySuccessorLLMScheduling(adapter: adapter)
         applySegmentLLMScheduling(adapter: adapter)
-        applyCandidateScorerScheduling(adapter: adapter)
 
         if adapter.didInsertText {
             scheduleMisconversionCheck(adapter: adapter)
@@ -425,15 +420,12 @@ class InputController: IMKInputController {
         if Thread.isMainThread {
             Self.successorLLM.cancel()
             Self.segmentLLM.cancel()
-            Self.candidateScorer.cancel()
         } else {
             DispatchQueue.main.sync {
                 Self.successorLLM.cancel()
                 Self.segmentLLM.cancel()
-                Self.candidateScorer.cancel()
             }
         }
-        handler.resetScorerPending()
         cachedSurroundingContext = nil
         handler.leftSideContext = ""
         candidateWindow.dismiss()
@@ -468,51 +460,6 @@ class InputController: IMKInputController {
         let prefix = adapter.surroundingText(maxLength: 200).prefix
         let recentWords = Array(handler.committedHistory.suffix(5))
         Self.misconversionChecker.check(surroundingPrefix: prefix, recentWords: recentWords)
-    }
-
-    /// 変換候補を直前文脈でスコアリングして並べ替える。文脈はこのキー処理内で同期取得したもののみ使う。
-    private func applyCandidateScorerScheduling(adapter: IMKTextInputAdapter) {
-        // 読みが変わった・ユーザーが操作した場合どちらも前タスクを破棄（↑↓ 後は guard で score しないが cancel は先行）。
-        Self.candidateScorer.cancel()
-        guard handler.lastScorerEligible else { return }
-        guard !handler.pendingScorerGlobalIndices.isEmpty else { return }
-        guard !candidateWindow.isExplicitlySelected else { return }
-        guard !handler.state.isSegmentMode else { return }
-        guard !handler.isSuccessorMode else { return }
-        guard !handler.isBracketMode else { return }
-
-        let contextForScore = resolvedLLMDocumentContextPrefix(adapter: adapter)
-        let reading = handler.state.composedHiragana
-        let opts = handler.pendingScorerStrings
-        let wasAutoShow = handler.lastCandidateListAutoShow
-
-        let examples: [(prev: String, next: String)] =
-            handler.committedHistory.last.map { lastWord in
-                handler.db.fetchBigramTop(prev: lastWord, limit: 5).map { (prev: lastWord, next: $0) }
-            } ?? []
-
-        Self.candidateScorer.score(
-            candidates: opts,
-            context: contextForScore,
-            reading: reading,
-            examples: examples
-        ) { [weak self] result in
-            guard let self else { return }
-            guard result.confidence == .high || !wasAutoShow else { return }
-            guard result.index != 0 || !wasAutoShow else { return }
-            let idx = result.index
-            guard idx >= 0, idx < self.handler.pendingScorerGlobalIndices.count else { return }
-            guard self.candidateWindow.isVisible else { return }
-            guard !self.candidateWindow.isExplicitlySelected else { return }
-            guard !self.handler.state.isSegmentMode else { return }
-            guard !self.handler.isSuccessorMode else { return }
-            guard !self.handler.isBracketMode else { return }
-            guard self.handler.state.composedHiragana == reading else { return }
-
-            let g = self.handler.pendingScorerGlobalIndices[idx]
-            self.candidateWindow.moveRow(from: g)
-            self.updateMarkedText(client: adapter)
-        }
     }
 
     /// `suggestSuccessors()` が立てた `successorLLMTrigger` に応じてオンデバイス LLM で後続語を補完する。

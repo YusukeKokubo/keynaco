@@ -92,8 +92,6 @@ stateDiagram-v2
 | Shift+Delete | 選択中の候補を履歴 DB から削除（`fixedEnd <= index < historyEnd` のときのみ有効。ユーザー辞書行は削除不可） |
 | `. / ,`（Shift なし） | 選択候補を確定**せず**、`。`/`、` を組成に追加して候補をリフレッシュ |
 
-候補リストは表示後、条件を満たすとき **F1（文脈スコアリング）** により非同期で並べ替えられる。↑↓ で明示選択済みのときは並べ替えない。
-
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### 括弧モード

@@ -33,7 +33,6 @@ public extension InputHandler {
     /// N-gram 候補がある場合は `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目まで表示を遅延）。
     /// 格助詞のみの場合（名詞末尾 + N-gram なし）は従来通り `.show` を返す。
     public mutating func suggestSuccessors() -> CandidateAction {
-        resetScorerPending()
         guard let last = lastCommittedOutput else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             clearSuccessorLLMAuxiliaryState()

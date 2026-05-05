@@ -136,10 +136,10 @@ eisu(英数)=102  kana(かな)=104
 
 ## LLM（Debug ビルド）
 
-`keynaco/Debug/DebugSocketServer.swift` は **`InputController` と同順**で `LLMSuccessorFetcher` / `LLMSegmentConverter` / `LLMCandidateScorer` をスケジュールする（キー処理の直後に `applyLLMScheduling()`）。
+`keynaco/Debug/DebugSocketServer.swift` は **`InputController` と同順**で `LLMSuccessorFetcher` / `LLMSegmentConverter` をスケジュールする（キー処理の直後に `applyLLMScheduling()`）。
 
 - **非同期**: 1 行の JSON 応答は、そのキー処理直後の状態。LLM の推論完了は後から届く。
-- **観察方法**: 同一ソケットで `{"state": true}` を送り **ポーリング**する。`successorLLMSurfaceExtras` の増加、セグメント全文の更新、`candidates` の並べ替え（候補スコアラー）が反映されたか確認できる。
+- **観察方法**: 同一ソケットで `{"state": true}` を送り **ポーリング**する。`successorLLMSurfaceExtras` の増加、セグメント全文の更新が反映されたか確認できる。
 - **Successor の extras**: `pendingLowConfidence` 経路では、オンデバイス LLM の表層形はまず `successorLLMSurfaceExtras` にだけ溜まる。`candidates` へ載るのは **次のキー処理で `mergePendingSuccessorMatches` が走ったとき**（本番と同じ）。ポーリングだけでは extras は増えても一覧が変わらない場合がある。
 - 設計メモ: `plans/PLAN260504f.md`
 

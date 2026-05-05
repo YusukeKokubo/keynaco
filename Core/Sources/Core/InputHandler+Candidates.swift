@@ -184,7 +184,6 @@ public extension InputHandler {
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     public mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
-        clearPendingScorerForDismiss()
         let h = state.composedHiragana
         let azooKeyCandidates: [String]
         let ctxFingerprint = leftSideContext
@@ -281,24 +280,6 @@ public extension InputHandler {
         insertedSet = Set(candidates)
         let uniqueLowHistory = lowHistory.filter { insertedSet.insert($0).inserted }
 
-        let numCount = uniqueNumberCandidates.count
-        let dtCount = uniqueDateTimeCandidates.count
-        let azooStart = historyEnd + numCount + dtCount
-        let azooEnd = candidates.count
-        var scorerGlobalIndices: [Int] = []
-        if predictionEnd < historyEnd {
-            for r in predictionEnd..<historyEnd {
-                guard scorerGlobalIndices.count < 10 else { break }
-                scorerGlobalIndices.append(r)
-            }
-        }
-        if scorerGlobalIndices.count < 10, azooStart < azooEnd {
-            for r in azooStart..<azooEnd {
-                guard scorerGlobalIndices.count < 10 else { break }
-                scorerGlobalIndices.append(r)
-            }
-        }
-
         candidates.append(contentsOf: uniqueLowHistory)
         // 助動詞・接続助詞等（ほぼひらがな表記のみ）は学習ゼロでもひらがなを初期選択する。
         // hiraganaInHistory の場合は固定位置にひらがながないため通常どおり fixedCount から。
@@ -307,44 +288,13 @@ public extension InputHandler {
         let initialRow = (candidates.count > fixedCount && !preferHiragana) ? fixedCount : 0
         guard !candidates.isEmpty else { return .dismiss }
 
-        pendingScorerGlobalIndices = scorerGlobalIndices
-        pendingScorerStrings = scorerGlobalIndices.map { candidates[$0] }
-        lastScorerEligible = Self.isComposedHiraganaEligibleForScorer(h)
-            && !state.isSegmentMode
-            && !isSuccessorMode
-            && !isBracketMode
-            && scorerGlobalIndices.count >= 2
-        lastCandidateListAutoShow = autoShow
-
         return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
                      predictionEnd: predictionEnd, fixedEnd: fixedEnd)
-    }
-
-    private mutating func clearPendingScorerForDismiss() {
-        pendingScorerGlobalIndices = []
-        pendingScorerStrings = []
-        lastScorerEligible = false
-        lastCandidateListAutoShow = false
-    }
-
-    /// `InputController` のライフサイクル（サーバ再有効化など）用
-    public mutating func resetScorerPending() {
-        clearPendingScorerForDismiss()
-    }
-
-    /// スコアラー起動用: 2 文字以上かつひらがなのみ（記号・ASCII 混在の `buildCandidateList` 経路を除外）
-    public static func isComposedHiraganaEligibleForScorer(_ s: String) -> Bool {
-        guard s.count >= 2 else { return false }
-        return s.unicodeScalars.allSatisfy { u in
-            let v = u.value
-            return (v >= 0x3041 && v <= 0x3096) || v == 0x309D || v == 0x309E
-        }
     }
 
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
     /// 候補が存在すれば isSuccessorMode = true を立てて返す。pendingRomaji は confirmSuccessor() で破棄される。
     public mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
-        resetScorerPending()
         guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
               let prev = lastCommittedOutput else { return .dismiss }
         var seen = Set<String>()
@@ -418,7 +368,6 @@ public extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if state.composingText.isEmpty {
-            resetScorerPending()
             bracketCandidates = options
             client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
             return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))

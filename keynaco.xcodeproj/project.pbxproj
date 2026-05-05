@@ -16,7 +16,6 @@
 		48F352724005237B685D8E35 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = AC5B60092B9315A5731AEF44 /* README.md */; };
 		54C6A7E0B755C0C9EDDFF520 /* preset_bigram.csv in Resources */ = {isa = PBXBuildFile; fileRef = 389579979B22B7F2D6298743 /* preset_bigram.csv */; };
 		57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19DE79F93A3BDB8CDBC90A08 /* AppDelegate.swift */; };
-		580EE686A6F36BC0E8F726CF /* CandidateWindowMoveRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2BFAF5162C51294F9D83C0D /* CandidateWindowMoveRowTests.swift */; };
 		6095BA557731F8320F694AF8 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A89E465235280624AF1A85 /* FoundationModels.framework */; };
 		6341605E1C0AA49D7B745FD7 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */; };
 		8A9990EB76F54E21875AA952 /* ZenzaiSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C150B0401BC4C609E82079A /* ZenzaiSettings.swift */; };
@@ -79,7 +78,6 @@
 		E6A89E465235280624AF1A85 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
 		EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDictViewController.swift; sourceTree = "<group>"; };
 		EF84CE1FD39376C1BC2A710C /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
-		F2BFAF5162C51294F9D83C0D /* CandidateWindowMoveRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowMoveRowTests.swift; sourceTree = "<group>"; };
 		FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
 		9CD4B32B2C294E56820A1632 /* ZenzaiViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenzaiViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -157,7 +155,6 @@
 		3EAA0BCEDB8E175E01567587 /* keynacoTests */ = {
 			isa = PBXGroup;
 			children = (
-				F2BFAF5162C51294F9D83C0D /* CandidateWindowMoveRowTests.swift */,
 				A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */,
 			);
 			path = keynacoTests;
@@ -320,7 +317,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				580EE686A6F36BC0E8F726CF /* CandidateWindowMoveRowTests.swift in Sources */,
 				B2ABABD46456BA4A8BC0BDA8 /* SurroundingIMKContextTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

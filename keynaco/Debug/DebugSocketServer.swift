@@ -27,7 +27,6 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private let successorLLM = LLMSuccessorFetcher()
     private let segmentLLM = LLMSegmentConverter()
-    private let candidateScorer = LLMCandidateScorer()
 
     /// `reset` のたびに増やし、直前のキー処理で飛ばした LLM 完了コールバックを無効化する。
     private var llmEpoch: UInt64 = 0
@@ -141,8 +140,6 @@ final class DebugSocketServer: @unchecked Sendable {
             cleanupSnapshot()
             successorLLM.cancel()
             segmentLLM.cancel()
-            candidateScorer.cancel()
-            handler.resetScorerPending()
             llmEpoch &+= 1
             let useRealDB = cmd["useRealDB"] as? Bool ?? false
             let converter = ZenzaiSettings.makeConverter()
@@ -231,7 +228,6 @@ final class DebugSocketServer: @unchecked Sendable {
     private func applyLLMScheduling() {
         applySuccessorLLMScheduling()
         applySegmentLLMScheduling()
-        applyCandidateScorerScheduling()
     }
 
     private func applySuccessorLLMScheduling() {
@@ -346,51 +342,6 @@ final class DebugSocketServer: @unchecked Sendable {
                 )
                 self.handler.applySegmentMarkedText(client: self.mockClient)
             }
-        }
-    }
-
-    private func applyCandidateScorerScheduling() {
-        candidateScorer.cancel()
-        guard handler.lastScorerEligible else { return }
-        guard !handler.pendingScorerGlobalIndices.isEmpty else { return }
-        guard !candidateWindow.isExplicitlySelected else { return }
-        guard !handler.state.isSegmentMode else { return }
-        guard !handler.isSuccessorMode else { return }
-        guard !handler.isBracketMode else { return }
-
-        let contextForScore = llmDocumentContextPrefix()
-        let reading = handler.state.composedHiragana
-        let opts = handler.pendingScorerStrings
-        let wasAutoShow = handler.lastCandidateListAutoShow
-
-        let examples: [(prev: String, next: String)] =
-            handler.committedHistory.last.map { lastWord in
-                handler.db.fetchBigramTop(prev: lastWord, limit: 5).map { (prev: lastWord, next: $0) }
-            } ?? []
-
-        let schedulingEpoch = llmEpoch
-        candidateScorer.score(
-            candidates: opts,
-            context: contextForScore,
-            reading: reading,
-            examples: examples
-        ) { [weak self] result in
-            guard let self else { return }
-            guard schedulingEpoch == self.llmEpoch else { return }
-            guard result.confidence == .high || !wasAutoShow else { return }
-            guard result.index != 0 || !wasAutoShow else { return }
-            let idx = result.index
-            guard idx >= 0, idx < self.handler.pendingScorerGlobalIndices.count else { return }
-            guard self.candidateWindow.isVisible else { return }
-            guard !self.candidateWindow.isExplicitlySelected else { return }
-            guard !self.handler.state.isSegmentMode else { return }
-            guard !self.handler.isSuccessorMode else { return }
-            guard !self.handler.isBracketMode else { return }
-            guard self.handler.state.composedHiragana == reading else { return }
-
-            let g = self.handler.pendingScorerGlobalIndices[idx]
-            self.candidateWindow.moveRow(from: g)
-            self.updateMockMarkedText()
         }
     }
 
@@ -568,35 +519,6 @@ struct DebugCandidateWindow {
             if row < historyEnd    { historyEnd -= 1 }
             if candidates.isEmpty { isVisible = false; selectedRow = 0 }
             else { selectedRow = min(selectedRow, candidates.count - 1) }
-        }
-    }
-
-    /// `CandidateWindow.moveRow(from:)` と同等（候補スコアラー用）。
-    mutating func moveRow(from: Int) {
-        guard candidates.indices.contains(from) else { return }
-        let destBefore = predictionEnd
-        if from == destBefore { return }
-        guard from >= predictionEnd else { return }
-
-        let keepText = selectedText
-
-        let fromHistoryBand = from >= predictionEnd && from < historyEnd
-        let fromAzooBand = from >= historyEnd
-
-        let item = candidates.remove(at: from)
-        candidates.insert(item, at: destBefore)
-
-        if fromHistoryBand {
-            predictionEnd += 1
-        } else if fromAzooBand {
-            predictionEnd += 1
-            historyEnd += 1
-        }
-
-        if let t = keepText, let newRow = candidates.firstIndex(of: t) {
-            selectedRow = newRow
-        } else {
-            selectedRow = min(selectedRow, candidates.count - 1)
         }
     }
 }
