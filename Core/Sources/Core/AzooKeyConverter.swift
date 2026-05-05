@@ -1,7 +1,7 @@
 import Foundation
 import KanaKanjiConverterModuleWithDefaultDictionary
 
-final class AzooKeyConverter: @unchecked Sendable {
+public final class AzooKeyConverter: @unchecked Sendable {
     private let converter = KanaKanjiConverter.withDefaultDictionary()
     private var candidateCache: [String: [Candidate]] = [:]
     private var candidateCacheKeys: [String] = []
@@ -10,7 +10,7 @@ final class AzooKeyConverter: @unchecked Sendable {
     private let memoryURL: URL
     private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }
 
-    var candidateCacheCount: Int { candidateCache.count }
+    public var candidateCacheCount: Int { candidateCache.count }
 
     private func insertCache(key: String, value: [Candidate]) {
         if candidateCache[key] != nil {
@@ -31,7 +31,7 @@ final class AzooKeyConverter: @unchecked Sendable {
         }
     }
 
-    init() {
+    public init() {
         let memoryURL = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first!.appendingPathComponent("keynaco")
@@ -59,7 +59,7 @@ final class AzooKeyConverter: @unchecked Sendable {
         )
     }
 
-    func requestCandidates(hiragana: String) -> [String] {
+    public func requestCandidates(hiragana: String) -> [String] {
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
         let result = converter.requestCandidates(text, options: options)
@@ -67,7 +67,7 @@ final class AzooKeyConverter: @unchecked Sendable {
         return result.mainResults.map { $0.text }
     }
 
-    func candidatesForSegment(reading: String) -> [String] {
+    public func candidatesForSegment(reading: String) -> [String] {
         var text = ComposingText()
         text.insertAtCursorPosition(reading, inputStyle: .direct)
         let result = converter.requestCandidates(text, options: options)
@@ -75,7 +75,7 @@ final class AzooKeyConverter: @unchecked Sendable {
         return result.mainResults.map { $0.text }
     }
 
-    func commit(reading: String, text: String) {
+    public func commit(reading: String, text: String) {
         guard let candidates = candidateCache[reading],
               let candidate = candidates.first(where: { $0.text == text }) else { return }
         FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
@@ -84,7 +84,7 @@ final class AzooKeyConverter: @unchecked Sendable {
         try? FileManager.default.removeItem(at: commitLockURL)
     }
 
-    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
+    public func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
         var segments: [(reading: String, candidates: [String])] = []
         var remaining = hiragana
         while !remaining.isEmpty {

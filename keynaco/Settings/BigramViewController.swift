@@ -1,4 +1,5 @@
 import AppKit
+import KeynacoCore
 import UniformTypeIdentifiers
 
 private struct BigramTransfer: Codable {

@@ -1,6 +1,7 @@
 #if DEBUG
 
 import AppKit
+import KeynacoCore
 
 extension Notification.Name {
     /// `InputController` が keyDown 処理完了後に内部状態を通知するときに使う（Debug のみ）。

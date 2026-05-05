@@ -2,20 +2,22 @@
 import PackageDescription
 
 let package = Package(
-    name: "Core",
-    platforms: [.macOS(.v15)],
+    // ディレクトリ名は `Core/` のまま。モジュール名を `KeynacoCore` にし、Xcode 上の `Core` フォルダ参照と `import Core` が衝突しないようにする。
+    name: "KeynacoCore",
+    platforms: [.macOS("26.0")],
     products: [
-        .library(name: "Core", targets: ["Core"])
+        .library(name: "KeynacoCore", targets: ["KeynacoCore"])
     ],
     dependencies: [
         .package(url: "https://github.com/azooKey/AzooKeyKanaKanjiConverter", from: "0.11.1")
     ],
     targets: [
         .target(
-            name: "Core",
+            name: "KeynacoCore",
             dependencies: [
                 .product(name: "KanaKanjiConverterModuleWithDefaultDictionary", package: "AzooKeyKanaKanjiConverter")
             ],
+            path: "Sources/Core",
             swiftSettings: [.interoperabilityMode(.Cxx)],
             linkerSettings: [
                 .linkedLibrary("sqlite3"),
@@ -23,8 +25,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "CoreTests",
-            dependencies: ["Core"],
+            name: "KeynacoCoreTests",
+            dependencies: ["KeynacoCore"],
+            path: "Sources/CoreTests",
             swiftSettings: [.interoperabilityMode(.Cxx)]
         )
     ]

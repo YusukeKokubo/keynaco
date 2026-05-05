@@ -1,4 +1,5 @@
 import AppKit
+import KeynacoCore
 
 final class HistoryViewController: NSViewController {
     private let tableView = DeletableTableView()

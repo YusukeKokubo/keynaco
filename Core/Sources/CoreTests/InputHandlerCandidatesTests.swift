@@ -1,5 +1,5 @@
 import XCTest
-@testable import keynaco
+@testable import KeynacoCore
 
 // See: docs/domain/states.md#候補選択中
 // See: docs/domain/glossary.md#fixedcount

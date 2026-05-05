@@ -1,8 +1,8 @@
 import Foundation
 import SQLite3
 
-final class DatabaseManager: @unchecked Sendable {
-    static let shared = DatabaseManager()
+public final class DatabaseManager: @unchecked Sendable {
+    public static let shared = DatabaseManager()
 
     private var db: OpaquePointer?
     private var stmtCache: [String: OpaquePointer] = [:]
@@ -32,7 +32,7 @@ final class DatabaseManager: @unchecked Sendable {
 
     /// テスト用: インメモリ DB で初期化
     /// - Parameter seedPresets: `true` のとき UserDefaults を踏まず `preset_bigram.csv` を投入（デバッグサンドボックス用）
-    init(inMemory: Bool, seedPresets: Bool = false) {
+    public init(inMemory: Bool, seedPresets: Bool = false) {
         writeAsync = false
         guard sqlite3_open(":memory:", &db) == SQLITE_OK else { return }
         createTables()
@@ -41,7 +41,7 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     /// デバッグ用: 既存ファイル DB を開く（一時スナップショット等）。`CREATE` は付けず、誤った空ファイル生成を避ける。
-    init(snapshotPath: String) {
+    public init(snapshotPath: String) {
         writeAsync = false
         guard sqlite3_open_v2(snapshotPath, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { return }
         createTables()
@@ -342,26 +342,33 @@ final class DatabaseManager: @unchecked Sendable {
 
     // MARK: - 設定画面用
 
-    struct BigramEntry {
-        let prev: String
-        let input: String
-        let output: String
-        let count: Int
+    public struct BigramEntry: Sendable {
+        public let prev: String
+        public let input: String
+        public let output: String
+        public let count: Int
+
+        public init(prev: String, input: String, output: String, count: Int) {
+            self.prev = prev
+            self.input = input
+            self.output = output
+            self.count = count
+        }
     }
 
-    struct HistoryEntry {
-        let input: String
-        let output: String
-        let count: Int
+    public struct HistoryEntry: Sendable {
+        public let input: String
+        public let output: String
+        public let count: Int
     }
 
-    struct UserDictEntry {
-        let id: Int
-        let input: String
-        let output: String
+    public struct UserDictEntry: Sendable {
+        public let id: Int
+        public let input: String
+        public let output: String
     }
 
-    func fetchAllBigram() -> [BigramEntry] {
+    public func fetchAllBigram() -> [BigramEntry] {
         dbQueue.sync {
             let sql = "SELECT prev, input, output, count FROM bigram ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
@@ -381,7 +388,7 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    func deleteBigram(prev: String, input: String, output: String) {
+    public func deleteBigram(prev: String, input: String, output: String) {
         dispatchWrite {
             self.executeOnQueue("DELETE FROM bigram WHERE prev = ? AND input = ? AND output = ?") {
                 self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
@@ -389,7 +396,7 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    func fetchAllHistory() -> [HistoryEntry] {
+    public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
             let sql = "SELECT input, output, count FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
@@ -408,7 +415,7 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    func deleteHistoryEntry(input: String, output: String) {
+    public func deleteHistoryEntry(input: String, output: String) {
         dispatchWrite {
             self.executeOnQueue("DELETE FROM history WHERE input = ? AND output = ?") {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
@@ -487,7 +494,7 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     /// 既存の bi-gram（プリセット以外）を全削除してからインポートデータで置き換える。
-    func replaceBigram(_ entries: [BigramEntry]) {
+    public func replaceBigram(_ entries: [BigramEntry]) {
         dbQueue.sync {
             self.executeOnQueue("DELETE FROM bigram WHERE is_preset = 0")
             let sql = """
@@ -544,7 +551,7 @@ final class DatabaseManager: @unchecked Sendable {
 
     /// prev に続く bi-gram 上位候補を返す（input に依らず output を集約）。
     /// 同じ output が複数 input で学習されている場合は count の合計でソートする。
-    func fetchBigramTop(prev: String, limit: Int = 20) -> [String] {
+    public func fetchBigramTop(prev: String, limit: Int = 20) -> [String] {
         dbQueue.sync {
             let now = self.nowEpoch()
             return self.queryStringsOnQueue("""
@@ -562,7 +569,7 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     /// prev に続く bi-gram の直近 90 日以内の最大 count を返す。即時表示の閾値判定用。
-    func fetchBigramTopCount(prev: String) -> Int {
+    public func fetchBigramTopCount(prev: String) -> Int {
         dbQueue.sync {
             let cutoff = self.nowEpoch() - 90 * 86400
             let sql = "SELECT MAX(count) FROM bigram WHERE prev = ? AND (used_at > ? OR is_preset = 1)"
@@ -713,7 +720,7 @@ final class DatabaseManager: @unchecked Sendable {
     // MARK: - 削除
 
     /// 履歴から指定の output を持つエントリを削除
-    func deleteHistory(output: String) {
+    public func deleteHistory(output: String) {
         dispatchWrite {
             self.executeOnQueue("DELETE FROM history WHERE output = ?") { self.bindText($0, 1, output) }
         }
@@ -895,7 +902,7 @@ final class DatabaseManager: @unchecked Sendable {
         return (exact, pfx)
     }
 
-    func fetchAllUserDict() -> [UserDictEntry] {
+    public func fetchAllUserDict() -> [UserDictEntry] {
         dbQueue.sync {
             let sql = "SELECT id, input, output FROM user_dict ORDER BY id ASC"
             var stmt: OpaquePointer?
@@ -916,7 +923,7 @@ final class DatabaseManager: @unchecked Sendable {
     }
 
     @discardableResult
-    func addUserDict(input: String, output: String) -> Bool {
+    public func addUserDict(input: String, output: String) -> Bool {
         dbQueue.sync {
             self.executeOnQueue("INSERT OR IGNORE INTO user_dict (input, output) VALUES (?, ?)") {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
@@ -925,7 +932,7 @@ final class DatabaseManager: @unchecked Sendable {
         }
     }
 
-    func deleteUserDict(id: Int) {
+    public func deleteUserDict(id: Int) {
         dispatchWrite {
             self.executeOnQueue("DELETE FROM user_dict WHERE id = ?") {
                 sqlite3_bind_int($0, 1, Int32(id))
@@ -971,7 +978,7 @@ final class DatabaseManager: @unchecked Sendable {
 
     // MARK: - GC
 
-    func performGCIfNeeded() {
+    public func performGCIfNeeded() {
         let key = "lastGCDate"
         let defaults = UserDefaults.standard
         let now = nowEpoch()

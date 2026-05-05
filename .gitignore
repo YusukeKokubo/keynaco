@@ -6,3 +6,9 @@ DerivedData/
 .claude/*
 !.claude/commands/
 !.claude/skills/
+
+# SPM/Xcode のビルドキャッシュ（コミットしない）
+LocalPackages/
+Core/.build/
+# ローカルに clone する zenz 重み（サブモジュールは使わず README で取得先を案内する想定）
+keynaco/Resources/zenz-v3.1-small-gguf/

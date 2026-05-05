@@ -3,13 +3,13 @@ import FoundationModels
 
 /// 変換候補を直前文脈に照らしてオンデバイス LLM が「最も自然な」1 件を選ぶ。
 @MainActor
-final class LLMCandidateScorer {
+public final class LLMCandidateScorer {
 
-    struct ScorerResult: Sendable {
-        let index: Int
-        let confidence: Confidence
+    public struct ScorerResult: Sendable {
+        public let index: Int
+        public let confidence: Confidence
 
-        enum Confidence: Sendable {
+        public enum Confidence: Sendable {
             case high
             case mid
             case low
@@ -23,7 +23,9 @@ final class LLMCandidateScorer {
         """
     }
 
-    func cancel() {
+    public init() {}
+
+    public func cancel() {
         task?.cancel()
         task = nil
     }
@@ -32,7 +34,7 @@ final class LLMCandidateScorer {
     /// - Parameter examples: N-gram DB の bi-gram 上位を few-shot として注入（最大5件想定）。
     /// - Parameter onResult: 成功時のみ呼ぶ。**`confidence == .low` のときは呼ばない**。
     ///   `index` は `candidates` 配列の 0-based。呼び出し側は `pendingF1GlobalIndices` でグローバル行へ写像する。
-    func score(
+    public func score(
         candidates: [String],
         context: String,
         reading: String,

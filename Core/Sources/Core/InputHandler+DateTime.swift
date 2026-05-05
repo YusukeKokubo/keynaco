@@ -1,7 +1,7 @@
 import Foundation
 
-extension InputHandler {
-    static func generateDateTimeCandidates(for reading: String) -> [String] {
+public extension InputHandler {
+    public static func generateDateTimeCandidates(for reading: String) -> [String] {
         let cal = Calendar.current
         let now = Date()
         switch reading {

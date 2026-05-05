@@ -3,29 +3,29 @@
 import Foundation
 
 /// `InputController` が `InputHandler` と候補ウィンドウから組み立てるデバッグ用スナップショット。
-struct InputHandlerSnapshot: Sendable {
-    var composedHiragana: String
-    var pendingRomaji: String
-    var composingText: String
-    var markedText: String
+public struct InputHandlerSnapshot: Sendable {
+    public var composedHiragana: String
+    public var pendingRomaji: String
+    public var composingText: String
+    public var markedText: String
 
-    var isAsciiMode: Bool
-    var isSuccessorMode: Bool
-    var isSegmentMode: Bool
-    var isBracketMode: Bool
-    var isExplicitlySelected: Bool
+    public var isAsciiMode: Bool
+    public var isSuccessorMode: Bool
+    public var isSegmentMode: Bool
+    public var isBracketMode: Bool
+    public var isExplicitlySelected: Bool
 
-    var candidateVisible: Bool
-    var selectedRow: Int
-    var selectedText: String?
-    var historyEnd: Int
-    var fixedEnd: Int
-    var candidates: [String]
+    public var candidateVisible: Bool
+    public var selectedRow: Int
+    public var selectedText: String?
+    public var historyEnd: Int
+    public var fixedEnd: Int
+    public var candidates: [String]
 
-    var committedHistory: [String]
+    public var committedHistory: [String]
 
-    var segmentTexts: [String]
-    var focusedSegmentIndex: Int
+    public var segmentTexts: [String]
+    public var focusedSegmentIndex: Int
 }
 
 #endif

@@ -3,7 +3,7 @@ import FoundationModels
 
 /// Successor モード用：確定直後の文脈に続く語をオンデバイス LLM で補完する（表層形）。
 @MainActor
-final class LLMSuccessorFetcher {
+public final class LLMSuccessorFetcher {
     private var task: Task<Void, Never>?
     private lazy var session: LanguageModelSession = LanguageModelSession(model: SystemLanguageModel.default) {
         """
@@ -11,13 +11,15 @@ final class LLMSuccessorFetcher {
         """
     }
 
-    func cancel() {
+    public init() {}
+
+    public func cancel() {
         task?.cancel()
         task = nil
     }
 
     /// `words` は確定語の直近順（末尾が最新）、最大3語。`documentContextPrefix` は IMK 前文または `committedHistory` フォールバック。`examples` は few-shot。失敗時は空配列。
-    func fetch(
+    public func fetch(
         context words: [String],
         documentContextPrefix: String,
         examples: [(prev: String, next: String)],

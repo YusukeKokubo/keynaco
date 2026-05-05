@@ -1,4 +1,5 @@
 import AppKit
+import KeynacoCore
 
 @MainActor
 final class UserDictViewController: NSViewController {

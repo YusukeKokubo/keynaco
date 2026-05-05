@@ -3,7 +3,7 @@ import FoundationModels
 
 /// セグメントモード用：`composedHiragana` 全体をオンデバイス LLM で一括変換する。
 @MainActor
-final class LLMSegmentConverter {
+public final class LLMSegmentConverter {
     private var task: Task<Void, Never>?
     private lazy var session: LanguageModelSession = LanguageModelSession(model: SystemLanguageModel.default) {
         """
@@ -11,13 +11,15 @@ final class LLMSegmentConverter {
         """
     }
 
-    func cancel() {
+    public init() {}
+
+    public func cancel() {
         task?.cancel()
         task = nil
     }
 
     /// 変換結果のテキストのみ（失敗時は空文字）。
-    func convert(hiragana: String, onResult: @escaping (String) -> Void) {
+    public func convert(hiragana: String, onResult: @escaping (String) -> Void) {
         guard case .available = SystemLanguageModel.default.availability else {
             onResult("")
             return
@@ -214,7 +216,7 @@ final class LLMSegmentConverter {
 }
 
 private extension String {
-    mutating func removeFirst(count n: Int) {
+    public mutating func removeFirst(count n: Int) {
         guard n > 0 else { return }
         let idx = index(startIndex, offsetBy: n, limitedBy: endIndex) ?? endIndex
         removeSubrange(startIndex..<idx)

@@ -19,16 +19,18 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 | パス | 内容 |
 |------|------|
-| `Sources/` | アプリ本体（Swift ソース + Info.plist + entitlements） |
-| `Sources/Settings/` | 設定画面（`SettingsWindowController` 等 4 ファイル） |
-| `Sources/PresetBigram/` | `preset_bigram.csv`（プリセット Bi-gram バンドルリソース） |
-| `Sources/Debug/` | デバッグ用ツール（`EventViewerWindow` 等、本番動作には影響しない） |
-| `Tests/` | ユニットテスト（XCTest） |
+| `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
+| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 4 ファイル） |
+| `keynaco/PresetBigram/` | `preset_bigram.csv`（プリセット Bi-gram バンドルリソース） |
+| `keynaco/Debug/` | デバッグ用ツール（`EventViewerWindow` 等、本番動作には影響しない） |
+| `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
+| `Core/Sources/CoreTests/` | `KeynacoCore` のユニットテスト（XCTest） |
+| `keynacoTests/` | アプリ専用テスト（`CandidateWindow` / `SurroundingIMKContext` 等） |
+| `keynaco.xcodeproj` | Xcode プロジェクト（リポジトリ管理。ローカル SPM で `Core/` を参照） |
 | `docs/domain/` | ドメイン知識ドキュメント（用語・状態遷移・シナリオ） |
 | `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` 形式） |
 | `scripts/` | 開発用スクリプト（`generate_preset_bigram_csv.py` 等） |
 | `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
-| `project.yml` | XcodeGen 設定 |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
 
 ### 起動チェーン（IMK ブートストラップ）
@@ -40,11 +42,10 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 ## ビルド・インストール
 
 ```bash
-xcodegen generate
 xcodebuild build -scheme keynaco -configuration Debug
 ```
 
-- Build Post-action（`project.yml` の `schemes`）により `/Library/Input Methods/` への自動コピーとプロセス再起動が行われる
+- Build Post-action（`keynaco` scheme の Build Post-action、`keynaco.xcodeproj` 内）により `/Library/Input Methods/` への自動コピーとプロセス再起動が行われる
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
 - バージョン番号は git tag で管理。`git tag v0.1.0` → ビルド時に `CFBundleShortVersionString` / `CFBundleVersion` に自動注入（post-action が `PlistBuddy` で書き換え）。`PlistBuddy` 後は署名が無効化されるため、post-action の最後で `codesign --force --deep --sign` による再署名が必須（無いと macOS 26 が SIGKILL でプロセスを落とす）
 - 初回セットアップ: `sudo chmod -R +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_child,delete,read,write,execute" "/Library/Input Methods"` が必要（所有者を root のまま ACL で自分にだけ権限を付与）
@@ -55,9 +56,16 @@ xcodebuild build -scheme keynaco -configuration Debug
 
 ## テスト実行
 
+アプリ＋ IMK 関連テスト:
+
 ```bash
-xcodegen generate  # .xcodeproj がない場合のみ
 xcodebuild test -scheme keynaco -destination "platform=macOS"
+```
+
+コアロジックのみ（`KeynacoCore` / SPM）:
+
+```bash
+cd Core && swift test
 ```
 
 ## コンポーネント構成
@@ -70,16 +78,16 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
 - `AzooKeyConverting` / `AzooKeyConverter` = ひらがな→漢字変換エンジンの DI プロトコルと実装（`TextInputClient` と同じ役割）。`AzooKeyConverter` は `KanaKanjiConverterModuleWithDefaultDictionary` のラッパー（学習データを `~/Library/Application Support/keynaco/` に保存）。`buildCandidateList` は `composedHiragana` が変わらない限り `requestCandidates` を再呼び出しせずキャッシュを返す（LRU 上限 50 件）
 - `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` / `skip_bigram` / `user_dict` / `boundary_pref` の **6 テーブル**を持つ。`bigram` には `is_preset` 列があり、バンドル `preset_bigram.csv` の初回シード行（`UserDefaults` `preset_seeded_v1`）は Bi-gram インポート・GC で消えない。`boundary_pref` はセグメント境界学習（読み全体 → 区切り位置の配列）を保存し、次回同じ読みを変換したとき同じ境界を優先する。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）。`user_dict` のみ time-decay なし（永続登録）。`performGCIfNeeded()` で count=1 かつ 180日超のエントリを定期削除（`boundary_pref` も対象。`bigram` のプリセット行は除外）
-- `SettingsWindowController` / `BigramViewController` / `HistoryViewController` / `UserDictViewController` = `Sources/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「ユーザー辞書」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD
+- `SettingsWindowController` / `BigramViewController` / `HistoryViewController` / `UserDictViewController` = `keynaco/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「ユーザー辞書」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
 - `SurroundingIMKContext` = カーソル前後テキストの取得ユーティリティ（enum + static func）。`IMKTextInput` の `attributedSubstring(from:)` / `length` / `selectedRange` をラップし、LLM 系コンポーネント（`LLMMisconversionChecker` 等）が文脈テキストを取得するために使用
 - `InputHandlerSnapshot`（`#if DEBUG`）= `InputController` が `InputHandler` と候補ウィンドウから組み立てるデバッグ用スナップショット（`InputHandlerSnapshot.swift` + `InputHandler+Snapshot.swift`）。`DebugSocketServer` が JSON レスポンスのペイロードとして送信
-- `EventViewerWindow` = `Sources/Debug/EventViewerWindow.swift`。`AppDelegate` が NSStatusItem（⌨アイコン）として常駐し、メニューから起動。keyCode・chars・mods・consumed・action・app をリアルタイム表示。確定テキストと候補リストをキャプチャしてクリップボードにコピー可能。JSONL エクスポートで `~/Library/Application Support/keynaco/sessions/` に保存。デバッグ用途
-- `IMESandboxWindow` = `Sources/Debug/IMESandboxWindow.swift`。GUI 上でキーシーケンスを手動送信し `DebugSocketServer` の状態スナップショットを表示するサンドボックス画面。`AppDelegate` からメニュー経由で起動
-- `DebugSocketServer` = `Sources/Debug/DebugSocketServer.swift`（`#if DEBUG`）。Unix ドメインソケット（`$TMPDIR/keynaco-debug.sock`）経由でキー入力コマンドを受け取り、専用 `InputHandler`（`DatabaseManager(inMemory: true, seedPresets: true)`）で処理して JSON を返す対話デバッグサーバー。IMK パイプラインをバイパスするため本番アプリとは独立。`/keynaco-ime-sandbox` スキルが使用
+- `EventViewerWindow` = `keynaco/Debug/EventViewerWindow.swift`。`AppDelegate` が NSStatusItem（⌨アイコン）として常駐し、メニューから起動。keyCode・chars・mods・consumed・action・app をリアルタイム表示。確定テキストと候補リストをキャプチャしてクリップボードにコピー可能。JSONL エクスポートで `~/Library/Application Support/keynaco/sessions/` に保存。デバッグ用途
+- `IMESandboxWindow` = `keynaco/Debug/IMESandboxWindow.swift`。GUI 上でキーシーケンスを手動送信し `DebugSocketServer` の状態スナップショットを表示するサンドボックス画面。`AppDelegate` からメニュー経由で起動
+- `DebugSocketServer` = `keynaco/Debug/DebugSocketServer.swift`（`#if DEBUG`）。Unix ドメインソケット（`$TMPDIR/keynaco-debug.sock`）経由でキー入力コマンドを受け取り、専用 `InputHandler`（`DatabaseManager(inMemory: true, seedPresets: true)`）で処理して JSON を返す対話デバッグサーバー。IMK パイプラインをバイパスするため本番アプリとは独立。`/keynaco-ime-sandbox` スキルが使用
 
-変換エンジンは `AzooKeyKanaKanjiConverter`（ローカルパッケージ）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
+変換エンジンは `AzooKeyKanaKanjiConverter`（`Core/Package.swift` の依存）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 `KanaUtils` = ひらがな↔カタカナ変換ユーティリティ（`hiraganaToKatakana` / `hiraganaToHankakuKatakana` / `toZenkakuAscii`）。F7–F9 変換確定とカタカナ候補生成で使用。
 

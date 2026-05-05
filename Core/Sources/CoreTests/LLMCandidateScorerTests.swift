@@ -1,5 +1,5 @@
 import XCTest
-@testable import keynaco
+@testable import KeynacoCore
 
 @MainActor
 final class LLMCandidateScorerTests: XCTestCase {

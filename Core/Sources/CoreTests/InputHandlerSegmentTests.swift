@@ -1,5 +1,5 @@
 import XCTest
-@testable import keynaco
+@testable import KeynacoCore
 
 // See: docs/domain/states.md#セグメントモード
 // See: docs/domain/glossary.md#セグメントモードsegmentmode

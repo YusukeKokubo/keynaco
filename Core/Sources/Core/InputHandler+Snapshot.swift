@@ -2,9 +2,9 @@
 
 import Foundation
 
-extension InputHandler {
+public extension InputHandler {
     /// 候補ウィンドウの状態は `InputController` が上書きする（ここではダミーで埋める）。
-    func snapshot(markedText: String) -> InputHandlerSnapshot {
+    public func snapshot(markedText: String) -> InputHandlerSnapshot {
         let segTexts: [String]
         let segFocus: Int
         if let ss = state.segmentState {

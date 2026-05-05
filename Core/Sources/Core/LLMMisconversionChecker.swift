@@ -3,7 +3,7 @@ import FoundationModels
 
 /// 確定直後のカーソル前文をオンデバイス LLM で検査し、誤変換の可能性を通知する。
 @MainActor
-final class LLMMisconversionChecker {
+public final class LLMMisconversionChecker {
     private var debounceTask: Task<Void, Never>?
     private var llmTask: Task<Void, Never>?
     private lazy var session: LanguageModelSession = LanguageModelSession(model: SystemLanguageModel.default) {
@@ -12,13 +12,15 @@ final class LLMMisconversionChecker {
         """
     }
 
+    public init() {}
+
     /// テスト用フック（任意）。通知とは別に呼ばれる。
-    var onIssueFound: ((String) -> Void)?
+    public var onIssueFound: ((String) -> Void)?
     /// テスト用フック（任意）。通知とは別に呼ばれる。
-    var onClear: (() -> Void)?
+    public var onClear: (() -> Void)?
 
     /// 進行中のデバウンス・LLM タスクを止める。`suppressClearNotification == false` のときクリア通知を送る。
-    func cancel(suppressClearNotification: Bool = false) {
+    public func cancel(suppressClearNotification: Bool = false) {
         debounceTask?.cancel()
         llmTask?.cancel()
         debounceTask = nil
@@ -30,7 +32,7 @@ final class LLMMisconversionChecker {
 
     /// カーソル直前の確定済みテキスト断片（最大 200 文字想定）を検査する。0.5 秒デバウンス。
     /// `recentWords` は呼び出し時点のスナップショット（デバウンス中の履歴変化は反映しない）。
-    func check(surroundingPrefix: String, recentWords: [String] = []) {
+    public func check(surroundingPrefix: String, recentWords: [String] = []) {
         guard case .available = SystemLanguageModel.default.availability else { return }
 
         cancel(suppressClearNotification: true)

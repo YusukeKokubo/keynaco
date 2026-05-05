@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""preset_bigram.csv を生成する（開発用）。出力は Sources/PresetBigram/preset_bigram.csv。"""
+"""preset_bigram.csv を生成する（開発用）。出力は keynaco/PresetBigram/preset_bigram.csv。"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -300,7 +300,7 @@ def main() -> None:
         add(*t)
 
     root = Path(__file__).resolve().parents[1]
-    out_path = root / "Sources" / "PresetBigram" / "preset_bigram.csv"
+    out_path = root / "keynaco" / "PresetBigram" / "preset_bigram.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["prev,input,output"]
     lines.extend(",".join((p.replace(",", "，"), i.replace(",", "，"), o.replace(",", "，"))) for p, i, o in rows)

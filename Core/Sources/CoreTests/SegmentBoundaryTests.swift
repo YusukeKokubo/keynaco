@@ -1,5 +1,5 @@
 import XCTest
-@testable import keynaco
+@testable import KeynacoCore
 
 /// `inferSegmentBoundaries` の単体テスト。`candidatesForSegment` は最短一致の前提を満たすよう、
 /// **短い読みでは長いトークンを返さない**スタブで固定する。

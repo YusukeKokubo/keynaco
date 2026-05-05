@@ -2,7 +2,7 @@ import AppKit
 
 /// テキスト操作のクライアント（テキストエディタ側）を表すプロトコル。
 /// IMKTextInput の薄い抽象。テストでは MockTextClient が実装する。
-protocol TextInputClient: AnyObject {
+public protocol TextInputClient: AnyObject {
     func insertText(_ text: String)
     func setMarkedText(_ text: String, selectionRange: NSRange)
     func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange)
@@ -11,15 +11,15 @@ protocol TextInputClient: AnyObject {
     func cursorRect() -> NSRect
 }
 
-extension TextInputClient {
+public extension TextInputClient {
     /// NSAttributedString 版のデフォルト実装（文字列版にフォールバック）
-    func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange) {
+    public func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange) {
         setMarkedText(text.string, selectionRange: selectionRange)
     }
     /// selectedRange 未サポートのアプリ向けデフォルト実装
-    func selectedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
+    public func selectedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
     /// replacementRange 未サポートのアプリ向けデフォルト実装
-    func setMarkedText(_ text: String, selectionRange: NSRange, replacementRange: NSRange) {
+    public func setMarkedText(_ text: String, selectionRange: NSRange, replacementRange: NSRange) {
         setMarkedText(text, selectionRange: selectionRange)
     }
 }

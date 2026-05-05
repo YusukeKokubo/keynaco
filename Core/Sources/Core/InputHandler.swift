@@ -1,7 +1,7 @@
 import AppKit
 
 /// 候補ウィンドウに対する操作指示
-enum CandidateAction {
+public enum CandidateAction: Sendable {
     case none
     case show(candidates: [String], historyEnd: Int, initialRow: Int, predictionEnd: Int, fixedEnd: Int)
     case dismiss
@@ -12,7 +12,7 @@ enum CandidateAction {
 
 /// 候補ウィンドウの現在状態スナップショット（読み取り専用）
 /// Successor 用：オンデバイス LLM で後続語を補完するタイミング（`InputController` が参照してフェッチを開始する）。
-enum SuccessorLLMTrigger: Equatable {
+public enum SuccessorLLMTrigger: Equatable {
     case none
     /// N-gram あり・閾値未満で保留（`.dismiss`）になった直後。`context` は `committedHistory.suffix(3)` のスナップショット。
     case pendingLowConfidence(context: [String])
@@ -21,53 +21,72 @@ enum SuccessorLLMTrigger: Equatable {
 }
 
 /// セグメントモード用：`InputController` が `LLMSegmentConverter` を起動するタイミング。
-enum SegmentLLMTrigger: Equatable {
+public enum SegmentLLMTrigger: Equatable {
     case none
     case start(hiragana: String)
 }
 
-struct CandidateContext {
-    var isVisible: Bool
-    var selectedRow: Int
-    var selectedText: String?
+public struct CandidateContext: Sendable {
+    public var isVisible: Bool
+    public var selectedRow: Int
+    public var selectedText: String?
     /// ユーザーが ↑↓ で明示的に候補を動かしたか（初期表示のまま = false）
-    var isExplicitlySelected: Bool = false
+    public var isExplicitlySelected: Bool
     /// 履歴セクションの末尾インデックス（これ未満の行が履歴）
-    var historyEnd: Int = 0
+    public var historyEnd: Int
     /// ユーザー辞書+カナ固定行の末尾インデックス（これ未満の行は Shift+Delete 不可）
-    var fixedEnd: Int = 0
+    public var fixedEnd: Int
 
-    static let hidden = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
+    public init(
+        isVisible: Bool,
+        selectedRow: Int,
+        selectedText: String?,
+        isExplicitlySelected: Bool = false,
+        historyEnd: Int = 0,
+        fixedEnd: Int = 0
+    ) {
+        self.isVisible = isVisible
+        self.selectedRow = selectedRow
+        self.selectedText = selectedText
+        self.isExplicitlySelected = isExplicitlySelected
+        self.historyEnd = historyEnd
+        self.fixedEnd = fixedEnd
+    }
+
+    public static let hidden = CandidateContext(
+        isVisible: false, selectedRow: 0, selectedText: nil,
+        isExplicitlySelected: false, historyEnd: 0, fixedEnd: 0
+    )
 }
 
 /// 確定直後 Backspace で `penalizeAll` するための、直前確定の学習コンテキスト。
-struct LastConfirmedContext: Equatable {
-    let input: String
-    let output: String
-    let prev1: String?
-    let prev2: String?
-    let skipPrevs: [String]
-    let fullReading: String?
+public struct LastConfirmedContext: Equatable {
+    public let input: String
+    public let output: String
+    public let prev1: String?
+    public let prev2: String?
+    public let skipPrevs: [String]
+    public let fullReading: String?
 }
 
-enum KeyCode {
-    static let eisu:      UInt16 = 102
-    static let kana:      UInt16 = 104
-    static let backspace: UInt16 = 51
-    static let space:     UInt16 = 49
-    static let enter:     UInt16 = 36
-    static let escape:    UInt16 = 53
-    static let tab:       UInt16 = 48
-    static let capsLock:  UInt16 = 57
-    static let downArrow: UInt16 = 125
-    static let upArrow:   UInt16 = 126
-    static let leftArrow: UInt16 = 123
-    static let rightArrow: UInt16 = 124
-    static let f6:  UInt16 = 97
-    static let f7:  UInt16 = 98
-    static let f8:  UInt16 = 100
-    static let f9:  UInt16 = 101
-    static let f10: UInt16 = 109
+public enum KeyCode {
+    public static let eisu:      UInt16 = 102
+    public static let kana:      UInt16 = 104
+    public static let backspace: UInt16 = 51
+    public static let space:     UInt16 = 49
+    public static let enter:     UInt16 = 36
+    public static let escape:    UInt16 = 53
+    public static let tab:       UInt16 = 48
+    public static let capsLock:  UInt16 = 57
+    public static let downArrow: UInt16 = 125
+    public static let upArrow:   UInt16 = 126
+    public static let leftArrow: UInt16 = 123
+    public static let rightArrow: UInt16 = 124
+    public static let f6:  UInt16 = 97
+    public static let f7:  UInt16 = 98
+    public static let f8:  UInt16 = 100
+    public static let f9:  UInt16 = 101
+    public static let f10: UInt16 = 109
 }
 
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
@@ -76,47 +95,47 @@ enum KeyCode {
 /// - `InputHandler+SuccessorMode.swift`：後続語サジェストと格助詞 fast-path
 /// - `InputHandler+SegmentMode.swift`  ：文節分割と境界調整
 /// - `InputHandler+Candidates.swift`   ：候補リスト構築・候補表示中・通常入力
-struct InputHandler {
+public struct InputHandler {
 
     // 全InputControllerインスタンスで共有するモード（アプリ切替後も保持）
-    nonisolated(unsafe) static var isAsciiMode = false
+    public nonisolated(unsafe) static var isAsciiMode = false
 
-    static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
-    static let sentenceTerminators: Set<String> = ["。", "！", "？"]
-    static let successorImmediateThreshold = LearningThresholds.successorImmediateThreshold
+    public static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
+    public static let sentenceTerminators: Set<String> = ["。", "！", "？"]
+    public static let successorImmediateThreshold = LearningThresholds.successorImmediateThreshold
 
-    var state = CompositionState()
-    var ignoreNextModeSwitch = false
-    var isSuccessorMode = false
-    var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
-    var pendingSuccessorCandidates: [String] = []
+    public var state = CompositionState()
+    public var ignoreNextModeSwitch = false
+    public var isSuccessorMode = false
+    public var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
+    public var pendingSuccessorCandidates: [String] = []
     /// LLM が返した表層形のみ。`mergePendingSuccessorMatches` の `pending` には渡さない。
-    var successorLLMSurfaceExtras: [String] = []
+    public var successorLLMSurfaceExtras: [String] = []
     /// `particlesOnly` のとき即時表示した候補（LLM の表層形は `successorLLMSurfaceExtras`）。
-    var successorLLMBaseCandidates: [String]? = nil
-    var successorLLMTrigger: SuccessorLLMTrigger = .none
-    var segmentLLMTrigger: SegmentLLMTrigger = .none
-    var bracketCandidates: [String]? = nil
-    var isBracketMode: Bool { bracketCandidates != nil }
-    var lastConfirmedContext: LastConfirmedContext? = nil
-    var lastAzooKeyInput: String = ""
-    var lastAzooKeyResults: [String] = []
+    public var successorLLMBaseCandidates: [String]? = nil
+    public var successorLLMTrigger: SuccessorLLMTrigger = .none
+    public var segmentLLMTrigger: SegmentLLMTrigger = .none
+    public var bracketCandidates: [String]? = nil
+    public var isBracketMode: Bool { bracketCandidates != nil }
+    public var lastConfirmedContext: LastConfirmedContext? = nil
+    public var lastAzooKeyInput: String = ""
+    public var lastAzooKeyResults: [String] = []
     /// 候補スコアラー: `buildCandidateList` が返す候補列でのグローバル行（`pendingScorerStrings` と対応）
-    var pendingScorerGlobalIndices: [Int] = []
-    var pendingScorerStrings: [String] = []
+    public var pendingScorerGlobalIndices: [Int] = []
+    public var pendingScorerStrings: [String] = []
     /// 直近の `buildCandidateList` でスコアラーを起動してよいか
-    var lastScorerEligible: Bool = false
+    public var lastScorerEligible: Bool = false
     /// 直近の `buildCandidateList` が `.show` になったときの `autoShow` 引数（スコアラー確信度 guard 用）
-    var lastCandidateListAutoShow: Bool = false
-    var committedHistory: [String] = []
+    public var lastCandidateListAutoShow: Bool = false
+    public var committedHistory: [String] = []
     /// `pushCommitted` で文末記号により `committedHistory` を消した直後に立て、`InputController` が IMK 文脈キャッシュを捨てる。
-    var documentSurroundingContextInvalidated = false
-    var lastCommittedOutput: String? { committedHistory.last }
-    var segmentCandidateCache: [String: Segment] = [:]
-    var prev2Output: String? {
+    public var documentSurroundingContextInvalidated = false
+    public var lastCommittedOutput: String? { committedHistory.last }
+    public var segmentCandidateCache: [String: Segment] = [:]
+    public var prev2Output: String? {
         committedHistory.count >= 2 ? committedHistory[committedHistory.count - 2] : nil
     }
-    mutating func pushCommitted(_ text: String) {
+    public mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
             committedHistory.removeAll()
             documentSurroundingContextInvalidated = true
@@ -126,11 +145,11 @@ struct InputHandler {
         if committedHistory.count > 5 { committedHistory.removeFirst() }
     }
 
-    func mostRecentContentWord() -> String? {
+    public func mostRecentContentWord() -> String? {
         mostRecentContentWords(n: 1).first
     }
 
-    func mostRecentContentWords(n: Int) -> [String] {
+    public func mostRecentContentWords(n: Int) -> [String] {
         guard committedHistory.count >= 2 else { return [] }
         var result: [String] = []
         for i in stride(from: committedHistory.count - 2, through: 0, by: -1) {
@@ -141,17 +160,17 @@ struct InputHandler {
         }
         return result
     }
-    let db: DatabaseManager
-    let azooKeyConverter: any AzooKeyConverting
+    public let db: DatabaseManager
+    public let azooKeyConverter: any AzooKeyConverting
 
-    init(db: DatabaseManager = .shared, azooKeyConverter: (any AzooKeyConverting)? = nil) {
+    public init(db: DatabaseManager = .shared, azooKeyConverter: (any AzooKeyConverting)? = nil) {
         self.db = db
         self.azooKeyConverter = azooKeyConverter ?? AzooKeyConverter()
     }
 
     // MARK: - 公開インターフェース
 
-    mutating func handle(
+    public mutating func handle(
         keyCode: UInt16,
         characters: String?,
         baseCharacters: String?,
@@ -257,7 +276,7 @@ struct InputHandler {
 
     /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
     /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
-    mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
+    public mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
         // セグメントモード中の強制確定（アプリ切り替えなど）
         if let segmentState = state.segmentState {
             let selectedText = candidate.selectedText ?? segmentState.focusedSegment.selectedText
@@ -307,7 +326,7 @@ struct InputHandler {
 
     // MARK: - 共通ヘルパー（extension からも参照される）
 
-    mutating func commitText(
+    public mutating func commitText(
         text: String,
         skipHistory: Bool = false,
         fullReading: String? = nil,
@@ -341,7 +360,7 @@ struct InputHandler {
     }
 
     /// F6–F10 の変換確定。composingText が空なら false を返す。
-    mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
+    public mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
         if state.isSegmentMode, let segmentState = state.segmentState {
             state.composedHiragana = segmentState.segments.map(\.reading).joined()
             state.segmentState = nil
@@ -368,7 +387,7 @@ struct InputHandler {
         return true
     }
 
-    func applyMarkedText(candidateText: String?, client: TextInputClient) {
+    public func applyMarkedText(candidateText: String?, client: TextInputClient) {
         let text: String
         if let selected = candidateText {
             text = selected + state.pendingRomaji
@@ -378,7 +397,7 @@ struct InputHandler {
         client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
 
-    mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
+    public mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         let (handled, needsRefresh) = state.backspace()
         if !handled, let ctx = lastConfirmedContext {
             db.penalizeAll(
@@ -397,7 +416,7 @@ struct InputHandler {
         return (true, action)
     }
 
-    mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
+    public mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         guard state.reset() else { return (false, .none) }
         segmentLLMTrigger = .none
         applyMarkedText(candidateText: nil, client: client)

@@ -1,5 +1,5 @@
 import XCTest
-@testable import keynaco
+@testable import KeynacoCore
 
 // See: docs/domain/states.md#状態一覧
 // See: docs/domain/glossary.md#ascii-モード

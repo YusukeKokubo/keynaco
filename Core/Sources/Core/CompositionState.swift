@@ -2,28 +2,30 @@ import AppKit
 
 /// InputController から分離した純粋な状態遷移ロジック。
 /// IMK ランタイムに依存しないため、ユニットテストで検証可能。
-struct CompositionState {
+public struct CompositionState {
 
-    var composedHiragana = ""
-    var pendingRomaji = ""
+    public init() {}
+
+    public var composedHiragana = ""
+    public var pendingRomaji = ""
     // "nn" → "ん" + pending "n" の状態。"n" は表示・確定に含めず、次の母音と組み合わせる。
     // 標準IME準拠: "nn" 後は "ん" のみ表示し、続けて "ni" と打てば "んに" になる。
-    var hiddenPendingN = false
+    public var hiddenPendingN = false
 
     /// マークドテキストに表示する未確定文字列
-    var composingText: String {
+    public var composingText: String {
         hiddenPendingN ? composedHiragana : composedHiragana + pendingRomaji
     }
 
     /// 確定時のテキストを返す（pending の "n" → "ん" 等を含む）
-    var finalizedText: String {
+    public var finalizedText: String {
         // hiddenPendingN のとき pending "n" は捨てる（"nn" 後の確定は "ん" 1つ）
         hiddenPendingN ? composedHiragana : composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
     }
 
     /// ローマ字を追加してひらがなに変換する。
     /// - Returns: 候補リフレッシュが必要かどうか
-    mutating func addRomaji(_ chars: String) -> Bool {
+    public mutating func addRomaji(_ chars: String) -> Bool {
         // 非ローマ字文字（a-z・"-" 以外）が来たら pending をフラッシュしてから処理。
         // 例: "k" pending 中に "." を打つと "k." が詰まるのを防ぐ。
         let isRomajiChar = chars.unicodeScalars.allSatisfy {
@@ -52,7 +54,7 @@ struct CompositionState {
     /// Backspace 処理。
     /// - Returns: `(handled, candidateRefreshNeeded)`
     ///   handled=false は未確定文字列が空だった場合
-    mutating func backspace() -> (handled: Bool, candidateRefreshNeeded: Bool) {
+    public mutating func backspace() -> (handled: Bool, candidateRefreshNeeded: Bool) {
         guard !composingText.isEmpty else { return (false, false) }
         if hiddenPendingN {
             // "nn" → "ん"(表示) の状態: pending "n" と直前の "ん" をまとめて1操作で削除
@@ -67,12 +69,12 @@ struct CompositionState {
         return (true, composedHiragana.count >= 2)
     }
 
-    var segmentState: SegmentState? = nil
-    var isSegmentMode: Bool { segmentState != nil }
+    public var segmentState: SegmentState? = nil
+    public var isSegmentMode: Bool { segmentState != nil }
 
     /// 全状態をリセットする。
     /// - Returns: リセット前に未確定文字列またはセグメント状態があったか
-    mutating func reset() -> Bool {
+    public mutating func reset() -> Bool {
         guard !composingText.isEmpty || segmentState != nil else { return false }
         composedHiragana = ""
         pendingRomaji = ""
@@ -82,44 +84,44 @@ struct CompositionState {
     }
 
     /// Shift 入力の検出
-    static func isShiftInput(characters: String, baseCharacters: String) -> Bool {
+    public static func isShiftInput(characters: String, baseCharacters: String) -> Bool {
         characters != baseCharacters
     }
 }
 
 // MARK: - セグメント変換
 
-struct Segment {
-    let reading: String
-    var candidates: [String]
-    var selectedIndex: Int
-    var historyEnd: Int
-    var isManuallyAdjusted: Bool = false
+public struct Segment {
+    public let reading: String
+    public var candidates: [String]
+    public var selectedIndex: Int
+    public var historyEnd: Int
+    public var isManuallyAdjusted: Bool = false
 
-    var selectedText: String {
+    public var selectedText: String {
         guard !candidates.isEmpty else { return reading }
         return candidates[selectedIndex]
     }
 }
 
-struct SegmentState {
-    var segments: [Segment]
-    var focusedIndex: Int
+public struct SegmentState {
+    public var segments: [Segment]
+    public var focusedIndex: Int
     /// LLM による読み全体の一括変換テキスト。各文節先頭候補の連結がこの文字列と一致しうる（推論失敗時は先頭文節のみ挿入）。
-    var llmWholeText: String? = nil
+    public var llmWholeText: String? = nil
     /// `inferSegmentBoundaries` が 2 ペア以上返し `applyLLMBoundaries` で多文節に再構築されたとき true（1 ペアのみ・フォールバック挿入は false）。
-    var isLlmBoundaryInferred: Bool = false
+    public var isLlmBoundaryInferred: Bool = false
 
-    var focusedSegment: Segment {
+    public var focusedSegment: Segment {
         get { segments[focusedIndex] }
         set { segments[focusedIndex] = newValue }
     }
 
-    var allSelectedText: String {
+    public var allSelectedText: String {
         segments.map(\.selectedText).joined()
     }
 
-    func attributedString(overrideFocusedText: String? = nil) -> NSAttributedString {
+    public func attributedString(overrideFocusedText: String? = nil) -> NSAttributedString {
         let result = NSMutableAttributedString()
         for (i, seg) in segments.enumerated() {
             let text = (i == focusedIndex)

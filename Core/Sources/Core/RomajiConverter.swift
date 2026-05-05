@@ -1,6 +1,6 @@
 import Foundation
 
-struct RomajiConverter {
+public struct RomajiConverter {
 
     // MARK: - 変換テーブル
 
@@ -138,7 +138,7 @@ struct RomajiConverter {
 
     /// ローマ字文字列を変換する。
     /// - Returns: `converted` は確定済みひらがな、`pending` は未確定のローマ字
-    static func convert(_ romaji: String) -> (converted: String, pending: String) {
+    public static func convert(_ romaji: String) -> (converted: String, pending: String) {
         var converted = ""
         var remaining = romaji.lowercased()
 
@@ -201,7 +201,7 @@ struct RomajiConverter {
     }
 
     /// ひらがな文字列をローマ字（半角ASCII）に変換する。F9/F10 確定で使用。
-    static func hiraganaToRomaji(_ text: String) -> String {
+    public static func hiraganaToRomaji(_ text: String) -> String {
         let compound: [String: String] = [
             "きゃ": "kya", "きぃ": "kyi", "きゅ": "kyu", "きぇ": "kye", "きょ": "kyo",
             "しゃ": "sha", "しぃ": "syi", "しゅ": "shu", "しぇ": "she", "しょ": "sho",
@@ -282,7 +282,7 @@ struct RomajiConverter {
     }
 
     /// 確定時に pending のローマ字を強制変換する。"n" → "ん" 等。
-    static func forceFinalize(_ pending: String) -> String {
+    public static func forceFinalize(_ pending: String) -> String {
         if pending.isEmpty { return "" }
         if pending == "n" { return "ん" }
         // pending が変換テーブルに完全一致する場合

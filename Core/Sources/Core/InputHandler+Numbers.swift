@@ -1,7 +1,7 @@
 import Foundation
 
-extension InputHandler {
-    static func generateNumberCandidates(for reading: String) -> [String] {
+public extension InputHandler {
+    public static func generateNumberCandidates(for reading: String) -> [String] {
         guard !reading.isEmpty,
               reading.unicodeScalars.allSatisfy({ $0.value >= 0x30 && $0.value <= 0x39 })
         else { return [] }

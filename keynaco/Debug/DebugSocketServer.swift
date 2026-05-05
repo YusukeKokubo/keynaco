@@ -1,6 +1,7 @@
 #if DEBUG
 
 import Foundation
+import KeynacoCore
 import Darwin
 import AppKit
 import SQLite3
