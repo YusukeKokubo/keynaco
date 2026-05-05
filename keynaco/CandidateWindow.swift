@@ -271,6 +271,7 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
             rowView.identifier = id
         }
 
+        guard row < candidates.count else { return nil }
         rowView.label.stringValue = candidates[row]
         rowView.deleteButton.tag = row
         rowView.deleteButton.isHidden = row < fixedRowCount || row >= historySectionEnd

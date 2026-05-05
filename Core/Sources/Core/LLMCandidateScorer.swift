@@ -17,11 +17,6 @@ public final class LLMCandidateScorer {
     }
 
     private var task: Task<Void, Never>?
-    private lazy var session: LanguageModelSession = LanguageModelSession(model: SystemLanguageModel.default) {
-        """
-        あなたは日本語入力メソッドの補助モジュールです。指示された形式だけを出力し、説明文は書かないでください。
-        """
-    }
 
     public init() {}
 
@@ -51,6 +46,9 @@ public final class LLMCandidateScorer {
             examples: examples
         )
         let n = candidates.count
+        let session = LanguageModelSession(model: SystemLanguageModel.default) {
+            "あなたは日本語入力メソッドの補助モジュールです。指示された形式だけを出力し、説明文は書かないでください。"
+        }
         task = Task { @MainActor [session] in
             do {
                 let response = try await session.respond(to: prompt)
