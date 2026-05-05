@@ -1,37 +1,31 @@
 keynaco をビルドしてインストールする。
 
-## 手順
+## 初回のみ：ACL 設定（sudo は一度だけ）
 
-1. `xcodegen generate` で Xcode プロジェクトを再生成
-2. `xcodebuild build` でビルド（Post-action で `/Library/Input Methods/` への自動コピーとプロセス再起動が行われる）
-3. ビルドエラーがあれば修正して再ビルド
-4. Post-action の再署名が失敗した場合は手動で再署名してコピー（下記参照）
+`/Library/Input Methods/` への書き込み権限を自分のアカウントに付与する。
+一度実行すれば以降は sudo 不要になる。
 
 ```bash
-/opt/homebrew/bin/xcodegen generate
+sudo chmod -R +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_child,delete,read,write,execute" "/Library/Input Methods"
+```
+
+## ビルド手順
+
+ACL 設定済みであれば、ビルドだけで自動インストールまで完結する
+（Post-action が再署名・コピー・プロセス再起動を行う）。
+
+```bash
 xcodebuild build -scheme keynaco -configuration Debug \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_REQUIRED=NO
 ```
 
-## 署名証明書がない場合の追加手順
-
-`security find-identity -v -p codesigning` で有効な "Mac Development" 証明書が見つからない環境では、
-post-action の `codesign` 再署名が失敗し、起動時に macOS に SIGKILL される。
-その場合はビルド後に以下を手動実行する：
-
-```bash
-# DerivedData パスはビルドログ内の BUILT_PRODUCTS_DIR に合わせる
-SOURCE_APP="$(xcodebuild -scheme keynaco -configuration Debug -showBuildSettings CODE_SIGN_IDENTITY=- 2>/dev/null | awk '/BUILT_PRODUCTS_DIR/{print $3}')/keynaco.app"
-codesign --force --deep --sign "-" "$SOURCE_APP"
-pkill -f keynaco || true
-rm -rf "/Library/Input Methods/keynaco.app"
-cp -R "$SOURCE_APP" "/Library/Input Methods/keynaco.app"
-open "/Library/Input Methods/keynaco.app"
-```
+ビルドエラーがあれば修正して再ビルド。
 
 ## 注意
 
-- `xcodegen` は `/opt/homebrew/bin/xcodegen` にある（PATH に入っていない場合あり）
+- `project.yml` は存在しない（`xcodegen` は不要）。`keynaco.xcodeproj` を直接使用する
+- Post-action が DerivedData 内アプリの再署名（`codesign --force --deep --sign`）まで行う。手動再署名は不要
+- ACL 設定後は `rm: Permission denied` が出なくなり、post-action がインストールまで完走する
 - 初回インストール後はログアウト→ログインが必要（TIS キャッシュ更新のため）
