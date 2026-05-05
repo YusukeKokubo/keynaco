@@ -1,7 +1,11 @@
 import AppKit
 
-final class SettingsWindowController: NSWindowController {
+final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+
     static let shared = SettingsWindowController()
+
+    /// ウィンドウ終了時に `saveToDefaults` するため保持
+    private weak var zenzaiViewController: ZenzaiViewController?
 
     private init() {
         let window = NSWindow(
@@ -22,15 +26,26 @@ final class SettingsWindowController: NSWindowController {
         userDictItem.label = "ユーザー辞書"
         let historyItem = NSTabViewItem(viewController: HistoryViewController())
         historyItem.label = "変換履歴"
+        let zenzaiVC = ZenzaiViewController()
+        let zenzaiItem = NSTabViewItem(viewController: zenzaiVC)
+        zenzaiItem.label = "Zenzai"
         tabVC.addTabViewItem(bigramItem)
         tabVC.addTabViewItem(userDictItem)
         tabVC.addTabViewItem(historyItem)
+        tabVC.addTabViewItem(zenzaiItem)
 
         window.contentViewController = tabVC
         super.init(window: window)
+        window.delegate = self
+        zenzaiViewController = zenzaiVC
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    func windowWillClose(_ notification: Notification) {
+        zenzaiViewController?.saveToDefaults()
+        NotificationCenter.default.post(name: .keynacoZenzaiSettingsDidChange, object: nil)
+    }
 
     func showSettings(selectingTab index: Int? = nil) {
         if window?.isVisible == false { window?.center() }

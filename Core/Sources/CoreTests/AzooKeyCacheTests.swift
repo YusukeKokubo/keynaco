@@ -5,16 +5,24 @@ import XCTest
 
 final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
     private(set) var requestCount = 0
+    private(set) var lastLeftContext: String?
 
-    func requestCandidates(hiragana: String) -> [String] {
+    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+        _ = hiragana
+        lastLeftContext = leftSideContext
         requestCount += 1
         return ["テスト"]
     }
 
-    func candidatesForSegment(reading: String) -> [String] { ["テスト"] }
-    func commit(reading: String, text: String) {}
-    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
-        [(reading: hiragana, candidates: ["テスト"])]
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = reading
+        _ = leftSideContext
+        return ["テスト"]
+    }
+    func commit(reading: String, text: String) { _ = (reading, text) }
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = leftSideContext
+        return [(reading: hiragana, candidates: ["テスト"])]
     }
 }
 
@@ -91,5 +99,17 @@ final class AzooKeyCacheTests: XCTestCase {
         type(chars: "i")  // "かい" → AzooKey("かい") → 1回追加
         XCTAssertGreaterThan(mock.requestCount, countAfterKa,
                              "composedHiragana が変わったので AzooKey が再呼びされるはず")
+    }
+
+    func testAzooKeyCalledAgainWhenLeftContextChangesWithSameHiragana() {
+        type(chars: "k")
+        type(chars: "a")
+        type(chars: "i")
+        XCTAssertEqual(mock.requestCount, 1)
+
+        handler.leftSideContext = "前文テスト"
+        _ = handler.buildCandidateList(autoShow: false)
+        XCTAssertEqual(mock.requestCount, 2, "左文脈が変われば同じ読みでも AzooKey を再呼びするはず")
+        XCTAssertEqual(mock.lastLeftContext, "前文テスト")
     }
 }

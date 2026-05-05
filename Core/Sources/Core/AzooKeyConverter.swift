@@ -6,11 +6,33 @@ public final class AzooKeyConverter: @unchecked Sendable {
     private var candidateCache: [String: [Candidate]] = [:]
     private var candidateCacheKeys: [String] = []
     private let candidateCacheLimit = 50
-    private let options: ConvertRequestOptions
+    private let baseOptions: ConvertRequestOptions
     private let memoryURL: URL
+    private let zenzaiEnabled: Bool
+    private let zenzaiProfile: String
+    private let zenzaiInferenceLimit: Int
     private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }
 
     public var candidateCacheCount: Int { candidateCache.count }
+
+    private static func cacheKey(segment: String, leftSideContext: String?) -> String {
+        "\(segment)|\(leftSideContext ?? "")"
+    }
+
+    private static func clearLearningData(at url: URL) {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: url.path) else { return }
+        for file in files where file.hasPrefix("memory") {
+            try? fm.removeItem(at: url.appendingPathComponent(file))
+        }
+    }
+
+    /// アプリバンドル内の Zenzai 量子化モデル。見つからない場合は Zenzai をオフにフォールバックする。
+    private var zenzaiModelURL: URL? {
+        let u = Bundle.main.url(forResource: "ggml-model-Q5_K_M", withExtension: "gguf")
+        guard let u, !u.path.isEmpty, FileManager.default.fileExists(atPath: u.path) else { return nil }
+        return u
+    }
 
     private func insertCache(key: String, value: [Candidate]) {
         if candidateCache[key] != nil {
@@ -23,29 +45,24 @@ public final class AzooKeyConverter: @unchecked Sendable {
         candidateCacheKeys.append(key)
     }
 
-    private static func clearLearningData(at url: URL) {
-        let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(atPath: url.path) else { return }
-        for file in files where file.hasPrefix("memory") {
-            try? fm.removeItem(at: url.appendingPathComponent(file))
-        }
+    public convenience init() {
+        self.init(zenzaiEnabled: false, zenzaiProfile: "", zenzaiInferenceLimit: 5)
     }
 
-    public init() {
+    public init(zenzaiEnabled: Bool = false, zenzaiProfile: String = "", zenzaiInferenceLimit: Int = 5) {
+        self.zenzaiEnabled = zenzaiEnabled
+        self.zenzaiProfile = zenzaiProfile
+        self.zenzaiInferenceLimit = max(1, min(zenzaiInferenceLimit, 50))
         let memoryURL = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first!.appendingPathComponent("keynaco")
         self.memoryURL = memoryURL
         try? FileManager.default.createDirectory(at: memoryURL, withIntermediateDirectories: true)
-        // A commit_lock left over from a previous run means the process crashed mid-save.
-        // AzooKey's LOUDS binary and metadata are then out of sync, which triggers an
-        // assertion in LongTermLearningMemory.merge. Clear the memory files to recover.
-        let lockURL = memoryURL.appendingPathComponent(".commit_lock")
-        if FileManager.default.fileExists(atPath: lockURL.path) {
+        if FileManager.default.fileExists(atPath: memoryURL.appendingPathComponent(".commit_lock").path) {
             Self.clearLearningData(at: memoryURL)
-            try? FileManager.default.removeItem(at: lockURL)
+            try? FileManager.default.removeItem(at: memoryURL.appendingPathComponent(".commit_lock"))
         }
-        options = ConvertRequestOptions(
+        baseOptions = ConvertRequestOptions(
             N_best: 10,
             requireJapanesePrediction: false,
             requireEnglishPrediction: false,
@@ -59,42 +76,70 @@ public final class AzooKeyConverter: @unchecked Sendable {
         )
     }
 
-    public func requestCandidates(hiragana: String) -> [String] {
+    private func makeOptions(leftSideContext: String?) -> ConvertRequestOptions {
+        var opts = baseOptions
+        guard zenzaiEnabled, let modelURL = zenzaiModelURL else { return opts }
+        opts.zenzaiMode = .on(
+            weight: modelURL,
+            inferenceLimit: zenzaiInferenceLimit,
+            requestRichCandidates: false,
+            personalizationMode: nil,
+            versionDependentMode: .v3(
+                .init(
+                    profile: zenzaiProfile.isEmpty ? nil : zenzaiProfile,
+                    leftSideContext: leftSideContext
+                )
+            )
+        )
+        return opts
+    }
+
+    public func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+        let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext)
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        let result = converter.requestCandidates(text, options: options)
-        insertCache(key: hiragana, value: result.mainResults)
+        let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
+        insertCache(key: key, value: result.mainResults)
         return result.mainResults.map { $0.text }
     }
 
-    public func candidatesForSegment(reading: String) -> [String] {
+    public func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        let key = Self.cacheKey(segment: reading, leftSideContext: leftSideContext)
         var text = ComposingText()
         text.insertAtCursorPosition(reading, inputStyle: .direct)
-        let result = converter.requestCandidates(text, options: options)
-        insertCache(key: reading, value: result.mainResults)
+        let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
+        insertCache(key: key, value: result.mainResults)
         return result.mainResults.map { $0.text }
     }
 
     public func commit(reading: String, text: String) {
-        guard let candidates = candidateCache[reading],
-              let candidate = candidates.first(where: { $0.text == text }) else { return }
-        FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
-        converter.updateLearningData(candidate)
-        converter.commitUpdateLearningData()
-        try? FileManager.default.removeItem(at: commitLockURL)
+        for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
+            if let candidate = candidates.first(where: { $0.text == text }) {
+                FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
+                converter.updateLearningData(candidate)
+                converter.commitUpdateLearningData()
+                try? FileManager.default.removeItem(at: commitLockURL)
+                return
+            }
+        }
     }
 
-    public func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
+    /// `cacheKey` の先頭セグメント（`|` より前）を読みとして取り出す。
+    private static func cacheSegment(fromCacheKey key: String) -> String {
+        guard let idx = key.firstIndex(of: "|") else { return key }
+        return String(key[..<idx])
+    }
+
+    public func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
         var segments: [(reading: String, candidates: [String])] = []
         var remaining = hiragana
+        let opts = makeOptions(leftSideContext: leftSideContext)
         while !remaining.isEmpty {
             var text = ComposingText()
             text.insertAtCursorPosition(remaining, inputStyle: .direct)
-            let result = converter.requestCandidates(text, options: options)
+            let result = converter.requestCandidates(text, options: opts)
             let clauseCandidates = result.firstClauseResults.isEmpty
                 ? result.mainResults : result.firstClauseResults
-            // firstClauseResults are sorted by rubyCount desc, so [0] may cover the whole input.
-            // Prefer the highest-value candidate that covers less than the entire remaining string.
             let totalLen = remaining.count
             let partialBest = clauseCandidates
                 .filter { composingCountValue($0) < totalLen }
@@ -107,7 +152,8 @@ public final class AzooKeyConverter: @unchecked Sendable {
             }
             let safeCount = max(1, min(count, totalLen))
             let reading = String(remaining.prefix(safeCount))
-            insertCache(key: reading, value: clauseCandidates)
+            let ck = Self.cacheKey(segment: reading, leftSideContext: leftSideContext)
+            insertCache(key: ck, value: clauseCandidates)
             segments.append((reading: reading, candidates: clauseCandidates.map { $0.text }))
             remaining = String(remaining.dropFirst(safeCount))
         }

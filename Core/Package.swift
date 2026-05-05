@@ -1,5 +1,11 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.1
 import PackageDescription
+
+#if os(macOS)
+private let azooKeyTraits: Set<Package.Dependency.Trait> = ["Zenzai"]
+#else
+private let azooKeyTraits: Set<Package.Dependency.Trait> = []
+#endif
 
 let package = Package(
     // ディレクトリ名は `Core/` のまま。モジュール名を `KeynacoCore` にし、Xcode 上の `Core` フォルダ参照と `import Core` が衝突しないようにする。
@@ -9,7 +15,13 @@ let package = Package(
         .library(name: "KeynacoCore", targets: ["KeynacoCore"])
     ],
     dependencies: [
-        .package(url: "https://github.com/azooKey/AzooKeyKanaKanjiConverter", from: "0.11.1")
+        // AzooKey の Zenzai trait が EfficientNGram → SwiftyMarisa を条件依存するため、解決を安定させる
+        .package(url: "https://github.com/ensan-hcl/SwiftyMarisa", from: "0.0.1"),
+        .package(
+            url: "https://github.com/azooKey/AzooKeyKanaKanjiConverter",
+            from: "0.11.1",
+            traits: azooKeyTraits
+        )
     ],
     targets: [
         .target(

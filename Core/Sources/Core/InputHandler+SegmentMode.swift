@@ -29,7 +29,7 @@ public extension InputHandler {
             for reading in stored {
                 let seg = buildSegmentCandidates(
                     reading: reading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading),
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading, leftSideContext: azooKeyLeftContext),
                     prev: prevText
                 )
                 built.append(seg)
@@ -37,7 +37,7 @@ public extension InputHandler {
             }
             segments = built
         } else {
-            let rawSegments = azooKeyConverter.segmentize(fullReading)
+            let rawSegments = azooKeyConverter.segmentize(fullReading, leftSideContext: azooKeyLeftContext)
             guard rawSegments.count >= 2 else {
                 return buildCandidateList()
             }
@@ -72,7 +72,8 @@ public extension InputHandler {
             hiragana: fullReading,
             llmText: text,
             azooKey: azooKeyConverter,
-            baselineSegmentReadings: baseline
+            baselineSegmentReadings: baseline,
+            leftSideContext: azooKeyLeftContext
         ) {
             applyLLMBoundaries(pairs: pairs, llmWholeText: text)
             return
@@ -96,7 +97,7 @@ public extension InputHandler {
             let prev: String? = (i == 0) ? lastCommittedOutput : pairs[i - 1].token
             var seg = buildSegmentCandidates(
                 reading: reading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading),
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading, leftSideContext: azooKeyLeftContext),
                 prev: prev
             )
             if let idx = seg.candidates.firstIndex(of: token) {
@@ -232,7 +233,7 @@ public extension InputHandler {
             let nextSeg = segmentState.segments[newIndex]
             state.segmentState!.segments[newIndex] = buildSegmentCandidates(
                 reading: nextSeg.reading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: nextSeg.reading),
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: nextSeg.reading, leftSideContext: azooKeyLeftContext),
                 prev: prevText
             )
             state.segmentState!.focusedIndex = newIndex
@@ -293,7 +294,7 @@ public extension InputHandler {
             let newNextReading = String(nextReading.dropFirst())
             var rebuilt = buildSegmentCandidatesCached(
                 reading: newFocusedReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading),
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading, leftSideContext: azooKeyLeftContext),
                 prev: focusedPrev
             )
             rebuilt.isManuallyAdjusted = true
@@ -303,7 +304,7 @@ public extension InputHandler {
             } else {
                 segmentState.segments[i + 1] = buildSegmentCandidatesCached(
                     reading: newNextReading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading),
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading, leftSideContext: azooKeyLeftContext),
                     prev: rebuilt.selectedText
                 )
             }
@@ -314,7 +315,7 @@ public extension InputHandler {
             let removedChar = String(focusedReading.last!)
             var rebuilt = buildSegmentCandidatesCached(
                 reading: newFocusedReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading),
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading, leftSideContext: azooKeyLeftContext),
                 prev: focusedPrev
             )
             rebuilt.isManuallyAdjusted = true
@@ -323,14 +324,14 @@ public extension InputHandler {
                 let newNextReading = removedChar + segmentState.segments[i + 1].reading
                 segmentState.segments[i + 1] = buildSegmentCandidatesCached(
                     reading: newNextReading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading),
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading, leftSideContext: azooKeyLeftContext),
                     prev: rebuilt.selectedText
                 )
             } else {
                 segmentState.segments.insert(
                     buildSegmentCandidatesCached(
                         reading: removedChar,
-                        dictCandidates: azooKeyConverter.candidatesForSegment(reading: removedChar),
+                        dictCandidates: azooKeyConverter.candidatesForSegment(reading: removedChar, leftSideContext: azooKeyLeftContext),
                         prev: rebuilt.selectedText
                     ),
                     at: i + 1

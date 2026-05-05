@@ -551,10 +551,14 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
 // MARK: - boundary_pref LLM 保存テスト用 AzooKey スタブ
 
 private final class BoundaryPrefLLMMockKyouHaii: AzooKeyConverting, @unchecked Sendable {
-    func requestCandidates(hiragana: String) -> [String] { [] }
+    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+        _ = (hiragana, leftSideContext)
+        return []
+    }
     func commit(reading: String, text: String) {}
 
-    func candidatesForSegment(reading: String) -> [String] {
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = leftSideContext
         switch reading {
         case "きょう": return ["今日"]
         case "は": return ["は"]
@@ -563,7 +567,8 @@ private final class BoundaryPrefLLMMockKyouHaii: AzooKeyConverting, @unchecked S
         }
     }
 
-    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = leftSideContext
         guard hiragana == "きょうはいい" else { return [] }
         return [
             ("きょう", ["今日"]),
@@ -574,15 +579,20 @@ private final class BoundaryPrefLLMMockKyouHaii: AzooKeyConverting, @unchecked S
 }
 
 private final class BoundaryPrefLLMMockTesutoOnePair: AzooKeyConverting, @unchecked Sendable {
-    func requestCandidates(hiragana: String) -> [String] { [] }
+    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+        _ = (hiragana, leftSideContext)
+        return []
+    }
     func commit(reading: String, text: String) {}
 
-    func candidatesForSegment(reading: String) -> [String] {
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = leftSideContext
         if reading == "てすと" { return ["テスト"] }
         return []
     }
 
-    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = leftSideContext
         guard hiragana == "てすと" else { return [] }
         return [
             ("て", ["て"]),

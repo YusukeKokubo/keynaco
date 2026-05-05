@@ -104,7 +104,9 @@ private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
 @MainActor
 class InputController: IMKInputController {
 
-    private lazy var handler: InputHandler = InputHandler()
+    private lazy var handler: InputHandler = InputHandler(azooKeyConverter: ZenzaiSettings.makeConverter())
+    /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
+    nonisolated(unsafe) private var zenzaiSettingsObserver: NSObjectProtocol?
     /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
     private static let successorLLM = LLMSuccessorFetcher()
     private static let segmentLLM = LLMSegmentConverter()
@@ -130,6 +132,24 @@ class InputController: IMKInputController {
             self?.handler.db.deleteHistory(output: text)
             self?.candidateWindow.removeCandidate(at: row)
         }
+        zenzaiSettingsObserver = NotificationCenter.default.addObserver(
+            forName: .keynacoZenzaiSettingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.reloadAzooKeyConverterFromSettings()
+        }
+    }
+
+    deinit {
+        if let zenzaiSettingsObserver {
+            NotificationCenter.default.removeObserver(zenzaiSettingsObserver)
+        }
+    }
+
+    @MainActor
+    private func reloadAzooKeyConverterFromSettings() {
+        handler.azooKeyConverter = ZenzaiSettings.makeConverter()
     }
 
     // MARK: - ライフサイクル
@@ -171,6 +191,7 @@ class InputController: IMKInputController {
         handler.segmentLLMTrigger = .none
         handler.resetScorerPending()
         cachedSurroundingContext = nil
+        handler.leftSideContext = ""
         if Thread.isMainThread {
             Self.successorLLM.cancel()
             Self.segmentLLM.cancel()
@@ -306,11 +327,15 @@ class InputController: IMKInputController {
             fixedEnd: candidateWindow.fixedRowCount
         )
         let adapter = IMKTextInputAdapter(sender)
+        nonisolated(unsafe) let ic: InputController = self
+        MainActor.assumeIsolated {
+            ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
+        }
 
-        let composingWasEmpty = handler.state.composingText.isEmpty
-        let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
+        let composingWasEmpty = ic.handler.state.composingText.isEmpty
+        let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
 
-        let (consumed, action) = handler.handle(
+        let (consumed, action) = ic.handler.handle(
             keyCode: event.keyCode,
             characters: event.characters,
             baseCharacters: event.charactersIgnoringModifiers,
@@ -327,7 +352,6 @@ class InputController: IMKInputController {
         // IMK の `handle` は nonisolated。候補ウィンドウ操作は従来どおり MainActor 前提（assumeIsolated はメイン以外では実行時クラッシュしうる）。
         // `sender` / `self` は IMK ブリッジ上 nonisolated から MainActor 島へ渡すため nonisolated(unsafe) とする（Swift 6 sending）。
         nonisolated(unsafe) let imkSenderForSurrounding: Any? = sender
-        nonisolated(unsafe) let ic: InputController = self
         // ステータス通知は島から値を返し、`DispatchQueue.main.async` で投稿する（post 自体は nonisolated static）。
         #if DEBUG
         let (successorPendingForMenuBar, imeStateSnapshot) = MainActor.assumeIsolated {
@@ -411,6 +435,7 @@ class InputController: IMKInputController {
         }
         handler.resetScorerPending()
         cachedSurroundingContext = nil
+        handler.leftSideContext = ""
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
 

@@ -6,15 +6,22 @@ import XCTest
 private final class SegmentBoundaryMockAzooKey: AzooKeyConverting, @unchecked Sendable {
     var segmentCandidates: [String: [String]] = [:]
 
-    func requestCandidates(hiragana: String) -> [String] { [] }
+    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+        _ = leftSideContext
+        return []
+    }
 
-    func candidatesForSegment(reading: String) -> [String] {
-        segmentCandidates[reading] ?? []
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = leftSideContext
+        return segmentCandidates[reading] ?? []
     }
 
     func commit(reading: String, text: String) {}
 
-    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] { [] }
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = leftSideContext
+        return []
+    }
 }
 
 final class SegmentBoundaryTests: XCTestCase {

@@ -187,14 +187,15 @@ public extension InputHandler {
         clearPendingScorerForDismiss()
         let h = state.composedHiragana
         let azooKeyCandidates: [String]
+        let ctxFingerprint = leftSideContext
         if h.allSatisfy({ $0.isASCII }) {
             azooKeyCandidates = []
-            lastAzooKeyInput = ""; lastAzooKeyResults = []
-        } else if h == lastAzooKeyInput {
+            lastAzooKeyInput = ""; lastAzooKeyContext = ""; lastAzooKeyResults = []
+        } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext {
             azooKeyCandidates = lastAzooKeyResults
         } else {
-            azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: h)
-            lastAzooKeyInput = h; lastAzooKeyResults = azooKeyCandidates
+            azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext)
+            lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)

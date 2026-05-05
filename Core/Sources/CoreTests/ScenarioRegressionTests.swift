@@ -7,11 +7,13 @@ import XCTest
 // MARK: - S-01 用モック（2 文節に分割し「漢字」が選ばれる）
 
 private final class ScenarioS01KanjiMockConverter: AzooKeyConverting {
-    func requestCandidates(hiragana: String) -> [String] {
-        hiragana == "かんじ" ? ["漢字"] : ["□"]
+    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+        _ = leftSideContext
+        return hiragana == "かんじ" ? ["漢字"] : ["□"]
     }
 
-    func candidatesForSegment(reading: String) -> [String] {
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = leftSideContext
         switch reading {
         case "かん": return ["漢"]
         case "じ": return ["字"]
@@ -21,7 +23,8 @@ private final class ScenarioS01KanjiMockConverter: AzooKeyConverting {
 
     func commit(reading _: String, text _: String) {}
 
-    func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = leftSideContext
         guard hiragana == "かんじ" else {
             return [(reading: hiragana, candidates: ["□"])]
         }

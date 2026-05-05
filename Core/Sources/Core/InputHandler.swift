@@ -119,7 +119,13 @@ public struct InputHandler {
     public var isBracketMode: Bool { bracketCandidates != nil }
     public var lastConfirmedContext: LastConfirmedContext? = nil
     public var lastAzooKeyInput: String = ""
+    /// `buildCandidateList` の AzooKey 候補キャッシュ照合用（`leftSideContext` が変わると再取得）
+    public var lastAzooKeyContext: String = ""
     public var lastAzooKeyResults: [String] = []
+    /// `resolvedLLMDocumentContextPrefix` 等から渡すカーソル左文（Zenzai）。空は文脈なし。
+    public var leftSideContext: String = ""
+    /// AzooKey API 用（空文字は `nil`）
+    public var azooKeyLeftContext: String? { leftSideContext.isEmpty ? nil : leftSideContext }
     /// 候補スコアラー: `buildCandidateList` が返す候補列でのグローバル行（`pendingScorerStrings` と対応）
     public var pendingScorerGlobalIndices: [Int] = []
     public var pendingScorerStrings: [String] = []
@@ -161,7 +167,7 @@ public struct InputHandler {
         return result
     }
     public let db: DatabaseManager
-    public let azooKeyConverter: any AzooKeyConverting
+    public var azooKeyConverter: any AzooKeyConverting
 
     public init(db: DatabaseManager = .shared, azooKeyConverter: (any AzooKeyConverting)? = nil) {
         self.db = db

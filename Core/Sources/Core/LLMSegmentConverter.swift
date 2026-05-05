@@ -56,7 +56,8 @@ public final class LLMSegmentConverter {
         hiragana: String,
         llmText: String,
         azooKey: AzooKeyConverting,
-        baselineSegmentReadings: [String]
+        baselineSegmentReadings: [String],
+        leftSideContext: String? = nil
     ) -> [(reading: String, token: String)]? {
         let processed = Self.preprocessLLMText(llmText)
         guard !processed.isEmpty, !hiragana.isEmpty else { return nil }
@@ -92,7 +93,7 @@ public final class LLMSegmentConverter {
             var readingMatch: String?
             for len in 1...remaining.count {
                 let prefix = String(remaining.prefix(len))
-                guard azooKey.candidatesForSegment(reading: prefix).contains(where: { $0 == token }) else { continue }
+                guard azooKey.candidatesForSegment(reading: prefix, leftSideContext: leftSideContext).contains(where: { $0 == token }) else { continue }
                 let nextRemaining = String(remaining.dropFirst(len))
                 let consumedAfter = String(hiragana.prefix(hiragana.count - nextRemaining.count))
                 guard Self.baselineSegmentsConsumed(consumedAfter, baseline: baselineSegmentReadings) != nil else { continue }
