@@ -1,5 +1,5 @@
 public protocol AzooKeyConverting: AnyObject, Sendable {
-    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String]
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String]
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String]
     func commit(reading: String, text: String)
     func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])]
@@ -7,7 +7,11 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
 
 public extension AzooKeyConverting {
     func requestCandidates(hiragana: String) -> [String] {
-        requestCandidates(hiragana: hiragana, leftSideContext: nil)
+        requestCandidates(hiragana: hiragana, leftSideContext: nil, richCandidates: false)
+    }
+
+    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+        requestCandidates(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: false)
     }
 
     func candidatesForSegment(reading: String) -> [String] {

@@ -190,10 +190,10 @@ public extension InputHandler {
         if h.allSatisfy({ $0.isASCII }) {
             azooKeyCandidates = []
             lastAzooKeyInput = ""; lastAzooKeyContext = ""; lastAzooKeyResults = []
-        } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext {
+        } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, autoShow {
             azooKeyCandidates = lastAzooKeyResults
         } else {
-            azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext)
+            azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
             lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h

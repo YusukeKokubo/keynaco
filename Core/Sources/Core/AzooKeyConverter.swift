@@ -76,13 +76,13 @@ public final class AzooKeyConverter: @unchecked Sendable {
         )
     }
 
-    private func makeOptions(leftSideContext: String?) -> ConvertRequestOptions {
+    private func makeOptions(leftSideContext: String?, richCandidates: Bool = false) -> ConvertRequestOptions {
         var opts = baseOptions
         guard zenzaiEnabled, let modelURL = zenzaiModelURL else { return opts }
         opts.zenzaiMode = .on(
             weight: modelURL,
             inferenceLimit: zenzaiInferenceLimit,
-            requestRichCandidates: false,
+            requestRichCandidates: richCandidates,
             personalizationMode: nil,
             versionDependentMode: .v3(
                 .init(
@@ -94,11 +94,11 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return opts
     }
 
-    public func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+    public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [String] {
         let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext)
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
+        let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates))
         insertCache(key: key, value: result.mainResults)
         let inputLength = hiragana.count
         let fullCoverage = result.mainResults.filter { composingCountValue($0) == inputLength }
