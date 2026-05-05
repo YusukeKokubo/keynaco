@@ -100,7 +100,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
         let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
         insertCache(key: key, value: result.mainResults)
-        return result.mainResults.map { $0.text }
+        let inputLength = hiragana.count
+        let fullCoverage = result.mainResults.filter { composingCountValue($0) == inputLength }
+        return (fullCoverage.isEmpty ? result.mainResults : fullCoverage).map { $0.text }
     }
 
     public func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
