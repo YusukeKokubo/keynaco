@@ -438,15 +438,25 @@ class InputController: IMKInputController {
 
     // MARK: - プライベートヘルパー
 
-    /// LLM 用の文脈プレフィックス。IMK の `before`（キャッシュ・location 一致時）が非空なら最大 300 字のみ。それ以外は `committedHistory.suffix(5)` のみ。
+    /// LLM 用の文脈プレフィックス。IMK の `before`（キャッシュ・location 一致時）が非空なら、`committedHistory.suffix(5)` が空でないときは先頭にその全量を付けたうえで `before` を続ける（`before` は最大 300 字に切り詰めた後、結合総長が 400 字を超えないようカーソル近傍の末尾側を採用）。`historyJoined` は切り捨てない。`before` が空またはキャッシュ不一致時は `committedHistory.suffix(5)` のみ。
     private func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
         let historyJoined = handler.committedHistory.suffix(5).joined()
         let loc = adapter.selectedRange().location
         guard loc != NSNotFound else { return historyJoined }
 
         if let cache = cachedSurroundingContext, cache.location == loc, !cache.text.before.isEmpty {
-            let b = cache.text.before
-            return b.count > 300 ? String(b.suffix(300)) : b
+            let rawBefore = cache.text.before
+            let beforeTruncated =
+                rawBefore.count > 300 ? String(rawBefore.suffix(300)) : rawBefore
+            if !historyJoined.isEmpty {
+                let maxBefore = max(0, 400 - historyJoined.count)
+                let trimmedBefore =
+                    beforeTruncated.count > maxBefore
+                    ? String(beforeTruncated.suffix(maxBefore))
+                    : beforeTruncated
+                return historyJoined + trimmedBefore
+            }
+            return beforeTruncated
         }
 
         if cachedSurroundingContext != nil {

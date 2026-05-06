@@ -169,6 +169,7 @@ final class DebugSocketServer: @unchecked Sendable {
         let base  = cmd["base"]  as? String ?? chars
         let mods  = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
 
+        handler.leftSideContext = llmDocumentContextPrefix()
         let (_, action) = handler.handle(
             keyCode: keyCode,
             characters: chars,
