@@ -400,10 +400,15 @@ final class DebugSocketServer: @unchecked Sendable {
         // {"test_suite": [{"name":"...", "cmds":[...], "assert": {...}}, ...]}
         if let suite = cmd["test_suite"] as? [[String: Any]] {
             let defaultUseRealDB = cmd["useRealDB"] as? Bool ?? false
+            let globalBeforeEach = cmd["before_each"] as? [[String: Any]] ?? []
+            let globalAfterEach = cmd["after_each"] as? [[String: Any]] ?? []
+            let failFast = cmd["fail_fast"] as? Bool ?? false
             var scenarios: [[String: Any]] = []
             var passCount = 0
+            let suiteStart = Date()
 
             for (idx, scenario) in suite.enumerated() {
+                let scenarioStart = Date()
                 let name = scenario["name"] as? String ?? "scenario_\(idx + 1)"
                 let useRealDB = scenario["useRealDB"] as? Bool ?? defaultUseRealDB
                 _ = processCommand(["reset": true, "useRealDB": useRealDB])
@@ -417,7 +422,32 @@ final class DebugSocketServer: @unchecked Sendable {
                     continue
                 }
 
-                var seqCmd: [String: Any] = ["sequence": cmds]
+                let scenarioBeforeEach = scenario["before_each"] as? [[String: Any]] ?? []
+                let scenarioAfterEach = scenario["after_each"] as? [[String: Any]] ?? []
+                var combined: [[String: Any]] = []
+                var stepPhases: [(phase: String, index: Int)] = []
+                for (i, c) in globalBeforeEach.enumerated() {
+                    combined.append(c)
+                    stepPhases.append(("before_each", i))
+                }
+                for (i, c) in scenarioBeforeEach.enumerated() {
+                    combined.append(c)
+                    stepPhases.append(("before_each", globalBeforeEach.count + i))
+                }
+                for (i, c) in cmds.enumerated() {
+                    combined.append(c)
+                    stepPhases.append(("cmd", i))
+                }
+                for (i, c) in scenarioAfterEach.enumerated() {
+                    combined.append(c)
+                    stepPhases.append(("after_each", i))
+                }
+                for (i, c) in globalAfterEach.enumerated() {
+                    combined.append(c)
+                    stepPhases.append(("after_each", scenarioAfterEach.count + i))
+                }
+
+                var seqCmd: [String: Any] = ["sequence": combined]
                 if let fields = scenario["fields"] as? [String] { seqCmd["fields"] = fields }
                 let seqResult = processCommand(seqCmd)
                 let steps = seqResult["steps"] as? [[String: Any]] ?? []
@@ -440,6 +470,10 @@ final class DebugSocketServer: @unchecked Sendable {
                         var detail = failure
                         detail["phase"] = "step"
                         detail["stepIndex"] = stepIndex
+                        if stepPhases.indices.contains(stepIndex) {
+                            detail["stepPhase"] = stepPhases[stepIndex].phase
+                            detail["stepInPhaseIndex"] = stepPhases[stepIndex].index
+                        }
                         if let stepDescribe = step["describe"] {
                             detail["stepDescribe"] = stepDescribe
                         }
@@ -460,6 +494,7 @@ final class DebugSocketServer: @unchecked Sendable {
                     "stepCount": steps.count,
                     "failedStepCount": failedSteps,
                     "failedAssertions": failureDetails,
+                    "durationMs": Int(Date().timeIntervalSince(scenarioStart) * 1000),
                     "last": finalCheck
                 ]
                 if scenario["describe"] != nil {
@@ -470,12 +505,15 @@ final class DebugSocketServer: @unchecked Sendable {
                 }
                 if let err = seqResult["error"] { result["error"] = err }
                 scenarios.append(result)
+                if failFast && !ok { break }
             }
 
             let summary: [String: Any] = [
                 "total": scenarios.count,
                 "passed": passCount,
-                "failed": max(0, scenarios.count - passCount)
+                "failed": max(0, scenarios.count - passCount),
+                "durationMs": Int(Date().timeIntervalSince(suiteStart) * 1000),
+                "stoppedEarly": failFast && scenarios.count < suite.count
             ]
             return Self.finalize(["results": scenarios, "summary": summary], cmd: cmd)
         }

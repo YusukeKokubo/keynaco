@@ -85,6 +85,8 @@ send({"reset": True})
 | 否定 assert | `{"state":true,"assert_not":{"isAsciiMode":true}}` |
 | 非同期待機 | `{"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}` |
 | 複数シナリオを一括実行 | `{"test_suite":[{"name":"kanzi変換","cmds":[...],"assert":{"inserted":["漢字"]}}]}` |
+| test_suite 共通前処理/後処理 | `{"before_each":[...], "after_each":[...], "test_suite":[...]}` |
+| test_suite fail-fast | `{"test_suite":[...], "fail_fast": true}`（最初の失敗で打ち切り） |
 | 名前付きキー | `{"key": "space"}` / `{"key": "enter"}` / `{"key": "down"}` 等 |
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
 | フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
@@ -134,6 +136,26 @@ suite = send({"test_suite": [
 ]})
 print(suite["summary"])  # {"total": 1, "passed": 1, "failed": 0}
 # 失敗時は scenario.failedAssertions に stepIndex/stepDescribe/field/expected/actual が集約される
+# scenario.failedAssertions には stepPhase(before_each/cmd/after_each) も入る
+
+# before_each / after_each で共通セットアップを DRY にする
+suite2 = send({
+    "before_each": [
+        {"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}
+    ],
+    "after_each": [
+        {"state": True, "describe": "終了時状態確認"}
+    ],
+    "fail_fast": True,
+    "test_suite": [
+        {
+            "name": "kyou→enter",
+            "cmds": [{"type_string": "kyou", "then": "enter"}],
+            "assert_contains": {"candidates": "は"}
+        }
+    ]
+})
+print(suite2["summary"])  # durationMs / stoppedEarly も返る
 
 # LLM の非同期反映を待つ（state 連打せずに待機）
 waited = send({

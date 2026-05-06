@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """keynaco IME デバッグソケットクライアント。
 
 使い方:
@@ -139,13 +141,27 @@ class IMEClient:
             cmd["assert_not"] = assert_not
         return self._send_recv(cmd)
 
-    def test_suite(self, *scenarios: dict, use_real_db: bool = False, describe: str | None = None) -> dict:
+    def test_suite(
+        self,
+        *scenarios: dict,
+        use_real_db: bool = False,
+        describe: str | None = None,
+        before_each: list[dict] | None = None,
+        after_each: list[dict] | None = None,
+        fail_fast: bool = False,
+    ) -> dict:
         """複数シナリオを自動 reset 付きで一括実行する。"""
         cmd: dict = {"test_suite": list(scenarios)}
         if use_real_db:
             cmd["useRealDB"] = True
         if describe:
             cmd["describe"] = describe
+        if before_each:
+            cmd["before_each"] = before_each
+        if after_each:
+            cmd["after_each"] = after_each
+        if fail_fast:
+            cmd["fail_fast"] = True
         return self._send_recv(cmd)
 
     def wait_until(
