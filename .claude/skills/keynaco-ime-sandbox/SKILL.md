@@ -81,6 +81,9 @@ send({"reset": True})
 | コマンド列を一括送信 | `{"sequence": [{cmd1}, {cmd2}, ...]}` → `{"steps": [...], "last": {...}}` |
 | ステップごとの説明ラベル | `{"type_string": "kanzi", "describe": "ローマ字入力"}`（レスポンスにも `describe` が返る） |
 | sequence 中間ステップ assert | `{"sequence": [{"type_string":"kanzi","assert":{"composedHiragana":"かんじ"}}, {"key":"space","assert":{"candidateVisible":true}}]}` |
+| 部分一致 assert | `{"key":"space","assert_contains":{"candidates":"漢字"}}` / `{"assert_contains":{"candidates":["漢字","感じ"]}}` |
+| 否定 assert | `{"state":true,"assert_not":{"isAsciiMode":true}}` |
+| 非同期待機 | `{"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}` |
 | 複数シナリオを一括実行 | `{"test_suite":[{"name":"kanzi変換","cmds":[...],"assert":{"inserted":["漢字"]}}]}` |
 | 名前付きキー | `{"key": "space"}` / `{"key": "enter"}` / `{"key": "down"}` 等 |
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
@@ -130,6 +133,19 @@ suite = send({"test_suite": [
     }
 ]})
 print(suite["summary"])  # {"total": 1, "passed": 1, "failed": 0}
+# 失敗時は scenario.failedAssertions に stepIndex/stepDescribe/field/expected/actual が集約される
+
+# LLM の非同期反映を待つ（state 連打せずに待機）
+waited = send({
+    "wait_until": {
+        "field": "successorLLMSurfaceExtras",
+        "minCount": 1,
+        "timeoutMs": 1500,
+        "intervalMs": 50
+    },
+    "describe": "LLM extras待機"
+})
+print(waited["matched"], waited["state"]["successorLLMSurfaceExtras"])
 ```
 
 ---

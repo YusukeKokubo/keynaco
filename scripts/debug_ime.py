@@ -94,6 +94,8 @@ class IMEClient:
         return_steps: bool = False,
         describe: str | None = None,
         assert_fields: dict | None = None,
+        assert_contains: dict | None = None,
+        assert_not: dict | None = None,
     ) -> dict:
         """文字列を一括送信してサーバー側でまとめて処理する。最終状態を返す。
         then: 末尾に続けて送る名前付きキー（"space" / "enter" 等）。
@@ -108,6 +110,10 @@ class IMEClient:
             cmd["describe"] = describe
         if assert_fields:
             cmd["assert"] = assert_fields
+        if assert_contains:
+            cmd["assert_contains"] = assert_contains
+        if assert_not:
+            cmd["assert_not"] = assert_not
         return self._send_recv(cmd)
 
     def sequence(
@@ -116,6 +122,8 @@ class IMEClient:
         fields: list[str] | None = None,
         describe: str | None = None,
         assert_fields: dict | None = None,
+        assert_contains: dict | None = None,
+        assert_not: dict | None = None,
     ) -> dict:
         """複数コマンドを1往復で一括送信する。result["steps"] に各状態、result["last"] に最終状態。"""
         cmd: dict = {"sequence": list(cmds)}
@@ -125,6 +133,10 @@ class IMEClient:
             cmd["describe"] = describe
         if assert_fields:
             cmd["assert"] = assert_fields
+        if assert_contains:
+            cmd["assert_contains"] = assert_contains
+        if assert_not:
+            cmd["assert_not"] = assert_not
         return self._send_recv(cmd)
 
     def test_suite(self, *scenarios: dict, use_real_db: bool = False, describe: str | None = None) -> dict:
@@ -132,6 +144,30 @@ class IMEClient:
         cmd: dict = {"test_suite": list(scenarios)}
         if use_real_db:
             cmd["useRealDB"] = True
+        if describe:
+            cmd["describe"] = describe
+        return self._send_recv(cmd)
+
+    def wait_until(
+        self,
+        field: str,
+        *,
+        equals=None,
+        contains=None,
+        min_count: int | None = None,
+        timeout_ms: int = 1000,
+        interval_ms: int = 50,
+        describe: str | None = None,
+    ) -> dict:
+        """条件を満たすまで state を待機する（LLM 非同期反映の観測向け）。"""
+        wait: dict = {"field": field, "timeoutMs": timeout_ms, "intervalMs": interval_ms}
+        if equals is not None:
+            wait["equals"] = equals
+        if contains is not None:
+            wait["contains"] = contains
+        if min_count is not None:
+            wait["minCount"] = min_count
+        cmd: dict = {"wait_until": wait}
         if describe:
             cmd["describe"] = describe
         return self._send_recv(cmd)

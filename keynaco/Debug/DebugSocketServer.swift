@@ -162,21 +162,109 @@ final class DebugSocketServer: @unchecked Sendable {
         guard let fields, !fields.isEmpty else { return dict }
         var keep = Set(fields)
         if dict["describe"] != nil { keep.insert("describe") }
+        if dict["assertion_failed"] != nil {
+            keep.insert("assertion_failed")
+            keep.insert("state")
+        }
         return dict.filter { keep.contains($0.key) }
     }
 
-    private static func applyAssert(_ dict: [String: Any], assertions: [String: Any]?) -> [String: Any] {
-        guard let assertions, !assertions.isEmpty else { return dict }
+    private static func jsonString(_ v: Any) -> String {
         // スカラー値は JSONSerialization のトップレベルとして渡せないので配列でラップして比較する
-        func jsonString(_ v: Any) -> String {
-            (try? JSONSerialization.data(withJSONObject: [v])).flatMap { String(data: $0, encoding: .utf8) } ?? "\(v)"
+        (try? JSONSerialization.data(withJSONObject: [v])).flatMap { String(data: $0, encoding: .utf8) } ?? "\(v)"
+    }
+
+    private static func isEqualJSON(_ actual: Any?, _ expected: Any) -> Bool {
+        guard let actual else { return false }
+        return jsonString(actual) == jsonString(expected)
+    }
+
+    private static func valueCount(_ value: Any?) -> Int? {
+        switch value {
+        case let arr as [Any]:
+            return arr.count
+        case let dict as [String: Any]:
+            return dict.count
+        case let str as String:
+            return str.count
+        default:
+            return nil
         }
+    }
+
+    private static func containsValue(_ actual: Any?, expected: Any) -> Bool {
+        guard let actual else { return false }
+        if let actualString = actual as? String, let expectedString = expected as? String {
+            return actualString.contains(expectedString)
+        }
+        if let actualArray = actual as? [Any] {
+            if let expectedArray = expected as? [Any] {
+                return expectedArray.allSatisfy { ev in
+                    actualArray.contains { av in jsonString(av) == jsonString(ev) }
+                }
+            }
+            return actualArray.contains { av in jsonString(av) == jsonString(expected) }
+        }
+        if let actualDict = actual as? [String: Any], let expectedDict = expected as? [String: Any] {
+            return expectedDict.allSatisfy { key, value in
+                actualDict[key].map { jsonString($0) == jsonString(value) } ?? false
+            }
+        }
+        if let actualDict = actual as? [String: Any], let expectedKey = expected as? String {
+            return actualDict[expectedKey] != nil
+        }
+        return false
+    }
+
+    private static func applyAssert(
+        _ dict: [String: Any],
+        assertions: [String: Any]?,
+        containsAssertions: [String: Any]?,
+        notAssertions: [String: Any]?
+    ) -> [String: Any] {
+        let hasEquality = assertions.map { !$0.isEmpty } ?? false
+        let hasContains = containsAssertions.map { !$0.isEmpty } ?? false
+        let hasNot = notAssertions.map { !$0.isEmpty } ?? false
+        guard hasEquality || hasContains || hasNot else { return dict }
+
         var failures: [[String: Any]] = []
-        for (key, expected) in assertions {
-            let actual = dict[key]
-            let match = actual.map { jsonString($0) == jsonString(expected) } ?? false
-            if !match {
-                failures.append(["field": key, "expected": expected, "actual": actual ?? NSNull()])
+        if let assertions {
+            for (key, expected) in assertions {
+                let actual = dict[key]
+                if !isEqualJSON(actual, expected) {
+                    failures.append([
+                        "kind": "equals",
+                        "field": key,
+                        "expected": expected,
+                        "actual": actual ?? NSNull()
+                    ])
+                }
+            }
+        }
+        if let containsAssertions {
+            for (key, expected) in containsAssertions {
+                let actual = dict[key]
+                if !containsValue(actual, expected: expected) {
+                    failures.append([
+                        "kind": "contains",
+                        "field": key,
+                        "expected": expected,
+                        "actual": actual ?? NSNull()
+                    ])
+                }
+            }
+        }
+        if let notAssertions {
+            for (key, expected) in notAssertions {
+                let actual = dict[key]
+                if isEqualJSON(actual, expected) {
+                    failures.append([
+                        "kind": "not_equals",
+                        "field": key,
+                        "expected": expected,
+                        "actual": actual ?? NSNull()
+                    ])
+                }
             }
         }
         if failures.isEmpty { return dict }
@@ -196,7 +284,64 @@ final class DebugSocketServer: @unchecked Sendable {
         let withDescribe = applyDescribe(dict, describe: cmd["describe"])
         let fields = cmd["fields"] as? [String]
         let assertions = cmd["assert"] as? [String: Any]
-        return applyAssert(applyFields(withDescribe, fields: fields), assertions: assertions)
+        let containsAssertions = cmd["assert_contains"] as? [String: Any]
+        let notAssertions = cmd["assert_not"] as? [String: Any]
+        return applyAssert(
+            applyFields(withDescribe, fields: fields),
+            assertions: assertions,
+            containsAssertions: containsAssertions,
+            notAssertions: notAssertions
+        )
+    }
+
+    private static func waitConditionMatched(state: [String: Any], field: String, wait: [String: Any]) -> Bool {
+        guard let actual = state[field] else { return false }
+        if let equals = wait["equals"] {
+            return isEqualJSON(actual, equals)
+        }
+        if let contains = wait["contains"] {
+            return containsValue(actual, expected: contains)
+        }
+        if let minCount = wait["minCount"] as? Int {
+            return (valueCount(actual) ?? 0) >= minCount
+        }
+        return false
+    }
+
+    private func waitUntil(_ wait: [String: Any], cmd: [String: Any]) -> [String: Any] {
+        guard let field = wait["field"] as? String else {
+            return Self.finalize(["error": "wait_until requires field"], cmd: cmd)
+        }
+        let hasCondition = wait["equals"] != nil || wait["contains"] != nil || wait["minCount"] != nil
+        guard hasCondition else {
+            return Self.finalize(["error": "wait_until requires one of equals, contains, minCount"], cmd: cmd)
+        }
+        let timeoutMs = max(0, wait["timeoutMs"] as? Int ?? 1000)
+        let intervalMs = max(1, wait["intervalMs"] as? Int ?? 50)
+        let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
+
+        var state = makeResponse(inserted: [])
+        while true {
+            if Self.waitConditionMatched(state: state, field: field, wait: wait) {
+                return Self.finalize([
+                    "ok": true,
+                    "matched": true,
+                    "waitField": field,
+                    "state": state
+                ], cmd: cmd)
+            }
+            if Date() >= deadline { break }
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(Double(intervalMs) / 1000.0))
+            state = makeResponse(inserted: [])
+        }
+
+        return Self.finalize([
+            "ok": false,
+            "matched": false,
+            "timedOut": true,
+            "waitField": field,
+            "state": state
+        ], cmd: cmd)
     }
 
     // MARK: - コマンド処理（MainActor 上で実行）
@@ -222,6 +367,11 @@ final class DebugSocketServer: @unchecked Sendable {
 
         if cmd["state"] != nil {
             return Self.finalize(makeResponse(inserted: []), cmd: cmd)
+        }
+
+        // {"wait_until": {"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}
+        if let wait = cmd["wait_until"] as? [String: Any] {
+            return waitUntil(wait, cmd: cmd)
         }
 
         // {"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}
@@ -273,16 +423,43 @@ final class DebugSocketServer: @unchecked Sendable {
                 let steps = seqResult["steps"] as? [[String: Any]] ?? []
                 let failedSteps = steps.filter { $0["assertion_failed"] != nil }.count
                 let last = seqResult["last"] as? [String: Any] ?? [:]
-                let finalCheck = Self.applyAssert(last, assertions: scenario["assert"] as? [String: Any])
+                let finalCheck = Self.applyAssert(
+                    last,
+                    assertions: scenario["assert"] as? [String: Any],
+                    containsAssertions: scenario["assert_contains"] as? [String: Any],
+                    notAssertions: scenario["assert_not"] as? [String: Any]
+                )
                 let hasFinalFailure = finalCheck["assertion_failed"] != nil
                 let ok = failedSteps == 0 && !hasFinalFailure && seqResult["error"] == nil
                 if ok { passCount += 1 }
+
+                var failureDetails: [[String: Any]] = []
+                for (stepIndex, step) in steps.enumerated() {
+                    guard let failures = step["assertion_failed"] as? [[String: Any]] else { continue }
+                    for failure in failures {
+                        var detail = failure
+                        detail["phase"] = "step"
+                        detail["stepIndex"] = stepIndex
+                        if let stepDescribe = step["describe"] {
+                            detail["stepDescribe"] = stepDescribe
+                        }
+                        failureDetails.append(detail)
+                    }
+                }
+                if let finalFailures = finalCheck["assertion_failed"] as? [[String: Any]] {
+                    for failure in finalFailures {
+                        var detail = failure
+                        detail["phase"] = "final"
+                        failureDetails.append(detail)
+                    }
+                }
 
                 var result: [String: Any] = [
                     "name": name,
                     "ok": ok,
                     "stepCount": steps.count,
                     "failedStepCount": failedSteps,
+                    "failedAssertions": failureDetails,
                     "last": finalCheck
                 ]
                 if scenario["describe"] != nil {
@@ -307,13 +484,20 @@ final class DebugSocketServer: @unchecked Sendable {
         if let seq = cmd["sequence"] as? [[String: Any]] {
             let fields     = cmd["fields"]     as? [String]
             let assertions = cmd["assert"]     as? [String: Any]
+            let containsAssertions = cmd["assert_contains"] as? [String: Any]
+            let notAssertions = cmd["assert_not"] as? [String: Any]
             var steps: [[String: Any]] = []
             for step in seq {
                 steps.append(processCommand(step))
             }
             let last = steps.last ?? [:]
             let filteredSteps = steps.map { Self.applyFields($0, fields: fields) }
-            let filteredLast  = Self.applyAssert(Self.applyFields(last, fields: fields), assertions: assertions)
+            let filteredLast  = Self.applyAssert(
+                Self.applyFields(last, fields: fields),
+                assertions: assertions,
+                containsAssertions: containsAssertions,
+                notAssertions: notAssertions
+            )
             return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast], describe: cmd["describe"])
         }
 
@@ -321,6 +505,8 @@ final class DebugSocketServer: @unchecked Sendable {
         if let text = cmd["type_string"] as? String {
             let fields     = cmd["fields"]     as? [String]
             let assertions = cmd["assert"]     as? [String: Any]
+            let containsAssertions = cmd["assert_contains"] as? [String: Any]
+            let notAssertions = cmd["assert_not"] as? [String: Any]
             var steps: [[String: Any]] = []
             for ch in text {
                 let s = String(ch)
@@ -329,7 +515,12 @@ final class DebugSocketServer: @unchecked Sendable {
             if let thenKey = cmd["then"] as? String {
                 steps.append(processCommand(["key": thenKey, "mods": cmd["mods"] ?? 0]))
             }
-            var result = Self.applyAssert(Self.applyFields(steps.last ?? [:], fields: fields), assertions: assertions)
+            var result = Self.applyAssert(
+                Self.applyFields(steps.last ?? [:], fields: fields),
+                assertions: assertions,
+                containsAssertions: containsAssertions,
+                notAssertions: notAssertions
+            )
             if cmd["return_steps"] as? Bool == true {
                 result["steps"] = steps.map { Self.applyFields($0, fields: fields) }
             }
