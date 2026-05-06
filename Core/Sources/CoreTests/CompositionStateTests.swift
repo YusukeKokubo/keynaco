@@ -58,6 +58,20 @@ final class CompositionStateTests: XCTestCase {
         XCTAssertEqual(s.pendingRomaji, "")
     }
 
+    func testAddRomajiDoubleNBeforeConsonantDoesNotCreateDoubleN() {
+        var s = CompositionState()
+        "hennkannkouho".forEach { _ = s.addRomaji(String($0)) }
+        XCTAssertEqual(s.composedHiragana, "へんかんこうほ")
+        XCTAssertEqual(s.pendingRomaji, "")
+    }
+
+    func testAddRomajiNNBeforeVowelStillKeepsN() {
+        var s = CompositionState()
+        "kanna".forEach { _ = s.addRomaji(String($0)) }
+        XCTAssertEqual(s.composedHiragana, "かんな")
+        XCTAssertEqual(s.pendingRomaji, "")
+    }
+
     func testAddRomajiNonRomajiCharFlushesConsonant() {
         var s = CompositionState()
         _ = s.addRomaji("k")

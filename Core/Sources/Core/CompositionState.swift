@@ -4,6 +4,11 @@ import AppKit
 /// IMK ランタイムに依存しないため、ユニットテストで検証可能。
 public struct CompositionState {
 
+    /// "nn" 後の hidden n を保持すべき入力（母音/ y / n）
+    /// それ以外の子音が続いた場合は、typo 許容として hidden n を破棄して
+    /// "hennkann..." のような入力で "んん" が増殖しないようにする。
+    private static let hiddenNKeepFollowers: Set<Character> = ["a", "i", "u", "e", "o", "y", "n"]
+
     public init() {}
 
     public var composedHiragana = ""
@@ -36,11 +41,21 @@ public struct CompositionState {
             pendingRomaji = ""
             hiddenPendingN = false
         }
-        // "nn" 後にさらに "n" を打った場合、hidden n を破棄して新しい pending として扱う
-        // 例: "konnna" → こ+ん+な（hidden n + 新n が再び nn→ん にならないよう防ぐ）
-        if hiddenPendingN && chars == "n" {
-            pendingRomaji = ""
-            hiddenPendingN = false
+        // "nn" 後の hidden n の扱い:
+        // - n が続く: hidden n を破棄して新しい n を受ける（konnna 対策）
+        // - 子音（母音/y/n 以外）が続く: typo 許容として hidden n を破棄（hennkann... 対策）
+        if hiddenPendingN {
+            let incoming = chars.lowercased()
+            if incoming == "n" {
+                pendingRomaji = ""
+                hiddenPendingN = false
+            } else if incoming.count == 1,
+                      let ch = incoming.first,
+                      ch >= "a", ch <= "z",
+                      !Self.hiddenNKeepFollowers.contains(ch) {
+                pendingRomaji = ""
+                hiddenPendingN = false
+            }
         }
         pendingRomaji += chars
         let result = RomajiConverter.convert(pendingRomaji)
