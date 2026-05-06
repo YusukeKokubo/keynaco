@@ -177,100 +177,39 @@ public struct InputHandler {
         candidate: CandidateContext,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-
-        // Dispatch order (early return wins):
-        // 1. successor mode    → handleSuccessorMode
-        // 2. F6–F10 (組成中)   → handleFunctionKey
-        // 3. segment mode      → handleSegmentModeKey
-        // 4. eisu / kana       → toggle ASCII mode
-        // 5. ASCII mode        → passthrough
-        // 6. candidate visible → handleCandidateVisible
-        // 7. else              → handleNormalInput
-
         let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
-        if !isBackspace { lastConfirmedContext = nil }
+        clearLastConfirmedContextUnlessBackspace(isBackspace: isBackspace)
 
         if isSuccessorMode {
-            return handleSuccessorMode(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-                                      modifiers: modifiers, candidate: candidate, client: client)
+            return handleSuccessorModeKey(
+                keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+                modifiers: modifiers, candidate: candidate, client: client)
         }
-
         if isBracketMode {
-            return handleBracketModeKey(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-                                        modifiers: modifiers, candidate: candidate, client: client)
+            return handleBracketModeKey(
+                keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+                modifiers: modifiers, candidate: candidate, client: client)
         }
 
         let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
 
-        // F6–F10 変換キー（組成中のみ動作）
-        if !InputHandler.isAsciiMode,
-           [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) {
-            let consumed = handleFunctionKey(keyCode: keyCode, client: client)
-            return (consumed, consumed ? suggestSuccessors() : .none)
-        }
-
-        // セグメントモード中は最優先でハンドリング
+        if let r = handleFunctionKeyIfNeeded(keyCode: keyCode, client: client) { return r }
         if state.isSegmentMode {
-            return handleSegmentModeKey(keyCode: keyCode, modifiers: modifiers, candidate: candidate, client: client)
+            return handleSegmentModeKey(
+                keyCode: keyCode, modifiers: modifiers, candidate: candidate, client: client)
         }
-
-        // 英数キー / かなキー
-        if keyCode == KeyCode.eisu || keyCode == KeyCode.kana {
-            if ignoreNextModeSwitch {
-                ignoreNextModeSwitch = false
-                return (true, .none)
-            }
-            if keyCode == KeyCode.eisu {
-                if !state.composingText.isEmpty { commitComposition(client: client) }
-                InputHandler.isAsciiMode = true
-            } else {
-                InputHandler.isAsciiMode = false
-            }
-            return (true, .none)
-        }
+        if let r = handleModeSwitchKey(keyCode: keyCode, client: client) { return r }
         ignoreNextModeSwitch = false
+        if let r = handleAsciiModeKey(
+            keyCode: keyCode, characters: characters, modifiers: modifiers, client: client) { return r }
+        if let r = handleCandidateVisibleOrComposeOnlyKey(
+            keyCode: keyCode, characters: characters, modifiers: modifiers, isBackspace: isBackspace,
+            candidate: candidate, client: client) { return r }
 
-        // 英字モード
-        if InputHandler.isAsciiMode {
-            if keyCode == KeyCode.escape { InputHandler.isAsciiMode = false; return (true, .none) }
-            if keyCode == KeyCode.enter {
-                committedHistory.removeAll()
-                documentSurroundingContextInvalidated = true
-                return (false, .none)
-            }
-            guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
-            guard let chars = characters, !chars.isEmpty,
-                  chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return (false, .none) }
-            client.insertText(chars)
-            return (true, .none)
-        }
-
-        // 候補ウィンドウ表示中
-        if candidate.isVisible {
-            if let result = handleCandidateVisible(keyCode: keyCode, characters: characters,
-                                                   modifiers: modifiers, candidate: candidate, client: client) {
-                return result
-            }
-        } else {
-            switch keyCode {
-            case KeyCode.enter:
-                guard !state.composingText.isEmpty else {
-                    committedHistory.removeAll()
-                    documentSurroundingContextInvalidated = true
-                    return (false, .none)
-                }
-                commitComposition(client: client)
-                return (true, suggestSuccessors())
-            case KeyCode.escape:
-                return doEscape(client: client)
-            default:
-                if isBackspace { return doBackspace(client: client) }
-            }
-        }
-
-        return handleNormalInput(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-                                 modifiers: modifiers, wasExplicitlySelected: wasExplicitlySelected,
-                                 candidate: candidate, client: client)
+        return handleNormalInput(
+            keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+            modifiers: modifiers, wasExplicitlySelected: wasExplicitlySelected,
+            candidate: candidate, client: client)
     }
 
     /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
@@ -420,5 +359,103 @@ public struct InputHandler {
         segmentLLMTrigger = .none
         applyMarkedText(candidateText: nil, client: client)
         return (true, .dismiss)
+    }
+}
+
+// MARK: - handle() 分岐（薄型ディスパッチ用）
+
+extension InputHandler {
+    private mutating func clearLastConfirmedContextUnlessBackspace(isBackspace: Bool) {
+        if !isBackspace { lastConfirmedContext = nil }
+    }
+
+    private mutating func handleSuccessorModeKey(
+        keyCode: UInt16,
+        characters: String?,
+        baseCharacters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        handleSuccessorMode(
+            keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+            modifiers: modifiers, candidate: candidate, client: client)
+    }
+
+    private mutating func handleFunctionKeyIfNeeded(
+        keyCode: UInt16, client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        guard !InputHandler.isAsciiMode,
+              [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) else { return nil }
+        let consumed = handleFunctionKey(keyCode: keyCode, client: client)
+        return (consumed, consumed ? suggestSuccessors() : .none)
+    }
+
+    private mutating func handleModeSwitchKey(
+        keyCode: UInt16, client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        guard keyCode == KeyCode.eisu || keyCode == KeyCode.kana else { return nil }
+        if ignoreNextModeSwitch {
+            ignoreNextModeSwitch = false
+            return (true, .none)
+        }
+        if keyCode == KeyCode.eisu {
+            if !state.composingText.isEmpty { commitComposition(client: client) }
+            InputHandler.isAsciiMode = true
+        } else {
+            InputHandler.isAsciiMode = false
+        }
+        return (true, .none)
+    }
+
+    private mutating func handleAsciiModeKey(
+        keyCode: UInt16,
+        characters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        guard InputHandler.isAsciiMode else { return nil }
+        if keyCode == KeyCode.escape { InputHandler.isAsciiMode = false; return (true, .none) }
+        if keyCode == KeyCode.enter {
+            committedHistory.removeAll()
+            documentSurroundingContextInvalidated = true
+            return (false, .none)
+        }
+        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
+        guard let chars = characters, !chars.isEmpty,
+              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return (false, .none) }
+        client.insertText(chars)
+        return (true, .none)
+    }
+
+    private mutating func handleCandidateVisibleOrComposeOnlyKey(
+        keyCode: UInt16,
+        characters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        isBackspace: Bool,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        if candidate.isVisible {
+            if let r = handleCandidateVisible(
+                keyCode: keyCode, characters: characters,
+                modifiers: modifiers, candidate: candidate, client: client) { return r }
+            return nil
+        }
+        switch keyCode {
+        case KeyCode.enter:
+            guard !state.composingText.isEmpty else {
+                committedHistory.removeAll()
+                documentSurroundingContextInvalidated = true
+                return (false, .none)
+            }
+            commitComposition(client: client)
+            return (true, suggestSuccessors())
+        case KeyCode.escape:
+            return doEscape(client: client)
+        default:
+            if isBackspace { return doBackspace(client: client) }
+            return nil
+        }
     }
 }

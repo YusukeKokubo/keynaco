@@ -68,6 +68,40 @@ class InputHandlerTestCase: XCTestCase {
         for c in s { type(chars: String(c), base: String(c)) }
     }
 
+    /// `recordBigram` で連鎖学習データを投入する（同期。in-memory DB 前提）。
+    func setupBigramChain(_ items: [(prev: String, input: String, output: String)]) {
+        for it in items {
+            handler.db.recordBigram(prev: it.prev, input: it.input, output: it.output)
+        }
+    }
+
+    /// 既定の `setUp` 後に AzooKey スタブ等へ差し替える。
+    func setUpWithConverter(_ converter: any AzooKeyConverting) {
+        handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
+        client = MockTextClient()
+    }
+
+    /// ローマ字入力のあと1キー（既定 Space）を送る。
+    @discardableResult
+    func typeAndPress(_ romaji: String, keyCode: UInt16 = KeyCode.space) -> (Bool, CandidateAction) {
+        typeRomaji(romaji)
+        return press(keyCode: keyCode)
+    }
+
+    /// ローマ字入力後、候補表示中に `selectedText` を付けて Enter で確定。
+    @discardableResult
+    func confirmWithSelection(_ romaji: String, selectedText: String) -> (Bool, CandidateAction) {
+        typeRomaji(romaji)
+        return press(keyCode: KeyCode.enter, candidateVisible: true, selectedText: selectedText)
+    }
+
+    /// Space でセグメントモードに入った直後の `SegmentState`（入れなければ nil）。
+    func enterSegmentMode(with romaji: String) -> SegmentState? {
+        typeRomaji(romaji)
+        _ = press(keyCode: KeyCode.space)
+        return handler.state.segmentState
+    }
+
     // MARK: - アサーションヘルパー
 
     /// action が .show なら候補リストを返す。そうでなければテストを失敗させて nil を返す。
@@ -89,5 +123,53 @@ class InputHandlerTestCase: XCTestCase {
     ) {
         if case .dismiss = action { return }
         XCTFail("Expected .dismiss but got \(action). \(msg)", file: file, line: line)
+    }
+
+    func assertMarkedText(
+        _ expected: String, _ msg: String = "",
+        file: StaticString = #file, line: UInt = #line
+    ) {
+        XCTAssertEqual(client.markedText, expected, msg, file: file, line: line)
+    }
+
+    /// 直近の `insertText` 1件を検証する。
+    func assertInserted(
+        _ expected: String, _ msg: String = "",
+        file: StaticString = #file, line: UInt = #line
+    ) {
+        XCTAssertEqual(client.inserted.last, expected, msg, file: file, line: line)
+    }
+
+    func assertSuccessorMode(
+        _ expected: Bool, _ msg: String = "",
+        file: StaticString = #file, line: UInt = #line
+    ) {
+        XCTAssertEqual(handler.isSuccessorMode, expected, msg, file: file, line: line)
+    }
+
+    func assertSegmentMode(
+        _ expected: Bool, _ msg: String = "",
+        file: StaticString = #file, line: UInt = #line
+    ) {
+        XCTAssertEqual(handler.state.isSegmentMode, expected, msg, file: file, line: line)
+    }
+
+    func assertCandidatesContain(
+        _ action: CandidateAction, _ expected: String...,
+        file: StaticString = #file, line: UInt = #line
+    ) {
+        guard let list = candidates(in: action, file: file, line: line) else { return }
+        for e in expected {
+            XCTAssertTrue(list.contains(e), "候補に \(e) を含むはず。\(list)", file: file, line: line)
+        }
+    }
+
+    @discardableResult
+    func requireSegmentMode(minSegments: Int = 2, file: StaticString = #file, line: UInt = #line) -> SegmentState? {
+        guard handler.state.isSegmentMode, let ss = handler.state.segmentState, ss.segments.count >= minSegments else {
+            XCTFail("セグメントモードかつ文節数 >= \(minSegments) を期待", file: file, line: line)
+            return nil
+        }
+        return ss
     }
 }

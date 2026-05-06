@@ -1,0 +1,93 @@
+import Foundation
+import SQLite3
+
+extension DatabaseManager {
+    // MARK: - ユーザー辞書
+
+    func fetchUserDict(reading: String) -> [String] {
+        dbQueue.sync {
+            self.queryStringsOnQueue("""
+            SELECT output FROM user_dict
+            WHERE input = ?
+            ORDER BY id ASC
+            """) {
+                self.bindText($0, 1, reading)
+            }
+        }
+    }
+
+    func fetchUserDictPrefix(reading: String) -> [String] {
+        dbQueue.sync {
+            self.queryStringsOnQueue("""
+            SELECT output FROM user_dict
+            WHERE ? LIKE (input || '%') AND input != ?
+            ORDER BY id ASC
+            """) {
+                self.bindText($0, 1, reading)
+                self.bindText($0, 2, reading)
+            }
+        }
+    }
+
+    /// 完全一致・前方一致のユーザー辞書候補を 1 クエリで返す（buildCandidateList ホットパス用）。
+    func fetchUserDictCombined(reading: String) -> (exact: [String], prefix: [String]) {
+        let pairs = dbQueue.sync {
+            self.queryStringKindPairsOnQueue("""
+            SELECT output, kind FROM (
+              SELECT output, 0 AS kind, id AS ord FROM user_dict WHERE input = ?
+              UNION ALL
+              SELECT output, 1 AS kind, id AS ord FROM user_dict
+              WHERE ? LIKE (input || '%') AND input != ?
+            ) ORDER BY kind ASC, ord ASC
+            """) {
+                self.bindText($0, 1, reading)
+                self.bindText($0, 2, reading)
+                self.bindText($0, 3, reading)
+            }
+        }
+        var exact: [String] = []
+        var pfx: [String] = []
+        for (output, kind) in pairs {
+            if kind == 0 { exact.append(output) } else { pfx.append(output) }
+        }
+        return (exact, pfx)
+    }
+
+    public func fetchAllUserDict() -> [UserDictEntry] {
+        dbQueue.sync {
+            let sql = "SELECT id, input, output FROM user_dict ORDER BY id ASC"
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+            var results: [UserDictEntry] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let i = sqlite3_column_text(stmt, 1),
+                      let o = sqlite3_column_text(stmt, 2) else { continue }
+                results.append(UserDictEntry(
+                    id: Int(sqlite3_column_int(stmt, 0)),
+                    input: String(cString: i),
+                    output: String(cString: o)
+                ))
+            }
+            return results
+        }
+    }
+
+    @discardableResult
+    public func addUserDict(input: String, output: String) -> Bool {
+        dbQueue.sync {
+            self.executeOnQueue("INSERT OR IGNORE INTO user_dict (input, output) VALUES (?, ?)") {
+                self.bindText($0, 1, input); self.bindText($0, 2, output)
+            }
+            return sqlite3_changes(self.db) == 1
+        }
+    }
+
+    public func deleteUserDict(id: Int) {
+        dispatchWrite {
+            self.executeOnQueue("DELETE FROM user_dict WHERE id = ?") {
+                sqlite3_bind_int($0, 1, Int32(id))
+            }
+        }
+    }
+}

@@ -5,7 +5,7 @@ import AppKit
 // `handle()` の主要分岐 4 つ：
 //   - handleCandidateVisible  : 候補ウィンドウ表示中のキー
 //   - handleBracketModeKey    : 括弧候補ウィンドウ表示中のキー
-//   - handleNormalInput       : 通常の文字入力（ローマ字・Shift・記号）
+//   - handleNormalInput       : 通常の文字入力（InputHandler+NormalInput.swift）
 //   - buildCandidateList      : 候補列の組み立て（履歴・bi-gram・azooKey 統合）
 //   - doConfirmSelection      : Enter による候補確定
 
@@ -35,7 +35,7 @@ public extension InputHandler {
 
     // MARK: - 括弧モード
 
-    public mutating func handleBracketModeKey(
+    mutating func handleBracketModeKey(
         keyCode: UInt16,
         characters: String?,
         baseCharacters: String?,
@@ -92,7 +92,7 @@ public extension InputHandler {
         return suggestSuccessors()
     }
 
-    public mutating func handleCandidateVisible(
+    mutating func handleCandidateVisible(
         keyCode: UInt16,
         characters: String?,
         modifiers: NSEvent.ModifierFlags,
@@ -135,55 +135,31 @@ public extension InputHandler {
         }
     }
 
-    // handleNormalInput は入力種別ごとのプライベートハンドラへ振り分けるディスパッチテーブル。
-    // 各ハンドラは nil（自分の担当外）または (consumed, action) を返す。
-    public mutating func handleNormalInput(
-        keyCode: UInt16,
-        characters: String?,
-        baseCharacters: String?,
-        modifiers: NSEvent.ModifierFlags,
-        wasExplicitlySelected: Bool,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        if keyCode == KeyCode.space {
-            if !state.composedHiragana.isEmpty {
-                let action = enterSegmentMode()
-                if state.isSegmentMode { applySegmentMarkedText(client: client) }
-                else { applyMarkedText(candidateText: nil, client: client) }
-                return (true, action)
-            }
-            return (false, .none)
-        }
-
-        // z + 矢印キー（矢印フィルタより前に処理）
-        if state.pendingRomaji == "z", let special = Self.zArrowMap[keyCode] {
-            return commitZSequence(special: special, client: client)
-        }
-
-        if keyCode >= KeyCode.leftArrow && keyCode <= KeyCode.upArrow { return (false, .none) }
-        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
-        guard let chars = characters, !chars.isEmpty,
-              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 }) else { return (false, .none) }
-        let base = baseCharacters ?? chars
-        let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
-
-        if let r = handleZSequence(base: base, client: client) { return r }
-        if let r = handlePunctuation(base: base, modifiers: modifiers, client: client) { return r }
-        if let r = handleBracketChar(chars: chars, client: client) { return r }
-        if let r = handleShiftChar(chars: chars, isNonAscii: isNonAscii, modifiers: modifiers,
-                                    wasExplicitlySelected: wasExplicitlySelected,
-                                    candidate: candidate, client: client) { return r }
-        if let r = handleNonAsciiChar(chars: chars, isNonAscii: isNonAscii, client: client) { return r }
-        if let r = handleAsciiWord(chars: chars, wasExplicitlySelected: wasExplicitlySelected,
-                                    candidate: candidate, client: client) { return r }
-        return handleRomaji(base: base, wasExplicitlySelected: wasExplicitlySelected,
-                             candidate: candidate, client: client)
-    }
+    // MARK: - buildCandidateList
 
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     public mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
+        let sources = collectCandidateSources(autoShow: autoShow)
+        return assembleCandidateList(from: sources, autoShow: autoShow)
+    }
+
+    private struct CandidateListSources {
+        let h: String
+        let azooKeyCandidates: [String]
+        let userDictRaw: [String]
+        let highHistory: [String]
+        let lowHistory: [String]
+        let totalHistoryCount: Int
+        let highHistoryCount: Int
+        let uniquePredictions: [String]
+        let predictCount: Int
+        let zenzaiPromoted: String?
+        let azooKeyUniq: [String]
+        let historySeen: Set<String>
+    }
+
+    private mutating func collectCandidateSources(autoShow: Bool) -> CandidateListSources {
         let h = state.composedHiragana
         let azooKeyCandidates: [String]
         let ctxFingerprint = leftSideContext
@@ -223,7 +199,6 @@ public extension InputHandler {
         let predictRaw = Self.merged(trigramRaw, bigramRaw, skipBigramRaw)
 
         let historySeen = Set(historyScored.map(\.output))
-        // ユーザー設定 ON かつ左文脈ありのときのみ先頭を後段でユーザー辞書直後へ固定挿入（辞書 top-1。モデル未ロードでもフラグは true になり得る）。
         let zenzaiPromoted: String? = {
             guard azooKeyConverter.isZenzaiEnabled,
                   azooKeyLeftContext != nil,
@@ -233,56 +208,71 @@ public extension InputHandler {
         let azooKeyUniq = azooKeyCandidates.filter {
             !historySeen.contains($0) && $0 != zenzaiPromoted
         }
-        var candidates = highHistory + azooKeyUniq
         let candidateSeen = historySeen.union(Set(azooKeyCandidates))
         let uniquePredictions = predictRaw.filter { !candidateSeen.contains($0) }
-        candidates.insert(contentsOf: uniquePredictions, at: 0)
         let predictCount = uniquePredictions.count
 
+        return CandidateListSources(
+            h: h,
+            azooKeyCandidates: azooKeyCandidates,
+            userDictRaw: userDictRaw,
+            highHistory: highHistory,
+            lowHistory: lowHistory,
+            totalHistoryCount: totalHistoryCount,
+            highHistoryCount: highHistoryCount,
+            uniquePredictions: uniquePredictions,
+            predictCount: predictCount,
+            zenzaiPromoted: zenzaiPromoted,
+            azooKeyUniq: azooKeyUniq,
+            historySeen: historySeen
+        )
+    }
+
+    private mutating func assembleCandidateList(from sources: CandidateListSources, autoShow: Bool) -> CandidateAction {
+        let h = sources.h
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
-        // azooKeyCandidates が空なら zenzaiPromoted も nil（先頭候補が要る）のため、この dismiss と Zenzai 挿入は排他。
-        if autoShow && totalHistoryCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0
-            && userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
+        if autoShow && sources.totalHistoryCount == 0 && sources.azooKeyCandidates.isEmpty && sources.predictCount == 0
+            && sources.userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
             return .dismiss
         }
+
+        var candidates = sources.highHistory + sources.azooKeyUniq
+        candidates.insert(contentsOf: sources.uniquePredictions, at: 0)
+        let predictCount = sources.predictCount
+        let highHistoryCount = sources.highHistoryCount
+        let lowHistory = sources.lowHistory
 
         let hiragana = state.composedHiragana
         let katakana = KanaUtils.hiraganaToKatakana(hiragana)
 
-        // 履歴にひらがな・カタカナが含まれるかを確認する
-        // 履歴にある場合 → 履歴エントリとして可視範囲に残す（固定位置に追加しない）
-        // 履歴にない場合 → スクロール範囲外の固定位置に追加し、↑ キーで到達できるようにする
-        // lowHistory はこの時点では candidates に未挿入のため集合で明示する。
         let hiraganaInHistory = candidates.prefix(predictCount + highHistoryCount).contains(hiragana)
             || lowHistory.contains(hiragana)
         let katakanaInHistory = candidates.prefix(predictCount + highHistoryCount).contains(katakana)
             || lowHistory.contains(katakana)
 
-        let allCandidatesSeen = candidateSeen.union(uniquePredictions)
+        let candidateSeen = sources.historySeen.union(Set(sources.azooKeyCandidates))
+        let allCandidatesSeen = candidateSeen.union(Set(sources.uniquePredictions))
         var fixedCount = 0
         if !katakanaInHistory {
             if allCandidatesSeen.contains(katakana) { candidates.removeAll { $0 == katakana } }
             candidates.insert(katakana, at: 0)
             fixedCount += 1
         }
-        // hiragana == katakana（非ひらがな文字）の場合は重複挿入しない
         if !hiraganaInHistory && hiragana != katakana {
             if allCandidatesSeen.contains(hiragana) { candidates.removeAll { $0 == hiragana } }
             candidates.insert(hiragana, at: 0)
             fixedCount += 1
         }
 
-        // ユーザー辞書エントリをカナ固定の直後（initialRow = fixedCount）に挿入する。
-        // 予測・履歴より高優先で表示し、Shift+Delete の誤削除から守るため fixedEnd で追跡する。
         var insertedSet = Set(candidates)
-        let uniqueUserDict = userDictRaw.filter { insertedSet.insert($0).inserted }
+        let uniqueUserDict = sources.userDictRaw.filter { insertedSet.insert($0).inserted }
         candidates.insert(contentsOf: uniqueUserDict, at: fixedCount)
         let userDictCount = uniqueUserDict.count
         let fixedEnd = fixedCount + userDictCount
 
         var zenzaiTop1Count = 0
-        if let top1 = zenzaiPromoted, !uniqueUserDict.contains(top1) {
+        if let top1 = sources.zenzaiPromoted, !uniqueUserDict.contains(top1) {
             candidates.insert(top1, at: fixedEnd)
             zenzaiTop1Count = 1
             insertedSet.insert(top1)
@@ -291,23 +281,39 @@ public extension InputHandler {
 
         let historyEnd = adjustedFixedEnd + predictCount + highHistoryCount
         let predictionEnd = adjustedFixedEnd + predictCount
+
+        appendSpecialCandidates(
+            &candidates,
+            insertedSet: &insertedSet,
+            historyEnd: historyEnd,
+            numberCandidates: numberCandidates,
+            dateTimeCandidates: dateTimeCandidates,
+            lowHistory: lowHistory
+        )
+
+        let preferHiragana = !hiraganaInHistory && Self.isHiraganaPreferred(h)
+        let initialRow = (candidates.count > fixedCount && !preferHiragana) ? fixedCount : 0
+        guard !candidates.isEmpty else { return .dismiss }
+
+        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
+                     predictionEnd: predictionEnd, fixedEnd: adjustedFixedEnd)
+    }
+
+    private mutating func appendSpecialCandidates(
+        _ candidates: inout [String],
+        insertedSet: inout Set<String>,
+        historyEnd: Int,
+        numberCandidates: [String],
+        dateTimeCandidates: [String],
+        lowHistory: [String]
+    ) {
         let uniqueNumberCandidates = numberCandidates.filter { insertedSet.insert($0).inserted }
         let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
         candidates.insert(contentsOf: uniqueNumberCandidates, at: historyEnd)
         candidates.insert(contentsOf: uniqueDateTimeCandidates, at: historyEnd + uniqueNumberCandidates.count)
         insertedSet = Set(candidates)
         let uniqueLowHistory = lowHistory.filter { insertedSet.insert($0).inserted }
-
         candidates.append(contentsOf: uniqueLowHistory)
-        // 助動詞・接続助詞等（ほぼひらがな表記のみ）は学習ゼロでもひらがなを初期選択する。
-        // hiraganaInHistory の場合は固定位置にひらがながないため通常どおり fixedCount から。
-        let preferHiragana = !hiraganaInHistory && Self.isHiraganaPreferred(h)
-        // 履歴・辞書候補がある場合はその先頭を初期選択、固定候補のみなら先頭から表示
-        let initialRow = (candidates.count > fixedCount && !preferHiragana) ? fixedCount : 0
-        guard !candidates.isEmpty else { return .dismiss }
-
-        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
-                     predictionEnd: predictionEnd, fixedEnd: adjustedFixedEnd)
     }
 
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
@@ -338,128 +344,6 @@ public extension InputHandler {
         let fixedCandidates = kanas
         let allCandidates = Self.merged(fixedCandidates, candidates)
         return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count, predictionEnd: 0, fixedEnd: 0)
-    }
-
-    // MARK: - Private input handlers
-
-    private mutating func flushPendingRomaji() {
-        guard !state.pendingRomaji.isEmpty else { return }
-        state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-        state.pendingRomaji = ""
-    }
-
-    private mutating func commitZSequence(special: String, client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
-        state.pendingRomaji = ""
-        if state.composedHiragana.isEmpty {
-            client.insertText(special)
-            return (true, .dismiss)
-        }
-        state.composedHiragana += special
-        let action = buildCandidateList()
-        applyMarkedText(candidateText: nil, client: client)
-        return (true, action)
-    }
-
-    private mutating func handleZSequence(base: String, client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard state.pendingRomaji == "z", let special = Self.zCharMap[base] else { return nil }
-        return commitZSequence(special: special, client: client)
-    }
-
-    private mutating func handlePunctuation(
-        base: String, modifiers: NSEvent.ModifierFlags, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard let mappedPunct = Self.punctuationMap[base], !modifiers.contains(.shift) else { return nil }
-        if state.composingText.isEmpty {
-            pushCommitted(mappedPunct)
-            client.insertText(mappedPunct)
-            return (true, .dismiss)
-        }
-        flushPendingRomaji()
-        state.composedHiragana += mappedPunct
-        let action = buildCandidateList()
-        applyMarkedText(candidateText: nil, client: client)
-        return (true, action)
-    }
-
-    private mutating func handleBracketChar(
-        chars: String, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard let options = InputHandler.bracketOptions[chars] else { return nil }
-        if state.composingText.isEmpty {
-            bracketCandidates = options
-            client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
-            return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
-        }
-        flushPendingRomaji()
-        state.composedHiragana += options[0]
-        let action = buildCandidateList()
-        applyMarkedText(candidateText: nil, client: client)
-        return (true, action)
-    }
-
-    private mutating func handleShiftChar(
-        chars: String, isNonAscii: Bool, modifiers: NSEvent.ModifierFlags,
-        wasExplicitlySelected: Bool, candidate: CandidateContext, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard modifiers.contains(.shift) && !isNonAscii else { return nil }
-        if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
-        else { flushPendingRomaji() }
-        state.composedHiragana += chars
-        let action = buildCandidateList(autoShow: true)
-        applyMarkedText(candidateText: nil, client: client)
-        return (true, action)
-    }
-
-    private mutating func handleNonAsciiChar(
-        chars: String, isNonAscii: Bool, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard isNonAscii else { return nil }
-        if state.composingText.isEmpty {
-            pushCommitted(chars)
-            client.insertText(chars)
-        } else {
-            flushPendingRomaji()
-            state.composedHiragana += chars
-            applyMarkedText(candidateText: nil, client: client)
-        }
-        return (true, .dismiss)
-    }
-
-    private mutating func handleAsciiWord(
-        chars: String, wasExplicitlySelected: Bool, candidate: CandidateContext, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard !state.composedHiragana.isEmpty && state.pendingRomaji.isEmpty
-              && state.composedHiragana.allSatisfy({ $0.isASCII }) else { return nil }
-        if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
-        state.composedHiragana += chars
-        let action = buildCandidateList(autoShow: true)
-        applyMarkedText(candidateText: nil, client: client)
-        return (true, action)
-    }
-
-    private mutating func handleRomaji(
-        base: String, wasExplicitlySelected: Bool, candidate: CandidateContext, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
-        let needsRefresh = state.addRomaji(base)
-        let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
-        let pending = state.pendingRomaji
-        let hasPendingPreview = lastCommittedOutput != nil
-            && state.composedHiragana.isEmpty
-            && pending.count == 1
-            && pending != "n"
-            && InputHandler.romajiToInitialKana[pending] != nil
-
-        let candidateAction: CandidateAction
-        if needsRefresh || hasBigramContext {
-            candidateAction = buildCandidateList(autoShow: true)
-        } else if hasPendingPreview {
-            candidateAction = buildPendingCandidateList(pendingChar: pending, client: client)
-        } else {
-            candidateAction = .dismiss
-        }
-        if !isSuccessorMode { applyMarkedText(candidateText: nil, client: client) }
-        return (true, candidateAction)
     }
 
     // MARK: - Utility

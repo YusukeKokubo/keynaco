@@ -4,7 +4,7 @@ import InputMethodKit
 
 // MARK: - IMKTextInput → TextInputClient アダプタ
 
-private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
+final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
     private let client: IMKTextInput?
     private(set) var didInsertText = false
     #if DEBUG
@@ -104,15 +104,15 @@ private final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
 @MainActor
 class InputController: IMKInputController {
 
-    private lazy var handler: InputHandler = InputHandler(azooKeyConverter: ZenzaiSettings.makeConverter())
+    lazy var handler: InputHandler = InputHandler(azooKeyConverter: ZenzaiSettings.makeConverter())
     /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
     nonisolated(unsafe) private var zenzaiSettingsObserver: NSObjectProtocol?
     /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
-    private static let successorLLM = LLMSuccessorFetcher()
-    private static let segmentLLM = LLMSegmentConverter()
-    private static let misconversionChecker = LLMMisconversionChecker()
+    static let successorLLM = LLMSuccessorFetcher()
+    static let segmentLLM = LLMSegmentConverter()
+    static let misconversionChecker = LLMMisconversionChecker()
 
-    private static let candidateWindow: CandidateWindow = {
+    static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
             contentRect: .zero, styleMask: [.borderless],
             backing: .buffered, defer: true
@@ -120,10 +120,10 @@ class InputController: IMKInputController {
         return w
     }()
 
-    private var candidateWindow: CandidateWindow { Self.candidateWindow }
+    var candidateWindow: CandidateWindow { Self.candidateWindow }
 
     /// `composedHiragana` が空→非空になったタイミングで `SurroundingIMKContext.fetch` 済み。`selectedRange().location` が一致するときだけ LLM 文脈に使う（Space 再取得は location 無効化で代替）。
-    private var cachedSurroundingContext: (location: Int, text: (before: String, after: String))?
+    var cachedSurroundingContext: (location: Int, text: (before: String, after: String))?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
@@ -190,17 +190,7 @@ class InputController: IMKInputController {
         handler.segmentLLMTrigger = .none
         cachedSurroundingContext = nil
         handler.leftSideContext = ""
-        if Thread.isMainThread {
-            Self.successorLLM.cancel()
-            Self.segmentLLM.cancel()
-            Self.misconversionChecker.cancel()
-        } else {
-            DispatchQueue.main.sync {
-                Self.successorLLM.cancel()
-                Self.segmentLLM.cancel()
-                Self.misconversionChecker.cancel()
-            }
-        }
+        Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: true)
         handler.ignoreNextModeSwitch = true
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
@@ -409,6 +399,7 @@ class InputController: IMKInputController {
             fixedEnd: candidateWindow.fixedRowCount
         )
         handler.commitComposition(client: adapter, candidate: ctx)
+        handler.bracketCandidates = nil
         handler.isSuccessorMode = false
         handler.successorFirstChar = nil
         handler.pendingSuccessorCandidates = []
@@ -416,18 +407,9 @@ class InputController: IMKInputController {
         handler.successorLLMTrigger = .none
         handler.successorLLMBaseCandidates = nil
         handler.segmentLLMTrigger = .none
-        handler.bracketCandidates = nil
-        if Thread.isMainThread {
-            Self.successorLLM.cancel()
-            Self.segmentLLM.cancel()
-        } else {
-            DispatchQueue.main.sync {
-                Self.successorLLM.cancel()
-                Self.segmentLLM.cancel()
-            }
-        }
         cachedSurroundingContext = nil
         handler.leftSideContext = ""
+        Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: false)
         candidateWindow.dismiss()
         Self.postSuccessorPendingNotification(pending: false)
 
@@ -438,151 +420,25 @@ class InputController: IMKInputController {
 
     // MARK: - プライベートヘルパー
 
-    /// LLM 用の文脈プレフィックス。IMK の `before`（キャッシュ・location 一致時）が非空なら、`committedHistory.suffix(5)` が空でないときは先頭にその全量を付けたうえで `before` を続ける（`before` は最大 300 字に切り詰めた後、結合総長が 400 字を超えないようカーソル近傍の末尾側を採用）。`historyJoined` は切り捨てない。`before` が空またはキャッシュ不一致時は `committedHistory.suffix(5)` のみ。
-    private func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
-        let historyJoined = handler.committedHistory.suffix(5).joined()
-        let loc = adapter.selectedRange().location
-        guard loc != NSNotFound else { return historyJoined }
-
-        if let cache = cachedSurroundingContext, cache.location == loc, !cache.text.before.isEmpty {
-            let rawBefore = cache.text.before
-            let beforeTruncated =
-                rawBefore.count > 300 ? String(rawBefore.suffix(300)) : rawBefore
-            if !historyJoined.isEmpty {
-                let maxBefore = max(0, 400 - historyJoined.count)
-                let trimmedBefore =
-                    beforeTruncated.count > maxBefore
-                    ? String(beforeTruncated.suffix(maxBefore))
-                    : beforeTruncated
-                return historyJoined + trimmedBefore
+    /// オンデバイス LLM（Successor / セグメント / 任意で誤変換チェック）をキャンセルする。
+    /// IMK の `activateServer` / `commitComposition` は nonisolated オーバーライドのため `self` を渡すインスタンスヘルパーは Swift 6 でコンパイルできない。static にして重複を抑える。
+    /// `commitComposition` では確定後に `scheduleMisconversionCheck` が走りうるため、`misconversionChecker.cancel()` はここでは呼ばない（`includeMisconversionCancel: false`）。
+    private static func cancelOnDeviceLLMTasks(includeMisconversionCancel: Bool) {
+        if Thread.isMainThread {
+            successorLLM.cancel()
+            segmentLLM.cancel()
+            if includeMisconversionCancel {
+                misconversionChecker.cancel()
             }
-            return beforeTruncated
-        }
-
-        if cachedSurroundingContext != nil {
-            cachedSurroundingContext = nil
-        }
-        return historyJoined
-    }
-
-    /// 確定 `insertText` 後にカーソル前文を誤変換検出で検査（0.5 秒デバウンス）。
-    private func scheduleMisconversionCheck(adapter: IMKTextInputAdapter) {
-        let prefix = adapter.surroundingText(maxLength: 200).prefix
-        let recentWords = Array(handler.committedHistory.suffix(5))
-        Self.misconversionChecker.check(surroundingPrefix: prefix, recentWords: recentWords)
-    }
-
-    /// `suggestSuccessors()` が立てた `successorLLMTrigger` に応じてオンデバイス LLM で後続語を補完する。
-    private func applySuccessorLLMScheduling(adapter: IMKTextInputAdapter) {
-        let trigger = handler.successorLLMTrigger
-        guard trigger != .none else { return }
-        handler.successorLLMTrigger = .none
-
-        let triggerContextOpt: [String]? = {
-            switch trigger {
-            case .pendingLowConfidence(let ctx), .particlesOnly(let ctx): return ctx
-            // 直前の guard で .none は除外済み（列挙の網羅性のため残す）
-            case .none: return nil
-            }
-        }()
-        let examples: [(prev: String, next: String)] = triggerContextOpt.flatMap { tc in
-            tc.last.map { lw in
-                handler.db.fetchBigramTop(prev: lw, limit: 5)
-                    .filter { !InputHandler.particles.contains($0) }
-                    .map { (prev: lw, next: $0) }
-            }
-        } ?? []
-
-        switch trigger {
-        case .none:
-            break
-        case .pendingLowConfidence(let triggerContext):
-            let docPrefix = resolvedLLMDocumentContextPrefix(adapter: adapter)
-            Self.successorLLM.fetch(
-                context: triggerContext, documentContextPrefix: docPrefix, examples: examples
-            ) { [weak self] words in
-                guard let self else { return }
-                guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
-                guard self.handler.isSuccessorMode else { return }
-                // LLM が遅延到着しても、既に1打目表示済みなら UI は更新しない（extras にのみ溜まりうる）。
-                var seen = Set(self.handler.pendingSuccessorCandidates)
-                seen.formUnion(self.handler.successorLLMSurfaceExtras)
-                let extra = words.filter { !seen.contains($0) }
-                guard !extra.isEmpty else { return }
-                self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
-                if !self.handler.pendingSuccessorCandidates.isEmpty {
-                    Self.postSuccessorPendingNotification(pending: true)
-                }
-            }
-        case .particlesOnly(let triggerContext):
-            let docPrefix = resolvedLLMDocumentContextPrefix(adapter: adapter)
-            Self.successorLLM.fetch(
-                context: triggerContext, documentContextPrefix: docPrefix, examples: examples
-            ) { [weak self] words in
-                guard let self else { return }
-                guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
-                guard self.handler.isSuccessorMode,
-                      self.candidateWindow.isVisible,
-                      let base = self.handler.successorLLMBaseCandidates else { return }
-                var seen = Set(base)
-                seen.formUnion(self.handler.successorLLMSurfaceExtras)
-                let extra = words.filter { !seen.contains($0) }
-                guard !extra.isEmpty else { return }
-                for w in extra where seen.insert(w).inserted {
-                    self.handler.successorLLMSurfaceExtras.append(w)
-                }
-                var merged = base
-                var tailSeen = Set(base)
-                for w in self.handler.successorLLMSurfaceExtras where tailSeen.insert(w).inserted {
-                    merged.append(w)
-                }
-                let rowCap = max(0, merged.count - 1)
-                let initialRow = min(self.candidateWindow.selectedRow, rowCap)
-                self.candidateWindow.show(
-                    candidates: merged, historySectionEnd: 0, initialRow: initialRow,
-                    predictionEnd: 0, fixedSectionEnd: 0, near: adapter.cursorRect()
-                )
-                if self.handler.isSuccessorMode, !merged.isEmpty,
-                   let markedText = self.candidateWindow.selectedText(), !markedText.isEmpty {
-                    adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
+        } else {
+            DispatchQueue.main.sync {
+                successorLLM.cancel()
+                segmentLLM.cancel()
+                if includeMisconversionCancel {
+                    misconversionChecker.cancel()
                 }
             }
         }
-    }
-
-    /// `enterSegmentMode()` が立てた `segmentLLMTrigger` に応じてオンデバイス LLM で読み全体を一括変換する。
-    private func applySegmentLLMScheduling(adapter: IMKTextInputAdapter) {
-        let trigger = handler.segmentLLMTrigger
-        guard case .start(let hiragana) = trigger else { return }
-        handler.segmentLLMTrigger = .none
-        Self.segmentLLM.convert(hiragana: hiragana) { [weak self] text in
-            guard let self else { return }
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty,
-                  let segState = self.handler.state.segmentState,
-                  segState.segments.map(\.reading).joined() == hiragana else { return }
-            self.handler.applyLLMSegmentResult(text: trimmed)
-            guard let updated = self.handler.state.segmentState,
-                  updated.llmWholeText != nil,
-                  !updated.segments.isEmpty else { return }
-            let action = self.handler.makeCandidateActionForFocusedSegment()
-            if case .show(let cands, let historyEnd, let initialRow, let predictionEnd, let fixedEnd) = action {
-                self.candidateWindow.show(
-                    candidates: cands, historySectionEnd: historyEnd, initialRow: initialRow,
-                    predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect()
-                )
-                self.handler.applySegmentMarkedText(client: adapter)
-            }
-        }
-    }
-
-    /// IMK の `handle` / `activateServer` は nonisolated のため、通知だけ static で送る（MainActor の `self` を捕らない）。
-    private nonisolated static func postSuccessorPendingNotification(pending: Bool) {
-        NotificationCenter.default.post(
-            name: .keynacoSuccessorPendingChanged,
-            object: nil,
-            userInfo: ["pending": pending]
-        )
     }
 
     private func updateMarkedText(client: TextInputClient) {

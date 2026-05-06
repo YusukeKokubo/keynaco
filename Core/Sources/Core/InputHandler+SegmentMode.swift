@@ -289,65 +289,86 @@ public extension InputHandler {
         guard var segmentState = state.segmentState else { return (false, .none) }
         syncFocusedSegmentSelection(from: candidate)
         let i = segmentState.focusedIndex
-
         let focusedPrev: String? = i > 0 ? segmentState.segments[i - 1].selectedText : lastCommittedOutput
 
         if expand {
-            guard i + 1 < segmentState.segments.count else { return (true, .none) }
-            let nextReading = segmentState.segments[i + 1].reading
-            guard !nextReading.isEmpty else { return (true, .none) }
-            let newFocusedReading = segmentState.segments[i].reading + String(nextReading.first!)
-            let newNextReading = String(nextReading.dropFirst())
-            var rebuilt = buildSegmentCandidatesCached(
-                reading: newFocusedReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading, leftSideContext: azooKeyLeftContext),
-                prev: focusedPrev
-            )
-            rebuilt.isManuallyAdjusted = true
-            segmentState.segments[i] = rebuilt
-            if newNextReading.isEmpty {
-                segmentState.segments.remove(at: i + 1)
-            } else {
-                segmentState.segments[i + 1] = buildSegmentCandidatesCached(
-                    reading: newNextReading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading, leftSideContext: azooKeyLeftContext),
-                    prev: rebuilt.selectedText
-                )
+            guard expandFocusedSegment(segmentState: &segmentState, focusedIndex: i, focusedPrev: focusedPrev) else {
+                return (true, .none)
             }
         } else {
-            let focusedReading = segmentState.segments[i].reading
-            guard focusedReading.count >= 2 else { return (true, .none) }
-            let newFocusedReading = String(focusedReading.dropLast())
-            let removedChar = String(focusedReading.last!)
-            var rebuilt = buildSegmentCandidatesCached(
-                reading: newFocusedReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading, leftSideContext: azooKeyLeftContext),
-                prev: focusedPrev
-            )
-            rebuilt.isManuallyAdjusted = true
-            segmentState.segments[i] = rebuilt
-            if i + 1 < segmentState.segments.count {
-                let newNextReading = removedChar + segmentState.segments[i + 1].reading
-                segmentState.segments[i + 1] = buildSegmentCandidatesCached(
-                    reading: newNextReading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading, leftSideContext: azooKeyLeftContext),
-                    prev: rebuilt.selectedText
-                )
-            } else {
-                segmentState.segments.insert(
-                    buildSegmentCandidatesCached(
-                        reading: removedChar,
-                        dictCandidates: azooKeyConverter.candidatesForSegment(reading: removedChar, leftSideContext: azooKeyLeftContext),
-                        prev: rebuilt.selectedText
-                    ),
-                    at: i + 1
-                )
+            guard shrinkFocusedSegment(segmentState: &segmentState, focusedIndex: i, focusedPrev: focusedPrev) else {
+                return (true, .none)
             }
         }
 
         state.segmentState = segmentState
         applySegmentMarkedText(client: client)
         return (true, makeCandidateActionForFocusedSegment())
+    }
+
+    private mutating func expandFocusedSegment(
+        segmentState: inout SegmentState,
+        focusedIndex i: Int,
+        focusedPrev: String?
+    ) -> Bool {
+        guard i + 1 < segmentState.segments.count else { return false }
+        let nextReading = segmentState.segments[i + 1].reading
+        guard !nextReading.isEmpty else { return false }
+        let newFocusedReading = segmentState.segments[i].reading + String(nextReading.first!)
+        let newNextReading = String(nextReading.dropFirst())
+        var rebuilt = buildSegmentCandidatesCached(
+            reading: newFocusedReading,
+            dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading, leftSideContext: azooKeyLeftContext),
+            prev: focusedPrev
+        )
+        rebuilt.isManuallyAdjusted = true
+        segmentState.segments[i] = rebuilt
+        if newNextReading.isEmpty {
+            segmentState.segments.remove(at: i + 1)
+        } else {
+            segmentState.segments[i + 1] = buildSegmentCandidatesCached(
+                reading: newNextReading,
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading, leftSideContext: azooKeyLeftContext),
+                prev: rebuilt.selectedText
+            )
+        }
+        return true
+    }
+
+    private mutating func shrinkFocusedSegment(
+        segmentState: inout SegmentState,
+        focusedIndex i: Int,
+        focusedPrev: String?
+    ) -> Bool {
+        let focusedReading = segmentState.segments[i].reading
+        guard focusedReading.count >= 2 else { return false }
+        let newFocusedReading = String(focusedReading.dropLast())
+        let removedChar = String(focusedReading.last!)
+        var rebuilt = buildSegmentCandidatesCached(
+            reading: newFocusedReading,
+            dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading, leftSideContext: azooKeyLeftContext),
+            prev: focusedPrev
+        )
+        rebuilt.isManuallyAdjusted = true
+        segmentState.segments[i] = rebuilt
+        if i + 1 < segmentState.segments.count {
+            let newNextReading = removedChar + segmentState.segments[i + 1].reading
+            segmentState.segments[i + 1] = buildSegmentCandidatesCached(
+                reading: newNextReading,
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading, leftSideContext: azooKeyLeftContext),
+                prev: rebuilt.selectedText
+            )
+        } else {
+            segmentState.segments.insert(
+                buildSegmentCandidatesCached(
+                    reading: removedChar,
+                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: removedChar, leftSideContext: azooKeyLeftContext),
+                    prev: rebuilt.selectedText
+                ),
+                at: i + 1
+            )
+        }
+        return true
     }
 
     public mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {
@@ -385,8 +406,8 @@ public extension InputHandler {
             db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
             let conv = azooKeyConverter; let r = seg.reading; let t = seg.selectedText
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
+            // 手動境界調整時は prefix 学習を1回追加（計2回: 上の通常1回 + ブースト1回）。過去の重複行はコピペ誤りによる3回だった。
             if seg.isManuallyAdjusted {
-                db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
                 db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
             }
             confirmed += seg.selectedText
@@ -400,8 +421,8 @@ public extension InputHandler {
             let prevSeg = segs[i]
             let next = segs[i + 1]
             db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
+            // 隣接いずれかが手動調整なら bi-gram も1回追加（計2回）。
             if next.isManuallyAdjusted || prevSeg.isManuallyAdjusted {
-                db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
                 db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
             }
         }

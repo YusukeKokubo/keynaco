@@ -112,6 +112,7 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 **取得の前方一致**: 完全一致だけでなく、入力のフル読みが保存キー（`full_reading`）で始まる行のうち、**最長の `full_reading`** を 1 件選んでその `boundaries` を使う（より長い読みへの入力でも、短いキーで学習した境界を再利用できる）。  
 **保存の最短長**: `full_reading` の Swift `String.count` が 4 未満のときは `saveBoundaryPref` が保存しない（一律ガード）。  
 **保存条件**: `doConfirmSegments()` 時に **`isManuallyAdjusted` なセグメントが 1 つ以上ある**、または **`SegmentState.isLlmBoundaryInferred` が真**（`inferSegmentBoundaries` が 2 ペア以上返し多文節に再構築済み）のとき記録する。AzooKey 初期分割のままかつ上記 LLM 条件も満たさない確定では記録しない。  
+**手動調整時の履歴・bi-gram ブースト**: 同上の確定処理では、各文節の `recordPrefixes` と隣接ペアの `recordBigram` を **通常1回**記録したうえで、手動境界調整のあった文節（および手動調整を含む隣接ペア）に限り **同じ引数でもう1回だけ** 追加記録する（2倍まで。3回以上の連続呼び出しはしない）。  
 **上書きポリシー**: 同じ `full_reading` に対して再調整・確定すると前回エントリが上書きされる（`ON CONFLICT DO UPDATE`）。  
 **GC**: 180日未使用のエントリを `performGCIfNeeded()` で削除する（`count` カラムなし、`used_at` のみで判定）。
 
