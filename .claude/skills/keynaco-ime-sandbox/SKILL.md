@@ -81,14 +81,28 @@ send({"reset": True})
 | コマンド列を一括送信 | `{"sequence": [{cmd1}, {cmd2}, ...]}` → `{"steps": [...], "last": {...}}` |
 | 名前付きキー | `{"key": "space"}` / `{"key": "enter"}` / `{"key": "down"}` 等 |
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
+| フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
+| インラインアサート | `{"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}}` |
+| bi-gram シード | `{"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}` |
+| 履歴シード | `{"seed_history": {"input": "かんじ", "output": "漢字", "times": 3}}` |
 
 `then` に指定できる名前: `space` / `enter` / `backspace` / `escape` / `tab` / `down` / `up` / `left` / `right` / `f6`–`f10` / `eisu` / `kana`
 
 **使用例:**
 ```python
-# "kanzi" を入力して Space で変換 → 最終状態だけ得る（最もシンプル）
-r = send({"type_string": "kanzi", "then": "space"})
+# "kanzi" を入力して Space で変換 → 候補だけ得る（fields で絞り込み）
+r = send({"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]})
 print(r["candidates"][:5])
+
+# assert でインライン検証 → 失敗時は {"assertion_failed": [...], "state": {...}} が返る
+r = send({"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}})
+if "assertion_failed" in r:
+    print("FAIL:", r["assertion_failed"])
+
+# bi-gram をシードしてから Successor を確認
+send({"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}})
+r = send({"type_string": "kyou", "then": "enter"})
+print(f"isSuccessorMode: {r['isSuccessorMode']}, candidates: {r['candidates'][:3]}")
 
 # 複数操作を1往復でバッチ送信
 r = send({"sequence": [
@@ -96,7 +110,6 @@ r = send({"sequence": [
     {"key": "down"},
     {"key": "enter"},
 ]})
-# r["steps"] に各ステップの状態、r["last"] に最終状態
 print(r["last"]["inserted"])
 ```
 

@@ -156,6 +156,33 @@ final class DebugSocketServer: @unchecked Sendable {
         "kana":      (104, ""),
     ]
 
+    // MARK: - fields / assert ヘルパー
+
+    private static func applyFields(_ dict: [String: Any], fields: [String]?) -> [String: Any] {
+        guard let fields, !fields.isEmpty else { return dict }
+        let keep = Set(fields)
+        return dict.filter { keep.contains($0.key) }
+    }
+
+    private static func applyAssert(_ dict: [String: Any], assertions: [String: Any]?) -> [String: Any] {
+        guard let assertions, !assertions.isEmpty else { return dict }
+        // スカラー値は JSONSerialization のトップレベルとして渡せないので配列でラップして比較する
+        func jsonString(_ v: Any) -> String {
+            (try? JSONSerialization.data(withJSONObject: [v])).flatMap { String(data: $0, encoding: .utf8) } ?? "\(v)"
+        }
+        var failures: [[String: Any]] = []
+        for (key, expected) in assertions {
+            let actual = dict[key]
+            let match = actual.map { jsonString($0) == jsonString(expected) } ?? false
+            if !match {
+                failures.append(["field": key, "expected": expected, "actual": actual ?? NSNull()])
+            }
+        }
+        return failures.isEmpty ? dict : ["assertion_failed": failures, "state": dict]
+    }
+
+    // MARK: - コマンド処理（MainActor 上で実行）
+
     private func processCommand(_ cmd: [String: Any]) -> [String: Any] {
         if cmd["reset"] != nil {
             cleanupSnapshot()
@@ -179,17 +206,47 @@ final class DebugSocketServer: @unchecked Sendable {
             return makeResponse(inserted: [])
         }
 
+        // {"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}
+        if let seed = cmd["seed_bigram"] as? [String: Any] {
+            guard let prev   = seed["prev"]   as? String,
+                  let input  = seed["input"]  as? String,
+                  let output = seed["output"] as? String else {
+                return ["error": "seed_bigram requires prev, input, output"]
+            }
+            let count = seed["count"] as? Int ?? 1
+            handler.db.debugSeedBigram(prev: prev, input: input, output: output, count: count)
+            return ["ok": true]
+        }
+
+        // {"seed_history": {"input": "かんじ", "output": "漢字"}}
+        if let seed = cmd["seed_history"] as? [String: Any] {
+            guard let input  = seed["input"]  as? String,
+                  let output = seed["output"] as? String else {
+                return ["error": "seed_history requires input and output"]
+            }
+            let times = seed["times"] as? Int ?? 1
+            for _ in 0..<times { handler.db.debugSeedHistory(input: input, output: output) }
+            return ["ok": true]
+        }
+
         // {"sequence": [{cmd}, {cmd}, ...]} — バッチ処理。各ステップの状態を配列で返す
         if let seq = cmd["sequence"] as? [[String: Any]] {
+            let fields     = cmd["fields"]     as? [String]
+            let assertions = cmd["assert"]     as? [String: Any]
             var steps: [[String: Any]] = []
             for step in seq {
                 steps.append(processCommand(step))
             }
-            return ["steps": steps, "last": steps.last ?? [:]]
+            let last = steps.last ?? [:]
+            let filteredSteps = steps.map { Self.applyFields($0, fields: fields) }
+            let filteredLast  = Self.applyAssert(Self.applyFields(last, fields: fields), assertions: assertions)
+            return ["steps": filteredSteps, "last": filteredLast]
         }
 
         // {"type_string": "kanzi"} — 文字列を1文字ずつ送信。最終状態を返す（return_steps: true で全ステップも付加）
         if let text = cmd["type_string"] as? String {
+            let fields     = cmd["fields"]     as? [String]
+            let assertions = cmd["assert"]     as? [String: Any]
             var steps: [[String: Any]] = []
             for ch in text {
                 let s = String(ch)
@@ -198,9 +255,9 @@ final class DebugSocketServer: @unchecked Sendable {
             if let thenKey = cmd["then"] as? String {
                 steps.append(processCommand(["key": thenKey, "mods": cmd["mods"] ?? 0]))
             }
-            var result = steps.last ?? [:]
+            var result = Self.applyAssert(Self.applyFields(steps.last ?? [:], fields: fields), assertions: assertions)
             if cmd["return_steps"] as? Bool == true {
-                result["steps"] = steps
+                result["steps"] = steps.map { Self.applyFields($0, fields: fields) }
             }
             return result
         }
@@ -243,7 +300,10 @@ final class DebugSocketServer: @unchecked Sendable {
         candidateWindow.apply(action: action)
         applyLLMScheduling()
 
-        return makeResponse(inserted: mockClient.consume())
+        let result = makeResponse(inserted: mockClient.consume())
+        let fields     = cmd["fields"]     as? [String]
+        let assertions = cmd["assert"]     as? [String: Any]
+        return Self.applyAssert(Self.applyFields(result, fields: fields), assertions: assertions)
     }
 
     private func makeResponse(inserted: [String]) -> [String: Any] {

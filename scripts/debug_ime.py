@@ -99,9 +99,20 @@ class IMEClient:
             cmd["return_steps"] = True
         return self._send_recv(cmd)
 
-    def sequence(self, *cmds: dict) -> dict:
+    def sequence(self, *cmds: dict, fields: list[str] | None = None) -> dict:
         """複数コマンドを1往復で一括送信する。result["steps"] に各状態、result["last"] に最終状態。"""
-        return self._send_recv({"sequence": list(cmds)})
+        cmd: dict = {"sequence": list(cmds)}
+        if fields:
+            cmd["fields"] = fields
+        return self._send_recv(cmd)
+
+    def seed_bigram(self, prev: str, input: str, output: str, count: int = 1) -> dict:
+        """bi-gram をテスト用に DB へ直接挿入する。"""
+        return self._send_recv({"seed_bigram": {"prev": prev, "input": input, "output": output, "count": count}})
+
+    def seed_history(self, input: str, output: str, times: int = 1) -> dict:
+        """変換履歴をテスト用に DB へ直接挿入する。"""
+        return self._send_recv({"seed_history": {"input": input, "output": output, "times": times}})
 
     def reset(self) -> dict:
         """InputHandler の状態をリセットする（in-memory DB も再生成）。"""
@@ -191,7 +202,8 @@ def interactive_mode(client: IMEClient) -> None:
 def batch_mode(client: IMEClient, text: str) -> None:
     r = client.type_string(text, return_steps=True)
     for i, step in enumerate(r.get("steps", [r])):
-        print(f"key={text[i] if i < len(text) else '?'!r}:")
+        ch = text[i] if i < len(text) else "?"
+        print(f"key={ch!r}:")
         print(client.pretty(step))
         print()
 

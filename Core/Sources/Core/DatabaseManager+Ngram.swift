@@ -297,6 +297,16 @@ extension DatabaseManager {
         }
     }
 
+    #if DEBUG
+    /// デバッグ専用: bi-gram を任意 count で直接挿入する。DebugSocketServer の seed_bigram コマンドから使用。
+    public func debugSeedBigram(prev: String, input: String, output: String, count: Int) {
+        testInsertBigram(
+            prev: prev, input: input, output: output,
+            count: count, usedAt: Int64(Date().timeIntervalSince1970), isPreset: false
+        )
+    }
+    #endif
+
     /// テスト専用: `is_preset` 付き bi-gram を直接挿入する。
     func testInsertBigram(
         prev: String, input: String, output: String, count: Int, usedAt: Int64, isPreset: Bool

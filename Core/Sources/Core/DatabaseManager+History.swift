@@ -112,6 +112,13 @@ extension DatabaseManager {
 
     // MARK: - 記録
 
+    #if DEBUG
+    /// デバッグ専用: 履歴エントリを直接挿入する。DebugSocketServer の seed_history コマンドから使用。
+    public func debugSeedHistory(input: String, output: String) {
+        record(input: input, output: output)
+    }
+    #endif
+
     /// 変換確定時に履歴へ追記（同じ input/output ペアはカウントアップ）
     func record(input: String, output: String) {
         dispatchWrite {
