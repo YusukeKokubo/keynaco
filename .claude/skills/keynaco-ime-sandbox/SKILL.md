@@ -78,12 +78,14 @@ send({"reset": True})
 | 文字列を一括送信（最終状態のみ） | `{"type_string": "kanzi"}` |
 | 文字列→変換キー（最終状態のみ） | `{"type_string": "kanzi", "then": "space"}` |
 | 文字列→確定（全ステップも取得） | `{"type_string": "kyou", "then": "enter", "return_steps": true}` |
+| サーバースキーマ取得（AI向け） | `{"schema": true}` |
 | コマンド列を一括送信 | `{"sequence": [{cmd1}, {cmd2}, ...]}` → `{"steps": [...], "last": {...}}` |
 | ステップごとの説明ラベル | `{"type_string": "kanzi", "describe": "ローマ字入力"}`（レスポンスにも `describe` が返る） |
 | sequence 中間ステップ assert | `{"sequence": [{"type_string":"kanzi","assert":{"composedHiragana":"かんじ"}}, {"key":"space","assert":{"candidateVisible":true}}]}` |
 | 部分一致 assert | `{"key":"space","assert_contains":{"candidates":"漢字"}}` / `{"assert_contains":{"candidates":["漢字","感じ"]}}` |
 | 否定 assert | `{"state":true,"assert_not":{"isAsciiMode":true}}` |
 | スキーマ assert | `{"state":true,"assert_schema":{"candidates":"array<string>","historyEnd":"int"}}` |
+| 正規表現 assert | `{"state":true,"assert_regex":{"markedText":"^\\\".*\\\"$"}}` |
 | 非同期待機 | `{"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}` |
 | 複数シナリオを一括実行 | `{"test_suite":[{"name":"kanzi変換","cmds":[...],"assert":{"inserted":["漢字"]}}]}` |
 | test_suite 共通前処理/後処理 | `{"before_each":[...], "after_each":[...], "test_suite":[...]}` |
@@ -115,6 +117,10 @@ if "assertion_failed" in r:
 # スキーマ検証（型崩れ検知）
 r_schema = send({"state": True, "assert_schema": {"candidates": "array<string>", "historyEnd": "int"}})
 print("schema_ok?", "assertion_failed" not in r_schema)
+
+# 正規表現検証（JSON化した値に対して評価）
+r_regex = send({"state": True, "assert_regex": {"composedHiragana": ".*"}})
+print("regex_ok?", "assertion_failed" not in r_regex)
 
 # bi-gram をシードしてから Successor を確認
 send({"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}})
@@ -250,6 +256,8 @@ eisu(英数)=102  kana(かな)=104
 
 ```json
 {
+  "protocolVersion": 1,         // デバッグプロトコルのバージョン
+  "capabilities": { ... },      // このサーバーが対応する機能フラグ
   "inserted": ["漢字"],          // 確定されたテキスト（空 = まだ組成中）
   "markedText": "かんじ",        // setMarkedText に渡された文字列
   "composedHiragana": "かんじ",  // ひらがな組成バッファ
@@ -271,6 +279,19 @@ eisu(英数)=102  kana(かな)=104
   "focusedSegmentIndex": 0,
   "predictionEnd": 0,            // 予測ブロック末尾（本番の CandidateWindow と同様）
   "successorLLMSurfaceExtras": [] // 後続語 LLM が返した表層形（コールバック後に増える）
+}
+```
+
+エラー時は後方互換で `error`（文字列）を残しつつ、`errorDetail` に構造化情報が入る:
+
+```json
+{
+  "error": "missing keyCode",
+  "errorDetail": {
+    "code": "MISSING_KEYCODE",
+    "message": "missing keyCode",
+    "hint": "Use keyCode/chars/base/mods or the shorthand {\"key\":\"space\"}."
+  }
 }
 ```
 

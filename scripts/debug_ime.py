@@ -99,6 +99,7 @@ class IMEClient:
         assert_contains: dict | None = None,
         assert_not: dict | None = None,
         assert_schema: dict | None = None,
+        assert_regex: dict | None = None,
     ) -> dict:
         """文字列を一括送信してサーバー側でまとめて処理する。最終状態を返す。
         then: 末尾に続けて送る名前付きキー（"space" / "enter" 等）。
@@ -119,6 +120,8 @@ class IMEClient:
             cmd["assert_not"] = assert_not
         if assert_schema:
             cmd["assert_schema"] = assert_schema
+        if assert_regex:
+            cmd["assert_regex"] = assert_regex
         return self._send_recv(cmd)
 
     def sequence(
@@ -130,6 +133,7 @@ class IMEClient:
         assert_contains: dict | None = None,
         assert_not: dict | None = None,
         assert_schema: dict | None = None,
+        assert_regex: dict | None = None,
         vars: dict | None = None,
     ) -> dict:
         """複数コマンドを1往復で一括送信する。result["steps"] に各状態、result["last"] に最終状態。"""
@@ -146,6 +150,8 @@ class IMEClient:
             cmd["assert_not"] = assert_not
         if assert_schema:
             cmd["assert_schema"] = assert_schema
+        if assert_regex:
+            cmd["assert_regex"] = assert_regex
         if vars:
             cmd["vars"] = vars
         return self._send_recv(cmd)
@@ -233,6 +239,10 @@ class IMEClient:
         """現在の状態を取得する（キー入力なし）。"""
         return self._send_recv({"state": True})
 
+    def schema(self) -> dict:
+        """サーバーのコマンド/フィールドスキーマを取得する。"""
+        return self._send_recv({"schema": True})
+
     def close(self) -> None:
         self.sock.close()
 
@@ -241,6 +251,15 @@ class IMEClient:
     @staticmethod
     def pretty(r: dict) -> str:
         lines: list[str] = []
+        if "protocolVersion" in r:
+            lines.append(f"  protocolVersion  : {r.get('protocolVersion')}")
+        if r.get("error"):
+            lines.append(f"  ❌ error          : {r.get('error')}")
+            detail = r.get("errorDetail") or {}
+            if detail.get("code"):
+                lines.append(f"  error.code       : {detail['code']}")
+            if detail.get("hint"):
+                lines.append(f"  error.hint       : {detail['hint']}")
         if r.get("inserted"):
             lines.append(f"  ✅ inserted       : {r['inserted']}")
         lines.append(f"  composedHiragana : {r.get('composedHiragana', '')!r}")
@@ -273,6 +292,7 @@ def interactive_mode(client: IMEClient) -> None:
     print("  .<name>            : 特殊キー (space/enter/backspace/escape/down/up/...)")
     print("  .reset             : ハンドラリセット")
     print("  .state             : 現在状態を表示")
+    print("  .schema            : サーバースキーマを表示")
     print()
 
     while True:
@@ -294,6 +314,9 @@ def interactive_mode(client: IMEClient) -> None:
             elif line == ".state":
                 r = client.state()
                 print(client.pretty(r))
+            elif line == ".schema":
+                r = client.schema()
+                print(json.dumps(r.get("schema", r), ensure_ascii=False, indent=2))
             elif line.startswith("."):
                 name = line[1:]
                 if name not in KEY_MAP:

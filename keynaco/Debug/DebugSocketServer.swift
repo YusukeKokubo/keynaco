@@ -129,7 +129,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private func processAndSerialize(_ lineData: Data) -> String {
         let cmd = (try? JSONSerialization.jsonObject(with: lineData) as? [String: Any]) ?? [:]
-        let dict = processCommand(cmd)
+        let dict = Self.withProtocolMetadata(processCommand(cmd))
         guard let data = try? JSONSerialization.data(withJSONObject: dict),
               let str = String(data: data, encoding: .utf8) else { return #"{"error":"serialization"}"# }
         return str
@@ -155,6 +155,76 @@ final class DebugSocketServer: @unchecked Sendable {
         "eisu":      (102, ""),
         "kana":      (104, ""),
     ]
+
+    // MARK: - Protocol metadata / error envelope
+
+    private static let protocolVersion = 1
+
+    private static let stateFieldSchemas: [String: String] = [
+        "inserted": "array<string>",
+        "markedText": "string",
+        "composedHiragana": "string",
+        "pendingRomaji": "string",
+        "composingText": "string",
+        "isAsciiMode": "bool",
+        "isSuccessorMode": "bool",
+        "isSegmentMode": "bool",
+        "isBracketMode": "bool",
+        "isExplicitlySelected": "bool",
+        "candidateVisible": "bool",
+        "selectedRow": "int",
+        "selectedText": "string|null",
+        "historyEnd": "int",
+        "predictionEnd": "int",
+        "fixedEnd": "int",
+        "candidates": "array<string>",
+        "committedHistory": "array<string>",
+        "segmentTexts": "array<string>",
+        "focusedSegmentIndex": "int",
+        "successorLLMSurfaceExtras": "array<string>",
+    ]
+
+    private static func capabilities() -> [String: Any] {
+        [
+            "supportsSchemaCommand": true,
+            "supportsNamedKeyShorthand": true,
+            "supportsTypeString": true,
+            "supportsSequence": true,
+            "supportsTestSuite": true,
+            "supportsLintSuite": true,
+            "supportsWaitUntil": true,
+            "supportsCapture": true,
+            "supportsVars": true,
+            "supportsAssertions": true,
+            "supportsStructuredErrors": true,
+        ]
+    }
+
+    private static func withProtocolMetadata(_ dict: [String: Any]) -> [String: Any] {
+        var out = dict
+        out["protocolVersion"] = protocolVersion
+        out["capabilities"] = capabilities()
+        return out
+    }
+
+    private static func errorPayload(
+        code: String,
+        message: String,
+        hint: String? = nil
+    ) -> [String: Any] {
+        var detail: [String: Any] = [
+            "code": code,
+            "message": message,
+        ]
+        if let hint {
+            detail["hint"] = hint
+        }
+        // 互換のため error(文字列) を残しつつ、構造化情報を errorDetail に追加する
+        return [
+            "error": message,
+            "errorDetail": detail
+        ]
+    }
 
     // MARK: - fields / assert ヘルパー
 
@@ -250,13 +320,15 @@ final class DebugSocketServer: @unchecked Sendable {
         assertions: [String: Any]?,
         containsAssertions: [String: Any]?,
         notAssertions: [String: Any]?,
-        schemaAssertions: [String: Any]?
+        schemaAssertions: [String: Any]?,
+        regexAssertions: [String: Any]?
     ) -> [String: Any] {
         let hasEquality = assertions.map { !$0.isEmpty } ?? false
         let hasContains = containsAssertions.map { !$0.isEmpty } ?? false
         let hasNot = notAssertions.map { !$0.isEmpty } ?? false
         let hasSchema = schemaAssertions.map { !$0.isEmpty } ?? false
-        guard hasEquality || hasContains || hasNot || hasSchema else { return dict }
+        let hasRegex = regexAssertions.map { !$0.isEmpty } ?? false
+        guard hasEquality || hasContains || hasNot || hasSchema || hasRegex else { return dict }
 
         var failures: [[String: Any]] = []
         if let assertions {
@@ -316,6 +388,37 @@ final class DebugSocketServer: @unchecked Sendable {
                         "field": key,
                         "expected": schema,
                         "actual": actual ?? NSNull()
+                    ])
+                }
+            }
+        }
+        if let regexAssertions {
+            for (key, expectedRegex) in regexAssertions {
+                guard let pattern = expectedRegex as? String else {
+                    failures.append([
+                        "kind": "regex",
+                        "field": key,
+                        "expected": expectedRegex,
+                        "actual": "regex must be string"
+                    ])
+                    continue
+                }
+                guard let actual = dict[key] else {
+                    failures.append([
+                        "kind": "regex",
+                        "field": key,
+                        "expected": pattern,
+                        "actual": NSNull()
+                    ])
+                    continue
+                }
+                let target = jsonString(actual)
+                if target.range(of: pattern, options: .regularExpression) == nil {
+                    failures.append([
+                        "kind": "regex",
+                        "field": key,
+                        "expected": pattern,
+                        "actual": actual
                     ])
                 }
             }
@@ -434,12 +537,14 @@ final class DebugSocketServer: @unchecked Sendable {
         let containsAssertions = cmd["assert_contains"] as? [String: Any]
         let notAssertions = cmd["assert_not"] as? [String: Any]
         let schemaAssertions = cmd["assert_schema"] as? [String: Any]
+        let regexAssertions = cmd["assert_regex"] as? [String: Any]
         return applyAssert(
             applyFields(withDescribe, fields: fields),
             assertions: assertions,
             containsAssertions: containsAssertions,
             notAssertions: notAssertions,
-            schemaAssertions: schemaAssertions
+            schemaAssertions: schemaAssertions,
+            regexAssertions: regexAssertions
         )
     }
 
@@ -459,11 +564,25 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private func waitUntil(_ wait: [String: Any], cmd: [String: Any]) -> [String: Any] {
         guard let field = wait["field"] as? String else {
-            return Self.finalize(["error": "wait_until requires field"], cmd: cmd)
+            return Self.finalize(
+                Self.errorPayload(
+                    code: "WAIT_UNTIL_MISSING_FIELD",
+                    message: "wait_until requires field",
+                    hint: #"Use {"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1}}."#
+                ),
+                cmd: cmd
+            )
         }
         let hasCondition = wait["equals"] != nil || wait["contains"] != nil || wait["minCount"] != nil
         guard hasCondition else {
-            return Self.finalize(["error": "wait_until requires one of equals, contains, minCount"], cmd: cmd)
+            return Self.finalize(
+                Self.errorPayload(
+                    code: "WAIT_UNTIL_MISSING_CONDITION",
+                    message: "wait_until requires one of equals, contains, minCount",
+                    hint: "Set at least one of equals/contains/minCount."
+                ),
+                cmd: cmd
+            )
         }
         let timeoutMs = max(0, wait["timeoutMs"] as? Int ?? 1000)
         let intervalMs = max(1, wait["intervalMs"] as? Int ?? 50)
@@ -527,15 +646,35 @@ final class DebugSocketServer: @unchecked Sendable {
     private static let knownCommandKeys: Set<String> = [
         "reset", "state", "wait_until", "seed_bigram", "seed_history",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
-        "capture", "vars",
+        "capture", "vars", "schema",
     ]
+
+    private static func schemaResponse(cmd: [String: Any]) -> [String: Any] {
+        let root: [String: Any] = [
+            "schema": [
+                "commandTriggers": Array(knownCommandKeys).sorted(),
+                "assertionFields": Array(knownAssertionFields).sorted(),
+                "namedKeys": Array(namedKeys.keys).sorted(),
+                "stateFields": stateFieldSchemas,
+                "structuredError": [
+                    "error": "string",
+                    "errorDetail": [
+                        "code": "string",
+                        "message": "string",
+                        "hint": "string(optional)",
+                    ]
+                ],
+            ]
+        ]
+        return finalize(root, cmd: cmd)
+    }
 
     private static func lintAssertionKeys(
         _ cmd: [String: Any],
         location: String
     ) -> [[String: Any]] {
         var issues: [[String: Any]] = []
-        for key in ["assert", "assert_contains", "assert_not", "assert_schema"] {
+        for key in ["assert", "assert_contains", "assert_not", "assert_schema", "assert_regex"] {
             guard let fields = cmd[key] as? [String: Any] else { continue }
             for field in fields.keys where !knownAssertionFields.contains(field) {
                 issues.append([
@@ -591,6 +730,25 @@ final class DebugSocketServer: @unchecked Sendable {
                         "location": location,
                         "message": "capture must be array<string> or object<string,string>"
                     ])
+                }
+            }
+            if let regexAssertions = command["assert_regex"] as? [String: Any] {
+                for (field, rawPattern) in regexAssertions {
+                    guard let pattern = rawPattern as? String else {
+                        issues.append([
+                            "severity": "error",
+                            "location": location,
+                            "message": "assert_regex.\(field) must be string"
+                        ])
+                        continue
+                    }
+                    if (try? NSRegularExpression(pattern: pattern)) == nil {
+                        issues.append([
+                            "severity": "error",
+                            "location": location,
+                            "message": "assert_regex.\(field) has invalid regex pattern"
+                        ])
+                    }
                 }
             }
             issues.append(contentsOf: lintAssertionKeys(command, location: location))
@@ -659,6 +817,10 @@ final class DebugSocketServer: @unchecked Sendable {
     // MARK: - コマンド処理（MainActor 上で実行）
 
     private func processCommand(_ cmd: [String: Any]) -> [String: Any] {
+        if cmd["schema"] != nil {
+            return Self.schemaResponse(cmd: cmd)
+        }
+
         if cmd["reset"] != nil {
             cleanupSnapshot()
             successorLLM.cancel()
@@ -698,7 +860,14 @@ final class DebugSocketServer: @unchecked Sendable {
             guard let prev   = seed["prev"]   as? String,
                   let input  = seed["input"]  as? String,
                   let output = seed["output"] as? String else {
-                return Self.finalize(["error": "seed_bigram requires prev, input, output"], cmd: cmd)
+                return Self.finalize(
+                    Self.errorPayload(
+                        code: "SEED_BIGRAM_MISSING_FIELDS",
+                        message: "seed_bigram requires prev, input, output",
+                        hint: #"Use {"seed_bigram":{"prev":"今日","input":"は","output":"は"}}."#
+                    ),
+                    cmd: cmd
+                )
             }
             let count = seed["count"] as? Int ?? 1
             handler.db.debugSeedBigram(prev: prev, input: input, output: output, count: count)
@@ -709,7 +878,14 @@ final class DebugSocketServer: @unchecked Sendable {
         if let seed = cmd["seed_history"] as? [String: Any] {
             guard let input  = seed["input"]  as? String,
                   let output = seed["output"] as? String else {
-                return Self.finalize(["error": "seed_history requires input and output"], cmd: cmd)
+                return Self.finalize(
+                    Self.errorPayload(
+                        code: "SEED_HISTORY_MISSING_FIELDS",
+                        message: "seed_history requires input and output",
+                        hint: #"Use {"seed_history":{"input":"かんじ","output":"漢字"}}."#
+                    ),
+                    cmd: cmd
+                )
             }
             let times = seed["times"] as? Int ?? 1
             for _ in 0..<times { handler.db.debugSeedHistory(input: input, output: output) }
@@ -811,7 +987,8 @@ final class DebugSocketServer: @unchecked Sendable {
                     assertions: scenario["assert"] as? [String: Any],
                     containsAssertions: scenario["assert_contains"] as? [String: Any],
                     notAssertions: scenario["assert_not"] as? [String: Any],
-                    schemaAssertions: scenario["assert_schema"] as? [String: Any]
+                    schemaAssertions: scenario["assert_schema"] as? [String: Any],
+                    regexAssertions: scenario["assert_regex"] as? [String: Any]
                 )
                 let hasError = !stepErrors.isEmpty || seqResult["error"] != nil || finalCheck["error"] != nil
                 let hasTimeout = !stepTimeouts.isEmpty || (finalCheck["timedOut"] as? Bool ?? false)
@@ -927,7 +1104,11 @@ final class DebugSocketServer: @unchecked Sendable {
             for rawStep in seq {
                 let resolvedAny = Self.resolveVars(in: rawStep, vars: vars)
                 guard var resolvedStep = resolvedAny as? [String: Any] else {
-                    steps.append(["error": "invalid step command"])
+                    steps.append(Self.errorPayload(
+                        code: "INVALID_STEP_COMMAND",
+                        message: "invalid step command",
+                        hint: "Each sequence step must be an object."
+                    ))
                     continue
                 }
                 let captureSpec = resolvedStep["capture"]
@@ -946,7 +1127,8 @@ final class DebugSocketServer: @unchecked Sendable {
                 assertions: assertions,
                 containsAssertions: containsAssertions,
                 notAssertions: notAssertions,
-                schemaAssertions: cmd["assert_schema"] as? [String: Any]
+                schemaAssertions: cmd["assert_schema"] as? [String: Any],
+                regexAssertions: cmd["assert_regex"] as? [String: Any]
             )
             return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast, "vars": vars], describe: cmd["describe"])
         }
@@ -970,7 +1152,8 @@ final class DebugSocketServer: @unchecked Sendable {
                 assertions: assertions,
                 containsAssertions: containsAssertions,
                 notAssertions: notAssertions,
-                schemaAssertions: cmd["assert_schema"] as? [String: Any]
+                schemaAssertions: cmd["assert_schema"] as? [String: Any],
+                regexAssertions: cmd["assert_regex"] as? [String: Any]
             )
             if cmd["return_steps"] as? Bool == true {
                 result["steps"] = steps.map { Self.applyFields($0, fields: fields) }
@@ -981,7 +1164,14 @@ final class DebugSocketServer: @unchecked Sendable {
         // {"key": "space"} ショートハンド — namedKeys テーブルから keyCode/chars を解決
         if let keyName = cmd["key"] as? String {
             guard let (resolvedKeyCode, resolvedChars) = Self.namedKeys[keyName] else {
-                return Self.finalize(["error": "unknown key name: \(keyName)"], cmd: cmd)
+                return Self.finalize(
+                    Self.errorPayload(
+                        code: "UNKNOWN_KEY_NAME",
+                        message: "unknown key name: \(keyName)",
+                        hint: "Call {\"schema\": true} to inspect supported named keys."
+                    ),
+                    cmd: cmd
+                )
             }
             let mods = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
             var expanded = cmd
@@ -997,7 +1187,15 @@ final class DebugSocketServer: @unchecked Sendable {
         switch cmd["keyCode"] {
         case let kc as UInt16: keyCode = kc
         case let kc as Int:    keyCode = UInt16(kc)
-        default: return Self.finalize(["error": "missing keyCode"], cmd: cmd)
+        default:
+            return Self.finalize(
+                Self.errorPayload(
+                    code: "MISSING_KEYCODE",
+                    message: "missing keyCode",
+                    hint: "Use keyCode/chars/base/mods or the shorthand {\"key\":\"space\"}."
+                ),
+                cmd: cmd
+            )
         }
 
         let chars = cmd["chars"] as? String
