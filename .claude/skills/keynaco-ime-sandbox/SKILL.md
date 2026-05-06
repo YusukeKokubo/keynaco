@@ -79,6 +79,7 @@ send({"reset": True})
 | 文字列→変換キー（最終状態のみ） | `{"type_string": "kanzi", "then": "space"}` |
 | 文字列→確定（全ステップも取得） | `{"type_string": "kyou", "then": "enter", "return_steps": true}` |
 | サーバースキーマ取得（AI向け） | `{"schema": true}` |
+| 状態説明付きレスポンス | `{"state": true, "explain": true}` / `{"type_string":"kanzi","then":"space","explain":true}` |
 | コマンド列を一括送信 | `{"sequence": [{cmd1}, {cmd2}, ...]}` → `{"steps": [...], "last": {...}}` |
 | ステップごとの説明ラベル | `{"type_string": "kanzi", "describe": "ローマ字入力"}`（レスポンスにも `describe` が返る） |
 | sequence 中間ステップ assert | `{"sequence": [{"type_string":"kanzi","assert":{"composedHiragana":"かんじ"}}, {"key":"space","assert":{"candidateVisible":true}}]}` |
@@ -282,7 +283,13 @@ eisu(英数)=102  kana(かな)=104
   "candidateEntries": [          // candidates の行ごとのメタデータ
     {"index": 0, "text": "漢字", "section": "fixed|prediction|history|dictionary_or_special"}
   ],
-  "changed": ["candidateVisible", "candidates"] // 直前のキー処理で変化した主要フィールド
+  "changed": ["candidateVisible", "candidates"], // 直前のキー処理で変化した主要フィールド
+  "explain": {                   // explain=true のときだけ追加される要約
+    "activeModes": ["successor"],
+    "composition": {"composingText":"かんじ", "composedHiragana":"かんじ", "pendingRomaji":""},
+    "candidateSummary": {"visible": true, "count": 10, "selectedRow": 0, "selectedText": "漢字", "sectionCounts": {"fixed": 2, "history": 3}},
+    "changedFields": ["candidates", "candidateEntries"]
+  }
 }
 ```
 

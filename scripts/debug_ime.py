@@ -276,6 +276,18 @@ class IMEClient:
                 lines.append(f"    [{i}] {c}{mark}")
         if r.get("changed"):
             lines.append(f"  changed          : {r['changed']}")
+        if isinstance(r.get("explain"), dict):
+            ex = r["explain"]
+            modes = ex.get("activeModes") or []
+            if modes:
+                lines.append(f"  explain.modes    : {modes}")
+            cand = ex.get("candidateSummary") or {}
+            if cand:
+                lines.append(
+                    "  explain.cands    : "
+                    f"visible={cand.get('visible')} count={cand.get('count')} "
+                    f"selected={cand.get('selectedRow')} text={cand.get('selectedText')!r}"
+                )
         if r.get("committedHistory"):
             lines.append(f"  committedHistory : {r['committedHistory']}")
         if r.get("isSegmentMode") and r.get("segmentTexts"):

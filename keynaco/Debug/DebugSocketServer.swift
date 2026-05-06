@@ -184,6 +184,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "successorLLMSurfaceExtras": "array<string>",
         "candidateEntries": "array<object>",
         "changed": "array<string>",
+        "explain": "object",
     ]
 
     private static func capabilities() -> [String: Any] {
@@ -201,6 +202,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "supportsStructuredErrors": true,
             "supportsChangedFields": true,
             "supportsCandidateEntries": true,
+            "supportsExplain": true,
         ]
     }
 
@@ -236,6 +238,7 @@ final class DebugSocketServer: @unchecked Sendable {
         guard let fields, !fields.isEmpty else { return dict }
         var keep = Set(fields)
         if dict["describe"] != nil { keep.insert("describe") }
+        if dict["explain"] != nil { keep.insert("explain") }
         if dict["assertion_failed"] != nil {
             keep.insert("assertion_failed")
             keep.insert("state")
@@ -536,6 +539,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private static func finalize(_ dict: [String: Any], cmd: [String: Any]) -> [String: Any] {
         let withDescribe = applyDescribe(dict, describe: cmd["describe"])
+        let withExplain = applyExplainIfRequested(withDescribe, cmd: cmd)
         let fields = cmd["fields"] as? [String]
         let assertions = cmd["assert"] as? [String: Any]
         let containsAssertions = cmd["assert_contains"] as? [String: Any]
@@ -543,13 +547,61 @@ final class DebugSocketServer: @unchecked Sendable {
         let schemaAssertions = cmd["assert_schema"] as? [String: Any]
         let regexAssertions = cmd["assert_regex"] as? [String: Any]
         return applyAssert(
-            applyFields(withDescribe, fields: fields),
+            applyFields(withExplain, fields: fields),
             assertions: assertions,
             containsAssertions: containsAssertions,
             notAssertions: notAssertions,
             schemaAssertions: schemaAssertions,
             regexAssertions: regexAssertions
         )
+    }
+
+    private static func applyExplainIfRequested(_ dict: [String: Any], cmd: [String: Any]) -> [String: Any] {
+        guard (cmd["explain"] as? Bool) == true else { return dict }
+
+        // 状態辞書を返すレスポンスにだけ explain を付与する
+        guard dict["composingText"] != nil else { return dict }
+        var out = dict
+
+        let modeFlags: [(String, String)] = [
+            ("isAsciiMode", "ascii"),
+            ("isSuccessorMode", "successor"),
+            ("isSegmentMode", "segment"),
+            ("isBracketMode", "bracket"),
+        ]
+        let activeModes = modeFlags.compactMap { key, label in
+            (dict[key] as? Bool) == true ? label : nil
+        }
+
+        let candidateVisible = dict["candidateVisible"] as? Bool ?? false
+        let selectedRow = dict["selectedRow"] as? Int ?? 0
+        let selectedText = dict["selectedText"] as? String
+        let candidates = dict["candidates"] as? [String] ?? []
+        let candidateEntries = dict["candidateEntries"] as? [[String: Any]] ?? []
+        var sectionCounts: [String: Int] = [:]
+        for entry in candidateEntries {
+            if let section = entry["section"] as? String {
+                sectionCounts[section, default: 0] += 1
+            }
+        }
+
+        out["explain"] = [
+            "activeModes": activeModes,
+            "composition": [
+                "composingText": dict["composingText"] ?? "",
+                "composedHiragana": dict["composedHiragana"] ?? "",
+                "pendingRomaji": dict["pendingRomaji"] ?? "",
+            ],
+            "candidateSummary": [
+                "visible": candidateVisible,
+                "count": candidates.count,
+                "selectedRow": selectedRow,
+                "selectedText": selectedText as Any,
+                "sectionCounts": sectionCounts,
+            ],
+            "changedFields": dict["changed"] as? [String] ?? []
+        ]
+        return out
     }
 
     private static func waitConditionMatched(state: [String: Any], field: String, wait: [String: Any]) -> Bool {
@@ -644,14 +696,14 @@ final class DebugSocketServer: @unchecked Sendable {
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
         "segmentTexts", "focusedSegmentIndex", "successorLLMSurfaceExtras",
-        "candidateEntries", "changed",
+        "candidateEntries", "changed", "explain",
         "ok", "matched", "timedOut", "waitField", "state", "steps", "last",
     ]
 
     private static let knownCommandKeys: Set<String> = [
         "reset", "state", "wait_until", "seed_bigram", "seed_history",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
-        "capture", "vars", "schema",
+        "capture", "vars", "schema", "explain",
     ]
 
     private static func schemaResponse(cmd: [String: Any]) -> [String: Any] {
@@ -1129,7 +1181,7 @@ final class DebugSocketServer: @unchecked Sendable {
             }
             let last = steps.last ?? [:]
             let filteredSteps = steps.map { Self.applyFields($0, fields: fields) }
-            let filteredLast  = Self.applyAssert(
+            var filteredLast  = Self.applyAssert(
                 Self.applyFields(last, fields: fields),
                 assertions: assertions,
                 containsAssertions: containsAssertions,
@@ -1137,6 +1189,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 schemaAssertions: cmd["assert_schema"] as? [String: Any],
                 regexAssertions: cmd["assert_regex"] as? [String: Any]
             )
+            filteredLast = Self.applyExplainIfRequested(filteredLast, cmd: cmd)
             return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast, "vars": vars], describe: cmd["describe"])
         }
 
@@ -1162,6 +1215,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 schemaAssertions: cmd["assert_schema"] as? [String: Any],
                 regexAssertions: cmd["assert_regex"] as? [String: Any]
             )
+            result = Self.applyExplainIfRequested(result, cmd: cmd)
             if cmd["return_steps"] as? Bool == true {
                 result["steps"] = steps.map { Self.applyFields($0, fields: fields) }
             }
