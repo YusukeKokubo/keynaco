@@ -20,7 +20,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | パス | 内容 |
 |------|------|
 | `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
-| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 4 ファイル） |
+| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 6 ファイル。Zenzai タブ含む） |
 | `keynaco/PresetBigram/` | `preset_bigram.csv`（プリセット Bi-gram バンドルリソース） |
 | `keynaco/Debug/` | デバッグ用ツール（`EventViewerWindow` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
@@ -32,6 +32,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `scripts/` | 開発用スクリプト（`generate_preset_bigram_csv.py` 等） |
 | `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
+| `LocalPackages/` | Xcode ローカルパッケージ参照（`keynacoCore/`）。Xcode が管理するため手動編集不要 |
 
 ### 起動チェーン（IMK ブートストラップ）
 
@@ -81,7 +82,8 @@ cd Core && swift test
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
 - `AzooKeyConverting` / `AzooKeyConverter` = ひらがな→漢字変換エンジンの DI プロトコルと実装（`TextInputClient` と同じ役割）。`AzooKeyConverter` は `KanaKanjiConverterModuleWithDefaultDictionary` のラッパー（学習データを `~/Library/Application Support/keynaco/` に保存）。`isZenzaiEnabled` はユーザー設定（モデル未ロード時も true になり得る）。`buildCandidateList` は `composedHiragana` が変わらない限り `requestCandidates` を再呼び出しせずキャッシュを返す（LRU 上限 50 件）
 - `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `bigram` / `trigram` / `skip_bigram` / `user_dict` / `boundary_pref` の **6 テーブル**を持つ。`bigram` には `is_preset` 列があり、バンドル `preset_bigram.csv` の初回シード行（`UserDefaults` `preset_seeded_v1`）は Bi-gram インポート・GC で消えない。`boundary_pref` はセグメント境界学習（読み全体 → 区切り位置の配列）を保存し、次回同じ読みを変換したとき同じ境界を優先する。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）。`user_dict` のみ time-decay なし（永続登録）。`performGCIfNeeded()` で count=1 かつ 180日超のエントリを定期削除（`boundary_pref` も対象。`bigram` のプリセット行は除外）
-- `SettingsWindowController` / `BigramViewController` / `HistoryViewController` / `UserDictViewController` = `keynaco/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「ユーザー辞書」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD
+- `SettingsWindowController` / `BigramViewController` / `HistoryViewController` / `UserDictViewController` = `keynaco/Settings/` 配下の設定画面。`NSTabViewController` で「Zenzai」「Bi-gram」「ユーザー辞書」「変換履歴」タブを提供。Bi-gram は JSON エクスポート/インポート対応。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD
+- `ZenzaiSettings` / `ZenzaiViewController` = `keynaco/Settings/` 配下の Zenzai 設定。有効フラグ・プロフィール文字列・推論トークン上限を `UserDefaults` 経由で保存。`AzooKeyConverter.isZenzaiEnabled` が参照する
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
 - `SurroundingIMKContext` = カーソル前後テキストの取得ユーティリティ（enum + static func）。`IMKTextInput` の `attributedSubstring(from:)` / `length` / `selectedRange` をラップし、LLM 系コンポーネント（`LLMMisconversionChecker` 等）が文脈テキストを取得するために使用
