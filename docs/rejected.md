@@ -4,6 +4,20 @@
 
 ---
 
+## E-2 AzooKey needTypoCorrection による typo 許容変換（2026-05-06）
+
+**概要**: `ConvertRequestOptions.needTypoCorrection = true` を設定することで、AzooKey のラティス探索に `TypoCorrectionGenerator` を追加し、読み入力の typo を補正した変換候補を出す。
+
+**調査した内容**:
+- `ConvertRequestOptions` に `needTypoCorrection: Bool?` が存在し、macOS では `nil` のとき `false` にフォールバックする（iOS は `true`）
+- `TypoCorrectionGenerator` が扱う誤り訂正は「清音↔濁音の混同」のみ（シ→ジ、テ→デ、ハ→バ/パ 等）。キーボード上の隣接キー誤打（`kanzi` → `kanji` 等）はスコープ外
+- 補正候補にはペナルティ −3.5〜−7.0 が付加される。`N_best=10` の制約下では、正規の読みの候補が豊富にある単語（「かんし」→34件）では補正候補がラティスから押し出されて出現しない
+- サンドボックスで複数パターンを実測したが、typo 補正候補が上位に出るケースは確認できなかった
+
+**不採用の理由**: AzooKey の `needTypoCorrection` は iOS フリック入力の「濁点ボタン押し忘れ」向けであり、ローマ字経由のひらがな direct 入力では恩恵が薄い。補正対象が狭く、ペナルティ設計上 N_best=10 では候補に現れないため実質効果ゼロ。`needTypoCorrection` を `true` にしても体感変化なし。ロールバック済み。
+
+---
+
 ## 数字キー（1–9）による候補直接確定
 
 **概要**: 候補ウィンドウ表示中に 1–9 を押すと対応する候補を確定する。
