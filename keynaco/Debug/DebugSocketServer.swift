@@ -135,6 +135,27 @@ final class DebugSocketServer: @unchecked Sendable {
         return str
     }
 
+    // MARK: - Named key table (name → (keyCode, chars))
+
+    private static let namedKeys: [String: (UInt16, String)] = [
+        "space":     (49,  " "),
+        "enter":     (36,  "\r"),
+        "backspace": (51,  "\u{08}"),
+        "escape":    (53,  ""),
+        "tab":       (48,  "\t"),
+        "down":      (125, ""),
+        "up":        (126, ""),
+        "left":      (123, ""),
+        "right":     (124, ""),
+        "f6":        (97,  ""),
+        "f7":        (98,  ""),
+        "f8":        (100, ""),
+        "f9":        (101, ""),
+        "f10":       (109, ""),
+        "eisu":      (102, ""),
+        "kana":      (104, ""),
+    ]
+
     private func processCommand(_ cmd: [String: Any]) -> [String: Any] {
         if cmd["reset"] != nil {
             cleanupSnapshot()
@@ -156,6 +177,47 @@ final class DebugSocketServer: @unchecked Sendable {
 
         if cmd["state"] != nil {
             return makeResponse(inserted: [])
+        }
+
+        // {"sequence": [{cmd}, {cmd}, ...]} — バッチ処理。各ステップの状態を配列で返す
+        if let seq = cmd["sequence"] as? [[String: Any]] {
+            var steps: [[String: Any]] = []
+            for step in seq {
+                steps.append(processCommand(step))
+            }
+            return ["steps": steps, "last": steps.last ?? [:]]
+        }
+
+        // {"type_string": "kanzi"} — 文字列を1文字ずつ送信。最終状態を返す（return_steps: true で全ステップも付加）
+        if let text = cmd["type_string"] as? String {
+            var steps: [[String: Any]] = []
+            for ch in text {
+                let s = String(ch)
+                steps.append(processCommand(["keyCode": 0, "chars": s, "base": s, "mods": 0]))
+            }
+            if let thenKey = cmd["then"] as? String {
+                steps.append(processCommand(["key": thenKey, "mods": cmd["mods"] ?? 0]))
+            }
+            var result = steps.last ?? [:]
+            if cmd["return_steps"] as? Bool == true {
+                result["steps"] = steps
+            }
+            return result
+        }
+
+        // {"key": "space"} ショートハンド — namedKeys テーブルから keyCode/chars を解決
+        if let keyName = cmd["key"] as? String {
+            guard let (resolvedKeyCode, resolvedChars) = Self.namedKeys[keyName] else {
+                return ["error": "unknown key name: \(keyName)"]
+            }
+            let mods = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
+            var expanded = cmd
+            expanded.removeValue(forKey: "key")
+            expanded["keyCode"] = Int(resolvedKeyCode)
+            expanded["chars"]   = resolvedChars
+            expanded["base"]    = resolvedChars
+            expanded["mods"]    = mods.rawValue
+            return processCommand(expanded)
         }
 
         let keyCode: UInt16

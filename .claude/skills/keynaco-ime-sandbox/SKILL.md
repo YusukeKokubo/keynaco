@@ -71,6 +71,39 @@ send({"reset": True})
 
 ## コマンド形式
 
+### 推奨: 高レベルコマンド（AI 向け）
+
+| 用途 | コマンド例 |
+|------|-----------|
+| 文字列を一括送信（最終状態のみ） | `{"type_string": "kanzi"}` |
+| 文字列→変換キー（最終状態のみ） | `{"type_string": "kanzi", "then": "space"}` |
+| 文字列→確定（全ステップも取得） | `{"type_string": "kyou", "then": "enter", "return_steps": true}` |
+| コマンド列を一括送信 | `{"sequence": [{cmd1}, {cmd2}, ...]}` → `{"steps": [...], "last": {...}}` |
+| 名前付きキー | `{"key": "space"}` / `{"key": "enter"}` / `{"key": "down"}` 等 |
+| Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
+
+`then` に指定できる名前: `space` / `enter` / `backspace` / `escape` / `tab` / `down` / `up` / `left` / `right` / `f6`–`f10` / `eisu` / `kana`
+
+**使用例:**
+```python
+# "kanzi" を入力して Space で変換 → 最終状態だけ得る（最もシンプル）
+r = send({"type_string": "kanzi", "then": "space"})
+print(r["candidates"][:5])
+
+# 複数操作を1往復でバッチ送信
+r = send({"sequence": [
+    {"type_string": "kanzi", "then": "space"},
+    {"key": "down"},
+    {"key": "enter"},
+]})
+# r["steps"] に各ステップの状態、r["last"] に最終状態
+print(r["last"]["inserted"])
+```
+
+---
+
+### 低レベルコマンド（keyCode を直接指定する場合）
+
 | 用途 | コマンド例 |
 |------|-----------|
 | 通常文字 | `{"keyCode": 0, "chars": "k", "base": "k", "mods": 0}` |
@@ -154,15 +187,17 @@ eisu(英数)=102  kana(かな)=104
 
 ```python
 send({"reset": True})
-for ch in "kanzi":
-    r = send({"keyCode": 0, "chars": ch, "base": ch, "mods": 0})
-    print(f"'{ch}': composed={r['composedHiragana']!r}, pending={r['pendingRomaji']!r}, candidates={r['candidates'][:3]}")
+# return_steps: true で各文字入力後の状態を一括取得
+r = send({"type_string": "kanzi", "return_steps": True})
+for i, step in enumerate(r["steps"]):
+    ch = "kanzi"[i]
+    print(f"'{ch}': composed={step['composedHiragana']!r}, pending={step['pendingRomaji']!r}")
 ```
 
 ### 2. Space で変換して候補を確認
 
 ```python
-r = send({"keyCode": 49, "chars": " ", "base": " ", "mods": 0})
+r = send({"type_string": "kanzi", "then": "space"})
 print(f"candidates: {r['candidates'][:10]}")
 print(f"historyEnd={r['historyEnd']}, fixedEnd={r['fixedEnd']}")
 ```
@@ -170,21 +205,22 @@ print(f"historyEnd={r['historyEnd']}, fixedEnd={r['fixedEnd']}")
 ### 3. 候補を選択して確定
 
 ```python
-# ↓ で3番目を選択してから Enter
-for _ in range(2):
-    send({"keyCode": 125, "chars": "", "base": "", "mods": 0})
-r = send({"keyCode": 36, "chars": "\r", "base": "\r", "mods": 0})
-print(f"inserted: {r['inserted']}")
-print(f"successor candidates: {r['candidates'][:5]}")  # 確定後の後続語
+# ↓ で3番目を選択してから Enter（sequence でバッチ送信）
+r = send({"sequence": [
+    {"type_string": "kanzi", "then": "space"},
+    {"key": "down"},
+    {"key": "down"},
+    {"key": "enter"},
+]})
+print(f"inserted: {r['last']['inserted']}")
+print(f"successor candidates: {r['last']['candidates'][:5]}")
 ```
 
 ### 4. Successor モードの確認
 
 ```python
-# 単語を確定してから後続語候補を確認
 send({"reset": True})
-for ch in "kyou": send({"keyCode": 0, "chars": ch, "base": ch, "mods": 0})
-r = send({"keyCode": 36, "chars": "\r", "base": "\r", "mods": 0})
+r = send({"type_string": "kyou", "then": "enter"})
 print(f"isSuccessorMode: {r['isSuccessorMode']}")
 print(f"successor candidates: {r['candidates'][:5]}")
 ```
@@ -192,10 +228,8 @@ print(f"successor candidates: {r['candidates'][:5]}")
 ### 5. セグメントモードの確認
 
 ```python
-# 長い文を入力して Space でセグメントモードへ
 send({"reset": True})
-for ch in "kyounohawaaidesu": send({"keyCode": 0, "chars": ch, "base": ch, "mods": 0})
-r = send({"keyCode": 49, "chars": " ", "base": " ", "mods": 0})
+r = send({"type_string": "kyounohawaaidesu", "then": "space"})
 print(f"isSegmentMode: {r['isSegmentMode']}")
 print(f"segments: {r['segmentTexts']}")
 ```

@@ -79,9 +79,29 @@ class IMEClient:
         kc, chars = KEY_MAP[name]
         return self._send_recv({"keyCode": kc, "chars": chars, "base": chars, "mods": mods})
 
+    def key(self, name: str, mods: int = 0) -> dict:
+        """名前付きキーを送信する（{"key": name} ショートハンド）。"""
+        return self._send_recv({"key": name, "mods": mods})
+
     def type(self, text: str) -> list[dict]:
-        """文字列を 1 文字ずつ送信する。"""
+        """文字列を 1 文字ずつ送信する（旧 API）。各ステップの状態リストを返す。"""
         return [self.char(c) for c in text]
+
+    def type_string(self, text: str, then: str | None = None, return_steps: bool = False) -> dict:
+        """文字列を一括送信してサーバー側でまとめて処理する。最終状態を返す。
+        then: 末尾に続けて送る名前付きキー（"space" / "enter" 等）。
+        return_steps: True なら result["steps"] に各ステップの状態リストも付加する。
+        """
+        cmd: dict = {"type_string": text}
+        if then:
+            cmd["then"] = then
+        if return_steps:
+            cmd["return_steps"] = True
+        return self._send_recv(cmd)
+
+    def sequence(self, *cmds: dict) -> dict:
+        """複数コマンドを1往復で一括送信する。result["steps"] に各状態、result["last"] に最終状態。"""
+        return self._send_recv({"sequence": list(cmds)})
 
     def reset(self) -> dict:
         """InputHandler の状態をリセットする（in-memory DB も再生成）。"""
@@ -127,10 +147,10 @@ class IMEClient:
 
 def interactive_mode(client: IMEClient) -> None:
     print("keynaco デバッグシェル  (exit / quit で終了)")
-    print("  <文字>           : 1 文字入力")
-    print("  .<name>          : 特殊キー (space/enter/backspace/escape/down/up/...)")
-    print("  .reset           : ハンドラリセット")
-    print("  .state           : 現在状態を表示")
+    print("  <文字列>           : 文字を1文字ずつ入力（type_string として一括送信）")
+    print("  .<name>            : 特殊キー (space/enter/backspace/escape/down/up/...)")
+    print("  .reset             : ハンドラリセット")
+    print("  .state             : 現在状態を表示")
     print()
 
     while True:
@@ -160,19 +180,19 @@ def interactive_mode(client: IMEClient) -> None:
                 r = client.special(name)
                 print(client.pretty(r))
             else:
-                for ch in line:
-                    r = client.char(ch)
-                    print(f"  '{ch}':")
-                    print(client.pretty(r))
+                r = client.type_string(line, return_steps=True)
+                for i, step in enumerate(r.get("steps", [r])):
+                    print(f"  '{line[i] if i < len(line) else '?'}':")
+                    print(client.pretty(step))
         except Exception as exc:
             print(f"  error: {exc}")
 
 
 def batch_mode(client: IMEClient, text: str) -> None:
-    for ch in text:
-        r = client.char(ch)
-        print(f"key={ch!r}:")
-        print(client.pretty(r))
+    r = client.type_string(text, return_steps=True)
+    for i, step in enumerate(r.get("steps", [r])):
+        print(f"key={text[i] if i < len(text) else '?'!r}:")
+        print(client.pretty(step))
         print()
 
 
