@@ -79,6 +79,7 @@ send({"reset": True})
 | 文字列→変換キー（最終状態のみ） | `{"type_string": "kanzi", "then": "space"}` |
 | 文字列→確定（全ステップも取得） | `{"type_string": "kyou", "then": "enter", "return_steps": true}` |
 | サーバースキーマ取得（AI向け） | `{"schema": true}` |
+| examples 付きスキーマ取得 | `{"schema": true, "with_examples": true}` |
 | 状態説明付きレスポンス | `{"state": true, "explain": true}` / `{"type_string":"kanzi","then":"space","explain":true}` |
 | コマンド列を一括送信 | `{"sequence": [{cmd1}, {cmd2}, ...]}` → `{"steps": [...], "last": {...}}` |
 | ステップごとの説明ラベル | `{"type_string": "kanzi", "describe": "ローマ字入力"}`（レスポンスにも `describe` が返る） |
@@ -313,10 +314,16 @@ eisu(英数)=102  kana(かな)=104
   "errorDetail": {
     "code": "MISSING_KEYCODE",
     "message": "missing keyCode",
-    "hint": "Use keyCode/chars/base/mods or the shorthand {\"key\":\"space\"}."
+    "hint": "Use keyCode/chars/base/mods or the shorthand {\"key\":\"space\"}.",
+    "suggestedFixes": [
+      {"key": "space"},
+      {"schema": true}
+    ]
   }
 }
 ```
+
+`test_suite` の失敗シナリオには `reproCommand` が付く。失敗ケースだけを切り出して再実行できる（`before_each` / `after_each` / `vars` / `useRealDB` を保持）。
 
 ## LLM（Debug ビルド）
 

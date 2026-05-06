@@ -190,6 +190,7 @@ final class DebugSocketServer: @unchecked Sendable {
     private static func capabilities() -> [String: Any] {
         [
             "supportsSchemaCommand": true,
+            "supportsSchemaExamples": true,
             "supportsNamedKeyShorthand": true,
             "supportsTypeString": true,
             "supportsSequence": true,
@@ -217,7 +218,8 @@ final class DebugSocketServer: @unchecked Sendable {
     private static func errorPayload(
         code: String,
         message: String,
-        hint: String? = nil
+        hint: String? = nil,
+        suggestedFixes: [[String: Any]]? = nil
     ) -> [String: Any] {
         var detail: [String: Any] = [
             "code": code,
@@ -225,6 +227,9 @@ final class DebugSocketServer: @unchecked Sendable {
         ]
         if let hint {
             detail["hint"] = hint
+        }
+        if let suggestedFixes, !suggestedFixes.isEmpty {
+            detail["suggestedFixes"] = suggestedFixes
         }
         // 互換のため error(文字列) を残しつつ、構造化情報を errorDetail に追加する
         return [
@@ -625,7 +630,11 @@ final class DebugSocketServer: @unchecked Sendable {
                 Self.errorPayload(
                     code: "WAIT_UNTIL_MISSING_FIELD",
                     message: "wait_until requires field",
-                    hint: #"Use {"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1}}."#
+                    hint: #"Use {"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1}}."#,
+                    suggestedFixes: [
+                        ["schema": true],
+                        ["wait_until": ["field": "successorLLMSurfaceExtras", "minCount": 1, "timeoutMs": 1500]]
+                    ]
                 ),
                 cmd: cmd
             )
@@ -636,7 +645,12 @@ final class DebugSocketServer: @unchecked Sendable {
                 Self.errorPayload(
                     code: "WAIT_UNTIL_MISSING_CONDITION",
                     message: "wait_until requires one of equals, contains, minCount",
-                    hint: "Set at least one of equals/contains/minCount."
+                    hint: "Set at least one of equals/contains/minCount.",
+                    suggestedFixes: [
+                        ["wait_until": ["field": field, "equals": true]],
+                        ["wait_until": ["field": field, "contains": "漢字"]],
+                        ["wait_until": ["field": field, "minCount": 1]]
+                    ]
                 ),
                 cmd: cmd
             )
@@ -739,11 +753,67 @@ final class DebugSocketServer: @unchecked Sendable {
     private static let knownCommandKeys: Set<String> = [
         "reset", "state", "wait_until", "assert_eventually", "seed_bigram", "seed_history",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
-        "capture", "vars", "schema", "explain",
+        "capture", "vars", "schema", "with_examples", "explain",
     ]
 
+    private static func schemaExamples() -> [[String: Any]] {
+        [
+            [
+                "name": "schema_with_examples",
+                "command": [
+                    "schema": true,
+                    "with_examples": true
+                ]
+            ],
+            [
+                "name": "type_string_and_convert",
+                "command": [
+                    "type_string": "kanzi",
+                    "then": "space",
+                    "fields": ["candidates", "historyEnd"]
+                ]
+            ],
+            [
+                "name": "sequence_with_capture",
+                "command": [
+                    "sequence": [
+                        ["type_string": "kanzi", "then": "space", "capture": ["picked": "selectedText"]],
+                        ["key": "enter", "assert_contains": ["inserted": "{{picked}}"]]
+                    ],
+                    "vars": [:]
+                ]
+            ],
+            [
+                "name": "eventual_llm_assert",
+                "command": [
+                    "assert_eventually": [
+                        "field": "successorLLMSurfaceExtras",
+                        "minCount": 1,
+                        "timeoutMs": 1500,
+                        "intervalMs": 50
+                    ]
+                ]
+            ],
+            [
+                "name": "minimal_test_suite",
+                "command": [
+                    "test_suite": [
+                        [
+                            "name": "kanzi変換",
+                            "cmds": [
+                                ["type_string": "kanzi"],
+                                ["key": "space", "assert": ["candidateVisible": true]]
+                            ],
+                            "assert_contains": ["candidates": "漢字"]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    }
+
     private static func schemaResponse(cmd: [String: Any]) -> [String: Any] {
-        let root: [String: Any] = [
+        var root: [String: Any] = [
             "schema": [
                 "commandTriggers": Array(knownCommandKeys).sorted(),
                 "assertionFields": Array(knownAssertionFields).sorted(),
@@ -755,10 +825,16 @@ final class DebugSocketServer: @unchecked Sendable {
                         "code": "string",
                         "message": "string",
                         "hint": "string(optional)",
+                        "suggestedFixes": "array<object>(optional)",
                     ]
                 ],
             ]
         ]
+        if (cmd["with_examples"] as? Bool) == true,
+           var schema = root["schema"] as? [String: Any] {
+            schema["examples"] = schemaExamples()
+            root["schema"] = schema
+        }
         return finalize(root, cmd: cmd)
     }
 
@@ -983,7 +1059,10 @@ final class DebugSocketServer: @unchecked Sendable {
                     Self.errorPayload(
                         code: "SEED_BIGRAM_MISSING_FIELDS",
                         message: "seed_bigram requires prev, input, output",
-                        hint: #"Use {"seed_bigram":{"prev":"今日","input":"は","output":"は"}}."#
+                        hint: #"Use {"seed_bigram":{"prev":"今日","input":"は","output":"は"}}."#,
+                        suggestedFixes: [
+                            ["seed_bigram": ["prev": "今日", "input": "は", "output": "は", "count": 10]]
+                        ]
                     ),
                     cmd: cmd
                 )
@@ -1001,7 +1080,10 @@ final class DebugSocketServer: @unchecked Sendable {
                     Self.errorPayload(
                         code: "SEED_HISTORY_MISSING_FIELDS",
                         message: "seed_history requires input and output",
-                        hint: #"Use {"seed_history":{"input":"かんじ","output":"漢字"}}."#
+                        hint: #"Use {"seed_history":{"input":"かんじ","output":"漢字"}}."#,
+                        suggestedFixes: [
+                            ["seed_history": ["input": "かんじ", "output": "漢字", "times": 3]]
+                        ]
                     ),
                     cmd: cmd
                 )
@@ -1198,6 +1280,24 @@ final class DebugSocketServer: @unchecked Sendable {
                     result["vars"] = seqVars
                 }
                 if let err = seqResult["error"] { result["error"] = err }
+                if !ok {
+                    var repro: [String: Any] = [
+                        "test_suite": [scenario]
+                    ]
+                    if useRealDB {
+                        repro["useRealDB"] = true
+                    }
+                    if !globalBeforeEach.isEmpty {
+                        repro["before_each"] = globalBeforeEach
+                    }
+                    if !globalAfterEach.isEmpty {
+                        repro["after_each"] = globalAfterEach
+                    }
+                    if !globalVars.isEmpty {
+                        repro["vars"] = globalVars
+                    }
+                    result["reproCommand"] = repro
+                }
                 scenarios.append(result)
                 if failFast && !ok { break }
             }
@@ -1226,7 +1326,11 @@ final class DebugSocketServer: @unchecked Sendable {
                     steps.append(Self.errorPayload(
                         code: "INVALID_STEP_COMMAND",
                         message: "invalid step command",
-                        hint: "Each sequence step must be an object."
+                        hint: "Each sequence step must be an object.",
+                        suggestedFixes: [
+                            ["sequence": [["key": "space"]]],
+                            ["schema": true]
+                        ]
                     ))
                     continue
                 }
@@ -1289,7 +1393,12 @@ final class DebugSocketServer: @unchecked Sendable {
                     Self.errorPayload(
                         code: "UNKNOWN_KEY_NAME",
                         message: "unknown key name: \(keyName)",
-                        hint: "Call {\"schema\": true} to inspect supported named keys."
+                        hint: "Call {\"schema\": true} to inspect supported named keys.",
+                        suggestedFixes: [
+                            ["schema": true],
+                            ["key": "space"],
+                            ["key": "enter"]
+                        ]
                     ),
                     cmd: cmd
                 )
@@ -1313,7 +1422,12 @@ final class DebugSocketServer: @unchecked Sendable {
                 Self.errorPayload(
                     code: "MISSING_KEYCODE",
                     message: "missing keyCode",
-                    hint: "Use keyCode/chars/base/mods or the shorthand {\"key\":\"space\"}."
+                    hint: "Use keyCode/chars/base/mods or the shorthand {\"key\":\"space\"}.",
+                    suggestedFixes: [
+                        ["key": "space"],
+                        ["keyCode": 49, "chars": " ", "base": " ", "mods": 0],
+                        ["schema": true]
+                    ]
                 ),
                 cmd: cmd
             )

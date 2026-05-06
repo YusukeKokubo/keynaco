@@ -263,9 +263,12 @@ class IMEClient:
         """現在の状態を取得する（キー入力なし）。"""
         return self._send_recv({"state": True})
 
-    def schema(self) -> dict:
+    def schema(self, with_examples: bool = False) -> dict:
         """サーバーのコマンド/フィールドスキーマを取得する。"""
-        return self._send_recv({"schema": True})
+        cmd: dict = {"schema": True}
+        if with_examples:
+            cmd["with_examples"] = True
+        return self._send_recv(cmd)
 
     def close(self) -> None:
         self.sock.close()
@@ -331,6 +334,7 @@ def interactive_mode(client: IMEClient) -> None:
     print("  .reset             : ハンドラリセット")
     print("  .state             : 現在状態を表示")
     print("  .schema            : サーバースキーマを表示")
+    print("  .schema+           : examples 付きスキーマを表示")
     print()
 
     while True:
@@ -354,6 +358,9 @@ def interactive_mode(client: IMEClient) -> None:
                 print(client.pretty(r))
             elif line == ".schema":
                 r = client.schema()
+                print(json.dumps(r.get("schema", r), ensure_ascii=False, indent=2))
+            elif line == ".schema+":
+                r = client.schema(with_examples=True)
                 print(json.dumps(r.get("schema", r), ensure_ascii=False, indent=2))
             elif line.startswith("."):
                 name = line[1:]
