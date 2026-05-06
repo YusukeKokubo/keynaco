@@ -188,6 +188,23 @@ class IMEClient:
             cmd["describe"] = describe
         return self._send_recv(cmd)
 
+    def lint_suite(
+        self,
+        *scenarios: dict,
+        before_each: list[dict] | None = None,
+        after_each: list[dict] | None = None,
+        describe: str | None = None,
+    ) -> dict:
+        """test_suite の静的チェックを行う（実行はしない）。"""
+        cmd: dict = {"lint_suite": list(scenarios)}
+        if before_each:
+            cmd["before_each"] = before_each
+        if after_each:
+            cmd["after_each"] = after_each
+        if describe:
+            cmd["describe"] = describe
+        return self._send_recv(cmd)
+
     def seed_bigram(self, prev: str, input: str, output: str, count: int = 1) -> dict:
         """bi-gram をテスト用に DB へ直接挿入する。"""
         return self._send_recv({"seed_bigram": {"prev": prev, "input": input, "output": output, "count": count}})

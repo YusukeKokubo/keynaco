@@ -87,6 +87,8 @@ send({"reset": True})
 | 複数シナリオを一括実行 | `{"test_suite":[{"name":"kanzi変換","cmds":[...],"assert":{"inserted":["漢字"]}}]}` |
 | test_suite 共通前処理/後処理 | `{"before_each":[...], "after_each":[...], "test_suite":[...]}` |
 | test_suite fail-fast | `{"test_suite":[...], "fail_fast": true}`（最初の失敗で打ち切り） |
+| 失敗/タイムアウト期待 | `{"test_suite":[{"expect_error":true, ...}]}` / `{"expect_timeout":true, ...}` |
+| スイートの静的検証 | `{"lint_suite":[...], "before_each":[...]}`（実行せずに問題点を返す） |
 | 名前付きキー | `{"key": "space"}` / `{"key": "enter"}` / `{"key": "down"}` 等 |
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
 | フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
@@ -137,6 +139,7 @@ suite = send({"test_suite": [
 print(suite["summary"])  # {"total": 1, "passed": 1, "failed": 0}
 # 失敗時は scenario.failedAssertions に stepIndex/stepDescribe/field/expected/actual が集約される
 # scenario.failedAssertions には stepPhase(before_each/cmd/after_each) も入る
+# scenario.compactFailures には人間/AIが読みやすい1行要約が入る
 
 # before_each / after_each で共通セットアップを DRY にする
 suite2 = send({
@@ -156,6 +159,26 @@ suite2 = send({
     ]
 })
 print(suite2["summary"])  # durationMs / stoppedEarly も返る
+
+# 異常系を期待するシナリオ（エラーが出れば pass）
+suite3 = send({
+    "test_suite": [
+        {
+            "name": "invalid-key",
+            "cmds": [{"key": "unknown_key"}],
+            "expect_error": True
+        }
+    ]
+})
+print(suite3["results"][0]["ok"], suite3["results"][0]["hasError"])
+
+# lint_suite: 実行前に静的チェック（cmds欠落・wait_until不足など）を検出
+linted = send({
+    "lint_suite": [
+        {"name": "bad", "cmds": [{"wait_until": {"timeoutMs": 10}}], "expect_timeout": True}
+    ]
+})
+print(linted["ok"], linted["summary"], linted["issues"])
 
 # LLM の非同期反映を待つ（state 連打せずに待機）
 waited = send({

@@ -344,6 +344,158 @@ final class DebugSocketServer: @unchecked Sendable {
         ], cmd: cmd)
     }
 
+    private static func compactFailureLine(_ failure: [String: Any]) -> String {
+        let phase = failure["phase"] as? String ?? "unknown"
+        if phase == "step" {
+            let stepIndex = failure["stepIndex"] as? Int ?? -1
+            let stepPhase = failure["stepPhase"] as? String ?? "cmd"
+            let field = failure["field"] as? String ?? "?"
+            let kind = failure["kind"] as? String ?? "assert"
+            let expected = failure["expected"].map { jsonString($0) } ?? "null"
+            return "step#\(stepIndex) [\(stepPhase)] \(kind) \(field) expected \(expected)"
+        }
+        if phase == "final" {
+            let field = failure["field"] as? String ?? "?"
+            let kind = failure["kind"] as? String ?? "assert"
+            let expected = failure["expected"].map { jsonString($0) } ?? "null"
+            return "final \(kind) \(field) expected \(expected)"
+        }
+        if phase == "suite" {
+            return failure["message"] as? String ?? "suite expectation failed"
+        }
+        return failure["message"] as? String ?? "assertion failed"
+    }
+
+    private static let knownAssertionFields: Set<String> = [
+        "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
+        "isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode",
+        "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
+        "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
+        "segmentTexts", "focusedSegmentIndex", "successorLLMSurfaceExtras",
+        "ok", "matched", "timedOut", "waitField", "state", "steps", "last",
+    ]
+
+    private static let knownCommandKeys: Set<String> = [
+        "reset", "state", "wait_until", "seed_bigram", "seed_history",
+        "test_suite", "sequence", "type_string", "key", "keyCode",
+    ]
+
+    private static func lintAssertionKeys(
+        _ cmd: [String: Any],
+        location: String
+    ) -> [[String: Any]] {
+        var issues: [[String: Any]] = []
+        for key in ["assert", "assert_contains", "assert_not"] {
+            guard let fields = cmd[key] as? [String: Any] else { continue }
+            for field in fields.keys where !knownAssertionFields.contains(field) {
+                issues.append([
+                    "severity": "warning",
+                    "location": location,
+                    "message": "Unknown assertion field '\(field)' in \(key)"
+                ])
+            }
+        }
+        return issues
+    }
+
+    private static func lintSuite(
+        suite: [[String: Any]],
+        beforeEach: [[String: Any]],
+        afterEach: [[String: Any]],
+        cmd: [String: Any]
+    ) -> [String: Any] {
+        var issues: [[String: Any]] = []
+        var scenarioCount = 0
+
+        func lintCommand(_ command: [String: Any], location: String) {
+            let hasKnownCommand = command.keys.contains { knownCommandKeys.contains($0) }
+            if !hasKnownCommand {
+                issues.append([
+                    "severity": "error",
+                    "location": location,
+                    "message": "Command has no executable key"
+                ])
+            }
+            if let wait = command["wait_until"] as? [String: Any] {
+                if wait["field"] as? String == nil {
+                    issues.append([
+                        "severity": "error",
+                        "location": location,
+                        "message": "wait_until requires field"
+                    ])
+                }
+                let hasCondition = wait["equals"] != nil || wait["contains"] != nil || wait["minCount"] != nil
+                if !hasCondition {
+                    issues.append([
+                        "severity": "error",
+                        "location": location,
+                        "message": "wait_until requires equals/contains/minCount"
+                    ])
+                }
+            }
+            issues.append(contentsOf: lintAssertionKeys(command, location: location))
+        }
+
+        for (i, command) in beforeEach.enumerated() {
+            lintCommand(command, location: "before_each[\(i)]")
+        }
+        for (i, command) in afterEach.enumerated() {
+            lintCommand(command, location: "after_each[\(i)]")
+        }
+
+        for (idx, scenario) in suite.enumerated() {
+            scenarioCount += 1
+            let location = "test_suite[\(idx)]"
+            let scenarioCmds = scenario["cmds"] as? [[String: Any]]
+            if scenarioCmds == nil {
+                issues.append([
+                    "severity": "error",
+                    "location": location,
+                    "message": "cmds must be an array"
+                ])
+                continue
+            }
+            if scenarioCmds?.isEmpty == true {
+                issues.append([
+                    "severity": "warning",
+                    "location": location,
+                    "message": "cmds is empty"
+                ])
+            }
+            let expectsTimeout = scenario["expect_timeout"] as? Bool ?? false
+            let hasWaitUntil = (scenarioCmds ?? []).contains { $0["wait_until"] != nil }
+            if expectsTimeout && !hasWaitUntil {
+                issues.append([
+                    "severity": "warning",
+                    "location": location,
+                    "message": "expect_timeout=true but no wait_until command found"
+                ])
+            }
+            for (i, command) in (scenario["before_each"] as? [[String: Any]] ?? []).enumerated() {
+                lintCommand(command, location: "\(location).before_each[\(i)]")
+            }
+            for (i, command) in (scenarioCmds ?? []).enumerated() {
+                lintCommand(command, location: "\(location).cmds[\(i)]")
+            }
+            for (i, command) in (scenario["after_each"] as? [[String: Any]] ?? []).enumerated() {
+                lintCommand(command, location: "\(location).after_each[\(i)]")
+            }
+            issues.append(contentsOf: lintAssertionKeys(scenario, location: location))
+        }
+
+        let errorCount = issues.filter { ($0["severity"] as? String) == "error" }.count
+        let warningCount = issues.filter { ($0["severity"] as? String) == "warning" }.count
+        return finalize([
+            "ok": errorCount == 0,
+            "issues": issues,
+            "summary": [
+                "scenarios": scenarioCount,
+                "errors": errorCount,
+                "warnings": warningCount
+            ]
+        ], cmd: cmd)
+    }
+
     // MARK: - コマンド処理（MainActor 上で実行）
 
     private func processCommand(_ cmd: [String: Any]) -> [String: Any] {
@@ -367,6 +519,13 @@ final class DebugSocketServer: @unchecked Sendable {
 
         if cmd["state"] != nil {
             return Self.finalize(makeResponse(inserted: []), cmd: cmd)
+        }
+
+        // {"lint_suite":[...], "before_each":[...], "after_each":[...]}
+        if let suite = cmd["lint_suite"] as? [[String: Any]] {
+            let beforeEach = cmd["before_each"] as? [[String: Any]] ?? []
+            let afterEach = cmd["after_each"] as? [[String: Any]] ?? []
+            return Self.lintSuite(suite: suite, beforeEach: beforeEach, afterEach: afterEach, cmd: cmd)
         }
 
         // {"wait_until": {"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}
@@ -453,17 +612,82 @@ final class DebugSocketServer: @unchecked Sendable {
                 let steps = seqResult["steps"] as? [[String: Any]] ?? []
                 let failedSteps = steps.filter { $0["assertion_failed"] != nil }.count
                 let last = seqResult["last"] as? [String: Any] ?? [:]
+                let expectError = scenario["expect_error"] as? Bool ?? false
+                let expectTimeout = scenario["expect_timeout"] as? Bool ?? false
+                let stepErrors: [[String: Any]] = steps.enumerated().compactMap { index, step in
+                    guard let err = step["error"] else { return nil }
+                    return [
+                        "phase": "step",
+                        "stepIndex": index,
+                        "stepPhase": stepPhases.indices.contains(index) ? stepPhases[index].phase : "cmd",
+                        "kind": "error",
+                        "field": "error",
+                        "expected": expectError ? "error" : "none",
+                        "actual": err,
+                        "message": "step returned error: \(err)"
+                    ]
+                }
+                let stepTimeouts: [[String: Any]] = steps.enumerated().compactMap { index, step in
+                    guard (step["timedOut"] as? Bool) == true else { return nil }
+                    return [
+                        "phase": "step",
+                        "stepIndex": index,
+                        "stepPhase": stepPhases.indices.contains(index) ? stepPhases[index].phase : "cmd",
+                        "kind": "timeout",
+                        "field": "timedOut",
+                        "expected": expectTimeout,
+                        "actual": true,
+                        "message": "step timed out"
+                    ]
+                }
                 let finalCheck = Self.applyAssert(
                     last,
                     assertions: scenario["assert"] as? [String: Any],
                     containsAssertions: scenario["assert_contains"] as? [String: Any],
                     notAssertions: scenario["assert_not"] as? [String: Any]
                 )
+                let hasError = !stepErrors.isEmpty || seqResult["error"] != nil || finalCheck["error"] != nil
+                let hasTimeout = !stepTimeouts.isEmpty || (finalCheck["timedOut"] as? Bool ?? false)
+                var suiteExpectationFailures: [[String: Any]] = []
+                if expectError && !hasError {
+                    suiteExpectationFailures.append([
+                        "phase": "suite",
+                        "kind": "expected_error",
+                        "message": "expect_error=true but no error occurred"
+                    ])
+                }
+                if !expectError && hasError {
+                    suiteExpectationFailures.append([
+                        "phase": "suite",
+                        "kind": "unexpected_error",
+                        "message": "unexpected error occurred"
+                    ])
+                }
+                if expectTimeout && !hasTimeout {
+                    suiteExpectationFailures.append([
+                        "phase": "suite",
+                        "kind": "expected_timeout",
+                        "message": "expect_timeout=true but no timeout occurred"
+                    ])
+                }
+                if !expectTimeout && hasTimeout {
+                    suiteExpectationFailures.append([
+                        "phase": "suite",
+                        "kind": "unexpected_timeout",
+                        "message": "unexpected timeout occurred"
+                    ])
+                }
                 let hasFinalFailure = finalCheck["assertion_failed"] != nil
-                let ok = failedSteps == 0 && !hasFinalFailure && seqResult["error"] == nil
+                let ok = failedSteps == 0 &&
+                         !hasFinalFailure &&
+                         suiteExpectationFailures.isEmpty &&
+                         (expectError || !hasError) &&
+                         (expectTimeout || !hasTimeout)
                 if ok { passCount += 1 }
 
                 var failureDetails: [[String: Any]] = []
+                failureDetails.append(contentsOf: stepErrors)
+                failureDetails.append(contentsOf: stepTimeouts)
                 for (stepIndex, step) in steps.enumerated() {
                     guard let failures = step["assertion_failed"] as? [[String: Any]] else { continue }
                     for failure in failures {
@@ -480,6 +704,7 @@ final class DebugSocketServer: @unchecked Sendable {
                         failureDetails.append(detail)
                     }
                 }
+                failureDetails.append(contentsOf: suiteExpectationFailures)
                 if let finalFailures = finalCheck["assertion_failed"] as? [[String: Any]] {
                     for failure in finalFailures {
                         var detail = failure
@@ -494,6 +719,9 @@ final class DebugSocketServer: @unchecked Sendable {
                     "stepCount": steps.count,
                     "failedStepCount": failedSteps,
                     "failedAssertions": failureDetails,
+                    "compactFailures": failureDetails.map(Self.compactFailureLine),
+                    "hasError": hasError,
+                    "hasTimeout": hasTimeout,
                     "durationMs": Int(Date().timeIntervalSince(scenarioStart) * 1000),
                     "last": finalCheck
                 ]
