@@ -78,6 +78,9 @@ public extension InputHandler {
             return
         }
 
+        // Zenzai 有効時は segmentize / candidatesForSegment ベースの候補を維持し、全文挿入フォールバックしない。
+        if azooKeyConverter.isZenzaiEnabled { return }
+
         if ss.segments[0].candidates.contains(text) { return }
 
         ss.segments[0].candidates.insert(text, at: 0)
@@ -89,27 +92,31 @@ public extension InputHandler {
     }
 
     private mutating func applyLLMBoundaries(pairs: [(reading: String, token: String)], llmWholeText: String) {
+        let zenzaiOn = azooKeyConverter.isZenzaiEnabled
         var built: [Segment] = []
         for i in pairs.indices {
             let reading = pairs[i].reading
             let token = pairs[i].token
             let prev: String? = (i == 0) ? lastCommittedOutput : pairs[i - 1].token
-            var seg = buildSegmentCandidates(
-                reading: reading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading, leftSideContext: azooKeyLeftContext),
-                prev: prev
-            )
-            if let idx = seg.candidates.firstIndex(of: token) {
+            let dictCandidates = azooKeyConverter.candidatesForSegment(reading: reading, leftSideContext: azooKeyLeftContext)
+            var seg = buildSegmentCandidates(reading: reading, dictCandidates: dictCandidates, prev: prev)
+            let zenTop = dictCandidates.first
+
+            if zenzaiOn, let z = zenTop, z != token, seg.candidates.contains(z) {
+                Self.reorderSegmentCandidatesZenzaiBeforeLLM(segment: &seg, zenTop: z, token: token)
+            } else if let idx = seg.candidates.firstIndex(of: token) {
                 if idx != 0 {
                     seg.candidates.remove(at: idx)
                     seg.candidates.insert(token, at: 0)
                 }
+                let newCount = seg.candidates.count
+                seg.selectedIndex = min(seg.selectedIndex + 1, newCount - 1)
             } else {
                 seg.candidates.insert(token, at: 0)
                 seg.historyEnd += 1
+                let newCount = seg.candidates.count
+                seg.selectedIndex = min(seg.selectedIndex + 1, newCount - 1)
             }
-            let newCount = seg.candidates.count
-            seg.selectedIndex = min(seg.selectedIndex + 1, newCount - 1)
             built.append(seg)
         }
         if pairs.count >= 2 {
@@ -410,5 +417,46 @@ public extension InputHandler {
         guard let segmentState = state.segmentState else { return }
         let str = segmentState.attributedString()
         client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
+    }
+
+    /// Zenzai 有効かつ `zenTop != token` のとき、辞書先頭表層を LLM トークンより前に並べ替える（`candidatesForSegment` の先頭は `zenTop` と一致し候補列に含まれること）。
+    private static func reorderSegmentCandidatesZenzaiBeforeLLM(segment: inout Segment, zenTop: String, token: String) {
+        func remove(_ s: String) {
+            guard let idx = segment.candidates.firstIndex(of: s) else { return }
+            if idx < segment.historyEnd {
+                segment.historyEnd -= 1
+            }
+            segment.candidates.remove(at: idx)
+        }
+
+        let ti = segment.candidates.firstIndex(of: token)
+        let zi = segment.candidates.firstIndex(of: zenTop)
+        if let ti = ti, let zi = zi {
+            if ti > zi {
+                remove(token)
+                remove(zenTop)
+            } else {
+                remove(zenTop)
+                remove(token)
+            }
+        } else if ti != nil {
+            remove(token)
+            if segment.candidates.contains(zenTop) {
+                remove(zenTop)
+            }
+        } else if zi != nil {
+            remove(zenTop)
+        }
+
+        segment.candidates.insert(zenTop, at: 0)
+        if zenTop != token {
+            segment.candidates.insert(token, at: 1)
+        }
+
+        // `remove()` が `idx < historyEnd` なら都度 -1 済み。先頭へ zenTop/token を2行挿入するので、履歴境界 index は常に +2
+        //（`netInserted == 1` のように見えるケースでも、新規 token のみ +1 では履歴行の index が足りず Shift+Delete 範囲が壊れる）。
+        segment.historyEnd += 2
+
+        segment.selectedIndex = 0
     }
 }

@@ -422,8 +422,12 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         }
         XCTAssertTrue(ss.isLlmBoundaryInferred)
         XCTAssertEqual(ss.segments.map(\.reading), ["きょう", "は", "いい"])
+        let segI = ss.segments[2]
+        XCTAssertEqual(segI.reading, "いい")
+        XCTAssertEqual(segI.candidates[0], "いい", "Zenzai on: candidatesForSegment 先頭が LLM トークン「イイ」より前")
+        XCTAssertEqual(segI.candidates[1], "イイ")
+        // isLlmWholeTextShortcut: 各文節の candidates[0] の連結は llmWholeText（カタカナ「イイ」）と一致しにくく、多文節一括ショートカットは成立しない。
 
-        let llm = "今日はイイ"
         _ = press(
             keyCode: KeyCode.enter,
             candidateVisible: true,
@@ -551,6 +555,8 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
 // MARK: - boundary_pref LLM 保存テスト用 AzooKey スタブ
 
 private final class BoundaryPrefLLMMockKyouHaii: AzooKeyConverting, @unchecked Sendable {
+    var isZenzaiEnabled: Bool { true }
+
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
         _ = (hiragana, leftSideContext, richCandidates)
         return []
@@ -579,6 +585,8 @@ private final class BoundaryPrefLLMMockKyouHaii: AzooKeyConverting, @unchecked S
 }
 
 private final class BoundaryPrefLLMMockTesutoOnePair: AzooKeyConverting, @unchecked Sendable {
+    var isZenzaiEnabled: Bool { false }
+
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
         _ = (hiragana, leftSideContext, richCandidates)
         return []

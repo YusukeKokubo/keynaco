@@ -24,7 +24,8 @@ final class InputHandlerSegmentLLMTests: InputHandlerTestCase {
     }
 
     func testApplyLLMSegmentResultInsertsAtHeadAndBumpsSelection() {
-        // 実辞書では `inferSegmentBoundaries` が成功しうるため、辞書を空にしたスタブでフォールバック挿入のみを固定する
+        // 実辞書では `inferSegmentBoundaries` が成功しうるため、辞書を空にしたスタブでフォールバック挿入のみを固定する。
+        // LLMFallbackForcingMockAzoo は isZenzaiEnabled=false。Zenzai on 時の早期 return を追加してもこの期待値（historyEnd+1 等）は変わらない。
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: LLMFallbackForcingMockAzoo())
         client = MockTextClient()
         typeRomaji("watashihagakusei")
@@ -116,5 +117,50 @@ final class InputHandlerSegmentLLMTests: InputHandlerTestCase {
         XCTAssertNotEqual(client.inserted.last, llm)
         XCTAssertFalse(client.inserted.isEmpty)
         _ = result
+    }
+
+    func testZenzaiOnSkipsFallbackInsertWhenInferFails() {
+        handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiOnEmptySegmentCandidatesMockAzoo())
+        client = MockTextClient()
+        typeRomaji("watashihagakusei")
+        _ = press(keyCode: KeyCode.space)
+        guard handler.state.isSegmentMode else {
+            XCTFail("セグメントモードに入るはず"); return
+        }
+        let beforeFirst = handler.state.segmentState!.segments[0].candidates[0]
+        let beforeCount = handler.state.segmentState!.segments[0].candidates.count
+        let beforeHist = handler.state.segmentState!.segments[0].historyEnd
+
+        handler.applyLLMSegmentResult(text: "私は学生です")
+
+        XCTAssertNil(handler.state.segmentState!.llmWholeText)
+        let seg0 = handler.state.segmentState!.segments[0]
+        XCTAssertEqual(seg0.candidates.first, beforeFirst)
+        XCTAssertEqual(seg0.candidates.count, beforeCount)
+        XCTAssertEqual(seg0.historyEnd, beforeHist)
+    }
+}
+
+/// `candidatesForSegment` が空で infer が失敗するが Zenzai on のため全文フォールバックを抑止する。
+private final class ZenzaiOnEmptySegmentCandidatesMockAzoo: AzooKeyConverting, @unchecked Sendable {
+    var isZenzaiEnabled: Bool { true }
+
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = (hiragana, leftSideContext, richCandidates)
+        return []
+    }
+    func commit(reading: String, text: String) {}
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = (reading, leftSideContext)
+        return []
+    }
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = leftSideContext
+        guard hiragana == "わたしはがくせい" else { return [] }
+        return [
+            ("わたし", []),
+            ("は", []),
+            ("がくせい", [])
+        ]
     }
 }
