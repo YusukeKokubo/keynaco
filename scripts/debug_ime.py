@@ -274,6 +274,8 @@ class IMEClient:
             for i, c in enumerate(r.get("candidates", [])):
                 mark = " ★" if i == sel else ""
                 lines.append(f"    [{i}] {c}{mark}")
+        if r.get("changed"):
+            lines.append(f"  changed          : {r['changed']}")
         if r.get("committedHistory"):
             lines.append(f"  committedHistory : {r['committedHistory']}")
         if r.get("isSegmentMode") and r.get("segmentTexts"):

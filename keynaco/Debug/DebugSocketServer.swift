@@ -182,6 +182,8 @@ final class DebugSocketServer: @unchecked Sendable {
         "segmentTexts": "array<string>",
         "focusedSegmentIndex": "int",
         "successorLLMSurfaceExtras": "array<string>",
+        "candidateEntries": "array<object>",
+        "changed": "array<string>",
     ]
 
     private static func capabilities() -> [String: Any] {
@@ -197,6 +199,8 @@ final class DebugSocketServer: @unchecked Sendable {
             "supportsVars": true,
             "supportsAssertions": true,
             "supportsStructuredErrors": true,
+            "supportsChangedFields": true,
+            "supportsCandidateEntries": true,
         ]
     }
 
@@ -640,6 +644,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
         "segmentTexts", "focusedSegmentIndex", "successorLLMSurfaceExtras",
+        "candidateEntries", "changed",
         "ok", "matched", "timedOut", "waitField", "state", "steps", "last",
     ]
 
@@ -840,7 +845,9 @@ final class DebugSocketServer: @unchecked Sendable {
         }
 
         if cmd["state"] != nil {
-            return Self.finalize(makeResponse(inserted: []), cmd: cmd)
+            var state = makeResponse(inserted: [])
+            state["changed"] = []
+            return Self.finalize(state, cmd: cmd)
         }
 
         // {"lint_suite":[...], "before_each":[...], "after_each":[...]}
@@ -1203,6 +1210,7 @@ final class DebugSocketServer: @unchecked Sendable {
         let mods  = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
 
         handler.leftSideContext = llmDocumentContextPrefix()
+        let before = makeResponse(inserted: [])
         let (_, action) = handler.handle(
             keyCode: keyCode,
             characters: chars,
@@ -1214,7 +1222,8 @@ final class DebugSocketServer: @unchecked Sendable {
         candidateWindow.apply(action: action)
         applyLLMScheduling()
 
-        let result = makeResponse(inserted: mockClient.consume())
+        var result = makeResponse(inserted: mockClient.consume())
+        result["changed"] = Self.computeChangedFields(before: before, after: result)
         return Self.finalize(result, cmd: cmd)
     }
 
@@ -1249,9 +1258,71 @@ final class DebugSocketServer: @unchecked Sendable {
             "segmentTexts":       snap.segmentTexts,
             "focusedSegmentIndex": snap.focusedSegmentIndex,
             "successorLLMSurfaceExtras": handler.successorLLMSurfaceExtras,
+            "candidateEntries":   Self.makeCandidateEntries(
+                candidates: snap.candidates,
+                fixedEnd: snap.fixedEnd,
+                predictionEnd: candidateWindow.predictionEnd,
+                historyEnd: snap.historyEnd
+            ),
         ]
         if let st = snap.selectedText { dict["selectedText"] = st }
         return dict
+    }
+
+    private static func candidateSection(
+        row: Int,
+        fixedEnd: Int,
+        predictionEnd: Int,
+        historyEnd: Int
+    ) -> String {
+        if row < fixedEnd {
+            return "fixed"
+        }
+        if row < predictionEnd {
+            return "prediction"
+        }
+        if row < historyEnd {
+            return "history"
+        }
+        return "dictionary_or_special"
+    }
+
+    private static func makeCandidateEntries(
+        candidates: [String],
+        fixedEnd: Int,
+        predictionEnd: Int,
+        historyEnd: Int
+    ) -> [[String: Any]] {
+        candidates.enumerated().map { idx, text in
+            [
+                "index": idx,
+                "text": text,
+                "section": candidateSection(
+                    row: idx,
+                    fixedEnd: fixedEnd,
+                    predictionEnd: predictionEnd,
+                    historyEnd: historyEnd
+                )
+            ]
+        }
+    }
+
+    private static let changedFieldTargets: [String] = [
+        "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
+        "isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode",
+        "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
+        "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
+        "segmentTexts", "focusedSegmentIndex", "successorLLMSurfaceExtras",
+        "candidateEntries"
+    ]
+
+    private static func computeChangedFields(
+        before: [String: Any],
+        after: [String: Any]
+    ) -> [String] {
+        changedFieldTargets.filter { key in
+            jsonString(before[key] ?? NSNull()) != jsonString(after[key] ?? NSNull())
+        }
     }
 
     // MARK: - LLM スケジューリング（InputController と同順・文脈は committedHistory のみ）

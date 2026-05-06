@@ -278,7 +278,11 @@ eisu(英数)=102  kana(かな)=104
   "segmentTexts": [],            // セグメントモード中の文節テキスト
   "focusedSegmentIndex": 0,
   "predictionEnd": 0,            // 予測ブロック末尾（本番の CandidateWindow と同様）
-  "successorLLMSurfaceExtras": [] // 後続語 LLM が返した表層形（コールバック後に増える）
+  "successorLLMSurfaceExtras": [], // 後続語 LLM が返した表層形（コールバック後に増える）
+  "candidateEntries": [          // candidates の行ごとのメタデータ
+    {"index": 0, "text": "漢字", "section": "fixed|prediction|history|dictionary_or_special"}
+  ],
+  "changed": ["candidateVisible", "candidates"] // 直前のキー処理で変化した主要フィールド
 }
 ```
 
