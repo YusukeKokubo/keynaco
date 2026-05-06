@@ -160,7 +160,8 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private static func applyFields(_ dict: [String: Any], fields: [String]?) -> [String: Any] {
         guard let fields, !fields.isEmpty else { return dict }
-        let keep = Set(fields)
+        var keep = Set(fields)
+        if dict["describe"] != nil { keep.insert("describe") }
         return dict.filter { keep.contains($0.key) }
     }
 
@@ -178,7 +179,24 @@ final class DebugSocketServer: @unchecked Sendable {
                 failures.append(["field": key, "expected": expected, "actual": actual ?? NSNull()])
             }
         }
-        return failures.isEmpty ? dict : ["assertion_failed": failures, "state": dict]
+        if failures.isEmpty { return dict }
+        var wrapped: [String: Any] = ["assertion_failed": failures, "state": dict]
+        if let describe = dict["describe"] { wrapped["describe"] = describe }
+        return wrapped
+    }
+
+    private static func applyDescribe(_ dict: [String: Any], describe: Any?) -> [String: Any] {
+        guard let describe = describe else { return dict }
+        var result = dict
+        result["describe"] = describe
+        return result
+    }
+
+    private static func finalize(_ dict: [String: Any], cmd: [String: Any]) -> [String: Any] {
+        let withDescribe = applyDescribe(dict, describe: cmd["describe"])
+        let fields = cmd["fields"] as? [String]
+        let assertions = cmd["assert"] as? [String: Any]
+        return applyAssert(applyFields(withDescribe, fields: fields), assertions: assertions)
     }
 
     // MARK: - コマンド処理（MainActor 上で実行）
@@ -199,11 +217,11 @@ final class DebugSocketServer: @unchecked Sendable {
             InputHandler.isAsciiMode = false
             candidateWindow = DebugCandidateWindow()
             mockClient.reset()
-            return ["ok": true]
+            return Self.finalize(["ok": true], cmd: cmd)
         }
 
         if cmd["state"] != nil {
-            return makeResponse(inserted: [])
+            return Self.finalize(makeResponse(inserted: []), cmd: cmd)
         }
 
         // {"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}
@@ -211,22 +229,78 @@ final class DebugSocketServer: @unchecked Sendable {
             guard let prev   = seed["prev"]   as? String,
                   let input  = seed["input"]  as? String,
                   let output = seed["output"] as? String else {
-                return ["error": "seed_bigram requires prev, input, output"]
+                return Self.finalize(["error": "seed_bigram requires prev, input, output"], cmd: cmd)
             }
             let count = seed["count"] as? Int ?? 1
             handler.db.debugSeedBigram(prev: prev, input: input, output: output, count: count)
-            return ["ok": true]
+            return Self.finalize(["ok": true], cmd: cmd)
         }
 
         // {"seed_history": {"input": "かんじ", "output": "漢字"}}
         if let seed = cmd["seed_history"] as? [String: Any] {
             guard let input  = seed["input"]  as? String,
                   let output = seed["output"] as? String else {
-                return ["error": "seed_history requires input and output"]
+                return Self.finalize(["error": "seed_history requires input and output"], cmd: cmd)
             }
             let times = seed["times"] as? Int ?? 1
             for _ in 0..<times { handler.db.debugSeedHistory(input: input, output: output) }
-            return ["ok": true]
+            return Self.finalize(["ok": true], cmd: cmd)
+        }
+
+        // {"test_suite": [{"name":"...", "cmds":[...], "assert": {...}}, ...]}
+        if let suite = cmd["test_suite"] as? [[String: Any]] {
+            let defaultUseRealDB = cmd["useRealDB"] as? Bool ?? false
+            var scenarios: [[String: Any]] = []
+            var passCount = 0
+
+            for (idx, scenario) in suite.enumerated() {
+                let name = scenario["name"] as? String ?? "scenario_\(idx + 1)"
+                let useRealDB = scenario["useRealDB"] as? Bool ?? defaultUseRealDB
+                _ = processCommand(["reset": true, "useRealDB": useRealDB])
+
+                guard let cmds = scenario["cmds"] as? [[String: Any]] else {
+                    scenarios.append([
+                        "name": name,
+                        "ok": false,
+                        "error": "cmds must be an array of command objects"
+                    ])
+                    continue
+                }
+
+                var seqCmd: [String: Any] = ["sequence": cmds]
+                if let fields = scenario["fields"] as? [String] { seqCmd["fields"] = fields }
+                let seqResult = processCommand(seqCmd)
+                let steps = seqResult["steps"] as? [[String: Any]] ?? []
+                let failedSteps = steps.filter { $0["assertion_failed"] != nil }.count
+                let last = seqResult["last"] as? [String: Any] ?? [:]
+                let finalCheck = Self.applyAssert(last, assertions: scenario["assert"] as? [String: Any])
+                let hasFinalFailure = finalCheck["assertion_failed"] != nil
+                let ok = failedSteps == 0 && !hasFinalFailure && seqResult["error"] == nil
+                if ok { passCount += 1 }
+
+                var result: [String: Any] = [
+                    "name": name,
+                    "ok": ok,
+                    "stepCount": steps.count,
+                    "failedStepCount": failedSteps,
+                    "last": finalCheck
+                ]
+                if scenario["describe"] != nil {
+                    result = Self.applyDescribe(result, describe: scenario["describe"])
+                }
+                if scenario["return_steps"] as? Bool == true {
+                    result["steps"] = steps
+                }
+                if let err = seqResult["error"] { result["error"] = err }
+                scenarios.append(result)
+            }
+
+            let summary: [String: Any] = [
+                "total": scenarios.count,
+                "passed": passCount,
+                "failed": max(0, scenarios.count - passCount)
+            ]
+            return Self.finalize(["results": scenarios, "summary": summary], cmd: cmd)
         }
 
         // {"sequence": [{cmd}, {cmd}, ...]} — バッチ処理。各ステップの状態を配列で返す
@@ -240,7 +314,7 @@ final class DebugSocketServer: @unchecked Sendable {
             let last = steps.last ?? [:]
             let filteredSteps = steps.map { Self.applyFields($0, fields: fields) }
             let filteredLast  = Self.applyAssert(Self.applyFields(last, fields: fields), assertions: assertions)
-            return ["steps": filteredSteps, "last": filteredLast]
+            return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast], describe: cmd["describe"])
         }
 
         // {"type_string": "kanzi"} — 文字列を1文字ずつ送信。最終状態を返す（return_steps: true で全ステップも付加）
@@ -259,13 +333,13 @@ final class DebugSocketServer: @unchecked Sendable {
             if cmd["return_steps"] as? Bool == true {
                 result["steps"] = steps.map { Self.applyFields($0, fields: fields) }
             }
-            return result
+            return Self.applyDescribe(result, describe: cmd["describe"])
         }
 
         // {"key": "space"} ショートハンド — namedKeys テーブルから keyCode/chars を解決
         if let keyName = cmd["key"] as? String {
             guard let (resolvedKeyCode, resolvedChars) = Self.namedKeys[keyName] else {
-                return ["error": "unknown key name: \(keyName)"]
+                return Self.finalize(["error": "unknown key name: \(keyName)"], cmd: cmd)
             }
             let mods = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
             var expanded = cmd
@@ -281,7 +355,7 @@ final class DebugSocketServer: @unchecked Sendable {
         switch cmd["keyCode"] {
         case let kc as UInt16: keyCode = kc
         case let kc as Int:    keyCode = UInt16(kc)
-        default: return ["error": "missing keyCode"]
+        default: return Self.finalize(["error": "missing keyCode"], cmd: cmd)
         }
 
         let chars = cmd["chars"] as? String
@@ -301,9 +375,7 @@ final class DebugSocketServer: @unchecked Sendable {
         applyLLMScheduling()
 
         let result = makeResponse(inserted: mockClient.consume())
-        let fields     = cmd["fields"]     as? [String]
-        let assertions = cmd["assert"]     as? [String: Any]
-        return Self.applyAssert(Self.applyFields(result, fields: fields), assertions: assertions)
+        return Self.finalize(result, cmd: cmd)
     }
 
     private func makeResponse(inserted: [String]) -> [String: Any] {

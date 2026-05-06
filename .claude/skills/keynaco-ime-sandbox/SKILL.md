@@ -79,6 +79,9 @@ send({"reset": True})
 | 文字列→変換キー（最終状態のみ） | `{"type_string": "kanzi", "then": "space"}` |
 | 文字列→確定（全ステップも取得） | `{"type_string": "kyou", "then": "enter", "return_steps": true}` |
 | コマンド列を一括送信 | `{"sequence": [{cmd1}, {cmd2}, ...]}` → `{"steps": [...], "last": {...}}` |
+| ステップごとの説明ラベル | `{"type_string": "kanzi", "describe": "ローマ字入力"}`（レスポンスにも `describe` が返る） |
+| sequence 中間ステップ assert | `{"sequence": [{"type_string":"kanzi","assert":{"composedHiragana":"かんじ"}}, {"key":"space","assert":{"candidateVisible":true}}]}` |
+| 複数シナリオを一括実行 | `{"test_suite":[{"name":"kanzi変換","cmds":[...],"assert":{"inserted":["漢字"]}}]}` |
 | 名前付きキー | `{"key": "space"}` / `{"key": "enter"}` / `{"key": "down"}` 等 |
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
 | フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
@@ -106,11 +109,27 @@ print(f"isSuccessorMode: {r['isSuccessorMode']}, candidates: {r['candidates'][:3
 
 # 複数操作を1往復でバッチ送信
 r = send({"sequence": [
-    {"type_string": "kanzi", "then": "space"},
+    {"type_string": "kanzi", "describe": "ローマ字入力", "assert": {"composedHiragana": "かんじ"}},
+    {"key": "space", "describe": "変換開始", "assert": {"candidateVisible": True}},
     {"key": "down"},
     {"key": "enter"},
 ]})
 print(r["last"]["inserted"])
+
+# test_suite: シナリオごとに自動 reset → cmds 実行 → 最終 assert
+suite = send({"test_suite": [
+    {
+        "name": "kanzi変換",
+        "cmds": [
+            {"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}},
+            {"key": "space", "assert": {"candidateVisible": True}},
+            {"key": "enter"},
+        ],
+        "assert": {"inserted": ["漢字"]},
+        "return_steps": True
+    }
+]})
+print(suite["summary"])  # {"total": 1, "passed": 1, "failed": 0}
 ```
 
 ---

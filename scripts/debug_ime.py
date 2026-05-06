@@ -87,7 +87,14 @@ class IMEClient:
         """文字列を 1 文字ずつ送信する（旧 API）。各ステップの状態リストを返す。"""
         return [self.char(c) for c in text]
 
-    def type_string(self, text: str, then: str | None = None, return_steps: bool = False) -> dict:
+    def type_string(
+        self,
+        text: str,
+        then: str | None = None,
+        return_steps: bool = False,
+        describe: str | None = None,
+        assert_fields: dict | None = None,
+    ) -> dict:
         """文字列を一括送信してサーバー側でまとめて処理する。最終状態を返す。
         then: 末尾に続けて送る名前付きキー（"space" / "enter" 等）。
         return_steps: True なら result["steps"] に各ステップの状態リストも付加する。
@@ -97,13 +104,36 @@ class IMEClient:
             cmd["then"] = then
         if return_steps:
             cmd["return_steps"] = True
+        if describe:
+            cmd["describe"] = describe
+        if assert_fields:
+            cmd["assert"] = assert_fields
         return self._send_recv(cmd)
 
-    def sequence(self, *cmds: dict, fields: list[str] | None = None) -> dict:
+    def sequence(
+        self,
+        *cmds: dict,
+        fields: list[str] | None = None,
+        describe: str | None = None,
+        assert_fields: dict | None = None,
+    ) -> dict:
         """複数コマンドを1往復で一括送信する。result["steps"] に各状態、result["last"] に最終状態。"""
         cmd: dict = {"sequence": list(cmds)}
         if fields:
             cmd["fields"] = fields
+        if describe:
+            cmd["describe"] = describe
+        if assert_fields:
+            cmd["assert"] = assert_fields
+        return self._send_recv(cmd)
+
+    def test_suite(self, *scenarios: dict, use_real_db: bool = False, describe: str | None = None) -> dict:
+        """複数シナリオを自動 reset 付きで一括実行する。"""
+        cmd: dict = {"test_suite": list(scenarios)}
+        if use_real_db:
+            cmd["useRealDB"] = True
+        if describe:
+            cmd["describe"] = describe
         return self._send_recv(cmd)
 
     def seed_bigram(self, prev: str, input: str, output: str, count: int = 1) -> dict:
