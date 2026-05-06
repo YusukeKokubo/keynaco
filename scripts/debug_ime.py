@@ -206,6 +206,30 @@ class IMEClient:
             cmd["describe"] = describe
         return self._send_recv(cmd)
 
+    def assert_eventually(
+        self,
+        field: str,
+        *,
+        equals=None,
+        contains=None,
+        min_count: int | None = None,
+        timeout_ms: int = 1000,
+        interval_ms: int = 50,
+        describe: str | None = None,
+    ) -> dict:
+        """条件がタイムアウト前に成立することをアサートする（失敗時は assertion_failed 返却）。"""
+        wait: dict = {"field": field, "timeoutMs": timeout_ms, "intervalMs": interval_ms}
+        if equals is not None:
+            wait["equals"] = equals
+        if contains is not None:
+            wait["contains"] = contains
+        if min_count is not None:
+            wait["minCount"] = min_count
+        cmd: dict = {"assert_eventually": wait}
+        if describe:
+            cmd["describe"] = describe
+        return self._send_recv(cmd)
+
     def lint_suite(
         self,
         *scenarios: dict,

@@ -196,6 +196,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "supportsTestSuite": true,
             "supportsLintSuite": true,
             "supportsWaitUntil": true,
+            "supportsAssertEventually": true,
             "supportsCapture": true,
             "supportsVars": true,
             "supportsAssertions": true,
@@ -668,6 +669,41 @@ final class DebugSocketServer: @unchecked Sendable {
         ], cmd: cmd)
     }
 
+    private func assertEventually(_ wait: [String: Any], cmd: [String: Any]) -> [String: Any] {
+        let field = wait["field"] as? String ?? "unknown"
+        let raw = waitUntil(wait, cmd: [:])
+        if (raw["matched"] as? Bool) == true {
+            return Self.finalize([
+                "ok": true,
+                "matched": true,
+                "waitField": field,
+                "state": raw["state"] as? [String: Any] ?? [:]
+            ], cmd: cmd)
+        }
+
+        let expected: Any = {
+            if let equals = wait["equals"] { return ["equals": equals] }
+            if let contains = wait["contains"] { return ["contains": contains] }
+            if let minCount = wait["minCount"] { return ["minCount": minCount] }
+            return "equals|contains|minCount"
+        }()
+        let state = raw["state"] as? [String: Any] ?? [:]
+        let actual = state[field] ?? NSNull()
+        return Self.finalize([
+            "ok": false,
+            "matched": false,
+            "timedOut": true,
+            "waitField": field,
+            "assertion_failed": [[
+                "kind": "eventually",
+                "field": field,
+                "expected": expected,
+                "actual": actual
+            ]],
+            "state": state
+        ], cmd: cmd)
+    }
+
     private static func compactFailureLine(_ failure: [String: Any]) -> String {
         let phase = failure["phase"] as? String ?? "unknown"
         if phase == "step" {
@@ -701,7 +737,7 @@ final class DebugSocketServer: @unchecked Sendable {
     ]
 
     private static let knownCommandKeys: Set<String> = [
-        "reset", "state", "wait_until", "seed_bigram", "seed_history",
+        "reset", "state", "wait_until", "assert_eventually", "seed_bigram", "seed_history",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
         "capture", "vars", "schema", "explain",
     ]
@@ -779,6 +815,23 @@ final class DebugSocketServer: @unchecked Sendable {
                     ])
                 }
             }
+            if let wait = command["assert_eventually"] as? [String: Any] {
+                if wait["field"] as? String == nil {
+                    issues.append([
+                        "severity": "error",
+                        "location": location,
+                        "message": "assert_eventually requires field"
+                    ])
+                }
+                let hasCondition = wait["equals"] != nil || wait["contains"] != nil || wait["minCount"] != nil
+                if !hasCondition {
+                    issues.append([
+                        "severity": "error",
+                        "location": location,
+                        "message": "assert_eventually requires equals/contains/minCount"
+                    ])
+                }
+            }
             if let capture = command["capture"] {
                 let validCapture = (capture as? [String]) != nil || (capture as? [String: Any]) != nil
                 if !validCapture {
@@ -838,12 +891,14 @@ final class DebugSocketServer: @unchecked Sendable {
                 ])
             }
             let expectsTimeout = scenario["expect_timeout"] as? Bool ?? false
-            let hasWaitUntil = (scenarioCmds ?? []).contains { $0["wait_until"] != nil }
+            let hasWaitUntil = (scenarioCmds ?? []).contains {
+                $0["wait_until"] != nil || $0["assert_eventually"] != nil
+            }
             if expectsTimeout && !hasWaitUntil {
                 issues.append([
                     "severity": "warning",
                     "location": location,
-                    "message": "expect_timeout=true but no wait_until command found"
+                    "message": "expect_timeout=true but no wait_until/assert_eventually command found"
                 ])
             }
             for (i, command) in (scenario["before_each"] as? [[String: Any]] ?? []).enumerated() {
@@ -912,6 +967,11 @@ final class DebugSocketServer: @unchecked Sendable {
         // {"wait_until": {"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}
         if let wait = cmd["wait_until"] as? [String: Any] {
             return waitUntil(wait, cmd: cmd)
+        }
+
+        // {"assert_eventually": {"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}
+        if let wait = cmd["assert_eventually"] as? [String: Any] {
+            return assertEventually(wait, cmd: cmd)
         }
 
         // {"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}

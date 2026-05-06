@@ -88,6 +88,7 @@ send({"reset": True})
 | スキーマ assert | `{"state":true,"assert_schema":{"candidates":"array<string>","historyEnd":"int"}}` |
 | 正規表現 assert | `{"state":true,"assert_regex":{"markedText":"^\\\".*\\\"$"}}` |
 | 非同期待機 | `{"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}` |
+| 非同期アサート（待機+検証） | `{"assert_eventually":{"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}` |
 | 複数シナリオを一括実行 | `{"test_suite":[{"name":"kanzi変換","cmds":[...],"assert":{"inserted":["漢字"]}}]}` |
 | test_suite 共通前処理/後処理 | `{"before_each":[...], "after_each":[...], "test_suite":[...]}` |
 | test_suite fail-fast | `{"test_suite":[...], "fail_fast": true}`（最初の失敗で打ち切り） |
@@ -212,6 +213,17 @@ waited = send({
     "describe": "LLM extras待機"
 })
 print(waited["matched"], waited["state"]["successorLLMSurfaceExtras"])
+
+# assert_eventually: タイムアウト前に条件が成立することをアサート
+ae = send({
+    "assert_eventually": {
+        "field": "successorLLMSurfaceExtras",
+        "minCount": 1,
+        "timeoutMs": 1500,
+        "intervalMs": 50
+    }
+})
+print("eventually_ok?", "assertion_failed" not in ae)
 ```
 
 ---
