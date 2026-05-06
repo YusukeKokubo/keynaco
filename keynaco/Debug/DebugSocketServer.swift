@@ -216,16 +216,47 @@ final class DebugSocketServer: @unchecked Sendable {
         return false
     }
 
+    private static func matchesSchema(_ value: Any?, schema rawSchema: String) -> Bool {
+        let schema = rawSchema.replacingOccurrences(of: " ", with: "").lowercased()
+        if schema.hasPrefix("array<"), schema.hasSuffix(">") {
+            guard let array = value as? [Any] else { return false }
+            let inner = String(schema.dropFirst("array<".count).dropLast())
+            return array.allSatisfy { matchesSchema($0, schema: inner) }
+        }
+        switch schema {
+        case "string":
+            return value is String
+        case "number", "double":
+            return value is Double || value is Float || value is Int || value is NSNumber
+        case "int", "integer":
+            return value is Int
+        case "bool", "boolean":
+            return value is Bool
+        case "array":
+            return value is [Any]
+        case "object", "dict", "dictionary":
+            return value is [String: Any]
+        case "null":
+            return value == nil || value is NSNull
+        case "any":
+            return true
+        default:
+            return false
+        }
+    }
+
     private static func applyAssert(
         _ dict: [String: Any],
         assertions: [String: Any]?,
         containsAssertions: [String: Any]?,
-        notAssertions: [String: Any]?
+        notAssertions: [String: Any]?,
+        schemaAssertions: [String: Any]?
     ) -> [String: Any] {
         let hasEquality = assertions.map { !$0.isEmpty } ?? false
         let hasContains = containsAssertions.map { !$0.isEmpty } ?? false
         let hasNot = notAssertions.map { !$0.isEmpty } ?? false
-        guard hasEquality || hasContains || hasNot else { return dict }
+        let hasSchema = schemaAssertions.map { !$0.isEmpty } ?? false
+        guard hasEquality || hasContains || hasNot || hasSchema else { return dict }
 
         var failures: [[String: Any]] = []
         if let assertions {
@@ -262,6 +293,28 @@ final class DebugSocketServer: @unchecked Sendable {
                         "kind": "not_equals",
                         "field": key,
                         "expected": expected,
+                        "actual": actual ?? NSNull()
+                    ])
+                }
+            }
+        }
+        if let schemaAssertions {
+            for (key, expectedSchema) in schemaAssertions {
+                guard let schema = expectedSchema as? String else {
+                    failures.append([
+                        "kind": "schema",
+                        "field": key,
+                        "expected": expectedSchema,
+                        "actual": "schema must be string"
+                    ])
+                    continue
+                }
+                let actual = dict[key]
+                if !matchesSchema(actual, schema: schema) {
+                    failures.append([
+                        "kind": "schema",
+                        "field": key,
+                        "expected": schema,
                         "actual": actual ?? NSNull()
                     ])
                 }
@@ -380,11 +433,13 @@ final class DebugSocketServer: @unchecked Sendable {
         let assertions = cmd["assert"] as? [String: Any]
         let containsAssertions = cmd["assert_contains"] as? [String: Any]
         let notAssertions = cmd["assert_not"] as? [String: Any]
+        let schemaAssertions = cmd["assert_schema"] as? [String: Any]
         return applyAssert(
             applyFields(withDescribe, fields: fields),
             assertions: assertions,
             containsAssertions: containsAssertions,
-            notAssertions: notAssertions
+            notAssertions: notAssertions,
+            schemaAssertions: schemaAssertions
         )
     }
 
@@ -480,7 +535,7 @@ final class DebugSocketServer: @unchecked Sendable {
         location: String
     ) -> [[String: Any]] {
         var issues: [[String: Any]] = []
-        for key in ["assert", "assert_contains", "assert_not"] {
+        for key in ["assert", "assert_contains", "assert_not", "assert_schema"] {
             guard let fields = cmd[key] as? [String: Any] else { continue }
             for field in fields.keys where !knownAssertionFields.contains(field) {
                 issues.append([
@@ -755,7 +810,8 @@ final class DebugSocketServer: @unchecked Sendable {
                     last,
                     assertions: scenario["assert"] as? [String: Any],
                     containsAssertions: scenario["assert_contains"] as? [String: Any],
-                    notAssertions: scenario["assert_not"] as? [String: Any]
+                    notAssertions: scenario["assert_not"] as? [String: Any],
+                    schemaAssertions: scenario["assert_schema"] as? [String: Any]
                 )
                 let hasError = !stepErrors.isEmpty || seqResult["error"] != nil || finalCheck["error"] != nil
                 let hasTimeout = !stepTimeouts.isEmpty || (finalCheck["timedOut"] as? Bool ?? false)
@@ -889,7 +945,8 @@ final class DebugSocketServer: @unchecked Sendable {
                 Self.applyFields(last, fields: fields),
                 assertions: assertions,
                 containsAssertions: containsAssertions,
-                notAssertions: notAssertions
+                notAssertions: notAssertions,
+                schemaAssertions: cmd["assert_schema"] as? [String: Any]
             )
             return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast, "vars": vars], describe: cmd["describe"])
         }
@@ -912,7 +969,8 @@ final class DebugSocketServer: @unchecked Sendable {
                 Self.applyFields(steps.last ?? [:], fields: fields),
                 assertions: assertions,
                 containsAssertions: containsAssertions,
-                notAssertions: notAssertions
+                notAssertions: notAssertions,
+                schemaAssertions: cmd["assert_schema"] as? [String: Any]
             )
             if cmd["return_steps"] as? Bool == true {
                 result["steps"] = steps.map { Self.applyFields($0, fields: fields) }

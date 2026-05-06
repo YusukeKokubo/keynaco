@@ -83,6 +83,7 @@ send({"reset": True})
 | sequence 中間ステップ assert | `{"sequence": [{"type_string":"kanzi","assert":{"composedHiragana":"かんじ"}}, {"key":"space","assert":{"candidateVisible":true}}]}` |
 | 部分一致 assert | `{"key":"space","assert_contains":{"candidates":"漢字"}}` / `{"assert_contains":{"candidates":["漢字","感じ"]}}` |
 | 否定 assert | `{"state":true,"assert_not":{"isAsciiMode":true}}` |
+| スキーマ assert | `{"state":true,"assert_schema":{"candidates":"array<string>","historyEnd":"int"}}` |
 | 非同期待機 | `{"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}` |
 | 複数シナリオを一括実行 | `{"test_suite":[{"name":"kanzi変換","cmds":[...],"assert":{"inserted":["漢字"]}}]}` |
 | test_suite 共通前処理/後処理 | `{"before_each":[...], "after_each":[...], "test_suite":[...]}` |
@@ -110,6 +111,10 @@ print(r["candidates"][:5])
 r = send({"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}})
 if "assertion_failed" in r:
     print("FAIL:", r["assertion_failed"])
+
+# スキーマ検証（型崩れ検知）
+r_schema = send({"state": True, "assert_schema": {"candidates": "array<string>", "historyEnd": "int"}})
+print("schema_ok?", "assertion_failed" not in r_schema)
 
 # bi-gram をシードしてから Successor を確認
 send({"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}})

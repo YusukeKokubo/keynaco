@@ -98,6 +98,7 @@ class IMEClient:
         assert_fields: dict | None = None,
         assert_contains: dict | None = None,
         assert_not: dict | None = None,
+        assert_schema: dict | None = None,
     ) -> dict:
         """文字列を一括送信してサーバー側でまとめて処理する。最終状態を返す。
         then: 末尾に続けて送る名前付きキー（"space" / "enter" 等）。
@@ -116,6 +117,8 @@ class IMEClient:
             cmd["assert_contains"] = assert_contains
         if assert_not:
             cmd["assert_not"] = assert_not
+        if assert_schema:
+            cmd["assert_schema"] = assert_schema
         return self._send_recv(cmd)
 
     def sequence(
@@ -126,6 +129,7 @@ class IMEClient:
         assert_fields: dict | None = None,
         assert_contains: dict | None = None,
         assert_not: dict | None = None,
+        assert_schema: dict | None = None,
         vars: dict | None = None,
     ) -> dict:
         """複数コマンドを1往復で一括送信する。result["steps"] に各状態、result["last"] に最終状態。"""
@@ -140,6 +144,8 @@ class IMEClient:
             cmd["assert_contains"] = assert_contains
         if assert_not:
             cmd["assert_not"] = assert_not
+        if assert_schema:
+            cmd["assert_schema"] = assert_schema
         if vars:
             cmd["vars"] = vars
         return self._send_recv(cmd)
