@@ -119,7 +119,7 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 - まず `trigram` テーブルを `(行った, 東京) × に*` で検索 → ヒットがあれば優先
 - 次に `bigram` テーブルを `東京 × に*` で検索して trigram にない候補を補完
 - ヒット例（bigram のみ）: `に` → 候補: `に` / `は` / `の`（東京の後によく続く助詞）
-- 候補リスト優先順位: ひらがな・カタカナ固定 → **予測（trigram + bigram）** → 履歴 → 辞書
+- 候補リスト優先順位: ひらがな・カタカナ固定 → ユーザー辞書 →（Zenzai ON かつ左文脈ありなら）**辞書先頭 1 行** → **予測（trigram + bigram）** → 履歴 → 残りの辞書
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 

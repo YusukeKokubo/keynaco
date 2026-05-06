@@ -1,4 +1,6 @@
 public protocol AzooKeyConverting: AnyObject, Sendable {
+    /// ユーザー設定の Zenzai 有効フラグ。モデルの実ロード状態は反映しない（ベストエフォート）。
+    var isZenzaiEnabled: Bool { get }
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String]
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String]
     func commit(reading: String, text: String)
@@ -6,6 +8,8 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
 }
 
 public extension AzooKeyConverting {
+    var isZenzaiEnabled: Bool { false }
+
     func requestCandidates(hiragana: String) -> [String] {
         requestCandidates(hiragana: hiragana, leftSideContext: nil, richCandidates: false)
     }

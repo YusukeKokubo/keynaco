@@ -4,8 +4,8 @@ import Foundation
 /// `candidatesForSegment` を常に空にし `inferSegmentBoundaries` を失敗させる。`segmentize` だけ
 /// `わたしはがくせい` 用の文節分割を返し、先頭文節への LLM 全文挿入フォールバックのテストを辞書非依存にする。
 final class LLMFallbackForcingMockAzoo: AzooKeyConverting, @unchecked Sendable {
-    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
-        _ = (hiragana, leftSideContext)
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = (hiragana, leftSideContext, richCandidates)
         return []
     }
     func commit(reading: String, text: String) {}

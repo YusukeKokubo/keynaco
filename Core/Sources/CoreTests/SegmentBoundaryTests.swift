@@ -6,8 +6,10 @@ import XCTest
 private final class SegmentBoundaryMockAzooKey: AzooKeyConverting, @unchecked Sendable {
     var segmentCandidates: [String: [String]] = [:]
 
-    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = hiragana
         _ = leftSideContext
+        _ = richCandidates
         return []
     }
 

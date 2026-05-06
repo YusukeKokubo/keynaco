@@ -7,8 +7,9 @@ final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
     private(set) var requestCount = 0
     private(set) var lastLeftContext: String?
 
-    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
         _ = hiragana
+        _ = richCandidates
         lastLeftContext = leftSideContext
         requestCount += 1
         return ["テスト"]

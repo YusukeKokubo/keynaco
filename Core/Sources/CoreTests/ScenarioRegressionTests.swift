@@ -7,8 +7,9 @@ import XCTest
 // MARK: - S-01 用モック（2 文節に分割し「漢字」が選ばれる）
 
 private final class ScenarioS01KanjiMockConverter: AzooKeyConverting {
-    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
         _ = leftSideContext
+        _ = richCandidates
         return hiragana == "かんじ" ? ["漢字"] : ["□"]
     }
 

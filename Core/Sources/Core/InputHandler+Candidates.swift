@@ -223,15 +223,25 @@ public extension InputHandler {
         let predictRaw = Self.merged(trigramRaw, bigramRaw, skipBigramRaw)
 
         let historySeen = Set(historyScored.map(\.output))
-        let azooKeyUniq = azooKeyCandidates.filter { !historySeen.contains($0) }
+        // ユーザー設定 ON かつ左文脈ありのときのみ先頭を後段でユーザー辞書直後へ固定挿入（辞書 top-1。モデル未ロードでもフラグは true になり得る）。
+        let zenzaiPromoted: String? = {
+            guard azooKeyConverter.isZenzaiEnabled,
+                  azooKeyLeftContext != nil,
+                  let top1 = azooKeyCandidates.first else { return nil }
+            return top1
+        }()
+        let azooKeyUniq = azooKeyCandidates.filter {
+            !historySeen.contains($0) && $0 != zenzaiPromoted
+        }
         var candidates = highHistory + azooKeyUniq
-        let candidateSeen = historySeen.union(azooKeyUniq)
+        let candidateSeen = historySeen.union(Set(azooKeyCandidates))
         let uniquePredictions = predictRaw.filter { !candidateSeen.contains($0) }
         candidates.insert(contentsOf: uniquePredictions, at: 0)
         let predictCount = uniquePredictions.count
 
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
+        // azooKeyCandidates が空なら zenzaiPromoted も nil（先頭候補が要る）のため、この dismiss と Zenzai 挿入は排他。
         if autoShow && totalHistoryCount == 0 && azooKeyCandidates.isEmpty && predictCount == 0
             && userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
             return .dismiss
@@ -271,8 +281,16 @@ public extension InputHandler {
         let userDictCount = uniqueUserDict.count
         let fixedEnd = fixedCount + userDictCount
 
-        let historyEnd = fixedEnd + predictCount + highHistoryCount
-        let predictionEnd = fixedEnd + predictCount
+        var zenzaiTop1Count = 0
+        if let top1 = zenzaiPromoted, !uniqueUserDict.contains(top1) {
+            candidates.insert(top1, at: fixedEnd)
+            zenzaiTop1Count = 1
+            insertedSet.insert(top1)
+        }
+        let adjustedFixedEnd = fixedEnd + zenzaiTop1Count
+
+        let historyEnd = adjustedFixedEnd + predictCount + highHistoryCount
+        let predictionEnd = adjustedFixedEnd + predictCount
         let uniqueNumberCandidates = numberCandidates.filter { insertedSet.insert($0).inserted }
         let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
         candidates.insert(contentsOf: uniqueNumberCandidates, at: historyEnd)
@@ -289,7 +307,7 @@ public extension InputHandler {
         guard !candidates.isEmpty else { return .dismiss }
 
         return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
-                     predictionEnd: predictionEnd, fixedEnd: fixedEnd)
+                     predictionEnd: predictionEnd, fixedEnd: adjustedFixedEnd)
     }
 
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。

@@ -43,12 +43,12 @@
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### fixedEnd
-`fixedEnd = fixedCount + userDictCount`。カナ固定 + ユーザー辞書行の末尾インデックス。
-`fixedEnd` 未満の行は Shift+Delete 削除不可（ユーザー辞書は誤削除から保護）。
+カナ固定 + ユーザー辞書 +（条件付き）**Zenzai top-1 プロモート 1 行**の直後のインデックス（末尾+1）。内部では `fixedCount + userDictCount` にプロモート行があれば +1 した値が `CandidateAction.fixedEnd` として返る。
+`fixedEnd` 未満の行は Shift+Delete 削除不可（ユーザー辞書・プロモート行は誤削除から保護）。
 
 ### historyEnd
-候補リスト内の「カナ固定 + ユーザー辞書 + 予測候補 + **高スコア**履歴候補」セクションの末尾インデックス（時間減衰スコア `recencyExpr` が閾値 **未満**の履歴は含めない）。
-`historyEnd = fixedEnd + predictCount + highHistoryCount`（`highHistoryCount` は閾値以上の履歴件数）。
+候補リスト内の「カナ固定 + ユーザー辞書 +（あれば）Zenzai top-1 + 予測候補 + **高スコア**履歴候補」セクションの末尾インデックス（時間減衰スコア `recencyExpr` が閾値 **未満**の履歴は含めない）。
+`historyEnd = fixedEnd + predictCount + highHistoryCount`（この式の `fixedEnd` は `CandidateAction` に返すプロモート込みの値。`highHistoryCount` は閾値以上の履歴件数）。
 `fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。
 閾値未満の履歴は数値・日時・AzooKey の**後**に続くため、この範囲外になり Shift+Delete 不可（辞書候補と同様の扱い）。
 
@@ -70,13 +70,14 @@
 
 ### 候補優先順位
 1. ひらがな / カタカナ（`fixedCount` 件）
-2. ユーザー辞書（完全一致 + 前方一致。`fixedEnd = fixedCount + userDictCount`）
-3. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWords(n: 2)` の各語 × 現読みで skip-bigram を引き（近い内容語の結果を先）、`merged` で重複除去のうえ trigram・bigram にない候補を末尾に追加）
-4. 履歴（`fetchHistoryScoredMerged`：exact → prefix 重複除去。スコアが閾値**以上**の行のみこのブロックに置く。閾値**未満**は 7 の直前に回す）
-5. 数字候補（`generateNumberCandidates`、数字のみ読みのとき。`historyEnd` 直後に挿入）
-6. 日時候補（`きょう` / `いま` 等のとき。数字候補の直後に挿入）
-7. AzooKey 辞書候補
-8. 低スコア履歴（同じく `fetchHistoryScoredMerged` 由来。閾値未満の行を重複除外して末尾に追記）
+2. ユーザー辞書（完全一致 + 前方一致）
+3. **Zenzai top-1**（Zenzai 設定 ON かつ左文脈ありのときのみ、ユーザー辞書の直後に辞書先頭候補を 1 行。設定フラグはモデル未ロード時も true になり得る）
+4. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWords(n: 2)` の各語 × 現読みで skip-bigram を引き（近い内容語の結果を先）、`merged` で重複除去のうえ trigram・bigram にない候補を末尾に追加。辞書先頭と同じ表層は予測から除外）
+5. 履歴（`fetchHistoryScoredMerged`：exact → prefix 重複除去。スコアが閾値**以上**の行のみこのブロックに置く。閾値**未満**は 8 の直前に回す）
+6. 数字候補（`generateNumberCandidates`、数字のみ読みのとき。`historyEnd` 直後に挿入）
+7. 日時候補（`きょう` / `いま` 等のとき。数字候補の直後に挿入）
+8. AzooKey 辞書候補（プロモート済み先頭は除外）
+9. 低スコア履歴（同じく `fetchHistoryScoredMerged` 由来。閾値未満の行を重複除外して末尾に追記）
 
 ### 括弧モード（isBracketMode）
 `[` / `(` 等の括弧キーを**待機中**（組成空）に入力したとき、対応する全角括弧の候補ウィンドウを表示するモード（`bracketCandidates != nil`）。  

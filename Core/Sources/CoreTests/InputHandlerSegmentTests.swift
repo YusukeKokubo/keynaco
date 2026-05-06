@@ -551,8 +551,8 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
 // MARK: - boundary_pref LLM 保存テスト用 AzooKey スタブ
 
 private final class BoundaryPrefLLMMockKyouHaii: AzooKeyConverting, @unchecked Sendable {
-    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
-        _ = (hiragana, leftSideContext)
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = (hiragana, leftSideContext, richCandidates)
         return []
     }
     func commit(reading: String, text: String) {}
@@ -579,8 +579,8 @@ private final class BoundaryPrefLLMMockKyouHaii: AzooKeyConverting, @unchecked S
 }
 
 private final class BoundaryPrefLLMMockTesutoOnePair: AzooKeyConverting, @unchecked Sendable {
-    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
-        _ = (hiragana, leftSideContext)
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = (hiragana, leftSideContext, richCandidates)
         return []
     }
     func commit(reading: String, text: String) {}

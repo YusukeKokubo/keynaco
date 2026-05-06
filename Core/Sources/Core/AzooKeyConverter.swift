@@ -9,6 +9,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
     private let baseOptions: ConvertRequestOptions
     private let memoryURL: URL
     private let zenzaiEnabled: Bool
+
+    /// ユーザー設定の Zenzai 有効フラグ。モデル URL 未取得などで実リランキングがフォールバックしていても `true` になり得る（ベストエフォート。プロモート行は辞書 top-1）。
+    public var isZenzaiEnabled: Bool { zenzaiEnabled }
     private let zenzaiProfile: String
     private let zenzaiInferenceLimit: Int
     private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }

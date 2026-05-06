@@ -607,3 +607,112 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertTrue(candidates.contains { $0.hasSuffix("日") }, "日本語日付が候補に含まれるはず")
     }
 }
+
+// MARK: - Zenzai top-1 プロモート（PLAN260506）
+
+private final class ZenzaiPromoteTestMockAzooKey: AzooKeyConverting, @unchecked Sendable {
+    var candidateLines: [String] = ["表層先頭", "表層2番目"]
+    var isZenzaiEnabled = true
+
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = hiragana
+        _ = leftSideContext
+        _ = richCandidates
+        return candidateLines
+    }
+
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = (reading, leftSideContext)
+        return []
+    }
+
+    func commit(reading: String, text: String) { _ = (reading, text) }
+
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = (hiragana, leftSideContext)
+        return []
+    }
+}
+
+final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
+    private var zenzaiMock: ZenzaiPromoteTestMockAzooKey!
+
+    override func setUp() {
+        super.setUp()
+        zenzaiMock = ZenzaiPromoteTestMockAzooKey()
+        handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: zenzaiMock)
+    }
+
+    func testZenzaiPromotedTop1AfterUserDictIncreasesFixedEnd() {
+        let top1 = zenzaiMock.candidateLines[0]
+        handler.leftSideContext = "左文脈"
+        type(chars: "a", base: "a")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        XCTAssertEqual(candidates[fixedEnd - 1], top1, "ユーザー辞書直後の 1 行が top-1")
+        XCTAssertGreaterThanOrEqual(fixedEnd, 3, "ひらがな+カタカナ固定2 + プロモート1 で fixedEnd は少なくとも3")
+    }
+
+    func testZenzaiPromotedRowIsBelowFixedEndForShiftDelete() {
+        handler.leftSideContext = "ctx"
+        type(chars: "a", base: "a")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(_, _, _, _, let fixedEnd) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        let promotedRow = fixedEnd - 1
+        XCTAssertLessThan(promotedRow, fixedEnd, "プロモート行は Shift+Delete 可能帯の外（index < fixedEnd）")
+    }
+
+    func testZenzaiPromotedTop1SingleOccurrenceAsideFromHistoryDup() {
+        let top1 = zenzaiMock.candidateLines[0]
+        handler.leftSideContext = "ctx"
+        type(chars: "a", base: "a")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(candidates.filter { $0 == top1 }.count, 1, "辞書ブロックに top-1 が重複して現れない（履歴二重は未設定のため全体でも1回）")
+    }
+
+    func testZenzaiPromotedTop1ExcludedFromPredictionBlockWhenBigramMatches() {
+        let top1 = "予測と同じ"
+        zenzaiMock.candidateLines = [top1, "辞書だけ"]
+        handler.leftSideContext = "前文"
+        handler.committedHistory = ["東京"]
+        handler.db.recordBigram(prev: "東京", input: "てすと", output: top1)
+        handler.db.recordBigram(prev: "東京", input: "てすと", output: "予測だけ別語")
+        typeRomaji("tesuto")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, let predictionEnd, let fixedEnd) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        let predictionSlice = candidates[fixedEnd..<predictionEnd]
+        XCTAssertFalse(predictionSlice.contains(top1), "予測ゾーンに top-1 と同じ表層を出さない: \(predictionSlice)")
+    }
+
+    func testZenzaiPromoteSkippedWhenDisabled() {
+        let top1 = zenzaiMock.candidateLines[0]
+        zenzaiMock.isZenzaiEnabled = false
+        handler.leftSideContext = "ctx"
+        type(chars: "a", base: "a")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+            XCTFail(".show"); return
+        }
+        XCTAssertNotEqual(candidates[fixedEnd - 1], top1, "Zenzai オフ時は top-1 を固定位置に挿入しない")
+    }
+
+    func testZenzaiPromoteSkippedWhenNoLeftContext() {
+        let top1 = zenzaiMock.candidateLines[0]
+        handler.leftSideContext = ""
+        type(chars: "a", base: "a")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+            XCTFail(".show"); return
+        }
+        XCTAssertNotEqual(candidates[fixedEnd - 1], top1, "左文脈なしでは固定位置に top-1 を置かない")
+    }
+}
