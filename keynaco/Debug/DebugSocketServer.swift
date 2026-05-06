@@ -280,6 +280,100 @@ final class DebugSocketServer: @unchecked Sendable {
         return result
     }
 
+    private static func valueByPath(_ root: Any, path: String) -> Any? {
+        if path.isEmpty { return root }
+        let parts = path.split(separator: ".").map(String.init)
+        var current: Any? = root
+        for part in parts {
+            switch current {
+            case let dict as [String: Any]:
+                if let next = dict[part] {
+                    current = next
+                } else if let state = dict["state"] as? [String: Any], let next = state[part] {
+                    // assertion_failed ラップのときは state を暗黙フォールバックとして見る
+                    current = next
+                } else {
+                    return nil
+                }
+            case let array as [Any]:
+                guard let idx = Int(part), array.indices.contains(idx) else { return nil }
+                current = array[idx]
+            default:
+                return nil
+            }
+        }
+        return current
+    }
+
+    private static func resolveTemplateString(_ raw: String, vars: [String: Any]) -> Any {
+        let pattern = #"\{\{([a-zA-Z0-9_.-]+)\}\}"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return raw }
+        let nsRaw = raw as NSString
+        let matches = regex.matches(in: raw, range: NSRange(location: 0, length: nsRaw.length))
+        guard !matches.isEmpty else { return raw }
+
+        // 文字列全体が {{var}} なら、型を保ったまま置換
+        if matches.count == 1, let m = matches.first, m.range.location == 0, m.range.length == nsRaw.length {
+            let key = nsRaw.substring(with: m.range(at: 1))
+            return valueByPath(vars, path: key) ?? raw
+        }
+
+        // 部分置換は文字列化して差し込む
+        var replaced = raw
+        for m in matches.reversed() {
+            let key = nsRaw.substring(with: m.range(at: 1))
+            let replacement = valueByPath(vars, path: key).map { jsonString($0) } ?? ""
+            if let range = Range(m.range, in: replaced) {
+                replaced.replaceSubrange(range, with: replacement)
+            }
+        }
+        return replaced
+    }
+
+    private static func resolveVars(in value: Any, vars: [String: Any]) -> Any {
+        switch value {
+        case let dict as [String: Any]:
+            var out: [String: Any] = [:]
+            for (k, v) in dict {
+                out[k] = resolveVars(in: v, vars: vars)
+            }
+            return out
+        case let array as [Any]:
+            return array.map { resolveVars(in: $0, vars: vars) }
+        case let str as String:
+            return resolveTemplateString(str, vars: vars)
+        default:
+            return value
+        }
+    }
+
+    private static func applyCapture(
+        _ capture: Any?,
+        from result: [String: Any],
+        vars: inout [String: Any]
+    ) -> [String: Any] {
+        var captured: [String: Any] = [:]
+
+        func capturePath(alias: String, path: String) {
+            guard let value = valueByPath(result, path: path) else { return }
+            vars[alias] = value
+            captured[alias] = value
+        }
+
+        if let list = capture as? [String] {
+            for path in list {
+                capturePath(alias: path, path: path)
+            }
+        } else if let map = capture as? [String: Any] {
+            for (alias, rawPath) in map {
+                if let path = rawPath as? String {
+                    capturePath(alias: alias, path: path)
+                }
+            }
+        }
+        return captured
+    }
+
     private static func finalize(_ dict: [String: Any], cmd: [String: Any]) -> [String: Any] {
         let withDescribe = applyDescribe(dict, describe: cmd["describe"])
         let fields = cmd["fields"] as? [String]
@@ -377,7 +471,8 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private static let knownCommandKeys: Set<String> = [
         "reset", "state", "wait_until", "seed_bigram", "seed_history",
-        "test_suite", "sequence", "type_string", "key", "keyCode",
+        "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
+        "capture", "vars",
     ]
 
     private static func lintAssertionKeys(
@@ -430,6 +525,16 @@ final class DebugSocketServer: @unchecked Sendable {
                         "severity": "error",
                         "location": location,
                         "message": "wait_until requires equals/contains/minCount"
+                    ])
+                }
+            }
+            if let capture = command["capture"] {
+                let validCapture = (capture as? [String]) != nil || (capture as? [String: Any]) != nil
+                if !validCapture {
+                    issues.append([
+                        "severity": "error",
+                        "location": location,
+                        "message": "capture must be array<string> or object<string,string>"
                     ])
                 }
             }
@@ -559,6 +664,7 @@ final class DebugSocketServer: @unchecked Sendable {
         // {"test_suite": [{"name":"...", "cmds":[...], "assert": {...}}, ...]}
         if let suite = cmd["test_suite"] as? [[String: Any]] {
             let defaultUseRealDB = cmd["useRealDB"] as? Bool ?? false
+            let globalVars = cmd["vars"] as? [String: Any] ?? [:]
             let globalBeforeEach = cmd["before_each"] as? [[String: Any]] ?? []
             let globalAfterEach = cmd["after_each"] as? [[String: Any]] ?? []
             let failFast = cmd["fail_fast"] as? Bool ?? false
@@ -608,6 +714,11 @@ final class DebugSocketServer: @unchecked Sendable {
 
                 var seqCmd: [String: Any] = ["sequence": combined]
                 if let fields = scenario["fields"] as? [String] { seqCmd["fields"] = fields }
+                var scenarioVars = globalVars
+                if let localVars = scenario["vars"] as? [String: Any] {
+                    for (k, v) in localVars { scenarioVars[k] = v }
+                }
+                if !scenarioVars.isEmpty { seqCmd["vars"] = scenarioVars }
                 let seqResult = processCommand(seqCmd)
                 let steps = seqResult["steps"] as? [[String: Any]] ?? []
                 let failedSteps = steps.filter { $0["assertion_failed"] != nil }.count
@@ -731,6 +842,9 @@ final class DebugSocketServer: @unchecked Sendable {
                 if scenario["return_steps"] as? Bool == true {
                     result["steps"] = steps
                 }
+                if scenario["return_vars"] as? Bool == true, let seqVars = seqResult["vars"] {
+                    result["vars"] = seqVars
+                }
                 if let err = seqResult["error"] { result["error"] = err }
                 scenarios.append(result)
                 if failFast && !ok { break }
@@ -752,9 +866,22 @@ final class DebugSocketServer: @unchecked Sendable {
             let assertions = cmd["assert"]     as? [String: Any]
             let containsAssertions = cmd["assert_contains"] as? [String: Any]
             let notAssertions = cmd["assert_not"] as? [String: Any]
+            var vars = cmd["vars"] as? [String: Any] ?? [:]
             var steps: [[String: Any]] = []
-            for step in seq {
-                steps.append(processCommand(step))
+            for rawStep in seq {
+                let resolvedAny = Self.resolveVars(in: rawStep, vars: vars)
+                guard var resolvedStep = resolvedAny as? [String: Any] else {
+                    steps.append(["error": "invalid step command"])
+                    continue
+                }
+                let captureSpec = resolvedStep["capture"]
+                resolvedStep.removeValue(forKey: "capture")
+                var result = processCommand(resolvedStep)
+                let captured = Self.applyCapture(captureSpec, from: result, vars: &vars)
+                if !captured.isEmpty {
+                    result["captured"] = captured
+                }
+                steps.append(result)
             }
             let last = steps.last ?? [:]
             let filteredSteps = steps.map { Self.applyFields($0, fields: fields) }
@@ -764,7 +891,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 containsAssertions: containsAssertions,
                 notAssertions: notAssertions
             )
-            return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast], describe: cmd["describe"])
+            return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast, "vars": vars], describe: cmd["describe"])
         }
 
         // {"type_string": "kanzi"} — 文字列を1文字ずつ送信。最終状態を返す（return_steps: true で全ステップも付加）

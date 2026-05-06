@@ -126,6 +126,7 @@ class IMEClient:
         assert_fields: dict | None = None,
         assert_contains: dict | None = None,
         assert_not: dict | None = None,
+        vars: dict | None = None,
     ) -> dict:
         """複数コマンドを1往復で一括送信する。result["steps"] に各状態、result["last"] に最終状態。"""
         cmd: dict = {"sequence": list(cmds)}
@@ -139,6 +140,8 @@ class IMEClient:
             cmd["assert_contains"] = assert_contains
         if assert_not:
             cmd["assert_not"] = assert_not
+        if vars:
+            cmd["vars"] = vars
         return self._send_recv(cmd)
 
     def test_suite(
@@ -149,6 +152,7 @@ class IMEClient:
         before_each: list[dict] | None = None,
         after_each: list[dict] | None = None,
         fail_fast: bool = False,
+        vars: dict | None = None,
     ) -> dict:
         """複数シナリオを自動 reset 付きで一括実行する。"""
         cmd: dict = {"test_suite": list(scenarios)}
@@ -162,6 +166,8 @@ class IMEClient:
             cmd["after_each"] = after_each
         if fail_fast:
             cmd["fail_fast"] = True
+        if vars:
+            cmd["vars"] = vars
         return self._send_recv(cmd)
 
     def wait_until(

@@ -89,6 +89,8 @@ send({"reset": True})
 | test_suite fail-fast | `{"test_suite":[...], "fail_fast": true}`（最初の失敗で打ち切り） |
 | 失敗/タイムアウト期待 | `{"test_suite":[{"expect_error":true, ...}]}` / `{"expect_timeout":true, ...}` |
 | スイートの静的検証 | `{"lint_suite":[...], "before_each":[...]}`（実行せずに問題点を返す） |
+| 変数展開（再利用） | `{"sequence":[...], "vars":{"needle":"漢字"}}` と `{{needle}}` |
+| ステップ結果の capture | `{"capture":{"top":"selectedText","h":"historyEnd"}}`（`sequence` の `vars` に保存） |
 | 名前付きキー | `{"key": "space"}` / `{"key": "enter"}` / `{"key": "down"}` 等 |
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
 | フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
@@ -122,6 +124,13 @@ r = send({"sequence": [
     {"key": "enter"},
 ]})
 print(r["last"]["inserted"])
+
+# capture/reuse: 途中結果を変数化して後続ステップで再利用
+r2 = send({"sequence": [
+    {"type_string": "kanzi", "then": "space", "capture": {"picked": "selectedText"}},
+    {"key": "enter", "assert_contains": {"inserted": "{{picked}}"}}
+]})
+print(r2["vars"])  # {"picked": "..."}
 
 # test_suite: シナリオごとに自動 reset → cmds 実行 → 最終 assert
 suite = send({"test_suite": [
