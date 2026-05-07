@@ -21,6 +21,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 |------|------|
 | `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
 | `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 6 ファイル。Zenzai タブ含む） |
+| `keynaco/Resources/` | バンドルリソース（`zenz-v3.1-small-gguf/` = Zenzai モデル git submodule） |
 | `keynaco/PresetBigram/` | `preset_bigram.csv`（プリセット Bi-gram バンドルリソース） |
 | `keynaco/Debug/` | デバッグ用ツール（`EventViewerWindow` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
@@ -51,6 +52,13 @@ xcodebuild build -scheme keynaco -configuration Debug
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
 - バージョン番号は git tag で管理。`git tag v0.1.0` → ビルド時に `CFBundleShortVersionString` / `CFBundleVersion` に自動注入（post-action が `PlistBuddy` で書き換え）。`PlistBuddy` 後は署名が無効化されるため、post-action の最後で `codesign --force --deep --sign` による再署名が必須（無いと macOS 26 が SIGKILL でプロセスを落とす）
 - 初回セットアップ: `sudo chmod -R +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_child,delete,read,write,execute" "/Library/Input Methods"` が必要（所有者を root のまま ACL で自分にだけ権限を付与）
+- **Zenzai モデルのセットアップ**: `keynaco/Resources/zenz-v3.1-small-gguf/` は HuggingFace の git submodule（LFS 管理）。初回 clone 後に以下が必要:
+  ```bash
+  brew install git-lfs && git lfs install
+  git submodule update --init
+  git -C keynaco/Resources/zenz-v3.1-small-gguf lfs pull
+  ```
+  モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る（Xcode プロジェクトからリソース参照を削除した場合）
 - `~/Library/Input Methods/` は使わない（入力ソースが重複登録される）
 - 初回インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
 - 起動のたびに `TISRegisterInputSource` を呼んで入力ソースを自動登録する。初回のみログアウト→ログインが必要（TIS がキャッシュを更新するため）
