@@ -25,6 +25,17 @@
 
 ---
 
+## S-01b: nn 直後の Space（hidden pending n）
+
+**入力**: `n` `n` Space
+
+- `nn` のあと: 表示は「ん」、`composedHiragana` は「ん」、内部は pending `n` と `hiddenPendingN` が立つ（`finalizedText` は「ん」のみ）。
+- Space: `absorbPendingIntoComposed()` で pending を捨て、**`composedHiragana` を「んん」に増やさない**（Enter 確定と同じ意味）。短い読みでセグメント分割できない場合は通常の候補表示へ。
+
+*Tests: `Core/Sources/CoreTests/InputHandlerHiddenPendingNTests.swift`*
+
+---
+
 ## S-02: 候補選択（↑↓）と右矢印確定
 
 **入力**: `k` `a` ↓ ↓ →

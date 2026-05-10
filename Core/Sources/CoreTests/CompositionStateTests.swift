@@ -153,6 +153,31 @@ final class CompositionStateTests: XCTestCase {
         XCTAssertEqual(s.finalizedText, "あ")
     }
 
+    // MARK: - absorbPendingIntoComposed
+
+    func testAbsorbPendingIntoComposedAfterNNDiscardsHiddenN() {
+        var s = CompositionState()
+        _ = s.addRomaji("n")
+        _ = s.addRomaji("n")
+        XCTAssertTrue(s.hiddenPendingN)
+        XCTAssertEqual(s.composedHiragana, "ん")
+        s.absorbPendingIntoComposed()
+        XCTAssertEqual(s.composedHiragana, "ん")
+        XCTAssertEqual(s.pendingRomaji, "")
+        XCTAssertFalse(s.hiddenPendingN)
+    }
+
+    func testAbsorbPendingIntoComposedForceFinalizesWhenNotHidden() {
+        var s = CompositionState()
+        _ = s.addRomaji("k")
+        _ = s.addRomaji("a")
+        _ = s.addRomaji("n")
+        XCTAssertFalse(s.hiddenPendingN)
+        s.absorbPendingIntoComposed()
+        XCTAssertEqual(s.composedHiragana, "かん")
+        XCTAssertEqual(s.pendingRomaji, "")
+    }
+
     // MARK: - isShiftInput
 
     func testIsShiftInput() {

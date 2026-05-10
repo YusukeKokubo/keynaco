@@ -28,6 +28,18 @@ public struct CompositionState {
         hiddenPendingN ? composedHiragana : composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
     }
 
+    /// `pendingRomaji` を `composedHiragana` へ取り込む。`hiddenPendingN` のときは `finalizedText` と同じく捨てるだけ。
+    public mutating func absorbPendingIntoComposed() {
+        guard !pendingRomaji.isEmpty else { return }
+        if hiddenPendingN {
+            pendingRomaji = ""
+            hiddenPendingN = false
+        } else {
+            composedHiragana += RomajiConverter.forceFinalize(pendingRomaji)
+            pendingRomaji = ""
+        }
+    }
+
     /// ローマ字を追加してひらがなに変換する。
     /// - Returns: 候補リフレッシュが必要かどうか
     public mutating func addRomaji(_ chars: String) -> Bool {
@@ -37,9 +49,7 @@ public struct CompositionState {
             ($0.value >= 0x61 && $0.value <= 0x7A) || $0.value == 0x2D  // a-z or "-"
         }
         if !isRomajiChar && !pendingRomaji.isEmpty {
-            composedHiragana += RomajiConverter.forceFinalize(pendingRomaji)
-            pendingRomaji = ""
-            hiddenPendingN = false
+            absorbPendingIntoComposed()
         }
         // "nn" 後の hidden n の扱い:
         // - n が続く: hidden n を破棄して新しい n を受ける（konnna 対策）

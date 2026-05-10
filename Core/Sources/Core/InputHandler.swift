@@ -306,10 +306,7 @@ public struct InputHandler {
             segmentLLMTrigger = .none
         }
         guard !state.composingText.isEmpty else { return false }
-        if !state.pendingRomaji.isEmpty {
-            state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-            state.pendingRomaji = ""
-        }
+        state.absorbPendingIntoComposed()
         let hiragana = state.composedHiragana
         let text: String
         switch keyCode {

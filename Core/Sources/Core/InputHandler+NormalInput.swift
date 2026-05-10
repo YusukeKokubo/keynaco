@@ -53,9 +53,7 @@ public extension InputHandler {
     // MARK: - Private input handlers
 
     private mutating func flushPendingRomaji() {
-        guard !state.pendingRomaji.isEmpty else { return }
-        state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-        state.pendingRomaji = ""
+        state.absorbPendingIntoComposed()
     }
 
     private mutating func commitZSequence(special: String, client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {

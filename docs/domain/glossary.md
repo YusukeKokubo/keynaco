@@ -29,6 +29,10 @@
 `composedHiragana + pendingRomaji` の組み合わせ。未確定文字列全体を表す。  
 **不変条件**: どちらかが非空なら「組成中」状態。両方が空なら「待機」状態。
 
+### hiddenPendingN
+`nn`（連続 `n`）直後、内部的には `composedHiragana` に「ん」＋ pending `"n"` だが、**表示**と**確定**（`finalizedText`）では pending の `n` を使わない（「ん」1文字）ためのフラグ。  
+Space や句読点の前に pending を `composedHiragana` へ取り込む処理（`absorbPendingIntoComposed`）でも同じく、hidden 時は pending を捨てる。
+
 ### 組成テキスト（markedText）
 アプリに送る下線付きの未確定文字列。`composedHiragana + pendingRomaji` を連結した表示用文字列。  
 **注意**: 空文字を渡すと Electron 系アプリが IME を非アクティブと誤認する。

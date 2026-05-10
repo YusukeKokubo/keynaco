@@ -8,10 +8,7 @@ import AppKit
 public extension InputHandler {
 
     public mutating func enterSegmentMode() -> CandidateAction {
-        if !state.pendingRomaji.isEmpty {
-            state.composedHiragana += RomajiConverter.forceFinalize(state.pendingRomaji)
-            state.pendingRomaji = ""
-        }
+        state.absorbPendingIntoComposed()
         let fullReading = state.composedHiragana
 
         // 全 ASCII（数字・英単語）はセグメント変換しない。
