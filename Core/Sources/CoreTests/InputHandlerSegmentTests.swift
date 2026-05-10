@@ -1,6 +1,59 @@
 import XCTest
 @testable import KeynacoCore
 
+/// segmentize の clause 辞書と `candidatesForSegment`（main）を意図的にずらす。
+/// 右矢印で `がくせい` をリビルドするとき、デフォルト `initialIndex` が短い候補になるケースを再現する。
+private final class SegmentRebuildDictMismatchMockAzoo: AzooKeyConverting, @unchecked Sendable {
+    var isZenzaiEnabled: Bool { false }
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = (hiragana, leftSideContext, richCandidates)
+        return []
+    }
+    func commit(reading: String, text: String) {}
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = leftSideContext
+        if reading == "がくせい" {
+            return ["がく", "学生"]
+        }
+        return []
+    }
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = leftSideContext
+        guard hiragana == "わたしはがくせい" else { return [] }
+        return [
+            ("わたし", []),
+            ("は", []),
+            ("がくせい", [])
+        ]
+    }
+}
+
+/// `preserved` がリビルド後リストに無いときフォールバックする経路（クラッシュなし・決定的な確定）。
+private final class SegmentRebuildPreservedMissingMockAzoo: AzooKeyConverting, @unchecked Sendable {
+    var isZenzaiEnabled: Bool { false }
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = (hiragana, leftSideContext, richCandidates)
+        return []
+    }
+    func commit(reading: String, text: String) {}
+    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
+        _ = leftSideContext
+        if reading == "がくせい" {
+            return ["がく"]
+        }
+        return []
+    }
+    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        _ = leftSideContext
+        guard hiragana == "わたしはがくせい" else { return [] }
+        return [
+            ("わたし", []),
+            ("は", []),
+            ("がくせい", ["ONLY_INITIAL_SURFACE"])
+        ]
+    }
+}
+
 // See: docs/domain/states.md#セグメントモード
 // See: docs/domain/glossary.md#セグメントモードsegmentmode
 
@@ -353,5 +406,67 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         XCTAssertNotNil(entry, "手動調整セグメントを含む bigram が記録されるはず")
         XCTAssertGreaterThanOrEqual(entry?.count ?? 0, 2,
                                     "手動調整（isManuallyAdjusted）により bigram は通常1回に加え1回ブーストされ count が 2 以上になるはず")
+    }
+
+    // MARK: - 右矢印リビルド時の selectedText 保持（segmentize / candidatesForSegment の不一致）
+
+    func testSegmentRightArrowPreservesReadingWhenRebuildDictOrderDiffers() {
+        setUpWithConverter(SegmentRebuildDictMismatchMockAzoo())
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss0 = handler.state.segmentState,
+              ss0.segments.count >= 3 else {
+            XCTFail("3文節セグメントモードになるはず")
+            return
+        }
+
+        XCTAssertEqual(ss0.segments[2].reading, "がくせい")
+        XCTAssertEqual(ss0.segments[2].selectedText, "がくせい",
+                       "clause 辞書が空なら読みのひらがな行が既定であるはず")
+
+        press(keyCode: 124)  // → は
+        press(keyCode: 124)  // → がくせい（リビルド）
+
+        guard let ss1 = handler.state.segmentState, ss1.focusedIndex == 2 else {
+            XCTFail("フォーカスが第3文節にあるはず")
+            return
+        }
+        XCTAssertEqual(ss1.segments[2].selectedText, "がくせい",
+                       "リビルド後も読み全文の表層を保持する（欠落バグの修正）")
+
+        press(keyCode: 36, candidateVisible: true, selectedRow: ss1.segments[2].selectedIndex,
+              selectedText: ss1.segments[2].selectedText)
+        XCTAssertEqual(client.inserted.last, "わたしはがくせい",
+                       "Enter で全節連結が読みどおり確定するはず")
+    }
+
+    func testSegmentRightArrowRebuildFallbackWhenPreservedSurfaceMissing() {
+        setUpWithConverter(SegmentRebuildPreservedMissingMockAzoo())
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode,
+              let ss0 = handler.state.segmentState,
+              ss0.segments.count >= 3 else {
+            XCTFail("3文節セグメントモードになるはず")
+            return
+        }
+
+        XCTAssertEqual(ss0.segments[2].selectedText, "ONLY_INITIAL_SURFACE")
+
+        press(keyCode: 124)
+        press(keyCode: 124)
+
+        guard let ss1 = handler.state.segmentState, ss1.focusedIndex == 2 else {
+            XCTFail("フォーカスが第3文節にあるはず")
+            return
+        }
+        XCTAssertEqual(ss1.segments[2].selectedText, "がく",
+                       "preserved が候補に無いときは buildSegmentCandidates の既定選択にフォールバック")
+
+        press(keyCode: 36, candidateVisible: true, selectedRow: ss1.segments[2].selectedIndex,
+              selectedText: ss1.segments[2].selectedText)
+        XCTAssertEqual(client.inserted.last, "わたしはがく",
+                       "フォールバックでも確定が破綻しない")
     }
 }

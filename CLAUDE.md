@@ -30,10 +30,19 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `keynaco.xcodeproj` | Xcode プロジェクト（リポジトリ管理。ローカル SPM で `Core/` を参照） |
 | `docs/domain/` | ドメイン知識ドキュメント（用語・状態遷移・シナリオ） |
 | `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` 形式） |
-| `scripts/` | 開発用スクリプト（`generate_preset_bigram_csv.py` 等） |
+| `scripts/` | 開発用スクリプト（下記参照） |
 | `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
 | `LocalPackages/` | Xcode ローカルパッケージ参照（`keynacoCore/`）。Xcode が管理するため手動編集不要 |
+
+### スクリプト一覧（`scripts/`）
+
+| スクリプト | 用途 |
+|-----------|------|
+| `generate_preset_bigram_csv.py` | `preset_bigram.csv` 生成 |
+| `debug_ime.py` | デバッグソケットの Python クライアント（キーシーケンス手動送信） |
+| `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
+| `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
 
 ### 起動チェーン（IMK ブートストラップ）
 
@@ -63,6 +72,7 @@ xcodebuild build -scheme keynaco -configuration Debug
 - 初回インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
 - 起動のたびに `TISRegisterInputSource` を呼んで入力ソースを自動登録する。初回のみログアウト→ログインが必要（TIS がキャッシュを更新するため）
 - `/deploy` スキル（Claude Code 内）: ビルドからインストールまでを一括実行する
+- LLM 機能（`LLMSuccessorFetcher` / `LLMSegmentConverter` / `LLMMisconversionChecker`）は `FoundationModels` フレームワーク（Apple Intelligence）を使用。macOS 26 で Apple Intelligence が有効なデバイスでないと `SystemLanguageModel.default.availability` が `.unavailable` を返しスキップされる（IME 基本動作は継続）
 
 ## テスト実行
 

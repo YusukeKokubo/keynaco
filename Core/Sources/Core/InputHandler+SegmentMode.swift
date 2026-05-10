@@ -237,11 +237,16 @@ public extension InputHandler {
             let newIndex = segmentState.focusedIndex + 1
             let prevText = state.segmentState!.segments[segmentState.focusedIndex].selectedText
             let nextSeg = segmentState.segments[newIndex]
-            state.segmentState!.segments[newIndex] = buildSegmentCandidates(
+            let preserved = nextSeg.selectedText
+            var rebuilt = buildSegmentCandidates(
                 reading: nextSeg.reading,
                 dictCandidates: azooKeyConverter.candidatesForSegment(reading: nextSeg.reading, leftSideContext: azooKeyLeftContext),
                 prev: prevText
             )
+            if let idx = rebuilt.candidates.firstIndex(of: preserved) {
+                rebuilt.selectedIndex = idx
+            }
+            state.segmentState!.segments[newIndex] = rebuilt
             state.segmentState!.focusedIndex = newIndex
             applySegmentMarkedText(client: client)
             return (true, makeCandidateActionForFocusedSegment())
