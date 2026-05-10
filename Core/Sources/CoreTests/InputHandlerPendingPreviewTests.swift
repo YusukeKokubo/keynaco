@@ -59,9 +59,38 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
         handler.db.recordBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         XCTAssertTrue(handler.isSuccessorMode)
-        press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "から")
+        press(keyCode: KeyCode.space, candidateVisible: true, selectedRow: 0, selectedText: "から")
         XCTAssertFalse(handler.isSuccessorMode, "Space 確定後は isSuccessorMode が解除されるはず")
         XCTAssertEqual(client.inserted.last, "から", "「から」が確定されるはず")
+    }
+
+    /// `selectedText == nil`（例: CandidateContext とウィンドウの不整合）でもマークドを空にせず pending を維持する
+    func testPendingPreviewSpaceWithNilSelectedRestoresComposingText() {
+        typeRomaji("te")
+        press(keyCode: KeyCode.enter)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        type(chars: "k", base: "k")
+        XCTAssertTrue(handler.isSuccessorMode)
+        let (_, action) = press(keyCode: KeyCode.space)
+        XCTAssertFalse(handler.isSuccessorMode)
+        guard case .dismiss = action else {
+            XCTFail(".dismiss を返すはず: \(action)"); return
+        }
+        XCTAssertEqual(handler.state.pendingRomaji, "k")
+        XCTAssertFalse(client.markedText.isEmpty)
+        XCTAssertEqual(client.markedText, "k")
+    }
+
+    func testPendingPreviewAfterNilSelectedSpaceTypingRomajiContinues() {
+        typeRomaji("te")
+        press(keyCode: KeyCode.enter)
+        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        type(chars: "k", base: "k")
+        _ = press(keyCode: KeyCode.space)
+        XCTAssertFalse(handler.isSuccessorMode)
+        type(chars: "a", base: "a")
+        XCTAssertEqual(client.markedText, "か", "先読み解除後も k+a で通常組成に戻るはず")
+        XCTAssertEqual(handler.state.pendingRomaji, "")
     }
 
     func testPendingPreviewEscapeCancels() {

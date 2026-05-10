@@ -68,7 +68,7 @@ stateDiagram-v2
 |------|------|
 | かな系文字 | composedHiragana / pendingRomaji に蓄積 |
 | `. / ,`（Shift なし） | `。`/`、` として composedHiragana に追加し候補ウィンドウを更新 |
-| Space | セグメントモードへ遷移 |
+| Space | `composedHiragana` 非空ならセグメントモードへ遷移。`composedHiragana` が空で `pendingRomaji` のみのときはキーを消費してマークドテキストを維持（本文へスペースは入れない） |
 | ↑↓ | 候補選択中へ遷移 |
 | Enter | 組成テキストをそのまま確定 |
 | Escape | 組成クリア → 待機 |
@@ -124,7 +124,7 @@ stateDiagram-v2
 
 | キー | 動作 |
 |------|------|
-| Space / Enter | 選択候補を確定 → 次の Successor 候補があれば継続、なければ待機 |
+| Space / Enter | 選択候補を確定 → 次の Successor 候補があれば継続、なければ待機。`selectedText` が得られないときは Successor を解除し `composingText`（`pendingRomaji` 含む）を再表示 |
 | ↑↓ | 候補を移動 |
 | Tab | 次候補へ |
 | ローマ字 1 文字（格助詞 fast-path, 名詞末尾時のみ） | `particleRomajiMap` で格助詞サブセットに絞り込み |

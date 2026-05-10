@@ -22,6 +22,11 @@ public extension InputHandler {
                 else { applyMarkedText(candidateText: nil, client: client) }
                 return (true, action)
             }
+            // composed のみ空で pending ローマ字だけあるとき Space をホストへ漏らすと未確定が消えることがあるため消費する
+            if !state.pendingRomaji.isEmpty {
+                applyMarkedText(candidateText: nil, client: client)
+                return (true, .none)
+            }
             return (false, .none)
         }
 

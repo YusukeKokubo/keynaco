@@ -123,7 +123,7 @@ public extension InputHandler {
             guard let selected = candidate.selectedText else {
                 isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
                 clearSuccessorLLMAuxiliaryState()
-                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
+                applyMarkedText(candidateText: nil, client: client)
                 return (true, .dismiss)
             }
             confirmSuccessor(selected, client: client)

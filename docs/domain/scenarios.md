@@ -224,7 +224,9 @@ skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加され
 
 **制約**: `composedHiragana` が空のとき限定。2文字目（`sh` 等）は対象外（`pending.count == 1` ガード）。
 
-*Tests: `Tests/InputHandlerCandidatesTests.swift`*
+**補足（誤操作）**: 直前に確定した語がなく `isSuccessorMode` も立っていない状態で、子音 1 文字だけ（例: `k`）のときに Space を押すと、キーはホストへ渡さず `pendingRomaji` を表示したまま維持する（本文にスペース文字は入れない）。**先読み**で `isSuccessorMode` 中に候補文脈と不整合で `selectedText` が得られない Space / Enter は、確定に失敗しても同じ `pendingRomaji` を `composingText` で再表示する。
+
+*Tests: `Tests/InputHandlerPendingPreviewTests.swift`, `Tests/InputHandlerCompositionTests.swift`*
 
 ---
 

@@ -137,11 +137,11 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
 
     // MARK: - composedHiragana が空のときのスペース
 
-    func testSpacePassesThroughWithOnlyPendingRomaji() {
+    func testSpaceConsumesWithOnlyPendingRomaji() {
         type(chars: "k", base: "k")
         XCTAssertEqual(client.markedText, "k")
-        let result = press(keyCode: 49)
-        XCTAssertFalse(result.consumed, "composedHiragana が空のときスペースはスルーするはず")
+        let result = press(keyCode: KeyCode.space)
+        XCTAssertTrue(result.consumed, "pending のみのとき Space は IME が消費しホストへ渡さないはず")
         XCTAssertEqual(client.markedText, "k", "組成は変化しないはず")
     }
 
