@@ -44,7 +44,7 @@ public extension InputHandler {
 
         if let r = handleZSequence(base: base, client: client) { return r }
         if let r = handlePunctuation(base: base, modifiers: modifiers, client: client) { return r }
-        if let r = handleBracketChar(chars: chars, client: client) { return r }
+        if let r = handleBracketChar(chars: chars, base: base, modifiers: modifiers, client: client) { return r }
         if let r = handleShiftChar(chars: chars, isNonAscii: isNonAscii, modifiers: modifiers,
                                     wasExplicitlySelected: wasExplicitlySelected,
                                     candidate: candidate, client: client) { return r }
@@ -95,8 +95,14 @@ public extension InputHandler {
     }
 
     private mutating func handleBracketChar(
-        chars: String, client: TextInputClient
+        chars: String, base: String, modifiers: NSEvent.ModifierFlags, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
+        // Shift+1→`!` のように `characters` と素キー `base` が異なるときは括弧候補ではなく ASCII 組成（handleShiftChar）へ回す。
+        // `base` が `!`/`?` と同じ（例: JIS での Shift+!）のときだけ「！」「？」候補ウィンドウを出す。
+        if modifiers.contains(.shift) {
+            if chars == "!" && base != "!" { return nil }
+            if chars == "?" && base != "?" { return nil }
+        }
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if state.composingText.isEmpty {
             bracketCandidates = options

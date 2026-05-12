@@ -63,8 +63,8 @@ public extension InputHandler {
 
         let maxC = LearningThresholds.successorMaxCandidates
         if predictTop.isEmpty {
-            // 格助詞 fallback のみ（N-gram なし）→ 従来通りすぐ表示
-            let capped = Array(candidates.prefix(maxC))
+            // 格助詞 fallback のみ（N-gram なし）→ 従来通りすぐ表示。助詞は件数が多いので maxC で省略しない。
+            let capped = candidates
             pendingSuccessorCandidates = []
             successorLLMBaseCandidates = capped
             successorLLMTrigger = .particlesOnly(context: llmContext)

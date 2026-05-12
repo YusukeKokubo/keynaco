@@ -29,10 +29,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let zenzaiVC = ZenzaiViewController()
         let zenzaiItem = NSTabViewItem(viewController: zenzaiVC)
         zenzaiItem.label = "Zenzai"
+        let cleanserItem = NSTabViewItem(viewController: CleanserViewController())
+        cleanserItem.label = "クレンジング"
         tabVC.addTabViewItem(bigramItem)
         tabVC.addTabViewItem(userDictItem)
         tabVC.addTabViewItem(historyItem)
         tabVC.addTabViewItem(zenzaiItem)
+        tabVC.addTabViewItem(cleanserItem)
 
         window.contentViewController = tabVC
         super.init(window: window)

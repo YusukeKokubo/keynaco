@@ -65,9 +65,51 @@ extension DatabaseManager {
         }
     }
 
+    /// LLM クレンジング等: プリセット行を除いた bi-gram（設定の Bi-gram タブ用 `fetchAllBigram` とは別）。
+    public func fetchAllBigramExcludingPresets() -> [BigramEntry] {
+        dbQueue.sync {
+            let sql = """
+            SELECT prev, input, output, count FROM bigram
+            WHERE is_preset = 0
+            ORDER BY count DESC, used_at DESC LIMIT 1000
+            """
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+            var results: [BigramEntry] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let p = sqlite3_column_text(stmt, 0),
+                      let i = sqlite3_column_text(stmt, 1),
+                      let o = sqlite3_column_text(stmt, 2) else { continue }
+                results.append(BigramEntry(
+                    prev: String(cString: p), input: String(cString: i),
+                    output: String(cString: o), count: Int(sqlite3_column_int(stmt, 3))
+                ))
+            }
+            return results
+        }
+    }
+
     public func deleteBigram(prev: String, input: String, output: String) {
         dispatchWrite {
             self.executeOnQueue("DELETE FROM bigram WHERE prev = ? AND input = ? AND output = ?") {
+                self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+            }
+        }
+    }
+
+    public func deleteTrigram(prev2: String, prev1: String, input: String, output: String) {
+        dispatchWrite {
+            self.executeOnQueue("DELETE FROM trigram WHERE prev2 = ? AND prev1 = ? AND input = ? AND output = ?") {
+                self.bindText($0, 1, prev2); self.bindText($0, 2, prev1)
+                self.bindText($0, 3, input); self.bindText($0, 4, output)
+            }
+        }
+    }
+
+    public func deleteSkipBigram(prev: String, input: String, output: String) {
+        dispatchWrite {
+            self.executeOnQueue("DELETE FROM skip_bigram WHERE prev = ? AND input = ? AND output = ?") {
                 self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
             }
         }
