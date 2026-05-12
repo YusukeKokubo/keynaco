@@ -27,7 +27,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `keynaco/Debug/` | デバッグ用ツール（`EventViewerWindow` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
 | `Core/Sources/CoreTests/` | `KeynacoCore` のユニットテスト（XCTest） |
-| `keynacoTests/` | アプリ専用テスト（`CandidateWindow` / `SurroundingIMKContext` 等） |
+| `keynacoTests/` | アプリ専用テスト（`SurroundingIMKContext` 等） |
 | `keynaco.xcodeproj` | Xcode プロジェクト（リポジトリ管理。ローカル SPM で `Core/` を参照） |
 | `docs/domain/` | ドメイン知識ドキュメント（用語・状態遷移・シナリオ） |
 | `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` 形式） |
@@ -98,12 +98,12 @@ cd Core && swift test
 | コンポーネント | 役割 |
 |--------------|------|
 | `InputController` | IMK ブリッジ。NSEvent → InputHandler 委譲、LLM 系（`LLMSuccessorFetcher` / `LLMSegmentConverter` / `LLMMisconversionChecker`）管理 |
-| `InputHandler` | 入力ロジック本体（テスト可能、Swift 6）。extension 分割: NormalInput / Candidates / DateTime / Numbers / SegmentMode / SuccessorMode |
+| `InputHandler` | 入力ロジック本体（テスト可能、Swift 6）。機能ごとに extension 分割 |
 | `TextInputClient` | `insertText` / `setMarkedText` の DI プロトコル。テスト時は `MockTextClient` |
 | `CompositionState` | 未確定文字列（composedHiragana + pendingRomaji）。`SegmentState` を内包 |
 | `RomajiConverter` | ローマ字→ひらがな変換ルール |
 | `AzooKeyConverter` | ひらがな→漢字変換エンジンラッパー（Zenzai 有効フラグ・LRU キャッシュ） |
-| `DatabaseManager` | 変換履歴・N-gram・ユーザー辞書・境界学習の SQLite 管理（6テーブル）。extension 分割: History / Ngram / Boundary / UserDict |
+| `DatabaseManager` | 変換履歴・N-gram・ユーザー辞書・境界学習の SQLite 管理（6テーブル）。機能ごとに extension 分割 |
 | `SettingsWindowController` 他 | 設定画面（5タブ: Bi-gram / Tri-gram / ユーザー辞書 / 変換履歴 / Zenzai）。`CleanserSheetViewController` はシートとして統合 |
 | `ZenzaiSettings` / `ZenzaiViewController` | Zenzai 有効フラグ・プロフィール・推論トークン上限（UserDefaults） |
 | `CandidateAction` / `CandidateContext` | InputHandler が返す候補ウィンドウ操作指示と状態スナップショット（`historyEnd` / `fixedEnd` が重要） |
@@ -113,6 +113,8 @@ cd Core && swift test
 | `EventViewerWindow` / `IMESandboxWindow` | デバッグ用 GUI ツール（`keynaco/Debug/`） |
 | `KanaUtils` | ひらがな↔カタカナ変換（`hiraganaToKatakana` / `hiraganaToHankakuKatakana` / `toZenkakuAscii`） |
 | `NotificationNames` | KeynacoCore 公開の通知名（successorPending / misconversionFound / misconversionCleared） |
+| `LLMCleanser` | DB エントリの品質判定（履歴・bi-gram の誤り検出）。`FoundationModels` 利用。`CleanserSheetViewController` から呼び出す |
+| `LearningThresholds` | Successor モードの閾値定数（`successorImmediateThreshold`=5・`successorMaxCandidates`=5）。チューニング時はここを編集 |
 
 ## テスト方針
 
@@ -132,13 +134,9 @@ IME はバックグラウンドエージェントとして動作するため、`
 
 - **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始。以降の小文字も `composedHiragana` に直接蓄積（ローマ字変換しない）。AzooKey は呼ばず、履歴検索キーは小文字正規化。`GitHub` 等の混在ケース入力に対応。
 - **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
-- **かなキー（keyCode 104）**: 日本語モードに戻る
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。`punctuationMap`は`baseCharacters`で照合するため Shift+`,`/`.` が `<`/`>` になる
 - **Shift+ASCII 文字（日本語モード中）**: 組成バッファに英字として蓄積される（`pendingRomaji` 経由ではなく直接 `composedHiragana` に追加）。Enter で確定。
 - **Shift+句読点**: `,` → `<`、`.` → `>`（`punctuationMap` は Shift なし時のみ `、` / `。` に変換）。
-- **Shift+Delete（候補選択中）**: 選択中の候補を変換履歴 DB から削除。
-- **Shift+Tab / Shift+矢印（セグメントモード中）**: セグメント境界を1文字単位で調整。
-- **F6–F10（組成中のみ）**: F6=ひらがな、F7=全角カタカナ、F8=半角カタカナ、F9=全角ASCII、F10=半角ASCII で即時確定。`handleFunctionKey()` 参照。
 - **z シーケンス（組成中・組成前どちらでも）**: `z` + 記号/矢印キーで特殊文字を即時挿入。`z-` → `〜`、`z/` → `・`、`z.` → `…`、`z,` → `、`、`z→` → `→`、`z←` → `←`（`zCharMap` / `zArrowMap`）。
 
 ## macOS 26 IME の罠
