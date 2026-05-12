@@ -66,11 +66,17 @@ final class HistoryViewController: NSViewController {
         refreshButton.translatesAutoresizingMaskIntoConstraints = false
         bar.addSubview(refreshButton)
 
+        let scanButton = NSButton(title: "AI スキャン", target: self, action: #selector(openCleanserSheet))
+        scanButton.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(scanButton)
+
         NSLayoutConstraint.activate([
             deleteButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             deleteButton.trailingAnchor.constraint(equalTo: refreshButton.leadingAnchor, constant: -8),
             refreshButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            refreshButton.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -12),
+            refreshButton.trailingAnchor.constraint(equalTo: scanButton.leadingAnchor, constant: -8),
+            scanButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            scanButton.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -12),
         ])
         return bar
     }
@@ -78,6 +84,10 @@ final class HistoryViewController: NSViewController {
     override func viewWillAppear() {
         super.viewWillAppear()
         reload()
+    }
+
+    @objc private func openCleanserSheet() {
+        presentAsSheet(CleanserSheetViewController(scope: .history))
     }
 
     @objc private func reload() {

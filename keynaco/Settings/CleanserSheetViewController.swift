@@ -1,18 +1,16 @@
 import AppKit
 import KeynacoCore
 
-/// LLM がフラグを立てた `history` / `bigram` エントリの確認・削除。
-final class CleanserViewController: NSViewController {
-
+final class CleanserSheetViewController: NSViewController {
     private static let appleIntelligenceHelpURL = "https://support.apple.com/ja-jp/guide/mac-help/mchl46361784/mac"
 
-    private let scrollView = NSScrollView()
+    private let scope: CleanserScope
     private let tableView = DeletableTableView()
-    private let descriptionLabel = NSTextField(wrappingLabelWithString: "")
+    private let scrollView = NSScrollView()
     private let statusLabel = NSTextField(labelWithString: "")
     private let helpLinkLabel = NSTextField(wrappingLabelWithString: "")
     private let timeHintLabel = NSTextField(labelWithString: "")
-    private let emptyStateLabel = NSTextField(labelWithString: "「スキャン」を押して、変換履歴・Bi-gram をオンデバイス AI で検査します。")
+    private let emptyStateLabel = NSTextField(labelWithString: "")
     private let progressIndicator = NSProgressIndicator()
     private let deleteSelectedButton = NSButton(title: "選択を削除", target: nil, action: nil)
     private let deleteAllButton = NSButton(title: "フラグをすべて削除", target: nil, action: nil)
@@ -24,7 +22,6 @@ final class CleanserViewController: NSViewController {
     )
     private let scanButton = NSButton(title: "スキャン", target: nil, action: nil)
 
-    /// セグメント選択に対応する maxCount（nil = 全件）
     private var selectedMaxCount: Int? {
         switch scopeSegment.selectedSegment {
         case 0: return 1
@@ -37,14 +34,54 @@ final class CleanserViewController: NSViewController {
     private var data: [FlaggedEntry] = []
     private var scanTask: Task<Void, Never>?
 
+    init(scope: CleanserScope) {
+        self.scope = scope
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var tableColumns: [(String, String, CGFloat)] {
+        switch scope {
+        case .history:
+            return [
+                ("input",   "読み",         180),
+                ("output",  "確定テキスト", 200),
+                ("verdict", "判定",          80),
+                ("reason",  "理由",         180),
+            ]
+        case .bigram:
+            return [
+                ("prev",    "直前の語",     130),
+                ("input",   "読み",         110),
+                ("output",  "確定テキスト", 170),
+                ("verdict", "判定",          80),
+                ("reason",  "理由",         150),
+            ]
+        }
+    }
+
+    private var titleText: String {
+        switch scope {
+        case .history: return "変換履歴 AI スキャン"
+        case .bigram:  return "Bi-gram AI スキャン"
+        }
+    }
+
+    private var emptyText: String {
+        switch scope {
+        case .history: return "「スキャン」を押して変換履歴をオンデバイス AI で検査します。"
+        case .bigram:  return "「スキャン」を押して Bi-gram をオンデバイス AI で検査します。"
+        }
+    }
+
     override func loadView() {
         view = NSView()
 
-        descriptionLabel.translatesAutoresizingMaskIntoConstraints = false
-        descriptionLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        descriptionLabel.textColor = .secondaryLabelColor
-        descriptionLabel.stringValue = "誤変換や不要な学習データをオンデバイス AI で検出・削除します。"
-        view.addSubview(descriptionLabel)
+        let titleLabel = NSTextField(labelWithString: titleText)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .boldSystemFont(ofSize: 13)
+        view.addSubview(titleLabel)
 
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.cell?.wraps = true
@@ -69,6 +106,7 @@ final class CleanserViewController: NSViewController {
         view.addSubview(timeHintLabel)
 
         emptyStateLabel.translatesAutoresizingMaskIntoConstraints = false
+        emptyStateLabel.stringValue = emptyText
         emptyStateLabel.alignment = .center
         emptyStateLabel.textColor = .tertiaryLabelColor
         emptyStateLabel.font = .systemFont(ofSize: 13)
@@ -81,7 +119,7 @@ final class CleanserViewController: NSViewController {
 
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        for (id, title, width) in columns {
+        for (id, title, width) in tableColumns {
             let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             col.title = title
             col.width = width
@@ -103,21 +141,20 @@ final class CleanserViewController: NSViewController {
         view.addSubview(bottomBar)
 
         NSLayoutConstraint.activate([
-            descriptionLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            descriptionLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            descriptionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
 
-            statusLabel.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 4),
-            statusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            statusLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            statusLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 6),
+            statusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            statusLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
             helpLinkLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 4),
-            helpLinkLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            helpLinkLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            helpLinkLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            helpLinkLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
             timeHintLabel.topAnchor.constraint(equalTo: helpLinkLabel.bottomAnchor, constant: 4),
-            timeHintLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            timeHintLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            timeHintLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            timeHintLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
             scrollView.topAnchor.constraint(equalTo: timeHintLabel.bottomAnchor, constant: 6),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
@@ -136,19 +173,10 @@ final class CleanserViewController: NSViewController {
             bottomBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             bottomBar.heightAnchor.constraint(equalToConstant: 44),
 
-            view.widthAnchor.constraint(greaterThanOrEqualToConstant: 500),
-            view.heightAnchor.constraint(greaterThanOrEqualToConstant: 300),
+            view.widthAnchor.constraint(greaterThanOrEqualToConstant: 600),
+            view.heightAnchor.constraint(greaterThanOrEqualToConstant: 420),
         ])
     }
-
-    private let columns: [(String, String, CGFloat)] = [
-        ("table", "テーブル", 80),
-        ("prev", "直前の語", 120),
-        ("input", "読み", 120),
-        ("output", "確定テキスト", 200),
-        ("verdict", "判定", 70),
-        ("reason", "理由", 160),
-    ]
 
     private func makeBottomBar() -> NSView {
         let bar = NSView()
@@ -173,7 +201,7 @@ final class CleanserViewController: NSViewController {
         bar.addSubview(scopeLabel)
 
         scopeSegment.translatesAutoresizingMaskIntoConstraints = false
-        scopeSegment.selectedSegment = 1  // デフォルト: 3回以下
+        scopeSegment.selectedSegment = 1
         scopeSegment.controlSize = .small
         scopeSegment.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         bar.addSubview(scopeSegment)
@@ -182,6 +210,10 @@ final class CleanserViewController: NSViewController {
         scanButton.target = self
         scanButton.action = #selector(scanOrCancelTapped)
         bar.addSubview(scanButton)
+
+        let closeButton = NSButton(title: "閉じる", target: self, action: #selector(closeTapped))
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(closeButton)
 
         NSLayoutConstraint.activate([
             deleteSelectedButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
@@ -197,7 +229,10 @@ final class CleanserViewController: NSViewController {
             scopeSegment.leadingAnchor.constraint(equalTo: scopeLabel.trailingAnchor, constant: 4),
 
             scanButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            scanButton.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -12),
+            scanButton.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -8),
+
+            closeButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            closeButton.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -12),
         ])
         return bar
     }
@@ -206,6 +241,14 @@ final class CleanserViewController: NSViewController {
         super.viewDidLoad()
         applyAvailabilityUI()
     }
+
+    override func viewWillDisappear() {
+        super.viewWillDisappear()
+        scanTask?.cancel()
+        scanTask = nil
+    }
+
+    // MARK: - Availability
 
     private func applyAvailabilityUI() {
         if LLMCleanser.isModelAvailable {
@@ -232,6 +275,8 @@ final class CleanserViewController: NSViewController {
         NSWorkspace.shared.open(url)
     }
 
+    // MARK: - Scan
+
     @objc private func scanOrCancelTapped() {
         if scanTask != nil {
             scanTask?.cancel()
@@ -255,6 +300,7 @@ final class CleanserViewController: NSViewController {
         deleteAllButton.isEnabled = false
 
         let maxCount = selectedMaxCount
+        let scope = self.scope
         scanTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer {
@@ -264,6 +310,7 @@ final class CleanserViewController: NSViewController {
             do {
                 let result = try await self.cleanser.evaluate(
                     db: .shared,
+                    scope: scope,
                     maxCount: maxCount,
                     onProgress: { processed, total in
                         if total == 0 {
@@ -292,7 +339,7 @@ final class CleanserViewController: NSViewController {
                 self.finishScanningUI()
             } catch is CancellationError {
                 self.statusLabel.stringValue = "スキャンを中止しました。"
-                self.emptyStateLabel.stringValue = "「スキャン」を押して、変換履歴・Bi-gram をオンデバイス AI で検査します。"
+                self.emptyStateLabel.stringValue = self.emptyText
                 self.emptyStateLabel.isHidden = self.data.isEmpty ? false : true
                 self.finishScanningUI()
             } catch let err as CleanserError where err == .unavailable {
@@ -309,7 +356,7 @@ final class CleanserViewController: NSViewController {
                     alert.beginSheetModal(for: window, completionHandler: nil)
                 }
                 self.statusLabel.stringValue = "スキャンに失敗しました。"
-                self.emptyStateLabel.stringValue = "「スキャン」を押して、変換履歴・Bi-gram をオンデバイス AI で検査します。"
+                self.emptyStateLabel.stringValue = self.emptyText
                 self.emptyStateLabel.isHidden = self.data.isEmpty ? false : true
                 self.finishScanningUI()
             }
@@ -321,6 +368,8 @@ final class CleanserViewController: NSViewController {
         progressIndicator.stopAnimation(nil)
         timeHintLabel.isHidden = true
     }
+
+    // MARK: - Delete
 
     @objc private func deleteSelected() {
         let row = tableView.selectedRow
@@ -334,9 +383,7 @@ final class CleanserViewController: NSViewController {
 
     @objc private func deleteAllFlagged() {
         guard !data.isEmpty else { return }
-        for entry in data {
-            deleteEntry(entry)
-        }
+        for entry in data { deleteEntry(entry) }
         data.removeAll()
         tableView.reloadData()
         refreshAfterDelete()
@@ -362,13 +409,18 @@ final class CleanserViewController: NSViewController {
             statusLabel.stringValue = "LLM がフラグを立てたエントリ（\(data.count) 件）"
         }
     }
+
+    @objc private func closeTapped() {
+        scanTask?.cancel()
+        dismiss(self)
+    }
 }
 
-extension CleanserViewController: NSTableViewDataSource {
+extension CleanserSheetViewController: NSTableViewDataSource {
     func numberOfRows(in tableView: NSTableView) -> Int { data.count }
 }
 
-extension CleanserViewController: NSTableViewDelegate {
+extension CleanserSheetViewController: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let id = tableColumn?.identifier else { return nil }
         let entry = data[row]
@@ -376,44 +428,28 @@ extension CleanserViewController: NSTableViewDelegate {
         let text: String
         let textColor: NSColor?
         switch id.rawValue {
-        case "table":
-            switch entry.source {
-            case .history: text = "history"
-            case .bigram: text = "bigram"
-            }
-            textColor = nil
         case "prev":
             switch entry.source {
-            case .history:
-                text = "—"
-            case let .bigram(prev, _, _):
-                text = prev
+            case .history:              text = "—"
+            case let .bigram(prev, _, _): text = prev
             }
             textColor = nil
         case "input":
             switch entry.source {
-            case let .history(input, _):
-                text = input
-            case let .bigram(_, input, _):
-                text = input
+            case let .history(input, _):    text = input
+            case let .bigram(_, input, _):  text = input
             }
             textColor = nil
         case "output":
             switch entry.source {
-            case let .history(_, output):
-                text = output
-            case let .bigram(_, _, output):
-                text = output
+            case let .history(_, output):   text = output
+            case let .bigram(_, _, output): text = output
             }
             textColor = nil
         case "verdict":
             switch entry.verdict {
-            case .suspect:
-                text = "⚠ suspect"
-                textColor = .systemOrange
-            case .delete:
-                text = "🗑 delete"
-                textColor = .systemRed
+            case .suspect: text = "⚠ suspect"; textColor = .systemOrange
+            case .delete:  text = "🗑 delete";  textColor = .systemRed
             }
         case "reason":
             text = entry.reason
@@ -428,11 +464,7 @@ extension CleanserViewController: NSTableViewDelegate {
             return f
         }()
         tf.stringValue = text
-        if let textColor {
-            tf.textColor = textColor
-        } else {
-            tf.textColor = .labelColor
-        }
+        tf.textColor = textColor ?? .labelColor
         return tf
     }
 
