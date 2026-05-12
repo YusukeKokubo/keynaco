@@ -98,6 +98,28 @@ extension DatabaseManager {
         }
     }
 
+    public func fetchAllTrigram() -> [TrigramEntry] {
+        dbQueue.sync {
+            let sql = "SELECT prev2, prev1, input, output, count FROM trigram ORDER BY count DESC, used_at DESC LIMIT 1000"
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+            var results: [TrigramEntry] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let p2 = sqlite3_column_text(stmt, 0),
+                      let p1 = sqlite3_column_text(stmt, 1),
+                      let i  = sqlite3_column_text(stmt, 2),
+                      let o  = sqlite3_column_text(stmt, 3) else { continue }
+                results.append(TrigramEntry(
+                    prev2: String(cString: p2), prev1: String(cString: p1),
+                    input: String(cString: i), output: String(cString: o),
+                    count: Int(sqlite3_column_int(stmt, 4))
+                ))
+            }
+            return results
+        }
+    }
+
     public func deleteTrigram(prev2: String, prev1: String, input: String, output: String) {
         dispatchWrite {
             self.executeOnQueue("DELETE FROM trigram WHERE prev2 = ? AND prev1 = ? AND input = ? AND output = ?") {

@@ -32,6 +32,7 @@
 		CC81B691B4422E5779491EE0 /* UserDictViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */; };
 		CF5D2357CC1B6C7209F9918F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC83CA0F9C13530D08702297 /* main.swift */; };
 		D28C670A95E553BA2AADB935 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EE68A42BB389946C522BC2 /* BigramViewController.swift */; };
+		B3F1A2C4D5E6F7A8B9C0D1E2 /* TrigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F1A2C4D5E6F7A8B9C0D1E3 /* TrigramViewController.swift */; };
 		A8C9D0E12F3A4B5C6D7E8F02 /* CleanserViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C9D0E12F3A4B5C6D7E8F01 /* CleanserViewController.swift */; };
 		E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A755C9097E561BF05FF3D11 /* InputController.swift */; };
 		7C3D2E1F4051627384A5B6C7 /* InputController+LLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */; };
@@ -77,6 +78,7 @@
 		BC83CA0F9C13530D08702297 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4EE68A42BB389946C522BC2 /* BigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigramViewController.swift; sourceTree = "<group>"; };
+		B3F1A2C4D5E6F7A8B9C0D1E3 /* TrigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrigramViewController.swift; sourceTree = "<group>"; };
 		A8C9D0E12F3A4B5C6D7E8F01 /* CleanserViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanserViewController.swift; sourceTree = "<group>"; };
 		C9289632F6594D9EE9A07926 /* IMESandboxWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMESandboxWindow.swift; sourceTree = "<group>"; };
 		E6A89E465235280624AF1A85 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
@@ -148,6 +150,7 @@
 			isa = PBXGroup;
 			children = (
 				C4EE68A42BB389946C522BC2 /* BigramViewController.swift */,
+				B3F1A2C4D5E6F7A8B9C0D1E3 /* TrigramViewController.swift */,
 				A8C9D0E12F3A4B5C6D7E8F01 /* CleanserViewController.swift */,
 				FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */,
 				184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */,
@@ -333,6 +336,7 @@
 			files = (
 				57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */,
 				D28C670A95E553BA2AADB935 /* BigramViewController.swift in Sources */,
+				B3F1A2C4D5E6F7A8B9C0D1E2 /* TrigramViewController.swift in Sources */,
 				A8C9D0E12F3A4B5C6D7E8F02 /* CleanserViewController.swift in Sources */,
 				8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
 				1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */,

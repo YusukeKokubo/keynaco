@@ -22,6 +22,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         let bigramItem = NSTabViewItem(viewController: BigramViewController())
         bigramItem.label = "Bi-gram"
+        let trigramItem = NSTabViewItem(viewController: TrigramViewController())
+        trigramItem.label = "Tri-gram"
         let userDictItem = NSTabViewItem(viewController: UserDictViewController())
         userDictItem.label = "ユーザー辞書"
         let historyItem = NSTabViewItem(viewController: HistoryViewController())
@@ -32,6 +34,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let cleanserItem = NSTabViewItem(viewController: CleanserViewController())
         cleanserItem.label = "クレンジング"
         tabVC.addTabViewItem(bigramItem)
+        tabVC.addTabViewItem(trigramItem)
         tabVC.addTabViewItem(userDictItem)
         tabVC.addTabViewItem(historyItem)
         tabVC.addTabViewItem(zenzaiItem)

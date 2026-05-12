@@ -282,6 +282,22 @@ public final class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    public struct TrigramEntry: Sendable {
+        public let prev2: String
+        public let prev1: String
+        public let input: String
+        public let output: String
+        public let count: Int
+
+        public init(prev2: String, prev1: String, input: String, output: String, count: Int) {
+            self.prev2 = prev2
+            self.prev1 = prev1
+            self.input = input
+            self.output = output
+            self.count = count
+        }
+    }
+
     public struct HistoryEntry: Sendable {
         public let input: String
         public let output: String
