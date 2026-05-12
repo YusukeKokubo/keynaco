@@ -227,6 +227,17 @@ class InputController: IMKInputController, @unchecked Sendable {
             #if DEBUG
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
             #endif
+            // 文中挿入時（カーソルが末尾でない）は Successor 候補を表示しない
+            if handler.isSuccessorMode,
+               let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding),
+               !ctx.after.isEmpty {
+                handler.isSuccessorMode = false
+                handler.successorFirstChar = nil
+                handler.pendingSuccessorCandidates = []
+                handler.clearSuccessorLLMAuxiliaryState()
+                candidateWindow.dismiss()
+                break
+            }
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
             if handler.isSuccessorMode {
                 // 格助詞を選択候補としてマークドテキストに設定する。
@@ -258,6 +269,16 @@ class InputController: IMKInputController, @unchecked Sendable {
                 handler.db.deleteHistory(output: text)
                 candidateWindow.removeCandidate(at: row)
             }
+        }
+
+        // Successor モード pending: カーソルが末尾でない場合は次打鍵での表示も抑制
+        if handler.isSuccessorMode, !handler.pendingSuccessorCandidates.isEmpty,
+           let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding),
+           !ctx.after.isEmpty {
+            handler.isSuccessorMode = false
+            handler.successorFirstChar = nil
+            handler.pendingSuccessorCandidates = []
+            handler.clearSuccessorLLMAuxiliaryState()
         }
 
         if handler.documentSurroundingContextInvalidated {

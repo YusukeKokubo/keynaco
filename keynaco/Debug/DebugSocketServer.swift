@@ -5,6 +5,7 @@ import KeynacoCore
 import Darwin
 import AppKit
 import SQLite3
+import InputMethodKit
 
 // MARK: - Unix ドメインソケットサーバー
 
@@ -752,6 +753,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private static let knownCommandKeys: Set<String> = [
         "reset", "state", "wait_until", "assert_eventually", "seed_bigram", "seed_history",
+        "set_surrounding",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
         "capture", "vars", "schema", "with_examples", "explain",
     ]
@@ -1090,6 +1092,14 @@ final class DebugSocketServer: @unchecked Sendable {
             }
             let times = seed["times"] as? Int ?? 1
             for _ in 0..<times { handler.db.debugSeedHistory(input: input, output: output) }
+            return Self.finalize(["ok": true], cmd: cmd)
+        }
+
+        // {"set_surrounding": {"before": "今日は", "after": "良い天気"}}
+        // SurroundingIMKContext のテスト用にカーソル前後テキストを模倣する
+        if let sur = cmd["set_surrounding"] as? [String: Any] {
+            if let b = sur["before"] as? String { mockClient.documentBefore = b }
+            if let a = sur["after"] as? String { mockClient.documentAfter = a }
             return Self.finalize(["ok": true], cmd: cmd)
         }
 
@@ -1448,6 +1458,16 @@ final class DebugSocketServer: @unchecked Sendable {
             client: mockClient
         )
         candidateWindow.apply(action: action)
+        // Successor 抑制: documentAfter が非空（文中挿入）のとき候補を出さない
+        if handler.isSuccessorMode,
+           let ctx = SurroundingIMKContext.fetch(from: mockClient),
+           !ctx.after.isEmpty {
+            handler.isSuccessorMode = false
+            handler.successorFirstChar = nil
+            handler.pendingSuccessorCandidates = []
+            handler.clearSuccessorLLMAuxiliaryState()
+            candidateWindow.apply(action: .dismiss)
+        }
         applyLLMScheduling()
 
         var result = makeResponse(inserted: mockClient.consume())
@@ -1486,6 +1506,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "segmentTexts":       snap.segmentTexts,
             "focusedSegmentIndex": snap.focusedSegmentIndex,
             "successorLLMSurfaceExtras": handler.successorLLMSurfaceExtras,
+            "surroundingAfter":   mockClient.documentAfter,
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,
                 fixedEnd: snap.fixedEnd,
@@ -1788,17 +1809,70 @@ final class DebugSocketServer: @unchecked Sendable {
 
 // MARK: - SocketMockClient
 
-final class SocketMockClient: TextInputClient {
+/// SurroundingIMKContext.fetch() が IMKTextInput にキャストできるよう NSObject + IMKTextInput に準拠させる。
+/// documentBefore / documentAfter で「カーソル前後のテキスト」を模倣し、
+/// {"set_surrounding": {"before": "...", "after": "..."}} で外部から設定できる。
+final class SocketMockClient: NSObject, TextInputClient, IMKTextInput, @unchecked Sendable {
     private var insertedTexts: [String] = []
     private(set) var markedText: String = ""
 
-    func insertText(_ text: String) { insertedTexts.append(text); markedText = "" }
+    /// カーソル前の確定済みテキスト（insertText で追記される）
+    var documentBefore: String = ""
+    /// カーソル後のテキスト（set_surrounding コマンドで設定。insertText では変化しない）
+    var documentAfter: String = ""
+
+    // MARK: TextInputClient
+
+    func insertText(_ text: String) {
+        insertedTexts.append(text)
+        documentBefore += text
+        markedText = ""
+    }
     func setMarkedText(_ text: String, selectionRange: NSRange) { markedText = text }
-    func selectedRange() -> NSRange { NSRange(location: markedText.count, length: 0) }
     func cursorRect() -> NSRect { .zero }
 
     func consume() -> [String] { let r = insertedTexts; insertedTexts = []; return r }
-    func reset() { insertedTexts = []; markedText = "" }
+    func reset() { insertedTexts = []; markedText = ""; documentBefore = ""; documentAfter = "" }
+
+    // MARK: IMKTextInput — SurroundingIMKContext が使うメソッド
+
+    func selectedRange() -> NSRange {
+        NSRange(location: documentBefore.utf16.count, length: 0)
+    }
+
+    func attributedSubstring(from range: NSRange) -> NSAttributedString! {
+        let full = documentBefore + documentAfter
+        let utf16 = full.utf16
+        guard range.location != NSNotFound,
+              range.location >= 0,
+              range.location + range.length <= utf16.count else { return nil }
+        let si = utf16.index(utf16.startIndex, offsetBy: range.location)
+        let ei = utf16.index(si, offsetBy: range.length)
+        return NSAttributedString(string: String(utf16[si..<ei])!)
+    }
+
+    func length() -> Int { (documentBefore + documentAfter).utf16.count }
+
+    func string(from range: NSRange, actualRange: NSRangePointer!) -> String! {
+        attributedSubstring(from: range)?.string
+    }
+
+    // MARK: IMKTextInput — スタブ
+
+    func insertText(_ string: Any!, replacementRange: NSRange) {}
+    func setMarkedText(_ string: Any!, selectionRange: NSRange, replacementRange: NSRange) {}
+    func markedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
+    func validAttributesForMarkedText() -> [Any]! { [] }
+    func firstRect(forCharacterRange aRange: NSRange, actualRange: NSRangePointer!) -> NSRect { .zero }
+    func characterIndex(for point: NSPoint, tracking mappingMode: IMKLocationToOffsetMappingMode, inMarkedRange: UnsafeMutablePointer<ObjCBool>!) -> Int { NSNotFound }
+    func attributes(forCharacterIndex index: Int, lineHeightRectangle lineRect: UnsafeMutablePointer<NSRect>!) -> [AnyHashable: Any]! { nil }
+    func overrideKeyboard(withKeyboardNamed keyboardUniqueName: String!) {}
+    func selectMode(_ modeIdentifier: String!) {}
+    func supportsUnicode() -> Bool { true }
+    func bundleIdentifier() -> String! { nil }
+    func windowLevel() -> CGWindowLevel { 0 }
+    func supportsProperty(_ property: TSMDocumentPropertyTag) -> Bool { false }
+    func uniqueClientIdentifierString() -> String! { nil }
 }
 
 // MARK: - DebugCandidateWindow
