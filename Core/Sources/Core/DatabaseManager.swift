@@ -68,9 +68,9 @@ public final class DatabaseManager: @unchecked Sendable {
             NSLog("keynaco: DB を開けませんでした: \(path)")
             return
         }
-        executeOnQueue("PRAGMA journal_mode = WAL;")
-        executeOnQueue("PRAGMA synchronous = NORMAL;")
-        executeOnQueue("PRAGMA cache_size = -4096;")
+        sqlite3_exec(db, "PRAGMA journal_mode = WAL;", nil, nil, nil)
+        sqlite3_exec(db, "PRAGMA synchronous = FULL;", nil, nil, nil)
+        sqlite3_exec(db, "PRAGMA cache_size = -4096;", nil, nil, nil)
         #if DEBUG
         NSLog("keynaco: DB パス = \(path)")
         #endif

@@ -79,15 +79,19 @@ extension DatabaseManager {
             self.executeOnQueue("INSERT OR IGNORE INTO user_dict (input, output) VALUES (?, ?)") {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
             }
-            return sqlite3_changes(self.db) == 1
+            let inserted = sqlite3_changes(self.db) == 1
+            // user_dict は手動登録のため、プロセス kill 後も失わないよう WAL を即時チェックポイント
+            if inserted { sqlite3_wal_checkpoint_v2(self.db, nil, SQLITE_CHECKPOINT_FULL, nil, nil) }
+            return inserted
         }
     }
 
     public func deleteUserDict(id: Int) {
-        dispatchWrite {
+        dbQueue.sync {
             self.executeOnQueue("DELETE FROM user_dict WHERE id = ?") {
                 sqlite3_bind_int($0, 1, Int32(id))
             }
+            sqlite3_wal_checkpoint_v2(self.db, nil, SQLITE_CHECKPOINT_FULL, nil, nil)
         }
     }
 }
