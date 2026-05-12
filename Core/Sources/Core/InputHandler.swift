@@ -126,6 +126,8 @@ public struct InputHandler {
     public var leftSideContext: String = ""
     /// AzooKey API 用（空文字は `nil`）
     public var azooKeyLeftContext: String? { leftSideContext.isEmpty ? nil : leftSideContext }
+    /// Zenzai がプロモートした候補の行インデックス。文脈なし・Zenzai 無効時は `nil`。
+    public var lastZenzaiRow: Int? = nil
     public var committedHistory: [String] = []
     /// `pushCommitted` で文末記号により `committedHistory` を消した直後に立て、`InputController` が IMK 文脈キャッシュを捨てる。
     public var documentSurroundingContextInvalidated = false

@@ -279,6 +279,7 @@ public extension InputHandler {
             zenzaiTop1Count = 1
             insertedSet.insert(top1)
         }
+        lastZenzaiRow = zenzaiTop1Count > 0 ? fixedEnd : nil
         let adjustedFixedEnd = fixedEnd + zenzaiTop1Count
 
         let historyEnd = adjustedFixedEnd + predictCount + highHistoryCount

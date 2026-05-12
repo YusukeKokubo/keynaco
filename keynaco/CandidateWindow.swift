@@ -83,6 +83,8 @@ final class CandidateWindow: NSPanel {
     private(set) var historySectionEnd: Int = 0
     /// 予測セクションの末尾インデックス（fixedRowCount <= row < predictionSectionEnd が予測行）
     private var predictionSectionEnd: Int = 0
+    /// Zenzai がプロモートした候補の行インデックス（nil = Zenzai 非発火）
+    private var zenzaiRowIndex: Int? = nil
 
     var onSelect: ((String) -> Void)?
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
@@ -133,13 +135,14 @@ final class CandidateWindow: NSPanel {
 
     // MARK: - Public API
 
-    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, predictionEnd: Int = 0, fixedSectionEnd: Int? = nil, near rect: NSRect) {
+    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, predictionEnd: Int = 0, fixedSectionEnd: Int? = nil, zenzaiRow: Int? = nil, near rect: NSRect) {
         self.candidates = candidates
         self.historySectionEnd = historySectionEnd
         self.predictionSectionEnd = predictionEnd
         self.selectedRow = candidates.isEmpty ? 0 : min(initialRow, candidates.count - 1)
         self.isExplicitlySelected = false
         self.fixedRowCount = fixedSectionEnd ?? initialRow
+        self.zenzaiRowIndex = zenzaiRow
         tableView.reloadData()
 
         // initialRow より前の行（ひらがな・カタカナ）はウィンドウ高さに含めず、
@@ -172,6 +175,7 @@ final class CandidateWindow: NSPanel {
         fixedRowCount = 0
         historySectionEnd = 0
         predictionSectionEnd = 0
+        zenzaiRowIndex = nil
     }
 
     func selectNext() {
@@ -244,13 +248,18 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
         rowView.isHistory = row >= predictionSectionEnd && row < historySectionEnd
 
         let sectionLabelText: String
-        switch row {
-        case fixedRowCount where row < predictionSectionEnd:      sectionLabelText = "予測"
-        case predictionSectionEnd where row < historySectionEnd:  sectionLabelText = "履歴"
-        case historySectionEnd where historySectionEnd < candidates.count: sectionLabelText = "辞書"
-        default:                                                   sectionLabelText = ""
+        if row == zenzaiRowIndex {
+            sectionLabelText = "Zenzai"
+        } else {
+            switch row {
+            case fixedRowCount where row < predictionSectionEnd:      sectionLabelText = "予測"
+            case predictionSectionEnd where row < historySectionEnd:  sectionLabelText = "履歴"
+            case historySectionEnd where historySectionEnd < candidates.count: sectionLabelText = "辞書"
+            default:                                                   sectionLabelText = ""
+            }
         }
         rowView.sectionLabel.stringValue = sectionLabelText
+        rowView.sectionLabel.textColor = row == zenzaiRowIndex ? .systemPurple : .tertiaryLabelColor
 
         let showDivider = (predictionSectionEnd > fixedRowCount && row == predictionSectionEnd - 1 && predictionSectionEnd <= historySectionEnd)
             || (row == historySectionEnd - 1 && historySectionEnd < candidates.count)
