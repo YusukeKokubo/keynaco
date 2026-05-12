@@ -3,9 +3,13 @@ import KeynacoCore
 
 /// LLM がフラグを立てた `history` / `bigram` エントリの確認・削除。
 final class CleanserViewController: NSViewController {
+
+    private static let appleIntelligenceHelpURL = "https://support.apple.com/ja-jp/guide/mac-help/mchl46361784/mac"
+
     private let scrollView = NSScrollView()
     private let tableView = DeletableTableView()
     private let statusLabel = NSTextField(labelWithString: "")
+    private let helpLinkLabel = NSTextField(wrappingLabelWithString: "")
     private let timeHintLabel = NSTextField(labelWithString: "")
     private let progressIndicator = NSProgressIndicator()
     private let deleteSelectedButton = NSButton(title: "選択を削除", target: nil, action: nil)
@@ -23,6 +27,16 @@ final class CleanserViewController: NSViewController {
         statusLabel.cell?.wraps = true
         statusLabel.maximumNumberOfLines = 3
         view.addSubview(statusLabel)
+
+        helpLinkLabel.translatesAutoresizingMaskIntoConstraints = false
+        helpLinkLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        helpLinkLabel.textColor = .linkColor
+        helpLinkLabel.stringValue = Self.appleIntelligenceHelpURL
+        helpLinkLabel.isSelectable = true
+        helpLinkLabel.isHidden = true
+        let linkClick = NSClickGestureRecognizer(target: self, action: #selector(openAppleIntelligenceHelp))
+        helpLinkLabel.addGestureRecognizer(linkClick)
+        view.addSubview(helpLinkLabel)
 
         timeHintLabel.translatesAutoresizingMaskIntoConstraints = false
         timeHintLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -64,7 +78,11 @@ final class CleanserViewController: NSViewController {
             statusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             statusLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
 
-            timeHintLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 4),
+            helpLinkLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 4),
+            helpLinkLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            helpLinkLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+
+            timeHintLabel.topAnchor.constraint(equalTo: helpLinkLabel.bottomAnchor, constant: 4),
             timeHintLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             timeHintLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
 
@@ -138,16 +156,23 @@ final class CleanserViewController: NSViewController {
         if LLMCleanser.isModelAvailable {
             scrollView.isHidden = false
             tableView.isHidden = false
+            helpLinkLabel.isHidden = true
             statusLabel.stringValue = "「スキャン」で学習データを評価し、怪しいエントリを表示します。"
             scanButton.isEnabled = true
         } else {
             scrollView.isHidden = true
             tableView.isHidden = true
             timeHintLabel.isHidden = true
+            helpLinkLabel.isHidden = false
             statusLabel.stringValue = "Apple Intelligence が必要です。この Mac ではオンデバイス言語モデルを利用できません。"
             scanButton.isEnabled = false
             progressIndicator.stopAnimation(nil)
         }
+    }
+
+    @objc private func openAppleIntelligenceHelp() {
+        guard let url = URL(string: Self.appleIntelligenceHelpURL) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func scanOrCancelTapped() {
