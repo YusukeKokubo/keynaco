@@ -132,13 +132,10 @@ IME はバックグラウンドエージェントとして動作するため、`
 
 ## キー入力の挙動（特殊ケース）
 
-- **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始。以降の小文字も `composedHiragana` に直接蓄積（ローマ字変換しない）。AzooKey は呼ばず、履歴検索キーは小文字正規化。`GitHub` 等の混在ケース入力に対応。
+- **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始（`GitHub` 等の混在ケース用）。`InputHandlerAsciiTests.swift` 参照。
 - **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。`punctuationMap`は`baseCharacters`で照合するため Shift+`,`/`.` が `<`/`>` になる
-- **Shift+ASCII 文字（日本語モード中）**: 組成バッファに英字として蓄積される（`pendingRomaji` 経由ではなく直接 `composedHiragana` に追加）。Enter で確定。
-- **Shift+句読点**: `,` → `<`、`.` → `>`（`punctuationMap` は Shift なし時のみ `、` / `。` に変換）。
-- **`handleBracketChar` の US/JIS ガード**: `bracketOptions` のキーは `chars`（シフト後の文字）。`"!"` だけ `base != "!"` ガードあり（US Shift+1 → base="1" を ASCII 組成へ回すため）。`"?"` はガードなし — US の Shift+/（base="/"）でも bracketOptions に通す。新しい Shift 系エントリを追加するとき、数字キー起源の場合のみガードが必要。
-- **z シーケンス（組成中・組成前どちらでも）**: `z` + 記号/矢印キーで特殊文字を即時挿入。`z-` → `〜`、`z/` → `・`、`z.` → `…`、`z,` → `、`、`z→` → `→`、`z←` → `←`（`zCharMap` / `zArrowMap`）。
+- **z シーケンス**: `z` + 記号/矢印キーで特殊文字を挿入（`zCharMap` / `zArrowMap` 定義）。`InputHandlerZSequenceTests.swift` 参照。
 
 ## macOS 26 IME の罠
 
