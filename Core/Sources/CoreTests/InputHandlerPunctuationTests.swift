@@ -318,6 +318,30 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         }
     }
 
+    func testShiftSlashUSKeyboardShowsCandidateWindow() {
+        // US キーボード: Shift+/ → chars="?", base="/"
+        let result = type(chars: "?", base: "/", modifiers: .shift)
+        XCTAssertTrue(result.consumed)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "？")
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("？"))
+            XCTAssertTrue(candidates.contains("?"))
+        } else {
+            XCTFail("Expected .show but got \(result.candidateAction)")
+        }
+    }
+
+    func testShiftSlashUSKeyboardAppendsToComposition() {
+        type(chars: "a", base: "a")
+        let result = type(chars: "?", base: "/", modifiers: .shift)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ？")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show but got \(result.candidateAction)")
+        }
+    }
+
     func testShiftOneShowsCandidateWindow() {
         let result = type(chars: "!", base: "!", modifiers: .shift)
         XCTAssertTrue(result.consumed)

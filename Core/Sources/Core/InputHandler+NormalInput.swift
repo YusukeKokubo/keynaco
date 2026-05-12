@@ -97,11 +97,10 @@ public extension InputHandler {
     private mutating func handleBracketChar(
         chars: String, base: String, modifiers: NSEvent.ModifierFlags, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        // Shift+1→`!` のように `characters` と素キー `base` が異なるときは括弧候補ではなく ASCII 組成（handleShiftChar）へ回す。
-        // `base` が `!`/`?` と同じ（例: JIS での Shift+!）のときだけ「！」「？」候補ウィンドウを出す。
+        // Shift+1→`!` のように数字キーから生成された `!` は ASCII 組成（handleShiftChar）へ回す。
+        // `?` は US キーボードの Shift+/ (base="/") を含め bracketOptions へ通す。
         if modifiers.contains(.shift) {
             if chars == "!" && base != "!" { return nil }
-            if chars == "?" && base != "?" { return nil }
         }
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if state.composingText.isEmpty {
