@@ -13,13 +13,13 @@ public protocol TextInputClient: AnyObject {
 
 public extension TextInputClient {
     /// NSAttributedString 版のデフォルト実装（文字列版にフォールバック）
-    public func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange) {
+    func setMarkedText(_ text: NSAttributedString, selectionRange: NSRange) {
         setMarkedText(text.string, selectionRange: selectionRange)
     }
     /// selectedRange 未サポートのアプリ向けデフォルト実装
-    public func selectedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
+    func selectedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
     /// replacementRange 未サポートのアプリ向けデフォルト実装
-    public func setMarkedText(_ text: String, selectionRange: NSRange, replacementRange: NSRange) {
+    func setMarkedText(_ text: String, selectionRange: NSRange, replacementRange: NSRange) {
         setMarkedText(text, selectionRange: selectionRange)
     }
 }

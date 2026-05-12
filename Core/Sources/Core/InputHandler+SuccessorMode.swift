@@ -7,14 +7,14 @@ import AppKit
 
 public extension InputHandler {
 
-    public mutating func clearSuccessorLLMAuxiliaryState() {
+    mutating func clearSuccessorLLMAuxiliaryState() {
         successorLLMTrigger = .none
         successorLLMBaseCandidates = nil
         successorLLMSurfaceExtras.removeAll()
     }
 
     /// DB で得た候補の並びを保ち、`pending` からローマ字1文字に対応する読み前方一致の語を末尾に追加する（単体テスト可）。
-    public static func mergePendingSuccessorMatches(dbOrdered: [String], pending: [String], romajiKey: String) -> [String] {
+    static func mergePendingSuccessorMatches(dbOrdered: [String], pending: [String], romajiKey: String) -> [String] {
         let key = romajiKey.lowercased()
         guard key.count == 1, let c = key.first, c.isLetter, c.isASCII,
               let kanas = romajiToInitialKana[String(c)], !kanas.isEmpty else {
@@ -32,7 +32,7 @@ public extension InputHandler {
     /// 後続語候補を組み立ててモードに入る／出る判定をする。
     /// N-gram 候補がある場合は `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目まで表示を遅延）。
     /// 格助詞のみの場合（名詞末尾 + N-gram なし）は従来通り `.show` を返す。
-    public mutating func suggestSuccessors() -> CandidateAction {
+    mutating func suggestSuccessors() -> CandidateAction {
         guard let last = lastCommittedOutput else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             clearSuccessorLLMAuxiliaryState()
@@ -84,7 +84,7 @@ public extension InputHandler {
         }
     }
 
-    public mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
+    mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
         isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
         clearSuccessorLLMAuxiliaryState()
         state.pendingRomaji = ""
@@ -110,7 +110,7 @@ public extension InputHandler {
         client.insertText(particle)
     }
 
-    public mutating func handleSuccessorMode(
+    mutating func handleSuccessorMode(
         keyCode: UInt16,
         characters: String?,
         baseCharacters: String?,
@@ -222,7 +222,7 @@ public extension InputHandler {
     // MARK: - Successor 用の static データ
 
     /// ローマ字1文字 → 読みの先頭になりうるひらがな（N-gram 保留候補の読みフィルタに使用）
-    public static let romajiToInitialKana: [String: [String]] = [
+    static let romajiToInitialKana: [String: [String]] = [
         "a": ["あ"],
         "i": ["い"],
         "u": ["う"],
@@ -249,7 +249,7 @@ public extension InputHandler {
     ]
 
     /// 頭文字（ローマ字1文字）→ 格助詞リスト（複数ある場合は使用頻度の高い順）
-    public static let particleRomajiMap: [String: [String]] = [
+    static let particleRomajiMap: [String: [String]] = [
         "g": ["が"],
         "w": ["を"],
         "n": ["に", "の"],
@@ -262,7 +262,7 @@ public extension InputHandler {
     ]
 
     /// 漢字またはカタカナで終わる語（名詞らしい）かどうか
-    public func isNounLike(_ text: String) -> Bool {
+    func isNounLike(_ text: String) -> Bool {
         guard let last = text.unicodeScalars.last else { return false }
         let v = last.value
         let isKanji = (v >= 0x4E00 && v <= 0x9FFF) || (v >= 0x3400 && v <= 0x4DBF) || (v >= 0xF900 && v <= 0xFAFF)

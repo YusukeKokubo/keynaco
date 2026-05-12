@@ -7,7 +7,7 @@ import AppKit
 
 public extension InputHandler {
 
-    public mutating func enterSegmentMode() -> CandidateAction {
+    mutating func enterSegmentMode() -> CandidateAction {
         state.absorbPendingIntoComposed()
         let fullReading = state.composedHiragana
 
@@ -53,7 +53,7 @@ public extension InputHandler {
     }
 
     /// `LLMSegmentConverter` の結果を文節境界推定に成功すれば再構築、失敗時は先頭文節に全文候補を挿入（`InputController` から呼ぶ）。
-    public mutating func applyLLMSegmentResult(text raw: String) {
+    mutating func applyLLMSegmentResult(text raw: String) {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         guard var ss = state.segmentState, ss.llmWholeText == nil else { return }
@@ -131,7 +131,7 @@ public extension InputHandler {
     /// LLM 全文一発確定: 以下のいずれかを満たすとき。
     /// - 多文節境界パス: 全文節が先頭候補選択かつ連結が llmWholeText と一致
     /// - 旧フォールバックパス: focusedSegment の candidates[0] が llmWholeText そのもの
-    public func isLlmWholeTextShortcut(segmentState: SegmentState, candidateSelectedText: String?) -> Bool {
+    func isLlmWholeTextShortcut(segmentState: SegmentState, candidateSelectedText: String?) -> Bool {
         guard let whole = segmentState.llmWholeText else { return false }
         guard segmentState.focusedIndex == 0 else { return false }
         guard !segmentState.segments.isEmpty else { return false }
@@ -153,7 +153,7 @@ public extension InputHandler {
         return false
     }
 
-    public func buildSegmentCandidates(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
+    func buildSegmentCandidates(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
         let hiragana = reading
         let katakana = KanaUtils.hiraganaToKatakana(reading)
         let exactCandidates = db.fetchHistoryExact(reading: reading)
@@ -191,7 +191,7 @@ public extension InputHandler {
         return Segment(reading: reading, candidates: candidates, selectedIndex: initialIndex, historyEnd: historyEnd)
     }
 
-    public mutating func buildSegmentCandidatesCached(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
+    mutating func buildSegmentCandidatesCached(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
         let cacheKey = "\(reading)|\(prev ?? "")"
         if let cached = segmentCandidateCache[cacheKey] { return cached }
         let result = buildSegmentCandidates(reading: reading, dictCandidates: dictCandidates, prev: prev)
@@ -199,14 +199,14 @@ public extension InputHandler {
         return result
     }
 
-    public func makeCandidateActionForFocusedSegment() -> CandidateAction {
+    func makeCandidateActionForFocusedSegment() -> CandidateAction {
         guard let segmentState = state.segmentState else { return .none }
         let seg = segmentState.focusedSegment
         guard !seg.candidates.isEmpty else { return .dismiss }
         return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex, predictionEnd: seg.historyEnd, fixedEnd: 0)
     }
 
-    public mutating func handleSegmentModeKey(
+    mutating func handleSegmentModeKey(
         keyCode: UInt16,
         modifiers: NSEvent.ModifierFlags,
         candidate: CandidateContext,
@@ -283,7 +283,7 @@ public extension InputHandler {
     /// Shift+右/左矢印でセグメント境界を1文字単位で調整する。
     /// expand=true: フォーカスセグメントを右に1文字拡張（次セグメントの先頭1文字を奪う）
     /// expand=false: フォーカスセグメントを左に1文字縮小（末尾1文字を次セグメントの先頭に渡す）
-    public mutating func resizeFocusedSegment(
+    mutating func resizeFocusedSegment(
         expand: Bool,
         candidate: CandidateContext,
         client: TextInputClient
@@ -373,14 +373,14 @@ public extension InputHandler {
         return true
     }
 
-    public mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {
+    mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {
         guard let segmentState = state.segmentState, let selectedText = candidate.selectedText else { return }
         if let idx = segmentState.focusedSegment.candidates.firstIndex(of: selectedText) {
             state.segmentState!.segments[segmentState.focusedIndex].selectedIndex = idx
         }
     }
 
-    public mutating func doConfirmSegments(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
+    mutating func doConfirmSegments(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         syncFocusedSegmentSelection(from: candidate)
         guard let segmentState = state.segmentState else { return .none }
 
@@ -436,7 +436,7 @@ public extension InputHandler {
         return suggestSuccessors()
     }
 
-    public func applySegmentMarkedText(client: TextInputClient) {
+    func applySegmentMarkedText(client: TextInputClient) {
         guard let segmentState = state.segmentState else { return }
         let str = segmentState.attributedString()
         client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))

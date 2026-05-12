@@ -6,7 +6,7 @@ import Carbon
 nonisolated(unsafe) var gServer: IMKServer?
 
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
     private var successorPendingObserver: NSObjectProtocol?
@@ -76,7 +76,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] note in
             let pending = (note.userInfo?["pending"] as? Bool) ?? false
-            self?.applySuccessorPending(pending: pending)
+            MainActor.assumeIsolated { self?.applySuccessorPending(pending: pending) }
         }
 
         misconversionIssueObserver = NotificationCenter.default.addObserver(
@@ -85,7 +85,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] note in
             if let s = note.userInfo?["detail"] as? String, !s.isEmpty {
-                self?.applyMisconversionIssue(detail: s)
+                MainActor.assumeIsolated { self?.applyMisconversionIssue(detail: s) }
             }
         }
 
@@ -94,7 +94,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.applyMisconversionCleared()
+            MainActor.assumeIsolated { self?.applyMisconversionCleared() }
         }
 
         let menu = NSMenu()

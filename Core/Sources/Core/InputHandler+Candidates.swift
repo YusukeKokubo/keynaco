@@ -13,24 +13,26 @@ public extension InputHandler {
 
     // MARK: - z + キー 特殊文字マップ
 
-    public static let zCharMap: [String: String] = [
+    static let zCharMap: [String: String] = [
         "-": "〜", "/": "・", ".": "…", ",": "、",
     ]
-    public static let zArrowMap: [UInt16: String] = [
+    static let zArrowMap: [UInt16: String] = [
         KeyCode.rightArrow: "→", KeyCode.leftArrow: "←",
     ]
 
     // MARK: - 括弧候補マップ
 
-    public static let punctuationMap: [String: String] = [",": "、", ".": "。"]
+    static let punctuationMap: [String: String] = [",": "、", ".": "。"]
 
-    public static let bracketOptions: [String: [String]] = [
+    static let bracketOptions: [String: [String]] = [
         "[": ["「", "【", "〔", "［", "〈", "《", "『"],
         "]": ["」", "】", "〕", "］", "〉", "》", "』"],
         "(": ["（", "〔", "｟"],
         ")": ["）", "〕", "｠"],
         "{": ["｛"],
         "}": ["｝"],
+        "?": ["？", "?"],
+        "!": ["！", "!"],
     ]
 
     // MARK: - 括弧モード
@@ -74,7 +76,7 @@ public extension InputHandler {
     }
 
     @discardableResult
-    public mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
+    mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         guard !state.composingText.isEmpty else { return .none }
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
@@ -139,7 +141,7 @@ public extension InputHandler {
 
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
-    public mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
+    mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
         let sources = collectCandidateSources(autoShow: autoShow)
         return assembleCandidateList(from: sources, autoShow: autoShow)
     }
@@ -318,7 +320,7 @@ public extension InputHandler {
 
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
     /// 候補が存在すれば isSuccessorMode = true を立てて返す。pendingRomaji は confirmSuccessor() で破棄される。
-    public mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
+    mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
         guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
               let prev = lastCommittedOutput else { return .dismiss }
         var seen = Set<String>()
@@ -378,13 +380,13 @@ public extension InputHandler {
         return try! NSRegularExpression(pattern: "(" + parts.joined(separator: "|") + ")$")
     }()
 
-    public static func isHiraganaPreferred(_ h: String) -> Bool {
+    static func isHiraganaPreferred(_ h: String) -> Bool {
         let range = NSRange(h.startIndex..., in: h)
         return hiraganaPreferredRegex.firstMatch(in: h, range: range) != nil
     }
 
     /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。
-    public static func merged(_ arrays: [String]...) -> [String] {
+    static func merged(_ arrays: [String]...) -> [String] {
         var seen = Set<String>()
         var result: [String] = []
         for arr in arrays {

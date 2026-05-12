@@ -215,7 +215,7 @@ public final class LLMSegmentConverter {
 }
 
 private extension String {
-    public mutating func removeFirst(count n: Int) {
+    mutating func removeFirst(count n: Int) {
         guard n > 0 else { return }
         let idx = index(startIndex, offsetBy: n, limitedBy: endIndex) ?? endIndex
         removeSubrange(startIndex..<idx)

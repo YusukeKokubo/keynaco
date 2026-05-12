@@ -303,6 +303,54 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         }
     }
 
+    // MARK: - Shift+/ → ？候補ウィンドウ、Shift+1 → ！候補ウィンドウ
+
+    func testShiftSlashShowsCandidateWindow() {
+        let result = type(chars: "?", base: "?", modifiers: .shift)
+        XCTAssertTrue(result.consumed)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "？")
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("？"))
+            XCTAssertTrue(candidates.contains("?"))
+        } else {
+            XCTFail("Expected .show but got \(result.candidateAction)")
+        }
+    }
+
+    func testShiftOneShowsCandidateWindow() {
+        let result = type(chars: "!", base: "!", modifiers: .shift)
+        XCTAssertTrue(result.consumed)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "！")
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("！"))
+            XCTAssertTrue(candidates.contains("!"))
+        } else {
+            XCTFail("Expected .show but got \(result.candidateAction)")
+        }
+    }
+
+    func testShiftSlashAppendsToComposition() {
+        type(chars: "a", base: "a")
+        let result = type(chars: "?", base: "?", modifiers: .shift)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ？")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show but got \(result.candidateAction)")
+        }
+    }
+
+    func testShiftOneAppendsToComposition() {
+        type(chars: "a", base: "a")
+        let result = type(chars: "!", base: "!", modifiers: .shift)
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "あ！")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show but got \(result.candidateAction)")
+        }
+    }
+
     // MARK: - Shift+句読点確定後の Successor モード非起動
 
     func testShiftAngleBracketConfirmedNotNounLikeNoSuccessor() {

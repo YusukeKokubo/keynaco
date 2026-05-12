@@ -102,7 +102,7 @@ final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
 
 @objc(InputController)
 @MainActor
-class InputController: IMKInputController {
+class InputController: IMKInputController, @unchecked Sendable {
 
     lazy var handler: InputHandler = InputHandler(azooKeyConverter: ZenzaiSettings.makeConverter())
     /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
@@ -127,16 +127,23 @@ class InputController: IMKInputController {
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
-        candidateWindow.onDelete = { [weak self] (text: String, row: Int) in
-            self?.handler.db.deleteHistory(output: text)
-            self?.candidateWindow.removeCandidate(at: row)
+        let ic = self
+        MainActor.assumeIsolated {
+            ic.candidateWindow.onDelete = { [weak ic] (text: String, row: Int) in
+                MainActor.assumeIsolated {
+                    ic?.handler.db.deleteHistory(output: text)
+                    ic?.candidateWindow.removeCandidate(at: row)
+                }
+            }
         }
         zenzaiSettingsObserver = NotificationCenter.default.addObserver(
             forName: .keynacoZenzaiSettingsDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.reloadAzooKeyConverterFromSettings()
+            MainActor.assumeIsolated {
+                self?.reloadAzooKeyConverterFromSettings()
+            }
         }
     }
 
@@ -169,7 +176,7 @@ class InputController: IMKInputController {
     }
 
     override func showPreferences(_ sender: Any!) {
-        SettingsWindowController.shared.showSettings()
+        MainActor.assumeIsolated { SettingsWindowController.shared.showSettings() }
     }
 
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
@@ -179,21 +186,24 @@ class InputController: IMKInputController {
 
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
-        handler.state = CompositionState()
-        handler.committedHistory = []
-        handler.isSuccessorMode = false
-        handler.successorFirstChar = nil
-        handler.pendingSuccessorCandidates = []
-        handler.successorLLMSurfaceExtras = []
-        handler.successorLLMTrigger = .none
-        handler.successorLLMBaseCandidates = nil
-        handler.segmentLLMTrigger = .none
-        cachedSurroundingContext = nil
-        handler.leftSideContext = ""
-        Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: true)
-        handler.ignoreNextModeSwitch = true
-        candidateWindow.dismiss()
-        Self.postSuccessorPendingNotification(pending: false)
+        let ic = self
+        MainActor.assumeIsolated {
+            ic.handler.state = CompositionState()
+            ic.handler.committedHistory = []
+            ic.handler.isSuccessorMode = false
+            ic.handler.successorFirstChar = nil
+            ic.handler.pendingSuccessorCandidates = []
+            ic.handler.successorLLMSurfaceExtras = []
+            ic.handler.successorLLMTrigger = .none
+            ic.handler.successorLLMBaseCandidates = nil
+            ic.handler.segmentLLMTrigger = .none
+            ic.cachedSurroundingContext = nil
+            ic.handler.leftSideContext = ""
+            Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: true)
+            ic.handler.ignoreNextModeSwitch = true
+            ic.candidateWindow.dismiss()
+            Self.postSuccessorPendingNotification(pending: false)
+        }
     }
 
     override func deactivateServer(_ sender: Any!) {
@@ -293,53 +303,48 @@ class InputController: IMKInputController {
 
         guard event.type == .keyDown else { return false }
 
-        let chars = event.characters ?? ""
-        let baseChars = event.charactersIgnoringModifiers ?? ""
-        let mods = event.modifierFlags
-        #if DEBUG
-        EventViewerWindow.shared.addEvent(
-            keyCode: event.keyCode, chars: chars, baseChars: baseChars,
-            mods: mods, bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        )
-        #endif
+        // NSEvent を assumeIsolated の外で value-type に分解して region-based isolation エラーを回避する
+        let keyCode = event.keyCode
+        let characters = event.characters
+        let baseCharacters = event.charactersIgnoringModifiers
+        let modifiers = event.modifierFlags
 
-        let ctx = CandidateContext(
-            isVisible: candidateWindow.isVisible,
-            selectedRow: candidateWindow.selectedRow,
-            selectedText: candidateWindow.selectedText(),
-            isExplicitlySelected: candidateWindow.isExplicitlySelected,
-            historyEnd: candidateWindow.historySectionEnd,
-            fixedEnd: candidateWindow.fixedRowCount
-        )
         let adapter = IMKTextInputAdapter(sender)
-        nonisolated(unsafe) let ic: InputController = self
-        MainActor.assumeIsolated {
-            ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
-        }
-
-        let composingWasEmpty = ic.handler.state.composingText.isEmpty
-        let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
-
-        let (consumed, action) = ic.handler.handle(
-            keyCode: event.keyCode,
-            characters: event.characters,
-            baseCharacters: event.charactersIgnoringModifiers,
-            modifiers: event.modifierFlags,
-            candidate: ctx,
-            client: adapter
-        )
-
-        #if DEBUG
-        let actionName = "\(action)".split(separator: "(").first.map(String.init) ?? "\(action)"
-        EventViewerWindow.shared.updateResult(consumed: consumed, action: actionName)
-        #endif
-
+        let ic: InputController = self
         // IMK の `handle` は nonisolated。候補ウィンドウ操作は従来どおり MainActor 前提（assumeIsolated はメイン以外では実行時クラッシュしうる）。
         // `sender` / `self` は IMK ブリッジ上 nonisolated から MainActor 島へ渡すため nonisolated(unsafe) とする（Swift 6 sending）。
         nonisolated(unsafe) let imkSenderForSurrounding: Any? = sender
-        // ステータス通知は島から値を返し、`DispatchQueue.main.async` で投稿する（post 自体は nonisolated static）。
+
+        // @MainActor アクセス（candidateWindow・handler）を assumeIsolated に集約。ステータス通知は島から値を返し DispatchQueue.main.async で投稿する。
         #if DEBUG
-        let (successorPendingForMenuBar, imeStateSnapshot) = MainActor.assumeIsolated {
+        let (successorPendingForMenuBar, consumed, imeStateSnapshot) = MainActor.assumeIsolated {
+            EventViewerWindow.shared.addEvent(
+                keyCode: keyCode, chars: characters ?? "",
+                baseChars: baseCharacters ?? "",
+                mods: modifiers,
+                bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            )
+            let ctx = CandidateContext(
+                isVisible: ic.candidateWindow.isVisible,
+                selectedRow: ic.candidateWindow.selectedRow,
+                selectedText: ic.candidateWindow.selectedText(),
+                isExplicitlySelected: ic.candidateWindow.isExplicitlySelected,
+                historyEnd: ic.candidateWindow.historySectionEnd,
+                fixedEnd: ic.candidateWindow.fixedRowCount
+            )
+            ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
+            let composingWasEmpty = ic.handler.state.composingText.isEmpty
+            let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
+            let (consumed, action) = ic.handler.handle(
+                keyCode: keyCode,
+                characters: characters,
+                baseCharacters: baseCharacters,
+                modifiers: modifiers,
+                candidate: ctx,
+                client: adapter
+            )
+            let actionName = "\(action)".split(separator: "(").first.map(String.init) ?? "\(action)"
+            EventViewerWindow.shared.updateResult(consumed: consumed, action: actionName)
             let pending = ic.applyPostKeyDownEffects(
                 action: action,
                 adapter: adapter,
@@ -355,17 +360,37 @@ class InputController: IMKInputController {
             snap.historyEnd = ic.candidateWindow.historySectionEnd
             snap.fixedEnd = ic.candidateWindow.fixedRowCount
             snap.candidates = Array(ic.candidateWindow.candidates.prefix(30))
-            return (pending, snap)
+            return (pending, consumed, snap)
         }
         #else
-        let successorPendingForMenuBar = MainActor.assumeIsolated {
-            ic.applyPostKeyDownEffects(
+        let (successorPendingForMenuBar, consumed) = MainActor.assumeIsolated {
+            let ctx = CandidateContext(
+                isVisible: ic.candidateWindow.isVisible,
+                selectedRow: ic.candidateWindow.selectedRow,
+                selectedText: ic.candidateWindow.selectedText(),
+                isExplicitlySelected: ic.candidateWindow.isExplicitlySelected,
+                historyEnd: ic.candidateWindow.historySectionEnd,
+                fixedEnd: ic.candidateWindow.fixedRowCount
+            )
+            ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
+            let composingWasEmpty = ic.handler.state.composingText.isEmpty
+            let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
+            let (consumed, action) = ic.handler.handle(
+                keyCode: keyCode,
+                characters: characters,
+                baseCharacters: baseCharacters,
+                modifiers: modifiers,
+                candidate: ctx,
+                client: adapter
+            )
+            let pending = ic.applyPostKeyDownEffects(
                 action: action,
                 adapter: adapter,
                 composedHiraganaWasEmpty: composedHiraganaWasEmpty,
                 composingWasEmpty: composingWasEmpty,
                 imkSenderForSurrounding: imkSenderForSurrounding
             )
+            return (pending, consumed)
         }
         #endif
         DispatchQueue.main.async {
@@ -384,37 +409,38 @@ class InputController: IMKInputController {
     // MARK: - 確定
 
     override func commitComposition(_ sender: Any!) {
-        // Successor モード中で組成がない場合は system-triggered commit をスキップ
-        // (insertText の副作用で system が commitComposition を呼ぶことがある)
-        if handler.isSuccessorMode && handler.state.composingText.isEmpty && !handler.state.isSegmentMode {
-            return
-        }
         let adapter = IMKTextInputAdapter(sender)
-        let ctx = CandidateContext(
-            isVisible: candidateWindow.isVisible,
-            selectedRow: candidateWindow.selectedRow,
-            selectedText: candidateWindow.selectedText(),
-            isExplicitlySelected: candidateWindow.isExplicitlySelected,
-            historyEnd: candidateWindow.historySectionEnd,
-            fixedEnd: candidateWindow.fixedRowCount
-        )
-        handler.commitComposition(client: adapter, candidate: ctx)
-        handler.bracketCandidates = nil
-        handler.isSuccessorMode = false
-        handler.successorFirstChar = nil
-        handler.pendingSuccessorCandidates = []
-        handler.successorLLMSurfaceExtras = []
-        handler.successorLLMTrigger = .none
-        handler.successorLLMBaseCandidates = nil
-        handler.segmentLLMTrigger = .none
-        cachedSurroundingContext = nil
-        handler.leftSideContext = ""
-        Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: false)
-        candidateWindow.dismiss()
-        Self.postSuccessorPendingNotification(pending: false)
+        let ic = self
+        MainActor.assumeIsolated {
+            // Successor モード中で組成がない場合は system-triggered commit をスキップ
+            // (insertText の副作用で system が commitComposition を呼ぶことがある)
+            guard !(ic.handler.isSuccessorMode && ic.handler.state.composingText.isEmpty && !ic.handler.state.isSegmentMode) else { return }
+            let ctx = CandidateContext(
+                isVisible: ic.candidateWindow.isVisible,
+                selectedRow: ic.candidateWindow.selectedRow,
+                selectedText: ic.candidateWindow.selectedText(),
+                isExplicitlySelected: ic.candidateWindow.isExplicitlySelected,
+                historyEnd: ic.candidateWindow.historySectionEnd,
+                fixedEnd: ic.candidateWindow.fixedRowCount
+            )
+            ic.handler.commitComposition(client: adapter, candidate: ctx)
+            ic.handler.bracketCandidates = nil
+            ic.handler.isSuccessorMode = false
+            ic.handler.successorFirstChar = nil
+            ic.handler.pendingSuccessorCandidates = []
+            ic.handler.successorLLMSurfaceExtras = []
+            ic.handler.successorLLMTrigger = .none
+            ic.handler.successorLLMBaseCandidates = nil
+            ic.handler.segmentLLMTrigger = .none
+            ic.cachedSurroundingContext = nil
+            ic.handler.leftSideContext = ""
+            Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: false)
+            ic.candidateWindow.dismiss()
+            Self.postSuccessorPendingNotification(pending: false)
 
-        if adapter.didInsertText {
-            scheduleMisconversionCheck(adapter: adapter)
+            if adapter.didInsertText {
+                ic.scheduleMisconversionCheck(adapter: adapter)
+            }
         }
     }
 
