@@ -61,19 +61,21 @@ public extension InputHandler {
         successorFirstChar = nil
         let llmContext = Array(committedHistory.suffix(3))
 
+        let maxC = LearningThresholds.successorMaxCandidates
         if predictTop.isEmpty {
             // 格助詞 fallback のみ（N-gram なし）→ 従来通りすぐ表示
+            let capped = Array(candidates.prefix(maxC))
             pendingSuccessorCandidates = []
-            successorLLMBaseCandidates = candidates
+            successorLLMBaseCandidates = capped
             successorLLMTrigger = .particlesOnly(context: llmContext)
-            return .show(candidates: candidates, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
+            return .show(candidates: capped, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
         } else {
             // 高信頼チェック：直近90日以内に閾値回数以上使ったペアは即時表示
             let topCount = db.fetchBigramTopCount(prev: last)
             if topCount >= InputHandler.successorImmediateThreshold {
                 pendingSuccessorCandidates = []
                 clearSuccessorLLMAuxiliaryState()
-                return .show(candidates: candidates, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
+                return .show(candidates: Array(candidates.prefix(maxC)), historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
             } else {
                 // 通常 → 保存して1打目まで待つ
                 pendingSuccessorCandidates = candidates
@@ -165,7 +167,7 @@ public extension InputHandler {
                     let ngram = InputHandler.merged(fromTrigram, fromBigram)
                     let ngramSet = Set(ngram)
                     let rest = matched.filter { !ngramSet.contains($0) }
-                    return (true, .show(candidates: ngram + rest, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+                    return (true, .show(candidates: Array((ngram + rest).prefix(LearningThresholds.successorMaxCandidates)), historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
                 }
             }
             // fast-path 非該当かつ N-gram 保留あり → 1打目で読み前方一致フィルタして表示
@@ -202,7 +204,7 @@ public extension InputHandler {
                         successorLLMSurfaceExtras = []
                         clearSuccessorLLMAuxiliaryState()
                         successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                        return (true, .show(candidates: merged, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+                        return (true, .show(candidates: Array(merged.prefix(LearningThresholds.successorMaxCandidates)), historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
                     }
                 }
                 pendingSuccessorCandidates = []
