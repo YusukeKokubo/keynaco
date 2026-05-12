@@ -66,6 +66,15 @@ private struct PromptLine: Encodable {
     let output: String
 }
 
+/// LLM に渡す文字列のみ短縮（DB キー・表示用の `WorkRow` は変更しない）。
+private enum PromptClip {
+    static let maxCharsPerField = 96
+    static func field(_ s: String) -> String {
+        guard s.count > maxCharsPerField else { return s }
+        return String(s.prefix(maxCharsPerField)) + "…"
+    }
+}
+
 private struct WorkRow: Sendable {
     let id: Int
     let source: EntrySource
@@ -83,15 +92,21 @@ public actor LLMCleanser {
     }
 
     /// history / bigram を評価して suspect/delete エントリを返す。
-    /// `onProgress(completed:total:)` は Main Actor から呼ばれる。
+    /// `maxCount` が nil でなければ使用回数がその値以下のエントリのみ対象にする。
+    /// `onProgress(completed:total:)` と `onEntry(_:)` は Main Actor から呼ばれる。
     public func evaluate(
         db: DatabaseManager,
-        onProgress: @MainActor @Sendable (Int, Int) -> Void = { _, _ in }
+        maxCount: Int? = nil,
+        onProgress: @MainActor @Sendable (Int, Int) -> Void = { _, _ in },
+        onEntry: @MainActor @Sendable ([FlaggedEntry]) -> Void = { _ in }
     ) async throws -> [FlaggedEntry] {
         guard Self.isModelAvailable else { throw CleanserError.unavailable }
 
-        let history = db.fetchAllHistory()
-        let bigrams = db.fetchAllBigramExcludingPresets()
+        let allHistory = db.fetchAllHistory()
+        let allBigrams = db.fetchAllBigramExcludingPresets()
+        let history = maxCount.map { mc in allHistory.filter { $0.count <= mc } } ?? allHistory
+        let bigrams = maxCount.map { mc in allBigrams.filter { $0.count <= mc } } ?? allBigrams
+
         var rows: [WorkRow] = []
         var nextId = 0
         for h in history {
@@ -120,19 +135,47 @@ public actor LLMCleanser {
         }
         await onProgress(0, total)
 
-        let batchSize = 30
+        // PromptClip で長文を短縮。コンテキスト超過は runBatchResilient が分割して吸収する。
+        let batchSize = 20
         var flagged: [FlaggedEntry] = []
         var batchStart = 0
         while batchStart < rows.count {
             try Task.checkCancellation()
             let end = min(batchStart + batchSize, rows.count)
             let slice = Array(rows[batchStart..<end])
-            let batchFlagged = try await Self.runBatch(rows: slice)
-            flagged.append(contentsOf: batchFlagged)
+            let batchFlagged = try await Self.runBatchResilient(rows: slice)
+            if !batchFlagged.isEmpty {
+                flagged.append(contentsOf: batchFlagged)
+                await onEntry(batchFlagged)
+            }
             await onProgress(end, total)
             batchStart = end
         }
         return flagged
+    }
+
+    /// コンテキスト上限っぽい失敗のときだけ行を半分に分けて再帰的に再試行する。
+    private nonisolated static func runBatchResilient(rows: [WorkRow]) async throws -> [FlaggedEntry] {
+        guard !rows.isEmpty else { return [] }
+        do {
+            return try await runBatch(rows: rows)
+        } catch {
+            guard rows.count > 1, isLikelyContextWindowError(error) else { throw error }
+            let mid = rows.count / 2
+            let head = Array(rows[..<mid])
+            let tail = Array(rows[mid...])
+            let a = try await runBatchResilient(rows: head)
+            let b = try await runBatchResilient(rows: tail)
+            return a + b
+        }
+    }
+
+    private nonisolated static func isLikelyContextWindowError(_ error: Error) -> Bool {
+        let m = error.localizedDescription.lowercased()
+        if m.contains("exceeded model context") { return true }
+        if m.contains("context window") { return true }
+        if m.contains("context") && m.contains("limit") { return true }
+        return false
     }
 
     private nonisolated static func runBatch(rows: [WorkRow]) async throws -> [FlaggedEntry] {
@@ -140,9 +183,18 @@ public actor LLMCleanser {
         let lines: [PromptLine] = rows.map { row in
             switch row.source {
             case let .history(input, output):
-                PromptLine(id: row.id, type: "history", prev: nil, input: input, output: output)
+                PromptLine(
+                    id: row.id, type: "history", prev: nil,
+                    input: PromptClip.field(input),
+                    output: PromptClip.field(output)
+                )
             case let .bigram(prev, input, output):
-                PromptLine(id: row.id, type: "bigram", prev: prev, input: input, output: output)
+                PromptLine(
+                    id: row.id, type: "bigram",
+                    prev: PromptClip.field(prev),
+                    input: PromptClip.field(input),
+                    output: PromptClip.field(output)
+                )
             }
         }
         let jsonData = try JSONEncoder().encode(lines)

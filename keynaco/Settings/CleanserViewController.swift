@@ -8,13 +8,30 @@ final class CleanserViewController: NSViewController {
 
     private let scrollView = NSScrollView()
     private let tableView = DeletableTableView()
+    private let descriptionLabel = NSTextField(wrappingLabelWithString: "")
     private let statusLabel = NSTextField(labelWithString: "")
     private let helpLinkLabel = NSTextField(wrappingLabelWithString: "")
     private let timeHintLabel = NSTextField(labelWithString: "")
+    private let emptyStateLabel = NSTextField(labelWithString: "「スキャン」を押して、変換履歴・Bi-gram をオンデバイス AI で検査します。")
     private let progressIndicator = NSProgressIndicator()
     private let deleteSelectedButton = NSButton(title: "選択を削除", target: nil, action: nil)
     private let deleteAllButton = NSButton(title: "フラグをすべて削除", target: nil, action: nil)
+    private let scopeSegment = NSSegmentedControl(
+        labels: ["1回のみ", "3回以下", "全件"],
+        trackingMode: .selectOne,
+        target: nil,
+        action: nil
+    )
     private let scanButton = NSButton(title: "スキャン", target: nil, action: nil)
+
+    /// セグメント選択に対応する maxCount（nil = 全件）
+    private var selectedMaxCount: Int? {
+        switch scopeSegment.selectedSegment {
+        case 0: return 1
+        case 1: return 3
+        default: return nil
+        }
+    }
 
     private let cleanser = LLMCleanser()
     private var data: [FlaggedEntry] = []
@@ -22,6 +39,12 @@ final class CleanserViewController: NSViewController {
 
     override func loadView() {
         view = NSView()
+
+        descriptionLabel.translatesAutoresizingMaskIntoConstraints = false
+        descriptionLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        descriptionLabel.textColor = .secondaryLabelColor
+        descriptionLabel.stringValue = "誤変換や不要な学習データをオンデバイス AI で検出・削除します。"
+        view.addSubview(descriptionLabel)
 
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.cell?.wraps = true
@@ -44,6 +67,12 @@ final class CleanserViewController: NSViewController {
         timeHintLabel.stringValue = "データ量によっては数分かかることがあります。"
         timeHintLabel.isHidden = true
         view.addSubview(timeHintLabel)
+
+        emptyStateLabel.translatesAutoresizingMaskIntoConstraints = false
+        emptyStateLabel.alignment = .center
+        emptyStateLabel.textColor = .tertiaryLabelColor
+        emptyStateLabel.font = .systemFont(ofSize: 13)
+        view.addSubview(emptyStateLabel)
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.hasVerticalScroller = true
@@ -74,7 +103,11 @@ final class CleanserViewController: NSViewController {
         view.addSubview(bottomBar)
 
         NSLayoutConstraint.activate([
-            statusLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            descriptionLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            descriptionLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            descriptionLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+
+            statusLabel.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 4),
             statusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             statusLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
 
@@ -89,6 +122,10 @@ final class CleanserViewController: NSViewController {
             scrollView.topAnchor.constraint(equalTo: timeHintLabel.bottomAnchor, constant: 6),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+
+            emptyStateLabel.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
+            emptyStateLabel.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
+            emptyStateLabel.widthAnchor.constraint(lessThanOrEqualTo: scrollView.widthAnchor, constant: -32),
 
             progressIndicator.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 6),
             progressIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -129,6 +166,18 @@ final class CleanserViewController: NSViewController {
         deleteAllButton.isEnabled = false
         bar.addSubview(deleteAllButton)
 
+        let scopeLabel = NSTextField(labelWithString: "対象:")
+        scopeLabel.translatesAutoresizingMaskIntoConstraints = false
+        scopeLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        scopeLabel.textColor = .secondaryLabelColor
+        bar.addSubview(scopeLabel)
+
+        scopeSegment.translatesAutoresizingMaskIntoConstraints = false
+        scopeSegment.selectedSegment = 1  // デフォルト: 3回以下
+        scopeSegment.controlSize = .small
+        scopeSegment.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        bar.addSubview(scopeSegment)
+
         scanButton.translatesAutoresizingMaskIntoConstraints = false
         scanButton.target = self
         scanButton.action = #selector(scanOrCancelTapped)
@@ -140,6 +189,12 @@ final class CleanserViewController: NSViewController {
 
             deleteAllButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             deleteAllButton.leadingAnchor.constraint(equalTo: deleteSelectedButton.trailingAnchor, constant: 8),
+
+            scopeLabel.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            scopeLabel.leadingAnchor.constraint(equalTo: deleteAllButton.trailingAnchor, constant: 16),
+
+            scopeSegment.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            scopeSegment.leadingAnchor.constraint(equalTo: scopeLabel.trailingAnchor, constant: 4),
 
             scanButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             scanButton.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -12),
@@ -157,13 +212,15 @@ final class CleanserViewController: NSViewController {
             scrollView.isHidden = false
             tableView.isHidden = false
             helpLinkLabel.isHidden = true
-            statusLabel.stringValue = "「スキャン」で学習データを評価し、怪しいエントリを表示します。"
+            statusLabel.stringValue = ""
+            emptyStateLabel.isHidden = false
             scanButton.isEnabled = true
         } else {
             scrollView.isHidden = true
             tableView.isHidden = true
             timeHintLabel.isHidden = true
             helpLinkLabel.isHidden = false
+            emptyStateLabel.isHidden = true
             statusLabel.stringValue = "Apple Intelligence が必要です。この Mac ではオンデバイス言語モデルを利用できません。"
             scanButton.isEnabled = false
             progressIndicator.stopAnimation(nil)
@@ -189,33 +246,54 @@ final class CleanserViewController: NSViewController {
         data.removeAll()
         tableView.reloadData()
         scanButton.title = "キャンセル"
+        scopeSegment.isEnabled = false
         timeHintLabel.isHidden = false
+        emptyStateLabel.isHidden = true
         progressIndicator.startAnimation(nil)
         statusLabel.stringValue = "スキャン中（0 / 0）…"
         deleteSelectedButton.isEnabled = false
         deleteAllButton.isEnabled = false
 
+        let maxCount = selectedMaxCount
         scanTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer {
                 self.scanTask = nil
+                self.scopeSegment.isEnabled = true
             }
             do {
-                let result = try await self.cleanser.evaluate(db: .shared) { processed, total in
-                    if total == 0 {
-                        self.statusLabel.stringValue = "評価対象のエントリがありません。"
-                    } else {
-                        self.statusLabel.stringValue = "スキャン中（\(processed) / \(total)）…"
+                let result = try await self.cleanser.evaluate(
+                    db: .shared,
+                    maxCount: maxCount,
+                    onProgress: { processed, total in
+                        if total == 0 {
+                            self.statusLabel.stringValue = "評価対象のエントリがありません。"
+                        } else {
+                            self.statusLabel.stringValue = "スキャン中（\(processed) / \(total)）…"
+                        }
+                    },
+                    onEntry: { newEntries in
+                        let startRow = self.data.count
+                        self.data.append(contentsOf: newEntries)
+                        let indexSet = IndexSet(startRow..<self.data.count)
+                        self.tableView.insertRows(at: indexSet, withAnimation: .effectFade)
+                        self.deleteAllButton.isEnabled = true
                     }
+                )
+                if result.isEmpty {
+                    self.statusLabel.stringValue = "問題のあるエントリは見つかりませんでした。"
+                    self.emptyStateLabel.isHidden = false
+                    self.emptyStateLabel.stringValue = "✓ 問題なし"
+                } else {
+                    self.statusLabel.stringValue = "LLM がフラグを立てたエントリ（\(result.count) 件）"
+                    self.emptyStateLabel.isHidden = true
                 }
-                self.data = result
-                self.tableView.reloadData()
-                self.statusLabel.stringValue =
-                    "LLM がフラグを立てたエントリ（\(result.count) 件）"
                 self.deleteAllButton.isEnabled = !result.isEmpty
                 self.finishScanningUI()
             } catch is CancellationError {
                 self.statusLabel.stringValue = "スキャンを中止しました。"
+                self.emptyStateLabel.stringValue = "「スキャン」を押して、変換履歴・Bi-gram をオンデバイス AI で検査します。"
+                self.emptyStateLabel.isHidden = self.data.isEmpty ? false : true
                 self.finishScanningUI()
             } catch let err as CleanserError where err == .unavailable {
                 self.statusLabel.stringValue = "Apple Intelligence が利用できなくなりました。"
@@ -231,6 +309,8 @@ final class CleanserViewController: NSViewController {
                     alert.beginSheetModal(for: window, completionHandler: nil)
                 }
                 self.statusLabel.stringValue = "スキャンに失敗しました。"
+                self.emptyStateLabel.stringValue = "「スキャン」を押して、変換履歴・Bi-gram をオンデバイス AI で検査します。"
+                self.emptyStateLabel.isHidden = self.data.isEmpty ? false : true
                 self.finishScanningUI()
             }
         }
@@ -275,7 +355,9 @@ final class CleanserViewController: NSViewController {
         deleteSelectedButton.isEnabled = tableView.selectedRow >= 0 && !data.isEmpty
         deleteAllButton.isEnabled = !data.isEmpty
         if data.isEmpty {
-            statusLabel.stringValue = "表示するフラグ付きエントリはありません。"
+            statusLabel.stringValue = "すべて削除しました。"
+            emptyStateLabel.stringValue = "✓ 問題なし"
+            emptyStateLabel.isHidden = false
         } else {
             statusLabel.stringValue = "LLM がフラグを立てたエントリ（\(data.count) 件）"
         }

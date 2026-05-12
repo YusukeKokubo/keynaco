@@ -276,10 +276,11 @@ public struct InputHandler {
         if !state.composingText.isEmpty && !skipHistory, let p1 = lastCommittedOutput {
             capPrev1 = p1
             capPrev2 = prev2Output
-            if InputHandler.particles.contains(p1) { capSkipPrevs = mostRecentContentWords(n: 2) }
+            let isParticlePrev = InputHandler.particles.contains(p1)
+            if isParticlePrev { capSkipPrevs = mostRecentContentWords(n: 2) }
             let bigramInput = state.finalizedText
             db.recordNgrams(
-                bigram: (prev: p1, input: bigramInput, output: text),
+                bigram: isParticlePrev ? nil : (prev: p1, input: bigramInput, output: text),
                 trigram: prev2Output.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) },
                 skipBigrams: capSkipPrevs.map { (prev: $0, input: bigramInput, output: text) }
             )

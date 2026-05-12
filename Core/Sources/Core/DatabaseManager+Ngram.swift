@@ -292,23 +292,26 @@ extension DatabaseManager {
     }
 
     /// bigram / trigram / skip-bigram をまとめて1トランザクションでバックグラウンド書き込みする。
+    /// bigram が nil のとき（prev が格助詞）はその記録をスキップし trigram / skip-bigram のみ保存する。
     func recordNgrams(
-        bigram: (prev: String, input: String, output: String),
+        bigram: (prev: String, input: String, output: String)?,
         trigram: (prev2: String, prev1: String, input: String, output: String)?,
         skipBigrams: [(prev: String, input: String, output: String)]
     ) {
         dispatchWrite {
             let t = self.nowEpoch()
             self.executeOnQueue("BEGIN")
-            self.executeOnQueue("""
-            INSERT INTO bigram (prev, input, output, count, used_at)
-            VALUES (?, ?, ?, 1, ?)
-            ON CONFLICT(prev, input, output) DO UPDATE SET
-                count   = count + 1,
-                used_at = excluded.used_at;
-            """) {
-                self.bindText($0, 1, bigram.prev); self.bindText($0, 2, bigram.input)
-                self.bindText($0, 3, bigram.output); sqlite3_bind_int64($0, 4, t)
+            if let bigram {
+                self.executeOnQueue("""
+                INSERT INTO bigram (prev, input, output, count, used_at)
+                VALUES (?, ?, ?, 1, ?)
+                ON CONFLICT(prev, input, output) DO UPDATE SET
+                    count   = count + 1,
+                    used_at = excluded.used_at;
+                """) {
+                    self.bindText($0, 1, bigram.prev); self.bindText($0, 2, bigram.input)
+                    self.bindText($0, 3, bigram.output); sqlite3_bind_int64($0, 4, t)
+                }
             }
             if let tri = trigram {
                 self.executeOnQueue("""
