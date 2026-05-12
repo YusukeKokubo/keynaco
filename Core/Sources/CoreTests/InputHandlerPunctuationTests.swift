@@ -355,6 +355,18 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         }
     }
 
+    // US キーボード Shift+1 → chars="!", base="1" は bracketOptions ではなく ASCII 組成へ。
+    // "?" と異なり "!" は数字キー起源のガードを意図的に残している。
+    func testShiftOneUSKeyboardDoesNotShowBracketCandidates() {
+        let result = type(chars: "!", base: "1", modifiers: .shift)
+        XCTAssertTrue(result.consumed)
+        XCTAssertFalse(handler.isBracketMode)
+        XCTAssertEqual(client.markedText, "!")
+        if case .show = result.candidateAction {
+            XCTFail("Shift+1 (US) should not open bracketOptions — got .show")
+        }
+    }
+
     func testShiftSlashAppendsToComposition() {
         type(chars: "a", base: "a")
         let result = type(chars: "?", base: "?", modifiers: .shift)

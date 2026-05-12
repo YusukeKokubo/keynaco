@@ -137,6 +137,7 @@ IME はバックグラウンドエージェントとして動作するため、`
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。`punctuationMap`は`baseCharacters`で照合するため Shift+`,`/`.` が `<`/`>` になる
 - **Shift+ASCII 文字（日本語モード中）**: 組成バッファに英字として蓄積される（`pendingRomaji` 経由ではなく直接 `composedHiragana` に追加）。Enter で確定。
 - **Shift+句読点**: `,` → `<`、`.` → `>`（`punctuationMap` は Shift なし時のみ `、` / `。` に変換）。
+- **`handleBracketChar` の US/JIS ガード**: `bracketOptions` のキーは `chars`（シフト後の文字）。`"!"` だけ `base != "!"` ガードあり（US Shift+1 → base="1" を ASCII 組成へ回すため）。`"?"` はガードなし — US の Shift+/（base="/"）でも bracketOptions に通す。新しい Shift 系エントリを追加するとき、数字キー起源の場合のみガードが必要。
 - **z シーケンス（組成中・組成前どちらでも）**: `z` + 記号/矢印キーで特殊文字を即時挿入。`z-` → `〜`、`z/` → `・`、`z.` → `…`、`z,` → `、`、`z→` → `→`、`z←` → `←`（`zCharMap` / `zArrowMap`）。
 
 ## macOS 26 IME の罠
