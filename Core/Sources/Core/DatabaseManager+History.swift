@@ -136,18 +136,12 @@ extension DatabaseManager {
         }
     }
 
-    /// フル読みに加え、先頭 2〜(N-1) 文字の各 prefix でも record する。
-    /// 読みが ASCII のみ、または 3 文字未満の場合はフル読みのみ。
+    /// フル読みのみ記録する。前方一致検索は `fetchHistoryScoredMerged` の LIKE クエリが担うため
+    /// プレフィックスを個別に記録する必要はない。
     func recordPrefixes(reading: String, output: String) {
         dispatchWrite {
-            self.recordPrefixesOnQueue(reading: reading, output: output)
-        }
-    }
-
-    private func recordPrefixesOnQueue(reading: String, output: String) {
-        guard !reading.allSatisfy({ $0.isASCII }) else {
-            let t = nowEpoch()
-            executeOnQueue("""
+            let t = self.nowEpoch()
+            self.executeOnQueue("""
             INSERT INTO history (input, output, count, used_at)
             VALUES (?, ?, 1, ?)
             ON CONFLICT(input, output) DO UPDATE SET
@@ -156,40 +150,6 @@ extension DatabaseManager {
             """) {
                 self.bindText($0, 1, reading); self.bindText($0, 2, output)
                 sqlite3_bind_int64($0, 3, t)
-            }
-            return
-        }
-        let chars = Array(reading)
-        guard chars.count >= 3 else {
-            let t = nowEpoch()
-            executeOnQueue("""
-            INSERT INTO history (input, output, count, used_at)
-            VALUES (?, ?, 1, ?)
-            ON CONFLICT(input, output) DO UPDATE SET
-                count   = count + 1,
-                used_at = excluded.used_at;
-            """) {
-                self.bindText($0, 1, reading); self.bindText($0, 2, output)
-                sqlite3_bind_int64($0, 3, t)
-            }
-            return
-        }
-        let now = nowEpoch()
-        let prefixes = (2...chars.count).map { String(chars.prefix($0)) }
-        let placeholders = prefixes.map { _ in "(?,?,1,?)" }.joined(separator: ",")
-        let sql = """
-            INSERT INTO history (input, output, count, used_at)
-            VALUES \(placeholders)
-            ON CONFLICT(input, output) DO UPDATE SET
-                count   = count + 1,
-                used_at = excluded.used_at;
-            """
-        executeOnQueue(sql) { stmt in
-            for (i, prefix) in prefixes.enumerated() {
-                let base = Int32(i * 3 + 1)
-                self.bindText(stmt, base, prefix)
-                self.bindText(stmt, base + 1, output)
-                sqlite3_bind_int64(stmt, base + 2, now)
             }
         }
     }

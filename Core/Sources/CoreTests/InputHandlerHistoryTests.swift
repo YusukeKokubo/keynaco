@@ -37,65 +37,38 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
                       "前回確定した「楽しい」が次回変換で履歴候補として現れるはず")
     }
 
-    // MARK: - 読み省略パターンの自動学習（recordPrefixes）
+    // MARK: - 読み前方一致による履歴ヒット（recordPrefixes はフル読みのみ記録）
+    // 前方一致検索は fetchHistoryScoredMerged の LIKE クエリが担う。
     // See: docs/domain/glossary.md#databasemanager
 
     func testPrefixRecord() {
-        // 5文字以上のひらがな読みを確定すると prefix も記録される
-        // "とうきょう"(5文字) → フル + prefix 3件("とうきょ","とうき","とう")
         handler.db.recordPrefixes(reading: "とうきょう", output: "東京")
 
         XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうきょう"), ["東京"], "フル読みで exact ヒット")
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうきょ"),   ["東京"], "N-1 prefix で exact ヒット")
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうき"),     ["東京"], "N-2 prefix で exact ヒット")
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とう"),       ["東京"], "N-3 prefix で exact ヒット")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "と").isEmpty,  "1文字(len<2)は記録しない")
-    }
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "とうきょ").isEmpty, "フル読み以外は exact ヒットしない")
 
-    func testPrefixRecord3Chars() {
-        // 3文字のひらがな読みを確定すると prefix も記録される
-        // "ぜんぶ"(3文字) → フル + prefix 1件("ぜん")
-        handler.db.recordPrefixes(reading: "ぜんぶ", output: "全部")
-
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "ぜんぶ"), ["全部"], "フル読みで exact ヒット")
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "ぜん"),   ["全部"], "N-1 prefix で exact ヒット")
-    }
-
-    func testPrefixRecord4Chars() {
-        // 4文字のひらがな読みを確定すると prefix も記録される
-        // "おはよう"(4文字) → フル + prefix 2件("おは","おはよ")
-        handler.db.recordPrefixes(reading: "おはよう", output: "おはよう")
-
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "おはよう"), ["おはよう"], "フル読みで exact ヒット")
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "おはよ"),   ["おはよう"], "N-1 prefix で exact ヒット")
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "おは"),     ["おはよう"], "N-2 prefix で exact ヒット")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "お").isEmpty, "1文字(len<2)は記録しない")
-    }
-
-    func testPrefixRecordSkips2Chars() {
-        // 2文字はフル読みのみ記録（prefix なし）
-        handler.db.recordPrefixes(reading: "とう", output: "東")
-
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とう"), ["東"], "フル読みは記録される")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "と").isEmpty, "2文字以下は prefix 記録しない")
+        // LIKE 前方一致では候補が出る
+        let merged = handler.db.fetchHistoryScoredMerged(reading: "とうきょ").map(\.output)
+        XCTAssertTrue(merged.contains("東京"), "prefix LIKE で前方一致ヒット")
     }
 
     func testPrefixRecordSkipsASCII() {
-        // ASCII のみの読みは prefix 記録しない（英字単語モード対策）
         handler.db.recordPrefixes(reading: "github", output: "GitHub")
 
         XCTAssertEqual(handler.db.fetchHistoryExact(reading: "github"), ["GitHub"], "フル読みは記録される")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "githu").isEmpty, "ASCII は prefix 記録しない")
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "githu").isEmpty, "プレフィックスはexactヒットしない")
     }
 
     func testPrefixRecordViaCommit() {
-        // 通常確定パスで recordPrefixes が呼ばれ、prefix で候補が出ることを確認
+        // 通常確定パスで recordPrefixes が呼ばれ、LIKE 検索で候補が出ることを確認
         typeRomaji("toukyou")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
 
-        // "とうきょ" (prefix) で exact 検索できる
-        let result = handler.db.fetchHistoryExact(reading: "とうきょ")
-        XCTAssertEqual(result, ["東京"], "確定後、prefix でも履歴ヒットするはず")
+        // exact ではヒットしない
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "とうきょ").isEmpty, "prefix の exact ヒットは記録しない")
+        // scoredMerged の LIKE パスでヒットする
+        let merged = handler.db.fetchHistoryScoredMerged(reading: "とうきょ").map(\.output)
+        XCTAssertTrue(merged.contains("東京"), "確定後、LIKE 前方一致で履歴ヒットするはず")
     }
 
     // MARK: - ネガティブフィードバック（確定直後 Backspace でカウント減算）
