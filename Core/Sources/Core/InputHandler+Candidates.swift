@@ -274,10 +274,9 @@ public extension InputHandler {
         let fixedEnd = fixedCount + userDictCount
 
         var zenzaiTop1Count = 0
-        if let top1 = sources.zenzaiPromoted, !uniqueUserDict.contains(top1) {
+        if let top1 = sources.zenzaiPromoted, insertedSet.insert(top1).inserted {
             candidates.insert(top1, at: fixedEnd)
             zenzaiTop1Count = 1
-            insertedSet.insert(top1)
         }
         lastZenzaiRow = zenzaiTop1Count > 0 ? fixedEnd : nil
         let adjustedFixedEnd = fixedEnd + zenzaiTop1Count

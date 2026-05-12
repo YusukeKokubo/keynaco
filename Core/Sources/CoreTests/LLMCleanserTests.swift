@@ -12,7 +12,7 @@ final class LLMCleanserTests: XCTestCase {
         let db = DatabaseManager(inMemory: true)
         let cleanser = LLMCleanser()
         do {
-            _ = try await cleanser.evaluate(db: db)
+            _ = try await cleanser.evaluate(db: db, scope: .history)
             XCTFail("unavailable 時は CleanserError.unavailable を投げるべき")
         } catch CleanserError.unavailable {
             // expected
@@ -28,7 +28,7 @@ final class LLMCleanserTests: XCTestCase {
         let db = DatabaseManager(inMemory: true)
         let cleanser = LLMCleanser()
         var progressCalls: [(Int, Int)] = []
-        let rows = try await cleanser.evaluate(db: db) { completed, total in
+        let rows = try await cleanser.evaluate(db: db, scope: .history) { completed, total in
             progressCalls.append((completed, total))
         }
         XCTAssertTrue(rows.isEmpty)

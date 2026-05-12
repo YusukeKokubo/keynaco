@@ -37,42 +37,21 @@ extension DatabaseManager {
         }
     }
 
-    /// 完全一致を先に、前方一致は重複 output を除いて続ける（`merged(exact,prefix)` と同じ順序）。
-    /// スコアは exact の行ごとの recency、prefix は `GROUP BY output` ごとの **MAX(recencyExpr)**（閾値が exact と同尺度）。
+    /// 読みが現在の入力で始まる全エントリを output 単位で SUM 集計して返す。
+    /// exact 一致と前方一致（より長い読み）を統合し、異なる読みで確定した回数を正しく合算する。
     func fetchHistoryScoredMerged(reading: String) -> [(output: String, score: Double)] {
         return dbQueue.sync {
             let now = self.nowEpoch()
-            let exactRows = self.queryOutputScorePairsOnQueue("""
-            SELECT output, (\(Self.recencyExpr)) AS s FROM history
-            WHERE input = ? COLLATE NOCASE
-            ORDER BY s DESC, used_at DESC
-            LIMIT 10
-            """) {
-                self.bindRecency($0, at: 1, now: now)
-                self.bindText($0, 3, reading)
-            }
-            let prefixRows = self.queryOutputScorePairsOnQueue("""
-            SELECT output, MAX((\(Self.recencyExpr))) AS s FROM history
-            WHERE input LIKE ? AND input != ?
+            return self.queryOutputScorePairsOnQueue("""
+            SELECT output, SUM((\(Self.recencyExpr))) AS s FROM history
+            WHERE input LIKE ?
             GROUP BY output
             ORDER BY s DESC, MAX(used_at) DESC
-            LIMIT 10
+            LIMIT 20
             """) {
                 self.bindRecency($0, at: 1, now: now)
                 self.bindText($0, 3, reading + "%")
-                self.bindText($0, 4, reading)
             }
-            var seen = Set<String>()
-            var merged: [(output: String, score: Double)] = []
-            for row in exactRows {
-                guard seen.insert(row.0).inserted else { continue }
-                merged.append((output: row.0, score: row.1))
-            }
-            for row in prefixRows {
-                guard seen.insert(row.0).inserted else { continue }
-                merged.append((output: row.0, score: row.1))
-            }
-            return merged
         }
     }
 
