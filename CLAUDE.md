@@ -34,7 +34,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `scripts/` | 開発用スクリプト（下記参照） |
 | `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
-| `LocalPackages/` | Xcode ローカルパッケージ参照（`keynacoCore/`）。Xcode が管理するため手動編集不要 |
+| `issues/` | バグ・課題メモ（`ISSUE<YYMMDD>.md` 形式） |
 
 ### スクリプト一覧（`scripts/`）
 
@@ -53,26 +53,16 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 ## ビルド・インストール
 
-```bash
-xcodebuild build -scheme keynaco -configuration Debug
-```
+`/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。
 
-- Build Post-action（`keynaco` scheme の Build Post-action、`keynaco.xcodeproj` 内）により `/Library/Input Methods/` への自動コピーとプロセス再起動が行われる
-- ビルド後の `Warning: unknown environment variable SWIFT_DEBUG_INFORMATION_FORMAT` は無害。`rm: /Library/Input Methods/keynaco.app: Permission denied` も正常（post-action は sudo なしでは Copy できないが BUILD SUCCEEDED は正しい）
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
-- バージョン番号は git tag で管理。`git tag v0.1.0` → ビルド時に `CFBundleShortVersionString` / `CFBundleVersion` に自動注入（post-action が `PlistBuddy` で書き換え）。`PlistBuddy` 後は署名が無効化されるため、post-action の最後で `codesign --force --deep --sign` による再署名が必須（無いと macOS 26 が SIGKILL でプロセスを落とす）
-- 初回セットアップ: `sudo chmod -R +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_child,delete,read,write,execute" "/Library/Input Methods"` が必要（所有者を root のまま ACL で自分にだけ権限を付与）
 - **Zenzai モデルのセットアップ**: `keynaco/Resources/zenz-v3.1-small-gguf/` は HuggingFace の git submodule（LFS 管理）。初回 clone 後に以下が必要:
   ```bash
   brew install git-lfs && git lfs install
   git submodule update --init
   git -C keynaco/Resources/zenz-v3.1-small-gguf lfs pull
   ```
-  モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る（Xcode プロジェクトからリソース参照を削除した場合）
-- `~/Library/Input Methods/` は使わない（入力ソースが重複登録される）
-- 初回インストール後、ログアウト→ログインで反映。System Settings → キーボード → 入力ソース → 英語 で追加
-- 起動のたびに `TISRegisterInputSource` を呼んで入力ソースを自動登録する。初回のみログアウト→ログインが必要（TIS がキャッシュを更新するため）
-- `/deploy` スキル（Claude Code 内）: ビルドからインストールまでを一括実行する
+  モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る
 - LLM 機能（`LLMSuccessorFetcher` / `LLMSegmentConverter` / `LLMMisconversionChecker`）は `FoundationModels` フレームワーク（Apple Intelligence）を使用。macOS 26 で Apple Intelligence が有効なデバイスでないと `SystemLanguageModel.default.availability` が `.unavailable` を返しスキップされる（IME 基本動作は継続）
 
 ## テスト実行
@@ -107,6 +97,7 @@ cd Core && swift test
 | `SettingsWindowController` 他 | 設定画面（5タブ: Bi-gram / Tri-gram / ユーザー辞書 / 変換履歴 / Zenzai）。`CleanserSheetViewController` はシートとして統合 |
 | `ZenzaiSettings` / `ZenzaiViewController` | Zenzai 有効フラグ・プロフィール・推論トークン上限（UserDefaults） |
 | `CandidateAction` / `CandidateContext` | InputHandler が返す候補ウィンドウ操作指示と状態スナップショット（`historyEnd` / `fixedEnd` が重要） |
+| `CandidateWindow` | 自作候補ウィンドウ（`NSPanel` + `NSTableView`）。`IMKCandidates` を使わない理由は「macOS 26 IME の罠」参照 |
 | `AppDelegate` | IMKServer 起動 + Edit メニュー登録 |
 | `SurroundingIMKContext` | カーソル前後テキスト取得ユーティリティ（LLM 系が使用） |
 | `DebugSocketServer` | Unix ドメインソケット経由のデバッグサーバー（`#if DEBUG`）。`/keynaco-ime-sandbox` スキルが使用 |
@@ -136,6 +127,7 @@ IME はバックグラウンドエージェントとして動作するため、`
 - **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。`punctuationMap`は`baseCharacters`で照合するため Shift+`,`/`.` が `<`/`>` になる
 - **z シーケンス**: `z` + 記号/矢印キーで特殊文字を挿入（`zCharMap` / `zArrowMap` 定義）。`InputHandlerZSequenceTests.swift` 参照。
+- **Bracket モード（`?` / `(` / `[` / `{` / `「`）**: 組成なし・ASCII モードでない状態でトリガー。`bracketOptions` マップで対応文字ペアを定義。US キーボードの `?` は `Shift+/`（`baseCharacters="/"`）なのでキーボード判定が必要（`InputHandler+Candidates.swift` 参照）。
 
 ## macOS 26 IME の罠
 
