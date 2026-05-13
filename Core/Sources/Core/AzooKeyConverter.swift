@@ -105,7 +105,10 @@ public final class AzooKeyConverter: @unchecked Sendable {
         insertCache(key: key, value: result.mainResults)
         let inputLength = hiragana.count
         let fullCoverage = result.mainResults.filter { composingCountValue($0) == inputLength }
-        return (fullCoverage.isEmpty ? result.mainResults : fullCoverage).map { $0.text }
+        // data.count == 1 の単一辞書エントリ候補を優先する（複合変換の残余ひらがな付き候補を除外）
+        let singleEntry = fullCoverage.filter { $0.data.count == 1 }
+        let preferred = singleEntry.isEmpty ? fullCoverage : singleEntry
+        return (preferred.isEmpty ? result.mainResults : preferred).map { $0.text }
     }
 
     public func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
@@ -158,8 +161,10 @@ public final class AzooKeyConverter: @unchecked Sendable {
             let safeCount = max(1, min(count, totalLen))
             let reading = String(remaining.prefix(safeCount))
             let ck = Self.cacheKey(segment: reading, leftSideContext: leftSideContext)
-            insertCache(key: ck, value: clauseCandidates)
-            segments.append((reading: reading, candidates: clauseCandidates.map { $0.text }))
+            let exactCoverage = clauseCandidates.filter { composingCountValue($0) == safeCount }
+            let segmentCandidates = exactCoverage.isEmpty ? clauseCandidates : exactCoverage
+            insertCache(key: ck, value: segmentCandidates)
+            segments.append((reading: reading, candidates: segmentCandidates.map { $0.text }))
             remaining = String(remaining.dropFirst(safeCount))
         }
         return segments

@@ -39,4 +39,50 @@ final class AzooKeyConverterTests: XCTestCase {
             "segmentize でもキャッシュ上限を超えないはず: \(converter.candidateCacheCount)"
         )
     }
+
+    // MARK: - segmentize の候補に残余ひらがなが混入しない
+
+    func testSegmentizeDoesNotProduceDanglingHiraganaCandidates() {
+        let converter = AzooKeyConverter()
+        let segments = converter.segmentize("じゃあ")
+        // 「じゃあ」は「じゃ」+「あ」の 2 セグメントに分割される
+        XCTAssertGreaterThanOrEqual(segments.count, 2,
+            "「じゃあ」は 2 セグメント以上に分割されるはず")
+        let jaCandidates = segments[0].candidates
+        // 「じゃ」セグメントの候補に残余ひらがな付き候補（「蛇あ」等）が出ない
+        let dangling = jaCandidates.filter { candidate in
+            let residual = String("じゃあ".dropFirst(segments[0].reading.count))
+            return !residual.isEmpty && candidate.hasSuffix(residual)
+        }
+        XCTAssertTrue(dangling.isEmpty,
+            "「じゃ」候補に残余ひらがな付きの候補が含まれてはいけない: \(dangling)")
+    }
+
+    func testSegmentizeFirstSegmentRetainsValidCandidates() {
+        let converter = AzooKeyConverter()
+        let segments = converter.segmentize("じゃあ")
+        XCTAssertGreaterThanOrEqual(segments.count, 2)
+        let jaCandidates = segments[0].candidates
+        // 「じゃ」単独の変換候補（「じゃ」「ジャ」「蛇」等）は残る
+        XCTAssertTrue(jaCandidates.contains("じゃ"),
+            "「じゃ」ひらがな候補が含まれるはず: \(jaCandidates)")
+    }
+
+    // MARK: - requestCandidates の候補に残余ひらがなが混入しない
+
+    func testRequestCandidatesDoesNotProduceDanglingHiraganaCandidates() {
+        let converter = AzooKeyConverter()
+        let candidates = converter.requestCandidates(hiragana: "じゃあ")
+        // 「じゃあ」全体を読みとして変換したとき、残余ひらがな付き候補（「蛇あ」等）が出ない
+        let hiraganaRange = Unicode.Scalar("あ").value...Unicode.Scalar("ん").value
+        let dangling = candidates.filter { candidate in
+            guard let first = candidate.unicodeScalars.first,
+                  let last = candidate.unicodeScalars.last else { return false }
+            // 先頭が非ひらがな（漢字/カタカナ等）で末尾がひらがな → 残余付き
+            return !(hiraganaRange ~= first.value) && (hiraganaRange ~= last.value)
+        }
+        XCTAssertTrue(dangling.isEmpty,
+            "requestCandidates(じゃあ) に残余ひらがな付き候補が含まれてはいけない: \(dangling)")
+    }
+
 }
