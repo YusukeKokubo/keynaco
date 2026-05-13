@@ -110,10 +110,14 @@ public extension InputHandler {
                 let action = enterSegmentMode()
                 if state.isSegmentMode {
                     applySegmentMarkedText(client: client)
+                    return (true, action)
                 } else {
                     applyMarkedText(candidateText: nil, client: client)
+                    if case .show(let candidates, let historyEnd, _, _, _) = action,
+                       candidates.count > historyEnd {
+                        return (true, action)
+                    }
                 }
-                return (true, action)
             }
             return (true, .selectNext)
         case KeyCode.tab, KeyCode.downArrow:
