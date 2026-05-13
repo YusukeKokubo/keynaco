@@ -115,9 +115,16 @@ extension DatabaseManager {
         }
     }
 
+    /// `input == output` かつ全ひらがなのエントリは学習価値がないため記録しない。
+    static func isHiraganaPassthrough(reading: String, output: String) -> Bool {
+        guard reading == output else { return false }
+        return output.unicodeScalars.allSatisfy { $0.value >= 0x3041 && $0.value <= 0x3096 }
+    }
+
     /// フル読みのみ記録する。前方一致検索は `fetchHistoryScoredMerged` の LIKE クエリが担うため
     /// プレフィックスを個別に記録する必要はない。
     func recordPrefixes(reading: String, output: String) {
+        guard !Self.isHiraganaPassthrough(reading: reading, output: output) else { return }
         dispatchWrite {
             let t = self.nowEpoch()
             self.executeOnQueue("""

@@ -14,7 +14,29 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         type(chars: "i", base: "i")
         press(keyCode: 36)  // Enter → 確定
         let hist = handler.db.fetchHistoryExact(reading: "あい")
-        XCTAssertTrue(hist.contains("あい"), "Enter 確定後にひらがなが履歴として記録されるはず")
+        XCTAssertFalse(hist.contains("あい"), "ひらがなパススルー確定は履歴に記録しない")
+    }
+
+    // MARK: - ひらがなパススルーの history 記録除外
+
+    func testHiraganaPassthroughNotRecorded() {
+        handler.db.recordPrefixes(reading: "は", output: "は")
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "は").isEmpty, "助詞パススルーは記録しない")
+    }
+
+    func testLongHiraganaPassthroughNotRecorded() {
+        handler.db.recordPrefixes(reading: "して", output: "して")
+        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "して").isEmpty, "複数文字ひらがなパススルーも記録しない")
+    }
+
+    func testHiraganaToKanjiIsRecorded() {
+        handler.db.recordPrefixes(reading: "は", output: "葉")
+        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "は").isEmpty, "「は」→「葉」は変換なので記録する")
+    }
+
+    func testKatakanaOutputIsRecorded() {
+        handler.db.recordPrefixes(reading: "ひらがな", output: "ヒラガナ")
+        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "ひらがな").isEmpty, "カタカナ変換は記録する")
     }
 
     func testHistoryRecordedAfterCandidateSelectionAndEnter() {
