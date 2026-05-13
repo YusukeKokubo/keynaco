@@ -35,7 +35,19 @@ public extension InputHandler {
         } else {
             let rawSegments = azooKeyConverter.segmentize(fullReading, leftSideContext: azooKeyLeftContext)
             guard rawSegments.count >= 2 else {
-                return buildCandidateList()
+                let listAction = buildCandidateList()
+                // 辞書候補がある場合はそのまま返す（「楽しい」等の既知単語）
+                if case .show(let candidates, let historyEnd, _, _, _) = listAction,
+                   candidates.count > historyEnd {
+                    return listAction
+                }
+                // 辞書候補なし（未知複合語等）のみ手動2分割を試みる
+                if let manualSegs = tryManualBisection(fullReading: fullReading) {
+                    state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
+                    segmentLLMTrigger = .start(hiragana: fullReading)
+                    return makeCandidateActionForFocusedSegment()
+                }
+                return listAction
             }
             var built: [Segment] = []
             var prevText: String? = lastCommittedOutput
@@ -43,6 +55,15 @@ public extension InputHandler {
                 let seg = buildSegmentCandidates(reading: raw.reading, dictCandidates: raw.candidates, prev: prevText)
                 built.append(seg)
                 prevText = seg.selectedText
+            }
+            // 先頭セグメントが促音(っ)終わりの2分割は誤分割の可能性が高い（例:「せっ」+「ていがめんの」）。
+            // 手動2分割でより長い前半が得られれば優先する。
+            if rawSegments.count == 2, rawSegments[0].reading.last == "っ",
+               let manualSegs = tryManualBisection(fullReading: fullReading),
+               manualSegs[0].reading.count > rawSegments[0].reading.count {
+                state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
+                segmentLLMTrigger = .start(hiragana: fullReading)
+                return makeCandidateActionForFocusedSegment()
             }
             segments = built
         }
@@ -481,5 +502,36 @@ public extension InputHandler {
         segment.historyEnd += 2
 
         segment.selectedIndex = 0
+    }
+
+    /// AzooKey が1セグメントのみ返す場合・促音終わり誤分割の場合に前から順に2分割を試みる。
+    /// requestCandidates の先頭候補が「先頭が非かな・末尾が小文字以外」= 辞書変換確度高とみなす。
+    /// 「迫っ」のように末尾が促音の候補は単語途中の可能性が高いため除外する。
+    func tryManualBisection(fullReading: String) -> [Segment]? {
+        let chars = Array(fullReading)
+        guard chars.count >= 4 else { return nil }
+        for i in 1..<chars.count - 1 {
+            let front = String(chars[..<i])
+            let back = String(chars[i...])
+            let frontCands = azooKeyConverter.requestCandidates(hiragana: front, leftSideContext: azooKeyLeftContext, richCandidates: false)
+            guard frontCands.first.map(Self.isValidWordCandidate) == true else { continue }
+            let backCands = azooKeyConverter.requestCandidates(hiragana: back, leftSideContext: azooKeyLeftContext, richCandidates: false)
+            guard backCands.first.map(Self.isValidWordCandidate) == true else { continue }
+            let frontDict = azooKeyConverter.candidatesForSegment(reading: front, leftSideContext: azooKeyLeftContext)
+            let backDict = azooKeyConverter.candidatesForSegment(reading: back, leftSideContext: azooKeyLeftContext)
+            let frontSeg = buildSegmentCandidates(reading: front, dictCandidates: frontDict, prev: lastCommittedOutput)
+            let backSeg = buildSegmentCandidates(reading: back, dictCandidates: backDict, prev: frontSeg.selectedText)
+            return [frontSeg, backSeg]
+        }
+        return nil
+    }
+
+    private static func isValidWordCandidate(_ s: String) -> Bool {
+        guard let first = s.unicodeScalars.first else { return false }
+        let v = first.value
+        guard !(0x3041...0x3096 ~= v) && !(0x30A1...0x30F6 ~= v) else { return false }
+        let smallKana: Set<Character> = ["っ", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "ゃ", "ゅ", "ょ", "ゎ", "ッ", "ァ", "ィ", "ゥ", "ェ", "ォ", "ャ", "ュ", "ョ", "ヮ"]
+        guard let last = s.last else { return false }
+        return !smallKana.contains(last)
     }
 }
