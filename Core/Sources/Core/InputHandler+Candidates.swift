@@ -381,6 +381,8 @@ public extension InputHandler {
     }()
 
     static func isHiraganaPreferred(_ h: String) -> Bool {
+        // 「の」「は」「が」等の1文字格助詞・副助詞は常にひらがな優先
+        if h.count == 1, "のはがをにでへもとやよ".contains(h) { return true }
         let range = NSRange(h.startIndex..., in: h)
         return hiraganaPreferredRegex.firstMatch(in: h, range: range) != nil
     }
