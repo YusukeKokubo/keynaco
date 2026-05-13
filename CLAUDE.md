@@ -83,43 +83,13 @@ cd Core && swift test
 
 ## コンポーネント構成
 
-詳細は [`docs/domain/architecture.md`](docs/domain/architecture.md) を参照。
-
-| コンポーネント | 役割 |
-|--------------|------|
-| `InputController` | IMK ブリッジ。NSEvent → InputHandler 委譲、LLM 系（`LLMSuccessorFetcher` / `LLMSegmentConverter` / `LLMMisconversionChecker`）管理 |
-| `InputHandler` | 入力ロジック本体（テスト可能、Swift 6）。機能ごとに extension 分割 |
-| `TextInputClient` | `insertText` / `setMarkedText` の DI プロトコル。テスト時は `MockTextClient` |
-| `CompositionState` | 未確定文字列（composedHiragana + pendingRomaji）。`SegmentState` を内包 |
-| `RomajiConverter` | ローマ字→ひらがな変換ルール |
-| `AzooKeyConverter` | ひらがな→漢字変換エンジンラッパー（Zenzai 有効フラグ・LRU キャッシュ） |
-| `DatabaseManager` | 変換履歴・N-gram・ユーザー辞書・境界学習の SQLite 管理（6テーブル）。機能ごとに extension 分割 |
-| `SettingsWindowController` 他 | 設定画面（5タブ: Bi-gram / Tri-gram / ユーザー辞書 / 変換履歴 / Zenzai）。`CleanserSheetViewController` はシートとして統合 |
-| `ZenzaiSettings` / `ZenzaiViewController` | Zenzai 有効フラグ・プロフィール・推論トークン上限（UserDefaults） |
-| `CandidateAction` / `CandidateContext` | InputHandler が返す候補ウィンドウ操作指示と状態スナップショット（`historyEnd` / `fixedEnd` が重要） |
-| `CandidateWindow` | 自作候補ウィンドウ（`NSPanel` + `NSTableView`）。`IMKCandidates` を使わない理由は「macOS 26 IME の罠」参照 |
-| `AppDelegate` | IMKServer 起動 + Edit メニュー登録 |
-| `SurroundingIMKContext` | カーソル前後テキスト取得ユーティリティ（LLM 系が使用） |
-| `DebugSocketServer` | Unix ドメインソケット経由のデバッグサーバー（`#if DEBUG`）。`/keynaco-ime-sandbox` スキルが使用 |
-| `EventViewerWindow` / `IMESandboxWindow` | デバッグ用 GUI ツール（`keynaco/Debug/`） |
-| `KanaUtils` | ひらがな↔カタカナ変換（`hiraganaToKatakana` / `hiraganaToHankakuKatakana` / `toZenkakuAscii`） |
-| `NotificationNames` | KeynacoCore 公開の通知名（successorPending / misconversionFound / misconversionCleared） |
-| `LLMCleanser` | DB エントリの品質判定（履歴・bi-gram の誤り検出）。`FoundationModels` 利用。`CleanserSheetViewController` から呼び出す |
-| `LearningThresholds` | Successor モードの閾値定数（`successorImmediateThreshold`=5・`successorMaxCandidates`=5）。チューニング時はここを編集 |
+[`docs/domain/architecture.md`](docs/domain/architecture.md) を参照。
 
 ## テスト方針
 
-### Core モジュール（KeynacoCore）への型追加
-
-`Core/` は独立 SPM ライブラリ。App（`keynaco/`）から参照する型・イニシャライザ・メソッド・プロパティはすべて `public`（必要なら `open`）が必須。`@testable import KeynacoCore` でテストからは `internal` でもアクセスできるが App からは見えないため注意。
-
-### XCUITest / CGEvent による E2E テストは採用しない
-
-IME はバックグラウンドエージェントとして動作するため、`XCUIElement.typeText()` はカスタム IME をバイパスする。`CGEvent` を用いた物理的なキー送信は Accessibility 権限に依存し CI で不安定になる。
-
-### InputHandler + TextInputClient モック（採用）
-
-`InputController` のロジックを `InputHandler`（純粋 Swift struct）に抽出し、テキスト操作の出力先を `TextInputClient` プロトコルで抽象化する。テストでは `MockTextClient` を渡して `insertText` / `setMarkedText` の呼び出しを検証する。
+- `Core/` の公開型は `public` 必須（`@testable import` はテストのみ有効。App からは `internal` は不可）
+- XCUITest / CGEvent は不採用（`typeText()` は IME をバイパス。CGEvent は Accessibility 権限依存で CI 不安定）
+- `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
 
 ## キー入力の挙動（特殊ケース）
 
