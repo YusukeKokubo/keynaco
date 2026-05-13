@@ -20,7 +20,7 @@ public final class DatabaseManager: @unchecked Sendable {
     /// `preset_seeded_v1` の保存先。統合テスト等で `UserDefaults(suiteName:)` に差し替え可能（既定は `standard`）。
     var presetSeedUserDefaults: UserDefaults = .standard
 
-    private static let presetSeededUserDefaultsKey = "preset_seeded_v1"
+    private static let presetSeededUserDefaultsKey = "preset_seeded_v2"
 
     private init() {
         writeAsync = true
