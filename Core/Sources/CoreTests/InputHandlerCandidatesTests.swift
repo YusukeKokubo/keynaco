@@ -59,6 +59,14 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertTrue(candidates.contains("楽しい"), "「楽しい」が候補に含まれるはず: \(candidates)")
     }
 
+    func testKoushitaiDoesNotContainFalseCompound() {
+        // AzooKey が「こうした」+「居（い）」と誤解析して生成する擬似複合語が候補に現れないこと
+        let (_, action) = typeAndPress("koushitai")
+        if let list = candidates(in: action) {
+            XCTAssertFalse(list.contains("こうした居"), "擬似複合語「こうした居」が候補に含まれるべきでない: \(list)")
+        }
+    }
+
     // MARK: - カタカナ変換・候補管理
     // See: docs/domain/glossary.md#fixedcount
     // See: docs/domain/glossary.md#historyend

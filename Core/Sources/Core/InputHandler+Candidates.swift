@@ -175,7 +175,8 @@ public extension InputHandler {
         } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, autoShow {
             azooKeyCandidates = lastAzooKeyResults
         } else {
-            azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
+            let raw = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
+            azooKeyCandidates = raw.filter { !Self.isSpuriousCompound($0, hiragana: h) }
             lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
@@ -389,6 +390,18 @@ public extension InputHandler {
         if h.count == 1, "のはがをにでへもとやよ".contains(h) { return true }
         let range = NSRange(h.startIndex..., in: h)
         return hiraganaPreferredRegex.firstMatch(in: h, range: range) != nil
+    }
+
+    /// 入力ひらがなと同文字数・先頭がひらがな・末尾が漢字の候補は擬似複合語とみなす。
+    /// 例: "こうしたい"→"こうした居"（居＝い）のように末尾1ひらがなを漢字化した誤変換を除外する。
+    private static func isSpuriousCompound(_ candidate: String, hiragana: String) -> Bool {
+        let candArr = Array(candidate)
+        guard candArr.count == hiragana.count, candArr.count >= 3 else { return false }
+        guard let firstV = candArr.first?.unicodeScalars.first?.value,
+              0x3041...0x3096 ~= firstV else { return false }
+        guard let lastV = candArr.last?.unicodeScalars.first?.value,
+              (0x4E00...0x9FFF ~= lastV) || (0x3400...0x4DBF ~= lastV) else { return false }
+        return true
     }
 
     /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。
