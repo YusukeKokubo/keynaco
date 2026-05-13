@@ -4,16 +4,73 @@ import FoundationModels
 /// セグメントモード用：`composedHiragana` 全体をオンデバイス LLM で一括変換する。
 @MainActor
 public final class LLMSegmentConverter {
+    /// `composedHiragana.count` がこの値以上のときだけプリフェッチする（`> 5` 文字）。
+    public static let segmentPrefetchMinHiraganaCount = 6
+
     private var task: Task<Void, Never>?
+    /// プリフェッチ／`convert` の Task を世代管理し、キャンセル済みクロージャが `self.task` を壊さないようにする。
+    private var taskGeneration: UInt64 = 0
+    private lazy var session: LanguageModelSession = LanguageModelSession(model: SystemLanguageModel.default) {
+        "あなたは日本語入力メソッドの補助モジュールです。指示された形式だけを出力し、説明文は書かないでください。"
+    }
+
+    /// 直近の `prefetch` が対象としている読み（末尾追記ではタスクを捨てずに更新する）。
+    private var pendingHiragana: String?
+    /// `takePrefetchIfMatching` まで保持する完了結果。
+    private var completedPrefetch: (hiragana: String, text: String)?
 
     public init() {}
 
     public func cancel() {
+        taskGeneration += 1
         task?.cancel()
         task = nil
+        completedPrefetch = nil
+        pendingHiragana = nil
     }
 
-    /// 変換結果のテキストのみ（失敗時は空文字）。
+    /// 組成中の読みが十分長いとき、Space 前に LLM 推論を先行開始する。
+    public func prefetch(hiragana: String) {
+        guard case .available = SystemLanguageModel.default.availability else {
+            cancel()
+            return
+        }
+        guard hiragana.count >= Self.segmentPrefetchMinHiraganaCount else {
+            cancel()
+            return
+        }
+        // 同一読みで既に完了済み・タスクなしなら再推論しない
+        if hiragana == pendingHiragana,
+           task == nil,
+           let done = completedPrefetch,
+           done.hiragana == hiragana {
+            return
+        }
+        // 末尾追記のみで推論が進行中なら cancel せず pending だけ更新（完了済み task==nil のときは再起動が必要）
+        if let prev = pendingHiragana,
+           prev.count >= Self.segmentPrefetchMinHiraganaCount,
+           hiragana.hasPrefix(prev),
+           task != nil {
+            pendingHiragana = hiragana
+            return
+        }
+        restartPrefetch(for: hiragana)
+    }
+
+    /// Space 入室時: `hiragana` がプリフェッチ完了と一致すれば変換テキストを返しキャッシュを消費する。常に進行中タスクは止める。
+    public func takePrefetchIfMatching(hiragana: String) -> String? {
+        taskGeneration += 1
+        task?.cancel()
+        task = nil
+        pendingHiragana = nil
+        guard let (h, t) = completedPrefetch, h == hiragana else {
+            return nil
+        }
+        completedPrefetch = nil
+        return t.isEmpty ? nil : t
+    }
+
+    /// 変換結果のテキストのみ（失敗時は空文字）。デバッグソケット等用。本番 IME のセグメント入室では `prefetch` / `takePrefetchIfMatching` を使う。
     public func convert(hiragana: String, onResult: @escaping (String) -> Void) {
         guard case .available = SystemLanguageModel.default.availability else {
             onResult("")
@@ -21,18 +78,92 @@ public final class LLMSegmentConverter {
         }
         cancel()
         let prompt = Self.buildPrompt(hiragana: hiragana)
-        let session = LanguageModelSession(model: SystemLanguageModel.default) {
-            "あなたは日本語入力メソッドの補助モジュールです。指示された形式だけを出力し、説明文は書かないでください。"
-        }
-        task = Task { @MainActor [session] in
+        let generation = taskGeneration
+        task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard !Task.isCancelled else {
+                if generation == self.taskGeneration {
+                    self.task = nil
+                }
+                return
+            }
             do {
-                let response = try await session.respond(to: prompt)
+                let response = try await self.session.respond(to: prompt)
+                guard !Task.isCancelled else {
+                    if generation == self.taskGeneration {
+                        self.task = nil
+                    }
+                    return
+                }
                 let text = Self.parseText(from: response)
                 onResult(text)
+                if generation == self.taskGeneration {
+                    self.task = nil
+                }
             } catch {
                 onResult("")
+                if generation == self.taskGeneration {
+                    self.task = nil
+                }
             }
         }
+    }
+
+    private func restartPrefetch(for hiragana: String) {
+        task?.cancel()
+        task = nil
+        completedPrefetch = nil
+        pendingHiragana = hiragana
+        taskGeneration += 1
+        let generation = taskGeneration
+        let promptHiragana = hiragana
+        let prompt = Self.buildPrompt(hiragana: promptHiragana)
+        task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard !Task.isCancelled else {
+                if generation == self.taskGeneration {
+                    self.task = nil
+                }
+                return
+            }
+            do {
+                let response = try await self.session.respond(to: prompt)
+                guard !Task.isCancelled else {
+                    if generation == self.taskGeneration {
+                        self.task = nil
+                    }
+                    return
+                }
+                let text = Self.parseText(from: response)
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if promptHiragana != self.pendingHiragana {
+                    if let p = self.pendingHiragana, p.count >= Self.segmentPrefetchMinHiraganaCount {
+                        self.restartPrefetch(for: p)
+                    } else if generation == self.taskGeneration {
+                        self.task = nil
+                    }
+                    return
+                }
+                guard !trimmed.isEmpty else {
+                    if generation == self.taskGeneration {
+                        self.task = nil
+                    }
+                    return
+                }
+                guard generation == self.taskGeneration else { return }
+                self.completedPrefetch = (promptHiragana, trimmed)
+                self.task = nil
+            } catch {
+                if generation == self.taskGeneration {
+                    self.task = nil
+                }
+            }
+        }
+    }
+
+    /// ユニットテスト用: 完了キャッシュを直接入れる（本番コードからは呼ばない）。
+    internal func _testing_seedCompletedPrefetch(hiragana: String, text: String) {
+        completedPrefetch = (hiragana, text)
     }
 
     private static func buildPrompt(hiragana: String) -> String {

@@ -1582,7 +1582,15 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private func applyLLMScheduling() {
         applySuccessorLLMScheduling()
+        applySegmentPrefetchIfNeeded()
         applySegmentLLMScheduling()
+    }
+
+    /// `InputController.applyPostKeyDownEffects` と同様。デバッグ用 `segmentLLM` は本番の static インスタンスとは別。
+    private func applySegmentPrefetchIfNeeded() {
+        guard !handler.state.isSegmentMode,
+              handler.state.composedHiragana.count >= LLMSegmentConverter.segmentPrefetchMinHiraganaCount else { return }
+        segmentLLM.prefetch(hiragana: handler.state.composedHiragana)
     }
 
     private func applySuccessorLLMScheduling() {
@@ -1672,31 +1680,26 @@ final class DebugSocketServer: @unchecked Sendable {
         let trigger = handler.segmentLLMTrigger
         guard case .start(let hiragana) = trigger else { return }
         handler.segmentLLMTrigger = .none
-        let schedulingEpoch = llmEpoch
-        segmentLLM.convert(hiragana: hiragana) { [weak self] text in
-            guard let self else { return }
-            guard schedulingEpoch == self.llmEpoch else { return }
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty,
-                  let segState = self.handler.state.segmentState,
-                  segState.segments.map(\.reading).joined() == hiragana else { return }
-            self.handler.applyLLMSegmentResult(text: trimmed)
-            guard let updated = self.handler.state.segmentState,
-                  updated.llmWholeText != nil,
-                  !updated.segments.isEmpty else { return }
-            let action = self.handler.makeCandidateActionForFocusedSegment()
-            if case .show(let cands, let historyEnd, let initialRow, let predictionEnd, let fixedEnd) = action {
-                self.candidateWindow.apply(
-                    action: .show(
-                        candidates: cands,
-                        historyEnd: historyEnd,
-                        initialRow: initialRow,
-                        predictionEnd: predictionEnd,
-                        fixedEnd: fixedEnd
-                    )
+        guard let trimmed = segmentLLM.takePrefetchIfMatching(hiragana: hiragana) else { return }
+        guard !trimmed.isEmpty,
+              let segState = handler.state.segmentState,
+              segState.segments.map(\.reading).joined() == hiragana else { return }
+        handler.applyLLMSegmentResult(text: trimmed)
+        guard let updated = handler.state.segmentState,
+              updated.llmWholeText != nil,
+              !updated.segments.isEmpty else { return }
+        let action = handler.makeCandidateActionForFocusedSegment()
+        if case .show(let cands, let historyEnd, let initialRow, let predictionEnd, let fixedEnd) = action {
+            candidateWindow.apply(
+                action: .show(
+                    candidates: cands,
+                    historyEnd: historyEnd,
+                    initialRow: initialRow,
+                    predictionEnd: predictionEnd,
+                    fixedEnd: fixedEnd
                 )
-                self.handler.applySegmentMarkedText(client: self.mockClient)
-            }
+            )
+            handler.applySegmentMarkedText(client: mockClient)
         }
     }
 

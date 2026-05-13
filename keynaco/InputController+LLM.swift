@@ -114,29 +114,26 @@ extension InputController {
         }
     }
 
-    /// `enterSegmentMode()` が立てた `segmentLLMTrigger` に応じてオンデバイス LLM で読み全体を一括変換する。
+    /// `enterSegmentMode()` が立てた `segmentLLMTrigger` に応じ、プリフェッチ済みの LLM 変換があれば同期的に適用する（未完了時は AzooKey のまま）。
     func applySegmentLLMScheduling(adapter: IMKTextInputAdapter) {
         let trigger = handler.segmentLLMTrigger
         guard case .start(let hiragana) = trigger else { return }
         handler.segmentLLMTrigger = .none
-        Self.segmentLLM.convert(hiragana: hiragana) { [weak self] text in
-            guard let self else { return }
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty,
-                  let segState = self.handler.state.segmentState,
-                  segState.segments.map(\.reading).joined() == hiragana else { return }
-            self.handler.applyLLMSegmentResult(text: trimmed)
-            guard let updated = self.handler.state.segmentState,
-                  updated.llmWholeText != nil,
-                  !updated.segments.isEmpty else { return }
-            let action = self.handler.makeCandidateActionForFocusedSegment()
-            if case .show(let cands, let historyEnd, let initialRow, let predictionEnd, let fixedEnd) = action {
-                self.candidateWindow.show(
-                    candidates: cands, historySectionEnd: historyEnd, initialRow: initialRow,
-                    predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect()
-                )
-                self.handler.applySegmentMarkedText(client: adapter)
-            }
+        guard let trimmed = Self.segmentLLM.takePrefetchIfMatching(hiragana: hiragana) else { return }
+        guard !trimmed.isEmpty,
+              let segState = handler.state.segmentState,
+              segState.segments.map(\.reading).joined() == hiragana else { return }
+        handler.applyLLMSegmentResult(text: trimmed)
+        guard let updated = handler.state.segmentState,
+              updated.llmWholeText != nil,
+              !updated.segments.isEmpty else { return }
+        let action = handler.makeCandidateActionForFocusedSegment()
+        if case .show(let cands, let historyEnd, let initialRow, let predictionEnd, let fixedEnd) = action {
+            candidateWindow.show(
+                candidates: cands, historySectionEnd: historyEnd, initialRow: initialRow,
+                predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, near: adapter.cursorRect()
+            )
+            handler.applySegmentMarkedText(client: adapter)
         }
     }
 

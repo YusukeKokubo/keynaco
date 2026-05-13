@@ -298,6 +298,10 @@ class InputController: IMKInputController, @unchecked Sendable {
         }
 
         applySuccessorLLMScheduling(adapter: adapter)
+        if !handler.state.isSegmentMode,
+           handler.state.composedHiragana.count >= LLMSegmentConverter.segmentPrefetchMinHiraganaCount {
+            Self.segmentLLM.prefetch(hiragana: handler.state.composedHiragana)
+        }
         applySegmentLLMScheduling(adapter: adapter)
 
         if adapter.didInsertText {
