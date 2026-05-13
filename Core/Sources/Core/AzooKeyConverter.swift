@@ -105,9 +105,16 @@ public final class AzooKeyConverter: @unchecked Sendable {
         insertCache(key: key, value: result.mainResults)
         let inputLength = hiragana.count
         let fullCoverage = result.mainResults.filter { composingCountValue($0) == inputLength }
-        // data.count == 1 の単一辞書エントリ候補を優先する（複合変換の残余ひらがな付き候補を除外）
-        let singleEntry = fullCoverage.filter { $0.data.count == 1 }
-        let preferred = singleEntry.isEmpty ? fullCoverage : singleEntry
+        // 末尾 data エントリが1文字のひらがな/カタカナである複合変換候補を除外する
+        // （例: 「蛇あ」= 蛇(じゃ)+あ → "あ"が1文字ひらがなで残余とみなす）
+        let validCoverage = fullCoverage.filter { c in
+            guard c.data.count > 1, let last = c.data.last else { return true }
+            guard last.word.count == 1, let scalar = last.word.unicodeScalars.first else { return true }
+            let isHiragana = (0x3041...0x3096).contains(scalar.value)
+            let isKatakana = (0x30A1...0x30F6).contains(scalar.value)
+            return !(isHiragana || isKatakana)
+        }
+        let preferred = validCoverage.isEmpty ? fullCoverage : validCoverage
         return (preferred.isEmpty ? result.mainResults : preferred).map { $0.text }
     }
 

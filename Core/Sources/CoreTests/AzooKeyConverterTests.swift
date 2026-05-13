@@ -85,4 +85,13 @@ final class AzooKeyConverterTests: XCTestCase {
             "requestCandidates(じゃあ) に残余ひらがな付き候補が含まれてはいけない: \(dangling)")
     }
 
+    // MARK: - 活用語 + 助動詞の複合変換
+
+    func testRequestCandidatesIncludesKanjiForInflectedVerb() {
+        let converter = AzooKeyConverter()
+        let candidates = converter.requestCandidates(hiragana: "たのみたい")
+        XCTAssertTrue(candidates.contains("頼みたい"),
+            "「たのみたい」→「頼みたい」が候補に含まれるはず: \(candidates)")
+    }
+
 }
