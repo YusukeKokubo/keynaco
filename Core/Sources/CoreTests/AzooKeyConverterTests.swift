@@ -94,4 +94,20 @@ final class AzooKeyConverterTests: XCTestCase {
             "「たのみたい」→「頼みたい」が候補に含まれるはず: \(candidates)")
     }
 
+
+    // MARK: - 助詞付き音便形の変換
+
+    func testManandakaConvertsToManandaka() {
+        let converter = AzooKeyConverter()
+        let candidates = converter.requestCandidates(hiragana: "まなんだか", leftSideContext: nil, richCandidates: true)
+        XCTAssertTrue(candidates.contains("学んだか"),
+            "「まなんだか」→「学んだか」が候補に含まれるはず: \(candidates)")
+    }
+
+    func testManandaConvertsToMananda() {
+        let converter = AzooKeyConverter()
+        let candidates = converter.requestCandidates(hiragana: "まなんだ", leftSideContext: nil, richCandidates: true)
+        XCTAssertTrue(candidates.contains("学んだ"),
+            "「まなんだ」→「学んだ」が候補に含まれるはず: \(candidates)")
+    }
 }

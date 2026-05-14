@@ -107,12 +107,17 @@ public final class AzooKeyConverter: @unchecked Sendable {
         let fullCoverage = result.mainResults.filter { composingCountValue($0) == inputLength }
         // 末尾 data エントリが1文字のひらがな/カタカナである複合変換候補を除外する
         // （例: 「蛇あ」= 蛇(じゃ)+あ → "あ"が1文字ひらがなで残余とみなす）
+        // 末尾 data エントリが1文字のひらがな/カタカナである複合変換候補を除外する。
+        // ただし末尾が助詞(lcid 147...368)または助動詞(lcid 369...554)として変換済みの場合は除外しない。
+        // 残余判定: 末尾が1文字かな かつ 助詞/助動詞でない → 未変換の残余（例: 「蛇あ」の"あ"）
+        // 変換済み判定: 末尾が助詞/助動詞 → 正当な変換（例: 「学んだか」の"か"、「学んだ」の"だ"）
         let validCoverage = fullCoverage.filter { c in
             guard c.data.count > 1, let last = c.data.last else { return true }
             guard last.word.count == 1, let scalar = last.word.unicodeScalars.first else { return true }
             let isHiragana = (0x3041...0x3096).contains(scalar.value)
             let isKatakana = (0x30A1...0x30F6).contains(scalar.value)
-            return !(isHiragana || isKatakana)
+            guard isHiragana || isKatakana else { return true }
+            return (147...554).contains(last.lcid)
         }
         let preferred = validCoverage.isEmpty ? fullCoverage : validCoverage
         return (preferred.isEmpty ? result.mainResults : preferred).map { $0.text }
