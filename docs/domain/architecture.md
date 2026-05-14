@@ -41,9 +41,9 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。
 
-**N-gram 候補の遅延表示と読みフィルタ**: N-gram 由来の候補がある場合、`suggestSuccessors()` はまず `fetchBigramTopCount(prev: last)` で前語に対する bi-gram 上位使用回数を取得する（直近 90 日の行の `MAX(count)`。**プリセット行** `is_preset=1` は日付窓外でも集計に含まれる）。`successorImmediateThreshold`（デフォルト 5。`LearningThresholds`）以上なら「高信頼ペア」とみなして即時表示（`.show`）。閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` してから **`successorLLMSurfaceExtras` を末尾に連結**して `.show` する（いずれにも一致しなければモード解除）。格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。利用可能なら `LLMSuccessorFetcher` が `committedHistory.suffix(3)` を文脈にオンデバイス LLM で表層形の後続語を非同期取得し、`successorLLMSurfaceExtras` に蓄える（コールバックは `suffix(3)` がトリガ時スナップショットと一致するときのみ反映。遅延到着で画面は更新しない場合あり）。格助詞のみ即時表示ではベース列と extras を結合してウィンドウ更新する。
+**N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加してから **`successorLLMSurfaceExtras` を末尾に連結**して `.show` する（いずれにも一致しなければモード解除）。利用可能なら `LLMSuccessorFetcher` が `committedHistory.suffix(3)` を文脈にオンデバイス LLM で表層形の後続語を非同期取得し、`successorLLMSurfaceExtras` に蓄える（コールバックは `suffix(3)` がトリガ時スナップショットと一致するときのみ反映。遅延到着で画面は更新しない場合あり）。
 
-- `successorFirstChar`: 頭文字 1 打目のバッファリング。`particleRomajiMap` による格助詞 fast-path が効くのは `isNounLike` のときのみ。N-gram 保留表示後の 2 打目でモード解除する際にも使用する。
+- `successorFirstChar`: 頭文字 1 打目のバッファリング。1打目で `pendingSuccessorCandidates` を表示したあと、2 打目でモード解除する際にも使用する。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
 - 候補確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば連鎖表示を継続する。候補が空なら自然に `.dismiss`（格助詞チェックは廃止）。
 - Successor モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。

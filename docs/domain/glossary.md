@@ -125,7 +125,7 @@ Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整で�
 ## Successor モード（SuccessorMode）
 
 ### isSuccessorMode
-確定直後に学習済みの後続語候補を自動表示する状態。  
+確定直後に学習済みの後続語候補を **`pendingSuccessorCandidates` に保持し**、ユーザーの 1 打目で候補ウィンドウを開く状態。
 候補は `fetchTrigramTop(prev2:prev1:)` + `fetchBigramTop(prev:)` + `mostRecentContentWords(n: 2)` ごとの `fetchSkipBigramTop`（`merged` で重複除去、近い内容語を優先）で引く。
 2語前文脈（trigram）を優先し、trigram にない候補を bigram で補完する。  
 漢字・カタカナ末尾（`isNounLike`）のときのみ、固定格助詞リスト（`InputHandler.particles`）を
@@ -134,29 +134,25 @@ tail に fallback として並べる。ひらがな末尾の語では格助詞 f
 連鎖表示を継続する（格助詞チェックは廃止。候補空なら自然に `.dismiss`）。
 
 **N-gram 候補の遅延表示と読みフィルタ**:
-N-gram 由来の候補（tri-gram + bi-gram + skip-bigram）がある場合、`suggestSuccessors()` は
-まず `fetchBigramTopCount(prev: last)` で前語に対する bi-gram 上位使用回数を取得する。
-`successorImmediateThreshold`（デフォルト 5。`LearningThresholds.successorImmediateThreshold` と一致）以上なら「高信頼ペア」とみなして即時表示（`.show`）。なお `fetchBigramTopCount` は直近 **90 日以内**の bi-gram の `MAX(count)` を取るが、**プリセット行**（`is_preset = 1`）は `used_at` に関係なく常に集計に含まれる（閾値判定から外れない）。
-閾値未満なら候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち）。
+N-gram 由来の候補（tri-gram + bi-gram + skip-bigram）がある場合でも、**確定直後は常に**候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち。高信頼 bi-gram の即時表示は行わない）。  
 1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、
-DB を再クエリして一致する候補に加え、**同一条件で** `pendingSuccessorCandidates` 内の語を読み前方一致で併合して `.show` する（DB 候補の後ろに追加。読みがいずれにも一致しなければモード解除）。  
-格助詞 fallback のみ（N-gram なし、名詞末尾の場合）は従来通り即時表示する。
+DB を再クエリして一致する候補に加え、**同一条件で** `pendingSuccessorCandidates` 内の語を `mergePendingSuccessorMatches` で併合し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を末尾側に追加して `.show` する（DB 候補の後ろに追加。読み・格助詞マップのいずれにも一致しなければモード解除）。  
+`fetchBigramTopCount` は直近 **90 日以内**の bi-gram の `MAX(count)` を取るが、**プリセット行**（`is_preset = 1`）は `used_at` に関係なく常に集計に含まれる。プリセット seed の初期 `count` に `successorImmediateThreshold`（デフォルト 5）を使うが、**閾値による即時表示には用いない**。
 
 **オンデバイス LLM 補完**（`LLMSuccessorFetcher`、Foundation Models / Apple Intelligence 利用可能時のみ）:
-N-gram あり・閾値未満（保留）の直後、または格助詞のみ即時表示の直後に、`committedHistory` の末尾最大3語（`"、"` 結合した文脈）を渡して続く語を非同期取得する。
+`pendingSuccessorCandidates` に積んで `.dismiss` を返した直後に、`committedHistory` の末尾最大3語（`"、"` 結合した文脈）を渡して続く語を非同期取得する。
 返答は **表層形**（漢字・カタカナ・ひらがな）とし、別バッファ **`successorLLMSurfaceExtras`** に蓄える（`pendingSuccessorCandidates` には混ぜない。読み前方一致は N-gram 側のみ）。
-保留（`.dismiss`）から1打目で候補を開くときは、DB 照会＋`mergePendingSuccessorMatches` の結果の **末尾**に `successorLLMSurfaceExtras` を重複除外で連結する。
-格助詞のみ即時表示のときは、格助詞列を `successorLLMBaseCandidates` に保持し、LLM 語だけを `successorLLMSurfaceExtras` に足してウィンドウを更新する。
+1打目で候補を開くときは、DB 照会＋`mergePendingSuccessorMatches` ＋格助詞マップ併合の結果の **末尾**に `successorLLMSurfaceExtras` を重複除外で連結する。
 非同期コールバックは `Array(committedHistory.suffix(3))` がフェッチ開始時のスナップショットと一致するときだけ反映する。
 LLM が1打目表示より遅れて届いた場合、**画面は更新しない**（extras にのみ溜まりうる仕様）。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`、`Tests/LLMSuccessorFetcherTests.swift`*
 
 ### pendingSuccessorCandidates
-Successor モードで N-gram 候補を1打目まで遅延表示するためのバッファ（**学習由来の語のみ**。オンデバイス LLM の表層形は含めない）。  
-**不変条件**: `suggestSuccessors()` が N-gram 候補を計算した際に設定され、1打目の入力時に
-`romajiToInitialKana` で読み前方一致フィルタを行い（併せて本バッファ内の語を DB 結果と merge）、`.show` して空になる。
-読みが一致しない場合はモード解除して空になる。
+Successor モードで候補を1打目まで遅延表示するためのバッファ（**N-gram 予測語と、名詞末尾時の格助詞 fallback**。オンデバイス LLM の表層形は含めない）。  
+**不変条件**: `suggestSuccessors()` が候補を計算した際に設定され、1打目の入力時に
+`romajiToInitialKana` で読み前方一致フィルタを行い（併せて `mergePendingSuccessorMatches` と `particleRomajiMap` で本バッファ内の語を併合）、`.show` して空になる。
+読み・格助詞マップのいずれにも一致しない場合はモード解除して空になる。
 `isSuccessorMode = false` になるすべての経路でクリアされる。  
 LLM 由来の語は `successorLLMSurfaceExtras` を参照する。
 
@@ -166,11 +162,8 @@ LLM 由来の語は `successorLLMSurfaceExtras` を参照する。
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。  
-**不変条件**: 1 打目が格助詞 fast-path（`particleRomajiMap`）に対応し、かつ直前確定語が `isNounLike`
-を満たすときのみ格助詞絞り込みバッファとして使用。2 打目が格助詞サブセットにマッチしなければ 1 打目を
-通常入力として流してからモード解除する。  
-`pendingSuccessorCandidates` が非空の場合（N-gram 遅延表示中）は、格助詞 fast-path 非該当の 1 打目でも
-`successorFirstChar` にバッファして N-gram 候補を表示する（2打目でマッチしなければ通常通り流す）。
+**不変条件**: 1 打目が `pendingSuccessorCandidates` を読みフィルタして `.show` した直後に設定し、
+2 打目が同じ読みフィルタにマッチしなければ 1 打目を通常入力として流してからモード解除する。
 
 ---
 

@@ -3,22 +3,27 @@ import XCTest
 
 // See: docs/domain/states.md#successor-モード
 // See: docs/domain/glossary.md#issuccessormode
-// See: docs/domain/scenarios.md#s-03-successor-モードの-1-打目バッファリング格助詞-fast-path
+// See: docs/domain/scenarios.md (S-03)
 
 final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     // MARK: - Successor モード（確定後の後続語予測 / 格助詞クイック選択を含む）
     // See: docs/domain/states.md#successor-モード
-    // See: docs/domain/scenarios.md#s-03-successor-モードの-1-打目バッファリング格助詞-fast-path
+    // See: docs/domain/scenarios.md (S-03)
 
     func testSuccessorModeActivatesAfterCommit() {
         typeRomaji("tokyo")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode, "漢字確定後はSuccessor モードになるはず")
-        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
-            XCTFail("格助詞リストを表示するはず: \(result.candidateAction)"); return
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("確定直後は .dismiss（1打目まで遅延）: \(result.candidateAction)"); return
         }
-        XCTAssertTrue(InputHandler.particles.allSatisfy { candidates.contains($0) }, "全格助詞が候補に含まれるはず")
+        XCTAssertFalse(handler.pendingSuccessorCandidates.isEmpty, "pending に候補が保存されるはず")
+        let showResult = type(chars: "g", base: "g")
+        guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
+            XCTFail("1打目で候補表示: \(showResult.candidateAction)"); return
+        }
+        XCTAssertTrue(candidates.contains("が"), "「g」で「が」を含むはず")
     }
 
     func testSuccessorModeSpaceConfirmsParticle() {
@@ -78,7 +83,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
             XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(commitResult.candidateAction)"); return
         }
 
-        // "g" → 格助詞 fast-path（名詞末尾）で「が」を表示
+        // "g" → pending から「が」を表示（particleRomajiMap + DB 順）
         let showResult = type(chars: "g", base: "g")
         guard case .show(let shown, _, _, _, _) = showResult.candidateAction else {
             XCTFail(".show を返すはず: \(showResult.candidateAction)"); return
@@ -174,8 +179,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         typeRomaji("tokyo")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode, "漢字末尾の確定後は格助詞モードになるはず")
-        guard case .show = result.candidateAction else {
-            XCTFail(".show を返すはず: \(result.candidateAction)"); return
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("確定直後は .dismiss（1打目まで遅延）: \(result.candidateAction)"); return
         }
     }
 
@@ -183,8 +188,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         typeRomaji("koohii")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "コーヒー")
         XCTAssertTrue(handler.isSuccessorMode, "カタカナ末尾の確定後は格助詞モードになるはず")
-        guard case .show = result.candidateAction else {
-            XCTFail(".show を返すはず: \(result.candidateAction)"); return
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("確定直後は .dismiss（1打目まで遅延）: \(result.candidateAction)"); return
         }
     }
 
@@ -304,7 +309,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         guard case .dismiss = commitResult.candidateAction else {
             XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(commitResult.candidateAction)"); return
         }
-        // 「d」打鍵 → 格助詞 fast-path 非該当（非名詞末尾）→ で行フィルタで「です」を表示
+        // 「d」打鍵 → 1打目の読みフィルタで「です」を表示
         let showResult = type(chars: "d", base: "d")
         XCTAssertTrue(handler.isSuccessorMode, "pendingSuccessorCandidates 表示中は Successor モード継続")
         guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
@@ -327,8 +332,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     // See: docs/domain/glossary.md#prev2output
     // See: docs/domain/scenarios.md#s-05-予測候補の表示trigram--bigram
 
-    func testSuccessorChainViaParticleFastPath() {
-        // S-03c: 格助詞 fast-path ("g" で絞り込み → Space で確定) を経由した Successor チェーン
+    func testSuccessorChainViaParticleFirstKey() {
+        // S-03c: 1打目で「が」に絞り込み → Space で確定した Successor チェーン
         // testSuccessorChain は Space 直接確定のみ検証。本テストは絞り込み後の確定＋チェーン継続を検証する。
         handler.db.recordBigram(prev: "東京", input: "が", output: "が")
         handler.db.recordBigram(prev: "が", input: "すき", output: "好き")
@@ -341,8 +346,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
             XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(commitResult.candidateAction)"); return
         }
 
-        // "g" → 格助詞 fast-path が発動（名詞末尾 + particleRomajiMap["g"] = ["が"]）
-        // pendingSuccessorCandidates は格助詞 fast-path に先に入るので無視される
+        // "g" → pending に「が」が含まれるので particleRomajiMap で絞り込み
         let gResult = type(chars: "g", base: "g")
         XCTAssertTrue(handler.isSuccessorMode, "絞り込み中は Successor モードを維持するはず")
         guard case .show(let filtered, _, _, _, _) = gResult.candidateAction else {
@@ -352,7 +356,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
         // Space で「が」確定 → bigram から「好き」あり → N-gram 候補 → .none（1打目まで遅延）
         let spaceResult = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "が")
-        XCTAssertTrue(client.inserted.contains("が"), "fast-path + Space で「が」が挿入されるはず")
+        XCTAssertTrue(client.inserted.contains("が"), "Space で「が」が挿入されるはず")
         XCTAssertTrue(handler.isSuccessorMode, "「が」確定後も Successor モードが継続するはず")
         guard case .dismiss = spaceResult.candidateAction else {
             XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(spaceResult.candidateAction)"); return
@@ -414,7 +418,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         }
     }
 
-    // MARK: - 即時表示（高信頼チェック）
+    // MARK: - 高信頼 bi-gram でも確定直後は遅延表示
 
     func testSuccessorImmediateThresholdNotMet() {
         // count = 4（閾値 5 未満）→ 確定後 .dismiss（遅延表示）
@@ -430,19 +434,23 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         XCTAssertFalse(handler.pendingSuccessorCandidates.isEmpty, "保留候補が保存されているはず")
     }
 
-    func testSuccessorImmediateThresholdMet() {
-        // count = 5（閾値以上）→ 確定後すぐ .show（即時表示）
+    func testSuccessorHighCountStillDelaysUntilFirstKey() {
+        // count = 5（旧「即時表示」閾値以上）でも確定直後は .dismiss
         for _ in 0..<5 {
             handler.db.recordBigram(prev: "東京", input: "について", output: "について")
         }
         typeRomaji("tokyo")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode)
-        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
-            XCTFail("count >= threshold → .show を返すはず: \(result.candidateAction)"); return
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("確定直後は常に .dismiss: \(result.candidateAction)"); return
         }
-        XCTAssertTrue(candidates.contains("について"), "高信頼候補「について」が含まれるはず")
-        XCTAssertTrue(handler.pendingSuccessorCandidates.isEmpty, "即時表示時は保留候補が空のはず")
+        XCTAssertTrue(handler.pendingSuccessorCandidates.contains("について"), "保留に高信頼候補が含まれるはず")
+        let showResult = type(chars: "n", base: "n")
+        guard case .show(let shown, _, _, _, _) = showResult.candidateAction else {
+            XCTFail("1打目で .show: \(showResult.candidateAction)"); return
+        }
+        XCTAssertTrue(shown.contains("について"), "「n」で「について」が含まれるはず")
     }
 
     func testSuccessorImmediateThresholdOutdated() {

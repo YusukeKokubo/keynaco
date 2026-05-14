@@ -188,7 +188,7 @@ extension DatabaseManager {
         fetchNgramTopGrouped(table: .bigram, prev: prev, limit: limit)
     }
 
-    /// prev に続く bi-gram の直近 90 日以内の最大 count を返す。即時表示の閾値判定用。
+    /// prev に続く bi-gram の直近 90 日以内の最大 count を返す（プリセット行は日付窓外でも含む）。統計・テスト用。
     public func fetchBigramTopCount(prev: String) -> Int {
         dbQueue.sync {
             let cutoff = self.nowEpoch() - 90 * 86400

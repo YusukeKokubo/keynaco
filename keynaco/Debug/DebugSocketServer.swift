@@ -1601,7 +1601,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
         let triggerContextOpt: [String]? = {
             switch trigger {
-            case .pendingLowConfidence(let ctx), .particlesOnly(let ctx): return ctx
+            case .pendingLowConfidence(let ctx): return ctx
             case .none: return nil
             }
         }()
@@ -1631,47 +1631,6 @@ final class DebugSocketServer: @unchecked Sendable {
                 let extra = words.filter { !seen.contains($0) }
                 guard !extra.isEmpty else { return }
                 self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
-            }
-        case .particlesOnly(let triggerContext):
-            successorLLM.fetch(
-                context: triggerContext, documentContextPrefix: docPrefix, examples: examples
-            ) { [weak self] words in
-                guard let self else { return }
-                guard schedulingEpoch == self.llmEpoch else { return }
-                guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
-                guard self.handler.isSuccessorMode,
-                      self.candidateWindow.isVisible,
-                      let base = self.handler.successorLLMBaseCandidates else { return }
-                var seen = Set(base)
-                seen.formUnion(self.handler.successorLLMSurfaceExtras)
-                let extra = words.filter { !seen.contains($0) }
-                guard !extra.isEmpty else { return }
-                for w in extra where seen.insert(w).inserted {
-                    self.handler.successorLLMSurfaceExtras.append(w)
-                }
-                var merged = base
-                var tailSeen = Set(base)
-                for w in self.handler.successorLLMSurfaceExtras where tailSeen.insert(w).inserted {
-                    merged.append(w)
-                }
-                let rowCap = max(0, merged.count - 1)
-                let initialRow = min(self.candidateWindow.selectedRow, rowCap)
-                self.candidateWindow.apply(
-                    action: .show(
-                        candidates: merged,
-                        historyEnd: 0,
-                        initialRow: initialRow,
-                        predictionEnd: 0,
-                        fixedEnd: 0
-                    )
-                )
-                if self.handler.isSuccessorMode, !merged.isEmpty,
-                   let markedText = self.candidateWindow.selectedText, !markedText.isEmpty {
-                    self.mockClient.setMarkedText(
-                        markedText,
-                        selectionRange: NSRange(location: markedText.count, length: 0)
-                    )
-                }
             }
         }
     }

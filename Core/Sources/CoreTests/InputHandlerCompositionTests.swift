@@ -66,10 +66,11 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
         XCTAssertTrue(result.consumed)
         XCTAssertEqual(client.inserted, ["阿"])
-        guard case .show = result.candidateAction else {
-            XCTFail("確定後は格助詞リストを表示するはず: \(result.candidateAction)"); return
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("確定直後は Successor も .dismiss（1打目まで遅延）: \(result.candidateAction)"); return
         }
         XCTAssertTrue(handler.isSuccessorMode)
+        XCTAssertFalse(handler.pendingSuccessorCandidates.isEmpty)
     }
 
     // MARK: - Escape でリセット

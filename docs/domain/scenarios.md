@@ -53,19 +53,20 @@
 
 ---
 
-## S-03: Successor モードの 1 打目バッファリング（格助詞 fast-path）
+## S-03: Successor モードの 1 打目（保留 + 読み／格助詞マージ）
 
-**前提**: `東京` を確定した直後（末尾カタカナ → `isNounLike` 真 → bi-gram 候補 + 格助詞 fallback を表示）
+**前提**: `東京` を確定した直後（末尾カタカナ → `isNounLike` 真 → bi-gram 候補 + 格助詞 fallback を **`pendingSuccessorCandidates` に保存し `.dismiss`**）
 
 | ステップ | キー | successorFirstChar | 動作 |
 |---------|------|--------------------|------|
-| 1 | `g` | `g` | バッファリング。`particleRomajiMap["g"] = ["が"]` で候補を「が」に絞り込み |
+| 0 | — | — | 確定直後はウィンドウを出さず Successor モードのみ |
+| 1 | `g` | `g` | `particleRomajiMap["g"]` と DB 併合で候補を「が」に絞り込み |
 | 2a | Space | — | 絞り込み中の先頭候補「が」を確定 → bigram があれば Successor 継続、なければ待機 |
 | 2b | `z` | — | `g` を通常入力として流す（`g` → pendingRomaji）、モード解除 |
 
 2b のケースでは、1 打目 `g` が組成バッファに入り直し、`gz` の途中状態から通常の組成処理が続く。  
 **注意**: `g` の後に `a` を打つと 2b 同様にモード解除→通常組成になり `が` が markedText に入る（自動確定はしない）。
-**注意**: この fast-path は `isNounLike(last)` を満たすとき限定。ひらがな末尾の語の後は 1 打目で即座に通常組成へフォールスルーする。
+**注意**: 1打目のマージは `pendingSuccessorCandidates` がある場合の経路。ひらがな末尾の語の後は Successor に入らないか、入っても保留が空なら 1 打目で通常組成へフォールスルーする。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
@@ -78,14 +79,14 @@
 
 | ステップ | キー | 状態 | candidates | 動作 |
 |---------|------|------|-----------|------|
-| 0a | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram あり → N-gram 遅延表示（候補ウィンドウは開かない） |
+| 0a | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram あり → 確定直後は `.dismiss`（ウィンドウは開かない） |
 | 0b | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram なし → bigram のみ。格助詞 fallback なし（`isNounLike` 偽）|
 | 1a | `d`（「で」行） | Successor モード | `["さまです", "です"]` or `["です"]` | 1打目 `romajiToInitialKana["d"]`→「で」行フィルタで一致候補を表示 |
 | 1b | Space | 待機 | — | 1打後、先頭候補を確定 |
 | 1c | マッチしないキー | 待機 | — | 一致候補なし → モード解除→通常入力 |
 
 trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismiss` が返り Successor モードには入らない。  
-格助詞のみ（N-gram なし、名詞末尾）の場合は従来通り確定後すぐに候補ウィンドウを表示する。
+名詞末尾で N-gram が空でも、格助詞 fallback は **`pendingSuccessorCandidates` に積まれ**、1打目で表示する。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
@@ -97,8 +98,8 @@ trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismi
 
 | ステップ | キー | 状態 | 動作 |
 |---------|------|------|------|
-| 0 | — | Successor モード | N-gram あり（`が` が bigram 学習済み）→ `.dismiss`（1打目待ち） |
-| 1 | 任意キー | Successor モード | `pendingSuccessorCandidates` を表示（candidates: `["が", ...]`）|
+| 0 | — | Successor モード | N-gram あり（`が` が bigram 学習済み）→ `.dismiss`（確定直後はウィンドウなし） |
+| 1 | 任意キー | Successor モード | 1打目で `pendingSuccessorCandidates` を読みフィルタして表示（例: `g` → `["が", ...]`）|
 | 2 | Space | Successor モード | 「が」確定 → `suggestSuccessors()` → N-gram あり（`好き`）→ `.dismiss`（1打目待ち） |
 | 3 | 任意キー | Successor モード | `pendingSuccessorCandidates` を表示（candidates: `["好き"]`）|
 | 4 | Space | 待機 | 「好き」確定 → bigram なし → `.dismiss` |

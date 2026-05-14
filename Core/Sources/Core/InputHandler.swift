@@ -14,10 +14,8 @@ public enum CandidateAction: Sendable {
 /// Successor 用：オンデバイス LLM で後続語を補完するタイミング（`InputController` が参照してフェッチを開始する）。
 public enum SuccessorLLMTrigger: Equatable {
     case none
-    /// N-gram あり・閾値未満で保留（`.dismiss`）になった直後。`context` は `committedHistory.suffix(3)` のスナップショット。
+    /// `suggestSuccessors()` が候補を `pendingSuccessorCandidates` に積んで `.dismiss` を返した直後。`context` は `committedHistory.suffix(3)` のスナップショット。
     case pendingLowConfidence(context: [String])
-    /// 格助詞のみ即時表示になった直後。
-    case particlesOnly(context: [String])
 }
 
 /// セグメントモード用：`InputController` が `LLMSegmentConverter` を起動するタイミング。
@@ -92,7 +90,7 @@ public enum KeyCode {
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
 ///
 /// 機能ごとの実装は extension で別ファイルに分散している：
-/// - `InputHandler+SuccessorMode.swift`：後続語サジェストと格助詞 fast-path
+/// - `InputHandler+SuccessorMode.swift`：後続語サジェストと 1 打目の保留マージ
 /// - `InputHandler+SegmentMode.swift`  ：文節分割と境界調整
 /// - `InputHandler+Candidates.swift`   ：候補リスト構築・候補表示中・通常入力
 public struct InputHandler {
@@ -102,7 +100,6 @@ public struct InputHandler {
 
     public static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
     public static let sentenceTerminators: Set<String> = ["。", "！", "？"]
-    public static let successorImmediateThreshold = LearningThresholds.successorImmediateThreshold
 
     public var state = CompositionState()
     public var ignoreNextModeSwitch = false
@@ -111,8 +108,6 @@ public struct InputHandler {
     public var pendingSuccessorCandidates: [String] = []
     /// LLM が返した表層形のみ。`mergePendingSuccessorMatches` の `pending` には渡さない。
     public var successorLLMSurfaceExtras: [String] = []
-    /// `particlesOnly` のとき即時表示した候補（LLM の表層形は `successorLLMSurfaceExtras`）。
-    public var successorLLMBaseCandidates: [String]? = nil
     public var successorLLMTrigger: SuccessorLLMTrigger = .none
     public var segmentLLMTrigger: SegmentLLMTrigger = .none
     public var bracketCandidates: [String]? = nil

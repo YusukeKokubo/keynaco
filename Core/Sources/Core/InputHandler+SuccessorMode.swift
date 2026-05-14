@@ -9,7 +9,6 @@ public extension InputHandler {
 
     mutating func clearSuccessorLLMAuxiliaryState() {
         successorLLMTrigger = .none
-        successorLLMBaseCandidates = nil
         successorLLMSurfaceExtras.removeAll()
     }
 
@@ -30,8 +29,7 @@ public extension InputHandler {
     }
 
     /// 後続語候補を組み立ててモードに入る／出る判定をする。
-    /// N-gram 候補がある場合は `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目まで表示を遅延）。
-    /// 格助詞のみの場合（名詞末尾 + N-gram なし）は従来通り `.show` を返す。
+    /// 候補がある場合は `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目まで表示を遅延）。
     mutating func suggestSuccessors() -> CandidateAction {
         guard let last = lastCommittedOutput else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
@@ -61,29 +59,9 @@ public extension InputHandler {
         successorFirstChar = nil
         let llmContext = Array(committedHistory.suffix(3))
 
-        let maxC = LearningThresholds.successorMaxCandidates
-        if predictTop.isEmpty {
-            // 格助詞 fallback のみ（N-gram なし）→ 従来通りすぐ表示。助詞は件数が多いので maxC で省略しない。
-            let capped = candidates
-            pendingSuccessorCandidates = []
-            successorLLMBaseCandidates = capped
-            successorLLMTrigger = .particlesOnly(context: llmContext)
-            return .show(candidates: capped, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
-        } else {
-            // 高信頼チェック：直近90日以内に閾値回数以上使ったペアは即時表示
-            let topCount = db.fetchBigramTopCount(prev: last)
-            if topCount >= InputHandler.successorImmediateThreshold {
-                pendingSuccessorCandidates = []
-                clearSuccessorLLMAuxiliaryState()
-                return .show(candidates: Array(candidates.prefix(maxC)), historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0)
-            } else {
-                // 通常 → 保存して1打目まで待つ
-                pendingSuccessorCandidates = candidates
-                successorLLMBaseCandidates = nil
-                successorLLMTrigger = .pendingLowConfidence(context: llmContext)
-                return .dismiss
-            }
-        }
+        pendingSuccessorCandidates = candidates
+        successorLLMTrigger = .pendingLowConfidence(context: llmContext)
+        return .dismiss
     }
 
     mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
@@ -151,26 +129,6 @@ public extension InputHandler {
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         default:
-            // 格助詞 fast-path: N-gram 保留なし かつ 名詞末尾のときのみ実行。
-            // pendingSuccessorCandidates がある場合は N-gram フィルタを優先し fast-path をスキップ。
-            let char = (baseCharacters ?? characters ?? "").lowercased()
-            if pendingSuccessorCandidates.isEmpty,
-               char.count == 1, let c = char.first, c.isLetter, c.isASCII,
-               let last = lastCommittedOutput, isNounLike(last) {
-                let matched = InputHandler.particleRomajiMap[char] ?? []
-                if !matched.isEmpty {
-                    successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                    let fromBigram = db.fetchBigramInList(prev: last, list: matched)
-                    let fromTrigram: [String] = prev2Output.map {
-                        db.fetchTrigramInList(prev2: $0, prev1: last, list: matched)
-                    } ?? []
-                    let ngram = InputHandler.merged(fromTrigram, fromBigram)
-                    let ngramSet = Set(ngram)
-                    let rest = matched.filter { !ngramSet.contains($0) }
-                    return (true, .show(candidates: Array((ngram + rest).prefix(LearningThresholds.successorMaxCandidates)), historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
-                }
-            }
-            // fast-path 非該当かつ N-gram 保留あり → 1打目で読み前方一致フィルタして表示
             let first = successorFirstChar
             if !pendingSuccessorCandidates.isEmpty, first == nil {
                 let char = (baseCharacters ?? characters ?? "").lowercased()
@@ -194,6 +152,12 @@ public extension InputHandler {
                     filtered = InputHandler.mergePendingSuccessorMatches(
                         dbOrdered: filtered, pending: pendingSuccessorCandidates, romajiKey: char
                     )
+                    let particleMatches = (InputHandler.particleRomajiMap[char] ?? [])
+                        .filter { pendingSuccessorCandidates.contains($0) }
+                    var particleSeen = Set(filtered)
+                    for p in particleMatches where particleSeen.insert(p).inserted {
+                        filtered.append(p)
+                    }
                     if !filtered.isEmpty {
                         var merged = filtered
                         var mergeSeen = Set(filtered)

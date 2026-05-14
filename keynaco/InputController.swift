@@ -195,7 +195,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.pendingSuccessorCandidates = []
             ic.handler.successorLLMSurfaceExtras = []
             ic.handler.successorLLMTrigger = .none
-            ic.handler.successorLLMBaseCandidates = nil
             ic.handler.segmentLLMTrigger = .none
             ic.cachedSurroundingContext = nil
             ic.handler.leftSideContext = ""
@@ -455,7 +454,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.pendingSuccessorCandidates = []
             ic.handler.successorLLMSurfaceExtras = []
             ic.handler.successorLLMTrigger = .none
-            ic.handler.successorLLMBaseCandidates = nil
             ic.handler.segmentLLMTrigger = .none
             ic.cachedSurroundingContext = nil
             ic.handler.leftSideContext = ""
