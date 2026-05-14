@@ -10,14 +10,6 @@ public enum CandidateAction: Sendable {
     case deleteSelected
 }
 
-/// 候補ウィンドウの現在状態スナップショット（読み取り専用）
-/// Successor 用：オンデバイス LLM で後続語を補完するタイミング（`InputController` が参照してフェッチを開始する）。
-public enum SuccessorLLMTrigger: Equatable {
-    case none
-    /// `suggestSuccessors()` が候補を `pendingSuccessorCandidates` に積んで `.dismiss` を返した直後。`context` は `committedHistory.suffix(3)` のスナップショット。
-    case pendingLowConfidence(context: [String])
-}
-
 /// セグメントモード用：`InputController` が `LLMSegmentConverter` を起動するタイミング。
 public enum SegmentLLMTrigger: Equatable {
     case none
@@ -108,7 +100,8 @@ public struct InputHandler {
     public var pendingSuccessorCandidates: [String] = []
     /// LLM が返した表層形のみ。`mergePendingSuccessorMatches` の `pending` には渡さない。
     public var successorLLMSurfaceExtras: [String] = []
-    public var successorLLMTrigger: SuccessorLLMTrigger = .none
+    /// `suggestSuccessors()` が候補を積んだ直後にセットされる LLM コンテキスト（`committedHistory.suffix(3)` のスナップショット）。nil = トリガーなし。
+    public var successorLLMContext: [String]? = nil
     public var segmentLLMTrigger: SegmentLLMTrigger = .none
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }

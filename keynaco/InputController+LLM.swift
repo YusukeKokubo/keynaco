@@ -38,45 +38,31 @@ extension InputController {
         Self.misconversionChecker.check(surroundingPrefix: prefix, recentWords: recentWords)
     }
 
-    /// `suggestSuccessors()` が立てた `successorLLMTrigger` に応じてオンデバイス LLM で後続語を補完する。
+    /// `suggestSuccessors()` が立てた `successorLLMContext` に応じてオンデバイス LLM で後続語を補完する。
     func applySuccessorLLMScheduling(adapter: IMKTextInputAdapter) {
-        let trigger = handler.successorLLMTrigger
-        guard trigger != .none else { return }
-        handler.successorLLMTrigger = .none
+        guard let triggerContext = handler.successorLLMContext else { return }
+        handler.successorLLMContext = nil
 
-        let triggerContextOpt: [String]? = {
-            switch trigger {
-            case .pendingLowConfidence(let ctx): return ctx
-            case .none: return nil
-            }
-        }()
-        let examples: [(prev: String, next: String)] = triggerContextOpt.flatMap { tc in
-            tc.last.map { lw in
-                handler.db.fetchBigramTop(prev: lw, limit: 5)
-                    .filter { !InputHandler.particles.contains($0) }
-                    .map { (prev: lw, next: $0) }
-            }
+        let examples: [(prev: String, next: String)] = triggerContext.last.map { lw in
+            handler.db.fetchBigramTop(prev: lw, limit: 5)
+                .filter { !InputHandler.particles.contains($0) }
+                .map { (prev: lw, next: $0) }
         } ?? []
 
-        switch trigger {
-        case .none:
-            break
-        case .pendingLowConfidence(let triggerContext):
-            let docPrefix = resolvedLLMDocumentContextPrefix(adapter: adapter)
-            Self.successorLLM.fetch(
-                context: triggerContext, documentContextPrefix: docPrefix, examples: examples
-            ) { [weak self] words in
-                guard let self else { return }
-                guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
-                guard self.handler.isSuccessorMode else { return }
-                var seen = Set(self.handler.pendingSuccessorCandidates)
-                seen.formUnion(self.handler.successorLLMSurfaceExtras)
-                let extra = words.filter { !seen.contains($0) }
-                guard !extra.isEmpty else { return }
-                self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
-                if !self.handler.pendingSuccessorCandidates.isEmpty {
-                    Self.postSuccessorPendingNotification(pending: true)
-                }
+        let docPrefix = resolvedLLMDocumentContextPrefix(adapter: adapter)
+        Self.successorLLM.fetch(
+            context: triggerContext, documentContextPrefix: docPrefix, examples: examples
+        ) { [weak self] words in
+            guard let self else { return }
+            guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
+            guard self.handler.isSuccessorMode else { return }
+            var seen = Set(self.handler.pendingSuccessorCandidates)
+            seen.formUnion(self.handler.successorLLMSurfaceExtras)
+            let extra = words.filter { !seen.contains($0) }
+            guard !extra.isEmpty else { return }
+            self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
+            if !self.handler.pendingSuccessorCandidates.isEmpty {
+                Self.postSuccessorPendingNotification(pending: true)
             }
         }
     }

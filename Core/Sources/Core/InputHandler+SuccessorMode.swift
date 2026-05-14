@@ -8,7 +8,7 @@ import AppKit
 public extension InputHandler {
 
     mutating func clearSuccessorLLMAuxiliaryState() {
-        successorLLMTrigger = .none
+        successorLLMContext = nil
         successorLLMSurfaceExtras.removeAll()
     }
 
@@ -60,7 +60,7 @@ public extension InputHandler {
         let llmContext = Array(committedHistory.suffix(3))
 
         pendingSuccessorCandidates = candidates
-        successorLLMTrigger = .pendingLowConfidence(context: llmContext)
+        successorLLMContext = llmContext
         return .dismiss
     }
 
@@ -171,7 +171,6 @@ public extension InputHandler {
                         return (true, .show(candidates: Array(merged.prefix(LearningThresholds.successorMaxCandidates)), historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
                     }
                 }
-                pendingSuccessorCandidates = []
             }
             // モード解除、バッファがあれば先に通常入力に流す
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
