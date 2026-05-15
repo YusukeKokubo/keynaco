@@ -90,7 +90,10 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
         let result = type(chars: "!", base: "1", modifiers: .shift)
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "!")
+        XCTAssertEqual(client.markedText, "！")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
     func testShiftSymbolAppendsToComposition() {
