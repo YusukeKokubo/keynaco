@@ -32,8 +32,10 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(candidates[0], "あい", "先頭はひらがなのはず")
-        XCTAssertEqual(candidates[1], "アイ", "2番目はカタカナのはず")
+        // 辞書先頭候補が row 0 に昇格するため、ひらがな/カタカナは row 1/2 以降に移動する
+        XCTAssertTrue(candidates.contains("あい"), "ひらがなが候補に含まれるはず")
+        XCTAssertTrue(candidates.contains("アイ"), "カタカナが候補に含まれるはず")
+        XCTAssertGreaterThan(candidates.firstIndex(of: "あい")!, 0, "ひらがなは row 0 より後のはず")
     }
 
     func testKatakanaInCandidatesWhenSpacePressed() {
@@ -522,25 +524,19 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
     }
 
     func testZenzaiPromoteSkippedWhenDisabled() {
-        let top1 = zenzaiMock.candidateLines[0]
         zenzaiMock.isZenzaiEnabled = false
         handler.leftSideContext = "ctx"
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
-            XCTFail(".show"); return
-        }
-        XCTAssertNotEqual(candidates[fixedEnd - 1], top1, "Zenzai オフ時は top-1 を固定位置に挿入しない")
+        guard case .show = action else { XCTFail(".show"); return }
+        XCTAssertNil(handler.lastZenzaiRow, "Zenzai オフ時は lastZenzaiRow が nil")
     }
 
     func testZenzaiPromoteSkippedWhenNoLeftContext() {
-        let top1 = zenzaiMock.candidateLines[0]
         handler.leftSideContext = ""
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
-            XCTFail(".show"); return
-        }
-        XCTAssertNotEqual(candidates[fixedEnd - 1], top1, "左文脈なしでは固定位置に top-1 を置かない")
+        guard case .show = action else { XCTFail(".show"); return }
+        XCTAssertNil(handler.lastZenzaiRow, "左文脈なしでは lastZenzaiRow が nil")
     }
 }

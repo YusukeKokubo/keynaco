@@ -319,13 +319,28 @@ public extension InputHandler {
             lowHistory: lowHistory
         )
 
+        // 履歴/予測/Zenzai/特殊候補/ユーザー辞書がなく辞書候補がある場合、辞書先頭候補を row 0 に昇格
+        let shouldPromoteFirstDict = historyEnd == adjustedFixedEnd
+            && zenzaiTop1Count == 0
+            && userDictCount == 0
+            && dateTimeCandidates.isEmpty
+            && numberCandidates.isEmpty
+            && candidates.count > adjustedFixedEnd
+        if shouldPromoteFirstDict {
+            let promoted = candidates.remove(at: adjustedFixedEnd)
+            candidates.insert(promoted, at: 0)
+        }
+
         // 履歴/予測候補があるときはその先頭（adjustedFixedEnd）を初期選択。
         // ない場合はひらがな固定候補（row 0）を初期選択にする。
         let initialRow = historyEnd > adjustedFixedEnd ? adjustedFixedEnd : 0
         guard !candidates.isEmpty else { return .dismiss }
 
-        return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
-                     predictionEnd: predictionEnd, fixedEnd: adjustedFixedEnd)
+        return .show(candidates: candidates,
+                     historyEnd: shouldPromoteFirstDict ? 0 : historyEnd,
+                     initialRow: initialRow,
+                     predictionEnd: shouldPromoteFirstDict ? 0 : predictionEnd,
+                     fixedEnd: shouldPromoteFirstDict ? 0 : adjustedFixedEnd)
     }
 
     private mutating func appendSpecialCandidates(

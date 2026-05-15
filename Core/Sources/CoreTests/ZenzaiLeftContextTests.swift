@@ -73,7 +73,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
 
     // MARK: - テスト
 
-    /// 左文脈なし: Zenzai 未発火 → fixedEnd = 2（ひらがな + カタカナのみ）
+    /// 左文脈なし: Zenzai 未発火 → 辞書先頭候補 "開催" が row 0 に昇格（fixedEnd = 0）
     func testZenzaiNotPromotedWithoutLeftContext() {
         handler.leftSideContext = ""
         typeRomaji("kaisai")
@@ -81,11 +81,11 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 2, "左文脈なし: fixedEnd はひらがな×1 + カタカナ×1 = 2 のはず")
-        XCTAssertEqual(candidates[0], "かいさい")
-        XCTAssertEqual(candidates[1], "カイサイ")
-        // [2] 以降は辞書候補（固定枠外）
-        XCTAssertEqual(candidates[2], "開催", "辞書 top-1 が [fixedEnd] に来るはず")
+        XCTAssertEqual(fixedEnd, 0, "左文脈なし: 辞書先頭昇格により fixedEnd = 0")
+        XCTAssertEqual(candidates[0], "開催", "辞書 top-1 が row 0 に昇格するはず")
+        XCTAssertEqual(candidates[1], "かいさい")
+        XCTAssertEqual(candidates[2], "カイサイ")
+        XCTAssertNil(handler.lastZenzaiRow, "Zenzai 未発火なので lastZenzaiRow は nil")
     }
 
     /// 左文脈あり: Zenzai top-1 が固定枠に昇格 → fixedEnd = 3
