@@ -71,7 +71,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
     // See: docs/domain/glossary.md#fixedcount
     // See: docs/domain/glossary.md#historyend
 
-    func testInitialRowSkipsFixedCandidatesWhenCandidatesExist() {
+    func testInitialRowIsHiraganaWhenNoHistory() {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         let (_, action) = press(keyCode: 49)
@@ -79,7 +79,18 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertGreaterThan(candidates.count, 2, "azooKey が候補を返すはず")
-        XCTAssertEqual(initialRow, 2, "initialRow はひらがな・カタカナの後（2）")
+        XCTAssertEqual(initialRow, 0, "履歴/予測なしのとき initialRow はひらがな固定候補（0）")
+    }
+
+    func testInitialRowSkipsFixedCandidatesWhenHistoryExists() {
+        handler.db.record(input: "あい", output: "愛")
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(_, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(initialRow, 2, "履歴候補があるとき initialRow はひらがな・カタカナの後（2）")
     }
 
     func testHiraganaInHistoryAppearsAsHistoryCandidate() {
