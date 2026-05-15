@@ -319,8 +319,9 @@ public extension InputHandler {
             lowHistory: lowHistory
         )
 
-        let preferHiragana = !hiraganaInHistory && Self.isHiraganaPreferred(h)
-        let initialRow = (candidates.count > fixedCount && !preferHiragana) ? fixedCount : 0
+        // 履歴/予測候補があるときはその先頭（adjustedFixedEnd）を初期選択。
+        // ない場合はひらがな固定候補（row 0）を初期選択にする。
+        let initialRow = historyEnd > adjustedFixedEnd ? adjustedFixedEnd : 0
         guard !candidates.isEmpty else { return .dismiss }
 
         return .show(candidates: candidates, historyEnd: historyEnd, initialRow: initialRow,
