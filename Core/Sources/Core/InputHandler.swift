@@ -92,6 +92,9 @@ public struct InputHandler {
 
     public static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
     public static let sentenceTerminators: Set<String> = ["。", "！", "？"]
+    /// 文脈をリセットせず、かつ N-gram・履歴にも記録しない句読点。
+    /// pushCommitted でスキップすることで直前単語が prev のまま維持される。
+    public static let readingPunctuations: Set<String> = ["、", "・", "…"]
 
     public var state = CompositionState()
     public var ignoreNextModeSwitch = false
@@ -130,6 +133,7 @@ public struct InputHandler {
             documentSurroundingContextInvalidated = true
             return
         }
+        if InputHandler.readingPunctuations.contains(text) { return }
         committedHistory.append(text)
         if committedHistory.count > 5 { committedHistory.removeFirst() }
     }
@@ -242,12 +246,14 @@ public struct InputHandler {
         if candidate.isVisible, let selected = candidate.selectedText {
             let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
             let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
-            if !isDateTime && !isNumber { db.recordPrefixes(reading: normalizedInput, output: selected) }
+            let isPunct = Self.readingPunctuations.contains(selected) || Self.sentenceTerminators.contains(selected)
+            if !isDateTime && !isNumber && !isPunct { db.recordPrefixes(reading: normalizedInput, output: selected) }
             let conv = azooKeyConverter; let r = inputKey; let t = selected
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
             commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
         } else {
-            db.recordPrefixes(reading: normalizedInput, output: inputKey)
+            let isPunct = Self.readingPunctuations.contains(inputKey) || Self.sentenceTerminators.contains(inputKey)
+            if !isPunct { db.recordPrefixes(reading: normalizedInput, output: inputKey) }
             commitText(text: inputKey, client: client)
         }
     }
@@ -260,10 +266,12 @@ public struct InputHandler {
         fullReading: String? = nil,
         client: TextInputClient
     ) {
+        let isPunctuation = InputHandler.readingPunctuations.contains(text)
+            || InputHandler.sentenceTerminators.contains(text)
         var capPrev1: String?
         var capPrev2: String?
         var capSkipPrevs: [String] = []
-        if !state.composingText.isEmpty && !skipHistory, let p1 = lastCommittedOutput {
+        if !state.composingText.isEmpty && !skipHistory && !isPunctuation, let p1 = lastCommittedOutput {
             capPrev1 = p1
             capPrev2 = prev2Output
             let isParticlePrev = InputHandler.particles.contains(p1)
