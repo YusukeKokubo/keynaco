@@ -193,7 +193,10 @@ public extension InputHandler {
             azooKeyCandidates = lastAzooKeyResults
         } else {
             let raw = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
-            azooKeyCandidates = raw.filter { !Self.isSpuriousCompound($0, hiragana: h) }
+            let katakanaForm = KanaUtils.hiraganaToKatakana(h)
+            azooKeyCandidates = raw
+                .filter { !Self.isSpuriousCompound($0, hiragana: h) }
+                .filter { !Self.isMixedKanaVariant($0, katakanaForm: katakanaForm) }
             lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
@@ -410,13 +413,24 @@ public extension InputHandler {
         return hiraganaPreferredRegex.firstMatch(in: h, range: range) != nil
     }
 
-    /// 入力ひらがなと同文字数・先頭がひらがな・末尾が漢字の候補は擬似複合語とみなす。
-    /// 例: "こうしたい"→"こうした居"（居＝い）のように末尾1ひらがなを漢字化した誤変換を除外する。
+    /// ひらがな/カタカナが混在する候補のうち、全角カタカナに統一すると katakanaForm と一致するものを除外する。
+    /// 例: "しっくり"の全角カタカナ "シックリ" に対して "シックり"/"しっクリ" を除外する。
+    /// 全カタカナ候補そのもの（candidate == katakanaForm）は除外しない。
+    private static func isMixedKanaVariant(_ candidate: String, katakanaForm: String) -> Bool {
+        guard candidate != katakanaForm else { return false }
+        return KanaUtils.hiraganaToKatakana(candidate) == katakanaForm
+    }
+
+    /// 入力ひらがなと同文字数かつ末尾が漢字で、先頭がひらがな or カタカナの候補は擬似複合語とみなす。
+    /// ひらがな先頭例: "こうしたい"→"こうした居"（末尾1ひらがなを漢字化した誤変換）
+    /// カタカナ先頭例: "しっくり"→"シック理"/"シック里"（カタカナ語頭+漢字末尾の誤変換）
     private static func isSpuriousCompound(_ candidate: String, hiragana: String) -> Bool {
         let candArr = Array(candidate)
         guard candArr.count == hiragana.count, candArr.count >= 3 else { return false }
-        guard let firstV = candArr.first?.unicodeScalars.first?.value,
-              0x3041...0x3096 ~= firstV else { return false }
+        guard let firstV = candArr.first?.unicodeScalars.first?.value else { return false }
+        let firstIsHiragana = (0x3041...0x3096).contains(firstV)
+        let firstIsKatakana = (0x30A1...0x30F6).contains(firstV)
+        guard firstIsHiragana || firstIsKatakana else { return false }
         guard let lastV = candArr.last?.unicodeScalars.first?.value,
               (0x4E00...0x9FFF ~= lastV) || (0x3400...0x4DBF ~= lastV) else { return false }
         return true
