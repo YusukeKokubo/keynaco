@@ -82,35 +82,35 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "あ、")
     }
 
-    // MARK: - Shift+句読点キー → 角括弧入力
-    // See: docs/domain/glossary.md#組成テキストmarkedtext
+    // MARK: - Shift+句読点キー → 全角記号候補ウィンドウ
 
-    func testShiftCommaInputsLessThan() {
-        type(chars: "<", base: ",", modifiers: .shift)
+    func testShiftCommaShowsLessThanCandidates() {
+        let result = type(chars: "<", base: ",", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "<")
+        XCTAssertEqual(client.markedText, "＜")
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("＜"))
+        } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
-    func testShiftPeriodInputsGreaterThan() {
-        type(chars: ">", base: ".", modifiers: .shift)
+    func testShiftPeriodShowsGreaterThanCandidates() {
+        let result = type(chars: ">", base: ".", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, ">")
-    }
-
-    func testAngleBracketsCanBeConfirmedWithEnter() {
-        type(chars: "<", base: ",", modifiers: .shift)
-        type(chars: ">", base: ".", modifiers: .shift)
-        XCTAssertEqual(client.markedText, "<>")
-        press(keyCode: 36)
-        XCTAssertEqual(client.inserted, ["<>"])
-        XCTAssertEqual(client.markedText, "")
+        XCTAssertEqual(client.markedText, "＞")
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("＞"))
+        } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
     func testShiftCommaAppendsToJapaneseComposition() {
         type(chars: "a", base: "a")
         type(chars: "<", base: ",", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ<")
+        XCTAssertEqual(client.markedText, "あ＜")
     }
 
     func testCommaWithoutShiftShowsCandidateWindow() {
@@ -401,8 +401,8 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     func testShiftAngleBracketConfirmedNotNounLikeNoSuccessor() {
         type(chars: "<", base: ",", modifiers: .shift)
         let result = press(keyCode: KeyCode.enter)
-        XCTAssertFalse(handler.isSuccessorMode, "「<」は名詞でないため Successor モードは起動しないはず")
-        XCTAssertEqual(client.inserted.last, "<")
+        XCTAssertFalse(handler.isSuccessorMode, "「＜」は名詞でないため Successor モードは起動しないはず")
+        XCTAssertEqual(client.inserted.last, "＜")
         guard case .dismiss = result.candidateAction else {
             XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
         }
