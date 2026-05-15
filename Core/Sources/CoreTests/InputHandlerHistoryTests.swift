@@ -231,16 +231,16 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(handler.committedHistory.isEmpty, "「。」直接入力で committedHistory がクリアされるはず")
     }
 
-    func testPeriodViaRomajiMappingClearsCommittedHistory() {
+    func testPeriodViaBracketModeDoesNotImmediatelyClearCommittedHistory() {
         // 「今日」を確定して history を積む
         typeRomaji("kyou")
         press(keyCode: 36, candidateVisible: true, selectedText: "今日")
         press(keyCode: 53)
         XCTAssertFalse(handler.committedHistory.isEmpty)
 
-        // "." → "。"（handlePunctuation 経由）→ clears
+        // "." → bracketOptions モード（markedText="。"）→ 確定前は history を残す
         type(chars: ".", base: ".")
-        XCTAssertTrue(handler.committedHistory.isEmpty, "「.」→「。」変換で committedHistory がクリアされるはず")
+        XCTAssertFalse(handler.committedHistory.isEmpty, "bracketOptions 表示中は history を残す")
     }
 
     func testCommaViaRomajiMappingDoesNotClearCommittedHistory() {

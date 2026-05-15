@@ -8,18 +8,30 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     // MARK: - 句読点変換
     // See: docs/domain/glossary.md#組成テキストmarkedtext
 
-    func testPeriodInsertsJapanesePeriod() {
+    func testPeriodShowsCandidateWindow() {
         let result = type(chars: ".", base: ".")
         XCTAssertTrue(result.consumed)
-        XCTAssertEqual(client.inserted, ["。"])
-        XCTAssertEqual(client.markedText, "")
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "。")
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("。"))
+            XCTAssertTrue(candidates.contains("."))
+        } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
-    func testCommaInsertsJapaneseComma() {
+    func testCommaShowsCandidateWindow() {
         let result = type(chars: ",", base: ",")
         XCTAssertTrue(result.consumed)
-        XCTAssertEqual(client.inserted, ["、"])
-        XCTAssertEqual(client.markedText, "")
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "、")
+        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+            XCTAssertTrue(candidates.contains("、"))
+            XCTAssertTrue(candidates.contains(","))
+        } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
     func testPeriodAppendsToCompositionAndOpensCandidates() {
@@ -101,14 +113,22 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "あ<")
     }
 
-    func testCommaStillMapsToJapaneseCommaWithoutShift() {
-        type(chars: ",", base: ",")
-        XCTAssertEqual(client.inserted, ["、"])
+    func testCommaWithoutShiftShowsCandidateWindow() {
+        let result = type(chars: ",", base: ",")
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "、")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
-    func testPeriodStillMapsToJapanesePeriodWithoutShift() {
-        type(chars: ".", base: ".")
-        XCTAssertEqual(client.inserted, ["。"])
+    func testPeriodWithoutShiftShowsCandidateWindow() {
+        let result = type(chars: ".", base: ".")
+        XCTAssertTrue(client.inserted.isEmpty)
+        XCTAssertEqual(client.markedText, "。")
+        if case .show = result.candidateAction { } else {
+            XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
+        }
     }
 
     // MARK: - 括弧変換（組成なし → 候補ウィンドウ）

@@ -99,6 +99,10 @@ public extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if state.composingText.isEmpty {
+            // "!" は Shift+1 起源（base が数字）のとき候補ウィンドウを出さず ASCII 組成へ
+            let isExclamFromDigitKey = chars == "!" &&
+                (base.unicodeScalars.first.map({ $0.value >= 0x30 && $0.value <= 0x39 }) ?? false)
+            if isExclamFromDigitKey { return nil }
             bracketCandidates = options
             client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
             return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))

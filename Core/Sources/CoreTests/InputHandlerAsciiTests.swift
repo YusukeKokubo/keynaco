@@ -97,7 +97,7 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "!", base: "1", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ!")
+        XCTAssertEqual(client.markedText, "あ！")
     }
 
     // MARK: - ASCII 英字学習（案4）
