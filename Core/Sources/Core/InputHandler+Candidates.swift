@@ -192,11 +192,7 @@ public extension InputHandler {
         } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, autoShow {
             azooKeyCandidates = lastAzooKeyResults
         } else {
-            let raw = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
-            let katakanaForm = KanaUtils.hiraganaToKatakana(h)
-            azooKeyCandidates = raw
-                .filter { !Self.isSpuriousCompound($0, hiragana: h) }
-                .filter { !Self.isMixedKanaVariant($0, katakanaForm: katakanaForm) }
+            azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
             lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
@@ -437,40 +433,6 @@ public extension InputHandler {
         if h.count == 1, "のはがをにでへもとやよ".contains(h) { return true }
         let range = NSRange(h.startIndex..., in: h)
         return hiraganaPreferredRegex.firstMatch(in: h, range: range) != nil
-    }
-
-    /// ひらがな/カタカナが混在する候補のうち、全角カタカナに統一すると katakanaForm と一致するものを除外する。
-    /// 例: "しっくり"の全角カタカナ "シックリ" に対して "シックり"/"しっクリ" を除外する。
-    /// ただし「カタカナ語 + ひらがな suffix」型（例: "ヒントだよ"）は自然な表記として保持する。
-    /// 全カタカナ候補そのもの（candidate == katakanaForm）は除外しない。
-    private static func isMixedKanaVariant(_ candidate: String, katakanaForm: String) -> Bool {
-        guard candidate != katakanaForm else { return false }
-        guard KanaUtils.hiraganaToKatakana(candidate) == katakanaForm else { return false }
-        // ひらがなの後にカタカナが来ない（suffix 型）なら自然な混在として保持
-        var seenHiragana = false
-        for scalar in candidate.unicodeScalars {
-            let v = scalar.value
-            let isHiragana = (0x3041...0x3096).contains(v)
-            let isKatakana = (0x30A1...0x30F6).contains(v)
-            if isHiragana { seenHiragana = true }
-            else if isKatakana && seenHiragana { return true }
-        }
-        return false
-    }
-
-    /// 入力ひらがなと同文字数かつ末尾が漢字で、先頭がひらがな or カタカナの候補は擬似複合語とみなす。
-    /// ひらがな先頭例: "こうしたい"→"こうした居"（末尾1ひらがなを漢字化した誤変換）
-    /// カタカナ先頭例: "しっくり"→"シック理"/"シック里"（カタカナ語頭+漢字末尾の誤変換）
-    private static func isSpuriousCompound(_ candidate: String, hiragana: String) -> Bool {
-        let candArr = Array(candidate)
-        guard candArr.count == hiragana.count, candArr.count >= 3 else { return false }
-        guard let firstV = candArr.first?.unicodeScalars.first?.value else { return false }
-        let firstIsHiragana = (0x3041...0x3096).contains(firstV)
-        let firstIsKatakana = (0x30A1...0x30F6).contains(firstV)
-        guard firstIsHiragana || firstIsKatakana else { return false }
-        guard let lastV = candArr.last?.unicodeScalars.first?.value,
-              (0x4E00...0x9FFF ~= lastV) || (0x3400...0x4DBF ~= lastV) else { return false }
-        return true
     }
 
     /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。
