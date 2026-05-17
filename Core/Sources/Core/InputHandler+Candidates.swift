@@ -441,10 +441,21 @@ public extension InputHandler {
 
     /// ひらがな/カタカナが混在する候補のうち、全角カタカナに統一すると katakanaForm と一致するものを除外する。
     /// 例: "しっくり"の全角カタカナ "シックリ" に対して "シックり"/"しっクリ" を除外する。
+    /// ただし「カタカナ語 + ひらがな suffix」型（例: "ヒントだよ"）は自然な表記として保持する。
     /// 全カタカナ候補そのもの（candidate == katakanaForm）は除外しない。
     private static func isMixedKanaVariant(_ candidate: String, katakanaForm: String) -> Bool {
         guard candidate != katakanaForm else { return false }
-        return KanaUtils.hiraganaToKatakana(candidate) == katakanaForm
+        guard KanaUtils.hiraganaToKatakana(candidate) == katakanaForm else { return false }
+        // ひらがなの後にカタカナが来ない（suffix 型）なら自然な混在として保持
+        var seenHiragana = false
+        for scalar in candidate.unicodeScalars {
+            let v = scalar.value
+            let isHiragana = (0x3041...0x3096).contains(v)
+            let isKatakana = (0x30A1...0x30F6).contains(v)
+            if isHiragana { seenHiragana = true }
+            else if isKatakana && seenHiragana { return true }
+        }
+        return false
     }
 
     /// 入力ひらがなと同文字数かつ末尾が漢字で、先頭がひらがな or カタカナの候補は擬似複合語とみなす。
