@@ -319,8 +319,14 @@ public extension InputHandler {
             lowHistory: lowHistory
         )
 
+        // 長音符「ー」・小母音（ぁぃぅぇぉ）を含む読みは外来語・カタカナ語が期待される。
+        let foreignMarkers: Set<Character> = ["ー", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
+        let hasForeignMarker = h.contains(where: { foreignMarkers.contains($0) })
+
         // 履歴/予測/Zenzai/特殊候補/ユーザー辞書がなく辞書候補がある場合、辞書先頭候補を row 0 に昇格
-        let shouldPromoteFirstDict = historyEnd == adjustedFixedEnd
+        // ただし外来語マーカーがある場合はカタカナを優先するため昇格しない
+        let shouldPromoteFirstDict = !hasForeignMarker
+            && historyEnd == adjustedFixedEnd
             && zenzaiTop1Count == 0
             && userDictCount == 0
             && dateTimeCandidates.isEmpty
@@ -333,9 +339,9 @@ public extension InputHandler {
 
         // 履歴/予測候補があるときはその先頭（adjustedFixedEnd）を初期選択。
         // ない場合はひらがな固定候補（row 0）を初期選択にする。
-        // 長音符「ー」を含む読みはカタカナ語が期待される。カタカナが固定セクションにあれば初期選択にする。
+        // 外来語マーカーがありカタカナが固定セクションにある場合はカタカナを初期選択にする。
         var initialRow = historyEnd > adjustedFixedEnd ? adjustedFixedEnd : 0
-        if h.contains("ー"), !katakanaInHistory, let katRow = candidates.firstIndex(of: katakana) {
+        if hasForeignMarker, !katakanaInHistory, let katRow = candidates.firstIndex(of: katakana) {
             initialRow = katRow
         }
         guard !candidates.isEmpty else { return .dismiss }

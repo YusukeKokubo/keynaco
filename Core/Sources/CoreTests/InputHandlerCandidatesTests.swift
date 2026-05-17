@@ -139,6 +139,23 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(candidates[initialRow], "トータル", "長音符入力の initialRow はカタカナ（トータル）を指すはず")
     }
 
+    func testSmallVowelInputPrefersKatakana() {
+        // 「ねいてぃぶ」はぃ（小母音）を含むため、カタカナ（ネイティブ）を初期選択かつ固定セクションに配置
+        // buildCandidateList を直接呼ぶ（Space は enterSegmentMode を経由するため）
+        type(chars: "n", base: "n"); type(chars: "e", base: "e"); type(chars: "i", base: "i")
+        type(chars: "t", base: "t"); type(chars: "h", base: "h"); type(chars: "i", base: "i")
+        type(chars: "b", base: "b"); type(chars: "u", base: "u")
+        XCTAssertEqual(handler.state.composedHiragana, "ねいてぃぶ", "composedHiragana が期待値")
+        let action = handler.buildCandidateList()
+        guard case .show(let candidates, _, let initialRow, _, let fixedEnd) = action else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains("ネイティブ"), "ネイティブが候補に含まれるはず: \(candidates)")
+        guard let katRow = candidates.firstIndex(of: "ネイティブ") else { return }
+        XCTAssertLessThan(katRow, fixedEnd, "ネイティブは固定セクションに含まれるはず（fixedEnd=\(fixedEnd)）")
+        XCTAssertEqual(initialRow, katRow, "小母音入力の initialRow はカタカナ（ネイティブ）を指すはず")
+    }
+
     func testReturnCommitsVisuallySelectedCandidateWithoutExplicitNav() {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
