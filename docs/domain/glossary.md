@@ -77,16 +77,17 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 2. ユーザー辞書（完全一致 + 前方一致）
 3. **Zenzai top-1**（Zenzai 設定 ON かつ左文脈ありのときのみ、ユーザー辞書の直後に辞書先頭候補を 1 行。設定フラグはモデル未ロード時も true になり得る）
 4. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWords(n: 2)` の各語 × 現読みで skip-bigram を引き（近い内容語の結果を先）、`merged` で重複除去のうえ trigram・bigram にない候補を末尾に追加。辞書先頭と同じ表層は予測から除外）
-5. 履歴（`fetchHistoryScoredMerged`：exact → prefix 重複除去。スコアが閾値**以上**の行のみこのブロックに置く。閾値**未満**は 8 の直前に回す）
+5. 履歴（`fetchHistoryScoredMerged`：exact → prefix 重複除去。スコアが閾値**以上**の行のみこのブロックに置く。閾値**未満**は 8 の直前に回す。**読みが完全一致する履歴のみ** `highHistory`（上位グループ）に昇格し、複合語（前方一致のみ）は末尾に移動する）
 6. 数字候補（`generateNumberCandidates`、数字のみ読みのとき。`historyEnd` 直後に挿入）
 7. 日時候補（`きょう` / `いま` 等のとき。数字候補の直後に挿入）
 8. AzooKey 辞書候補（プロモート済み先頭は除外）
 9. 低スコア履歴（同じく `fetchHistoryScoredMerged` 由来。閾値未満の行を重複除外して末尾に追記）
 
 ### 括弧モード（isBracketMode）
-`[` / `(` 等の括弧キーを**待機中**（組成空）に入力したとき、対応する全角括弧の候補ウィンドウを表示するモード（`bracketCandidates != nil`）。  
-`handleBracketModeKey()` がキーを処理し、`bracketOptions` マップで ASCII 括弧 → 全角候補列に変換する（例: `[` → `「` / `【` / `〔` / ...）。  
-**組成中**に括弧を入力した場合は候補ウィンドウは表示せず、全角1文字目を `composedHiragana` に追加して通常の組成継続。
+`[` / `(` / `!` / `?` / `/` / `.` / `,` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補リストを候補ウィンドウで表示するモード（`bracketCandidates != nil`）。  
+`handleBracketModeKey()` がキーを処理し、`bracketOptions` マップで ASCII 記号 → 全角候補列に変換する（例: `[` → `「`/`【`/`〔`/...、`!` → `！`/`!`、`/` → `・`/`÷`/`…`、`.` → `。`/`．`/`…`、`,` → `、`/`，`）。  
+US キーボードの `Shift+/`（`?`）と `Shift+1`（`!`）は `baseCharacters` で判定し bracketOptions を発動する。  
+**組成中**に記号キーを入力した場合は候補ウィンドウは表示せず、全角1文字目を `composedHiragana` に追加して通常の組成継続。
 
 ---
 
@@ -193,7 +194,9 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 #### recordPrefixes
 読みが **3 文字以上**のひらがなを確定するとき、len=2 から N-1 までの前方一致パターンも同時に `history` に記録する。  
 例: 「おはよう」（4文字）を確定 → `おはよう`/`おはよ`/`おは` の3エントリを記録。  
-「おは」と打つだけで「おはよう」が履歴候補に出るようになる。ASCII のみの読み（`github` など）は prefix 記録しない。
+「おは」と打つだけで「おはよう」が履歴候補に出るようになる。ASCII のみの読み（`github` など）は prefix 記録しない。  
+**ひらがなパススルー確定**（`input == output` かつ全ひらがな）は記録しない（`isHiraganaPassthrough` ガード）。  
+**句読点確定**（`readingPunctuations`：`「、」「・」「…」` 等。`sentenceTerminators` の `「。」「！」「？」` とは別）は `recordPrefixes` / `recordNgrams` をスキップし `pushCommitted` でも `committedHistory` に追加しない。
 
 #### recency / 時間減衰
 全 fetch SQL は `score = count / (1 + age_days / τ)` でソートする（τ = 30日）。  
@@ -209,7 +212,8 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 
 #### skip-bigram
 助詞（`InputHandler.particles`）が直前に確定されたとき、`mostRecentContentWords(n: 2)` が返す各内容語（最大 2 語）と現在の確定語のペアを `skip_bigram` テーブルに記録する（同一トランザクションで複数行になりうる）。  
-`今日 → を → 行く` `今日 → が → 走る` のように助詞でバラけたペアが「今日 → 行く/走る」として統合される。
+`今日 → を → 行く` `今日 → が → 走る` のように助詞でバラけたペアが「今日 → 行く/走る」として統合される。  
+**格助詞を prev とする bigram は記録しない**: `recordNgrams` は `isParticlePrev`（直前確定語が格助詞）のとき `bigram` 引数を `nil` で渡し、bigram テーブルへの記録をスキップする（trigram・skip-bigram は通常どおり記録）。格助詞汎用ペア（`を → ～する` 等）が bigram に蓄積してノイズになるのを防ぐ設計。
 
 #### penalizeAll（訂正シグナル）
 確定直後 Backspace 時に呼ばれる。`history` の該当行を count -1（0 以下で削除）、同じ確定に対応する `bigram`（**`is_preset = 0` のみ**）/`trigram`/`skip_bigram` も同様に -1、`fullReading` があればそのキーの `boundary_pref` 行を DELETE。`withTransaction` で一括実行。

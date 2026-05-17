@@ -8,7 +8,7 @@
 | **待機** | `isAsciiMode = false`、組成空、特殊モードなし |
 | **組成中** | `composedHiragana` または `pendingRomaji` が非空 |
 | **候補選択中** | 組成中 + `isExplicitlySelected = true`（↑↓ 操作済み）|
-| **括弧モード** | `bracketCandidates != nil`（組成空で `[`/`(` 等を入力） |
+| **括弧モード** | `bracketCandidates != nil`（組成空で `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを入力） |
 | **セグメントモード** | `isSegmentMode = true` |
 | **Successor モード** | `isSuccessorMode = true` |
 
@@ -36,7 +36,7 @@ stateDiagram-v2
     候補選択中 --> 待機 : →（組成テキストをひらがなのまま確定）
     候補選択中 --> 待機 : Escape（クリア）
 
-    待機 --> 括弧モード : 括弧キー（`[`/`(`等）
+    待機 --> 括弧モード : 記号キー（`[`/`(`/`!`/`?`/`/`/`.`/`,` 等）
     括弧モード --> 括弧モード : ↑↓ / Space / Tab（候補移動）
     括弧モード --> 待機 : Enter（選択候補を確定）
     括弧モード --> 待機 : Escape / Backspace（キャンセル）
@@ -49,7 +49,7 @@ stateDiagram-v2
     セグメントモード --> 待機 : Enter（確定）
     セグメントモード --> 組成中 : Escape（組成に戻す）
 
-    待機 --> Successorモード : 確定直後に tri-gram / bi-gram 候補 or 格助詞 fallback が存在
+    待機 --> Successorモード : 確定直後にカーソルが文末 かつ tri-gram / bi-gram 候補 or 格助詞 fallback が存在
     組成中 --> Successorモード : ローマ字1文字入力かつ composedHiragana 空で bi-gram 先読みヒット（pendingRomaji を破棄）
     Successorモード --> Successorモード : 候補確定後に次の tri-gram / bi-gram 候補が存在
     Successorモード --> 待機 : 候補確定後に次候補なし
@@ -139,6 +139,7 @@ stateDiagram-v2
 ## 補足
 
 - **Successor の再帰防止**: 格助詞チェックは廃止。候補が空なら自然に `.dismiss` になるため、無限ループは起きない
+- **Successor の文中挿入抑制**: カーソルが文末でない（文中挿入モード）場合、`suggestSuccessors()` は Successor モードに入らず `.dismiss` を返す
 - **候補取得の優先順位**: `prev2Output`（2語前）× `lastCommittedOutput`（1語前）で trigram を引き、なければ `lastCommittedOutput` だけで bigram をフォールバック
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
 - **N-gram 遅延表示と読みフィルタ**: 後続候補がある場合、確定直後は常に候補ウィンドウを閉じ（`.dismiss`）`pendingSuccessorCandidates` に保存。1打目の入力で `romajiToInitialKana` によるかな先頭一致で DB を再照会し、**同じ条件で** `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる格助詞を追加して併合（DB 由来を先、重複は除外）し、続けて **`successorLLMSurfaceExtras`**（LLM 表層形）を末尾に連結して表示する。一致なしはモード解除して通常入力に流す。LLM は直近3語文脈で非同期補完する。
