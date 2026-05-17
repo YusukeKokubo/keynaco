@@ -32,10 +32,10 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
-        // 辞書先頭候補が row 0 に昇格するため、ひらがな/カタカナは row 1/2 以降に移動する
+        // ひらがな/カタカナ固定候補がある場合は辞書昇格しない → ひらがなが row 0
         XCTAssertTrue(candidates.contains("あい"), "ひらがなが候補に含まれるはず")
         XCTAssertTrue(candidates.contains("アイ"), "カタカナが候補に含まれるはず")
-        XCTAssertGreaterThan(candidates.firstIndex(of: "あい")!, 0, "ひらがなは row 0 より後のはず")
+        XCTAssertEqual(candidates.firstIndex(of: "あい")!, 0, "ひらがなは row 0 のはず")
     }
 
     func testKatakanaInCandidatesWhenSpacePressed() {

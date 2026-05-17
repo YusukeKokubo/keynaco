@@ -81,10 +81,10 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 0, "左文脈なし: 辞書先頭昇格により fixedEnd = 0")
-        XCTAssertEqual(candidates[0], "開催", "辞書 top-1 が row 0 に昇格するはず")
-        XCTAssertEqual(candidates[1], "かいさい")
-        XCTAssertEqual(candidates[2], "カイサイ")
+        XCTAssertEqual(fixedEnd, 2, "左文脈なし: ひらがな/カタカナ固定候補があるため辞書昇格なし fixedEnd = 2")
+        XCTAssertEqual(candidates[0], "かいさい", "ひらがな固定候補が row 0")
+        XCTAssertEqual(candidates[1], "カイサイ", "カタカナ固定候補が row 1")
+        XCTAssertTrue(candidates.contains("開催"), "辞書候補に開催が含まれるはず")
         XCTAssertNil(handler.lastZenzaiRow, "Zenzai 未発火なので lastZenzaiRow は nil")
     }
 

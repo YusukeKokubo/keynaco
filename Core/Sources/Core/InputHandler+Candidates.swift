@@ -324,8 +324,9 @@ public extension InputHandler {
         let hasForeignMarker = h.contains(where: { foreignMarkers.contains($0) })
 
         // 履歴/予測/Zenzai/特殊候補/ユーザー辞書がなく辞書候補がある場合、辞書先頭候補を row 0 に昇格
-        // ただし外来語マーカーがある場合はカタカナを優先するため昇格しない
-        let shouldPromoteFirstDict = !hasForeignMarker
+        // ただし外来語マーカーがある場合やひらがな/カタカナ固定候補がある場合は昇格しない
+        let shouldPromoteFirstDict = fixedCount == 0
+            && !hasForeignMarker
             && historyEnd == adjustedFixedEnd
             && zenzaiTop1Count == 0
             && userDictCount == 0
