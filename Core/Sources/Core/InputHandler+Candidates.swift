@@ -333,7 +333,11 @@ public extension InputHandler {
 
         // 履歴/予測候補があるときはその先頭（adjustedFixedEnd）を初期選択。
         // ない場合はひらがな固定候補（row 0）を初期選択にする。
-        let initialRow = historyEnd > adjustedFixedEnd ? adjustedFixedEnd : 0
+        // 長音符「ー」を含む読みはカタカナ語が期待される。カタカナが固定セクションにあれば初期選択にする。
+        var initialRow = historyEnd > adjustedFixedEnd ? adjustedFixedEnd : 0
+        if h.contains("ー"), !katakanaInHistory, let katRow = candidates.firstIndex(of: katakana) {
+            initialRow = katRow
+        }
         guard !candidates.isEmpty else { return .dismiss }
 
         return .show(candidates: candidates,

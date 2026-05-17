@@ -119,6 +119,26 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(initialRow, 1, "固定候補はひらがなの1件のみ")
     }
 
+    func testLongVowelInputPrefersKatakanaOverHistory() {
+        // 「とーたる」→「と一樽」の履歴があっても、ーを含む読みはカタカナ（トータル）を初期選択
+        handler.db.record(input: "とーたる", output: "と一樽")
+        handler.db.record(input: "とーたる", output: "と一樽")
+        handler.db.record(input: "とーたる", output: "と一樽")
+        type(chars: "t", base: "t")
+        type(chars: "o", base: "o")
+        type(chars: "-", base: "-")
+        type(chars: "t", base: "t")
+        type(chars: "a", base: "a")
+        type(chars: "r", base: "r")
+        type(chars: "u", base: "u")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertTrue(candidates.contains("トータル"), "トータルが候補に含まれるはず: \(candidates)")
+        XCTAssertEqual(candidates[initialRow], "トータル", "長音符入力の initialRow はカタカナ（トータル）を指すはず")
+    }
+
     func testReturnCommitsVisuallySelectedCandidateWithoutExplicitNav() {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
