@@ -202,12 +202,11 @@ public extension InputHandler {
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
-        let exactOutputs = Set(db.fetchHistoryExact(reading: historyKey))
         let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
         var highHistory: [String] = []
         var lowHistory: [String] = []
         for row in historyScored {
-            if exactOutputs.contains(row.output) && row.score >= Self.historyRecencyScoreCutoff {
+            if row.score >= Self.historyRecencyScoreCutoff {
                 highHistory.append(row.output)
             } else {
                 lowHistory.append(row.output)
