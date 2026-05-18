@@ -334,10 +334,10 @@ public extension InputHandler {
             candidates.insert(promoted, at: 0)
         }
 
-        // 履歴/予測候補があるときはその先頭（adjustedFixedEnd）を初期選択。
-        // ない場合はひらがな固定候補（row 0）を初期選択にする。
+        // 格助詞入力時はひらがな固定候補（row 0）を初期選択にする。
         // 外来語マーカーがありカタカナが固定セクションにある場合はカタカナを初期選択にする。
-        var initialRow = historyEnd > adjustedFixedEnd ? adjustedFixedEnd : 0
+        let isParticleInput = InputHandler.particles.contains(h)
+        var initialRow = (!isParticleInput && historyEnd > adjustedFixedEnd) ? adjustedFixedEnd : 0
         if hasForeignMarker, !katakanaInHistory, let katRow = candidates.firstIndex(of: katakana) {
             initialRow = katRow
         }
