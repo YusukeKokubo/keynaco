@@ -130,9 +130,11 @@ public extension InputHandler {
                     return (true, action)
                 } else {
                     applyMarkedText(candidateText: nil, client: client)
-                    if case .show(let candidates, let historyEnd, _, _, _) = action,
-                       candidates.count > historyEnd {
-                        return (true, action)
+                    if case .show(let candidates, let historyEnd, _, _, _) = action {
+                        // ひらがな優先語は辞書候補の有無によらず initialRow を維持
+                        if Self.isHiraganaPreferred(state.composedHiragana) || candidates.count > historyEnd {
+                            return (true, action)
+                        }
                     }
                 }
             }
@@ -334,12 +336,13 @@ public extension InputHandler {
             candidates.insert(promoted, at: 0)
         }
 
-        // 格助詞入力時はひらがな固定候補（row 0）を初期選択にする。
-        // 外来語マーカーがありカタカナが固定セクションにある場合はカタカナを初期選択にする。
-        let isParticleInput = InputHandler.particles.contains(h)
-        var initialRow = (!isParticleInput && historyEnd > adjustedFixedEnd) ? adjustedFixedEnd : 0
-        if hasForeignMarker, !katakanaInHistory, let katRow = candidates.firstIndex(of: katakana) {
+        let initialRow: Int
+        if Self.isHiraganaPreferred(h) {
+            initialRow = candidates.firstIndex(of: h) ?? 0
+        } else if hasForeignMarker, !katakanaInHistory, let katRow = candidates.firstIndex(of: katakana) {
             initialRow = katRow
+        } else {
+            initialRow = historyEnd > adjustedFixedEnd ? adjustedFixedEnd : 0
         }
         guard !candidates.isEmpty else { return .dismiss }
 
@@ -403,38 +406,8 @@ public extension InputHandler {
     private static let historyRecencyScoreCutoff = 0.5
     private static let maxHighHistoryCount = 3
 
-    /// 現代日本語でほぼひらがな表記のみが使われる語（助動詞・形式名詞・副助詞等）の末尾パターン。
-    /// 学習ゼロ状態でもひらがな候補を初期選択にするために使用する。
-    /// 静的プロパティとして一度だけコンパイルし、末尾マッチ（$）で判定する。
-    private static let hiraganaPreferredRegex: NSRegularExpression = {
-        let parts: [String] = [
-            // て/で + 補助動詞（活用形をまとめて吸収）
-            "[てで](いる|いた|いく|くる|おく|ある|しまう|しまった|しまって|みる|みた|ほしい" +
-                "|います|いました|おきます|おきました|あります|ありました" +
-                "|しまいます|しまいました|いきます|いきました|きます|きました" +
-                "|みます|みました|くれます|くれました|あげます|あげました)",
-            // 丁寧体助動詞・推量・勧誘
-            "(ます|ました|ません|ませんでした|まして|ましょう|ませ)(が|ね|よ|か|けど|けれど)?",
-            "(です|でした|でして|でしょう)(が|ね|よ|か|けど|けれど)?",
-            // 接続助詞・接続詞
-            "(な)?ので", "けれ?ど(も)?", "だから", "ながら", "つつ", "たり", "[てで]も",
-            // 形式名詞（公用文でひらがな表記が推奨されるもの）
-            "(な|の)?(こと|もの|ところ|わけ|はず|つもり|ため|とおり|ほう)",
-            // 推量・様態・比況・当為
-            "らしい", "みたい(だ|に|な|です)?", "そう(だ|です|に|な)?",
-            "よう(だ|です|に|な)?", "かもしれ(ない|ません)", "べき(だ|です)",
-            // 副助詞
-            "(く|ぐ)らい", "ばかり", "など", "まで", "だけ", "ほど",
-        ]
-        // swiftlint:disable:next force_try
-        return try! NSRegularExpression(pattern: "(" + parts.joined(separator: "|") + ")$")
-    }()
-
     static func isHiraganaPreferred(_ h: String) -> Bool {
-        // 「の」「は」「が」等の1文字格助詞・副助詞は常にひらがな優先
-        if h.count == 1, "のはがをにでへもとやよ".contains(h) { return true }
-        let range = NSRange(h.startIndex..., in: h)
-        return hiraganaPreferredRegex.firstMatch(in: h, range: range) != nil
+        InputHandler.hiraganaPreferred.contains(h)
     }
 
     /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。

@@ -67,6 +67,15 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
+### particles
+格助詞の固定リスト（`InputHandler.particles`）。Successor モードの名詞末尾 fallback、bigram 文脈スキップ（`mostRecentContentWords`）等に使用する。候補の `initialRow` 判定には使わない。
+
+### hiraganaPreferred
+ひらがな表記が自然な語彙の集合（`InputHandler.hiraganaPreferred`）。`particles` の上位集合。  
+**役割**: `assembleCandidateList` で組成読み `h` がこの集合に含まれるとき、履歴スコア・予測候補の有無に関わらず `initialRow` を候補リスト内のひらがな行（`candidates.firstIndex(of: h)`）にする。固定枠にあれば row 0、ひらがなが履歴枠に移動していればその行を選ぶ。リスト外の語は従来どおり履歴・予測の先頭行を優先する。
+
+*Tests: `Core/Sources/CoreTests/InputHandlerCandidatesTests.swift`*
+
 ### F4（誤変換検出）
 確定直後（`insertText`）、カーソル直前最大 200 文字をオンデバイス LLM で検査するオプション機能。前文が 5 文字未満ならスキップ。0.5 秒デバウンス後に起動。  
 **メニューバー**: 指摘あり時はタイトルを `⌨?` にし、左クリックでポップオーバーに全文を表示（問題なし時・クリア時は通常の `⌨` または Successor 保留の `⌨…`）。  

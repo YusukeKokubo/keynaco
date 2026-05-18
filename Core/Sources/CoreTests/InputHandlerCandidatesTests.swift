@@ -95,6 +95,68 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(initialRow, 2, "履歴候補があるとき initialRow はひらがな・カタカナの後（2）")
     }
 
+    // MARK: - hiraganaPreferred initialRow
+
+    func testHiraganaPreferredParticleWithWrongHistorySelectsHiraganaFixed() {
+        handler.db.recordPrefixes(reading: "の", output: "ノックアウト")
+        typeRomaji("no")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(initialRow, 0)
+        XCTAssertEqual(candidates[initialRow], "の", "誤履歴があってもひらがな固定を初期選択")
+    }
+
+    func testHiraganaPreferredParticleWithHiraganaHistorySelectsHiraganaNotKatakana() {
+        handler.db.recordPrefixes(reading: "の", output: "の")
+        typeRomaji("no")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        let noIdx = candidates.firstIndex(of: "の")
+        XCTAssertNotNil(noIdx)
+        XCTAssertEqual(initialRow, noIdx)
+        XCTAssertEqual(candidates[initialRow], "の")
+        if let katakanaIdx = candidates.firstIndex(of: "ノ") {
+            XCTAssertNotEqual(initialRow, katakanaIdx, "ひらがな履歴時はカタカナ行を選ばない")
+        }
+        if candidates[0] != "の" {
+            XCTAssertNotEqual(initialRow, 0, "row 0 がひらがなでないときは 0 を選ばない")
+        }
+    }
+
+    func testHiraganaPreferredTokaWithWrongHistory() {
+        handler.db.recordPrefixes(reading: "とか", output: "戸籍")
+        typeRomaji("toka")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(candidates[initialRow], "とか")
+    }
+
+    func testHiraganaPreferredDewaWithWrongHistory() {
+        handler.db.recordPrefixes(reading: "では", output: "出羽")
+        typeRomaji("deha")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(candidates[initialRow], "では")
+    }
+
+    func testHiraganaPreferredKoreWithWrongHistory() {
+        handler.db.recordPrefixes(reading: "これ", output: "己れ")
+        typeRomaji("kore")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(candidates[initialRow], "これ")
+    }
+
     func testHiraganaInHistoryAppearsAsHistoryCandidate() {
         handler.db.record(input: "あい", output: "あい")
         type(chars: "a", base: "a")
