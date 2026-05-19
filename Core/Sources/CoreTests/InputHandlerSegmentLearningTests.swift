@@ -88,24 +88,15 @@ final class InputHandlerSegmentLearningTests: InputHandlerTestCase {
 
 // MARK: - Mock
 
-private final class SegmentLearningMockAzooKey: AzooKeyConverting, @unchecked Sendable {
+private final class SegmentLearningMockAzooKey: BaseAzooKeyStub, @unchecked Sendable {
     var candidateLines: [String] = []
     var segmentizeResult: [(reading: String, candidates: [String])] = []
 
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
-        _ = (hiragana, leftSideContext, richCandidates)
-        return candidateLines
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        candidateLines
     }
 
-    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
-        _ = (reading, leftSideContext)
-        return []
-    }
-
-    func commit(reading: String, text: String) { _ = (reading, text) }
-
-    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
-        _ = (hiragana, leftSideContext)
-        return segmentizeResult
+    override func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
+        segmentizeResult
     }
 }

@@ -104,7 +104,8 @@ public extension InputHandler {
             if !isDateTime && !isNumber {
                 db.recordPrefixes(reading: normalizedInput, output: selected)
                 // 4文字以上の日本語読みのみセグメント分割して部分語を学習
-                if !normalizedInput.allSatisfy({ $0.isASCII }), normalizedInput.count > 3 {
+                if !normalizedInput.allSatisfy({ $0.isASCII }),
+                   normalizedInput.count >= Self.segmentizeMinReadingLength {
                     let db = db; let conv = azooKeyConverter; let reading = normalizedInput
                     let leftCtx = azooKeyLeftContext
                     let cache = segmentizeCache
@@ -190,7 +191,18 @@ public extension InputHandler {
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
         let sources = collectCandidateSources(autoShow: autoShow)
-        return assembleCandidateList(from: sources, autoShow: autoShow)
+        let action = assembleCandidateList(from: sources, autoShow: autoShow)
+        lastZenzaiRow = resolveZenzaiRow(action: action, zenzaiPromoted: sources.zenzaiPromoted)
+        return action
+    }
+
+    /// 候補リスト中の Zenzai top-1 行を特定する。`assembleCandidateList` の副作用ではなく
+    /// その結果から事後計算することで、リスト構築ロジックを純粋に保つ。
+    private func resolveZenzaiRow(action: CandidateAction, zenzaiPromoted: String?) -> Int? {
+        guard let top1 = zenzaiPromoted,
+              case .show(let candidates, _, _, _, _) = action,
+              let idx = candidates.firstIndex(of: top1) else { return nil }
+        return idx
     }
 
     private struct CandidateListSources {
@@ -278,7 +290,7 @@ public extension InputHandler {
         )
     }
 
-    private mutating func assembleCandidateList(from sources: CandidateListSources, autoShow: Bool) -> CandidateAction {
+    private func assembleCandidateList(from sources: CandidateListSources, autoShow: Bool) -> CandidateAction {
         let h = sources.h
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
@@ -337,7 +349,6 @@ public extension InputHandler {
             candidates.insert(top1, at: fixedEnd)
             zenzaiTop1Count = 1
         }
-        lastZenzaiRow = zenzaiTop1Count > 0 ? fixedEnd : nil
         let adjustedFixedEnd = fixedEnd + zenzaiTop1Count
 
         let historyEnd = adjustedFixedEnd + predictCount + highHistoryCount
@@ -362,14 +373,21 @@ public extension InputHandler {
         }
         guard !candidates.isEmpty else { return .dismiss }
 
-        return .show(candidates: candidates,
-                     historyEnd: historyEnd,
-                     initialRow: initialRow,
-                     predictionEnd: predictionEnd,
-                     fixedEnd: adjustedFixedEnd)
+        let layout = CandidateLayout(
+            candidates: candidates,
+            fixedEnd: adjustedFixedEnd,
+            predictionEnd: predictionEnd,
+            historyEnd: historyEnd,
+            initialRow: initialRow
+        )
+        return .show(candidates: layout.candidates,
+                     historyEnd: layout.historyEnd,
+                     initialRow: layout.initialRow,
+                     predictionEnd: layout.predictionEnd,
+                     fixedEnd: layout.fixedEnd)
     }
 
-    private mutating func appendSpecialCandidates(
+    private func appendSpecialCandidates(
         _ candidates: inout [String],
         insertedSet: inout Set<String>,
         historyEnd: Int,
@@ -420,7 +438,10 @@ public extension InputHandler {
 
     /// これ未満の履歴スコアは AzooKey・数値・日時の後ろに回す（DB の `recencyExpr` と同じ尺度）。
     private static let historyRecencyScoreCutoff = 0.5
+    /// 候補ヘッドの過剰膨張を抑える前方一致履歴の上限件数。
     private static let maxHighHistoryCount = 3
+    /// 確定語の segmentize 学習を行う最小読み長。短すぎる読みは文節分割の意味が薄い。
+    static let segmentizeMinReadingLength = 4
 
     func isHiraganaPreferred(_ h: String) -> Bool {
         hiraganaPreferredSet.contains(h)
@@ -439,6 +460,32 @@ public extension InputHandler {
     }
 }
 
+// MARK: - CandidateLayout
+
+/// 候補リストとそのセクション境界をまとめた値。
+/// init で `0 <= fixedEnd <= predictionEnd <= historyEnd <= candidates.count`
+/// および `initialRow` の範囲を assert する。
+struct CandidateLayout {
+    let candidates: [String]
+    let fixedEnd: Int
+    let predictionEnd: Int
+    let historyEnd: Int
+    let initialRow: Int
+
+    init(candidates: [String], fixedEnd: Int, predictionEnd: Int, historyEnd: Int, initialRow: Int) {
+        assert(fixedEnd >= 0, "fixedEnd >= 0")
+        assert(predictionEnd >= fixedEnd, "predictionEnd >= fixedEnd")
+        assert(historyEnd >= predictionEnd, "historyEnd >= predictionEnd")
+        assert(historyEnd <= candidates.count, "historyEnd <= candidates.count")
+        assert(initialRow >= 0 && initialRow < max(1, candidates.count), "initialRow in [0, count)")
+        self.candidates = candidates
+        self.fixedEnd = fixedEnd
+        self.predictionEnd = predictionEnd
+        self.historyEnd = historyEnd
+        self.initialRow = initialRow
+    }
+}
+
 // MARK: - SegmentizeLRUCache
 
 /// segmentize 結果の LRU キャッシュ。`Task.detached` から参照されるため class（参照型）。
@@ -448,7 +495,10 @@ public final class SegmentizeLRUCache: @unchecked Sendable {
     private var values: [[( reading: String, candidates: [String])]] = []
     private let lock = NSLock()
 
-    init(capacity: Int = 50) {
+    /// 直近この件数までの segmentize 結果を保持する。
+    public static let defaultCapacity = 50
+
+    public init(capacity: Int = SegmentizeLRUCache.defaultCapacity) {
         self.capacity = capacity
     }
 

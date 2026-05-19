@@ -534,27 +534,16 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
 
 // MARK: - Zenzai top-1 プロモート（PLAN260506）
 
-private final class ZenzaiPromoteTestMockAzooKey: AzooKeyConverting, @unchecked Sendable {
+private final class ZenzaiPromoteTestMockAzooKey: BaseAzooKeyStub, @unchecked Sendable {
     var candidateLines: [String] = ["表層先頭", "表層2番目"]
-    var isZenzaiEnabled = true
 
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
-        _ = hiragana
-        _ = leftSideContext
-        _ = richCandidates
-        return candidateLines
+    override init() {
+        super.init()
+        isZenzaiEnabled = true
     }
 
-    func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
-        _ = (reading, leftSideContext)
-        return []
-    }
-
-    func commit(reading: String, text: String) { _ = (reading, text) }
-
-    func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
-        _ = (hiragana, leftSideContext)
-        return []
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        candidateLines
     }
 }
 
