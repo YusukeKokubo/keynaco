@@ -145,10 +145,9 @@ final class CandidateWindow: NSPanel {
         self.zenzaiRowIndex = zenzaiRow
         tableView.reloadData()
 
-        // initialRow より前の行（ひらがな・カタカナ）はウィンドウ高さに含めず、
-        // スクロールで隠す。↑ キーで上スクロールすると現れる。
         let rowHeight = tableView.rowHeight + tableView.intercellSpacing.height
-        let visibleCount = max(min(candidates.count - initialRow, 8), 1)
+        let maxVisibleRows = 8
+        let visibleCount = max(min(candidates.count, maxVisibleRows), 1)
         let height = CGFloat(visibleCount) * rowHeight + 8
         let width: CGFloat = 300
 
@@ -160,8 +159,9 @@ final class CandidateWindow: NSPanel {
 
         setFrame(NSRect(x: origin.x, y: origin.y, width: width, height: height), display: true)
         tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
-        // initialRow の行がウィンドウ最上部に来るようスクロール位置を設定
-        let scrollPoint = NSPoint(x: 0, y: CGFloat(initialRow) * rowHeight)
+        // 候補が少ないときは先頭から全行表示。多いときだけ initialRow を上端に合わせる。
+        let scrollRow = candidates.count <= maxVisibleRows ? 0 : initialRow
+        let scrollPoint = NSPoint(x: 0, y: CGFloat(scrollRow) * rowHeight)
         scrollView.contentView.scroll(to: scrollPoint)
         scrollView.reflectScrolledClipView(scrollView.contentView)
         orderFront(nil)

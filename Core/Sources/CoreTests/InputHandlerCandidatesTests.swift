@@ -155,6 +155,22 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(candidates[initialRow], "これ")
     }
 
+    func testBareConversionPutsHiraganaBeforeKatakanaReadingSurface() {
+        setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: true))
+        handler.leftSideContext = "前文"
+        handler.state.composedHiragana = "よいのでは"
+        handler.state.pendingRomaji = ""
+        let action = handler.buildCandidateList(autoShow: true)
+        guard case .show(let candidates, _, let initialRow, _, let fixedEnd) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(candidates.first, "よいのでは", "row 0 は読みのひらがな")
+        XCTAssertEqual(initialRow, 0)
+        XCTAssertFalse(candidates.contains("ヨイノデハ"), "読みのカタカナ表記は辞書から除外")
+        XCTAssertEqual(candidates[1], "良いのでは", "Zenzai top-1 はひらがなの直後")
+        XCTAssertGreaterThanOrEqual(fixedEnd, 2)
+    }
+
     func testHiraganaInHistoryAppearsAsHistoryCandidate() {
         handler.db.record(input: "あい", output: "あい")
         type(chars: "a", base: "a")

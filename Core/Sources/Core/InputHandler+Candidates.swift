@@ -230,7 +230,8 @@ public extension InputHandler {
         } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, autoShow {
             azooKeyCandidates = lastAzooKeyResults
         } else {
-            azooKeyCandidates = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
+            let raw = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
+            azooKeyCandidates = raw.filter { !Self.isScriptMixed($0) }
             lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
@@ -317,20 +318,62 @@ public extension InputHandler {
         return .none
     }
 
-    private func resolveInitialRowPolicy(sources: CandidateListSources, fixedSlot: FixedSlot) -> InitialRowPolicy {
+    private func resolveInitialRowPolicy(
+        sources: CandidateListSources,
+        fixedSlot: FixedSlot,
+        hiraganaInHistory: Bool,
+        addsDefaultFixedHiragana: Bool
+    ) -> InitialRowPolicy {
         switch fixedSlot {
         case .hiragana:
             return .firstMatching(state.composedHiragana)
         case .katakana:
             return .atZero
         case .none:
+            if addsDefaultFixedHiragana {
+                return .firstMatching(state.composedHiragana)
+            }
             return .afterFixed
         }
+    }
+
+    /// 履歴・予測・ユーザー辞書・数値/日時がなく AzooKey のみのとき、読みのひらがなを先頭固定する。
+    private func shouldAddDefaultFixedHiragana(
+        autoShow: Bool,
+        fixedSlot: FixedSlot,
+        hiraganaInHistory: Bool,
+        sources: CandidateListSources,
+        numberCandidates: [String],
+        dateTimeCandidates: [String]
+    ) -> Bool {
+        autoShow
+            && fixedSlot == .none
+            && !hiraganaInHistory
+            && sources.predictCount == 0
+            && sources.highHistoryCount == 0
+            && sources.totalHistoryCount == 0
+            && sources.userDictRaw.isEmpty
+            && numberCandidates.isEmpty
+            && dateTimeCandidates.isEmpty
+    }
+
+    /// ひらがなとカタカナが混在する表層（AzooKey が返す「きョ」等）を除外する。
+    private static func isScriptMixed(_ text: String) -> Bool {
+        var hasHiragana = false
+        var hasKatakana = false
+        for scalar in text.unicodeScalars {
+            if scalar.value >= 0x3041 && scalar.value <= 0x3096 { hasHiragana = true }
+            if scalar.value >= 0x30A1 && scalar.value <= 0x30F6 { hasKatakana = true }
+            if hasHiragana && hasKatakana { return true }
+        }
+        return false
     }
 
     private func buildSections(
         from sources: CandidateListSources,
         fixedSlot: FixedSlot,
+        hiraganaInHistory: Bool,
+        addsDefaultFixedHiragana: Bool,
         numberCandidates: [String],
         dateTimeCandidates: [String]
     ) -> [CandidateSection] {
@@ -355,7 +398,11 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .fixedKatakana, items: [katakana]))
             insertedSet.insert(katakana)
         case .none:
-            break
+            if addsDefaultFixedHiragana {
+                if allCandidatesSeen.contains(hiragana) { insertedSet.remove(hiragana) }
+                sections.append(CandidateSection(kind: .fixedHiragana, items: [hiragana]))
+                insertedSet.insert(hiragana)
+            }
         }
 
         let uniqueUserDict = sources.userDictRaw.filter { insertedSet.insert($0).inserted }
@@ -383,8 +430,12 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .dateTime, items: uniqueDateTimeCandidates))
         }
 
-        if !sources.azooKeyUniq.isEmpty {
-            sections.append(CandidateSection(kind: .azooKeyDict, items: sources.azooKeyUniq))
+        let readingKatakana = KanaUtils.hiraganaToKatakana(hiragana)
+        let azooKeyItems = sources.azooKeyUniq.filter {
+            !(addsDefaultFixedHiragana && $0 == readingKatakana)
+        }
+        if !azooKeyItems.isEmpty {
+            sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
         }
 
         let preLowLayout = CandidateLayout(
@@ -427,16 +478,31 @@ public extension InputHandler {
             katakanaInHistory: katakanaInHistory
         )
 
+        let addsDefaultFixedHiragana = shouldAddDefaultFixedHiragana(
+            autoShow: autoShow,
+            fixedSlot: fixedSlot,
+            hiraganaInHistory: hiraganaInHistory,
+            sources: sources,
+            numberCandidates: numberCandidates,
+            dateTimeCandidates: dateTimeCandidates
+        )
         let sections = buildSections(
             from: sources,
             fixedSlot: fixedSlot,
+            hiraganaInHistory: hiraganaInHistory,
+            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
         )
         let layout = CandidateLayout(
             sections: sections,
             sectionOrder: CandidateLayout.defaultSectionOrder,
-            initialRowPolicy: resolveInitialRowPolicy(sources: sources, fixedSlot: fixedSlot)
+            initialRowPolicy: resolveInitialRowPolicy(
+                sources: sources,
+                fixedSlot: fixedSlot,
+                hiraganaInHistory: hiraganaInHistory,
+                addsDefaultFixedHiragana: addsDefaultFixedHiragana
+            )
         )
         guard !layout.candidates.isEmpty else { return .dismiss }
 

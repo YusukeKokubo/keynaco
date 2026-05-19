@@ -15,7 +15,7 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 - `SettingsWindowController` / `BigramViewController` / `TrigramViewController` / `HistoryViewController` / `UserDictViewController` / `CleanserSheetViewController` = `keynaco/Settings/` 配下の設定画面。`NSTabViewController` で「Bi-gram」「Tri-gram」「ユーザー辞書」「変換履歴」「Zenzai」タブ（5タブ）を提供。Bi-gram・Tri-gram は JSON エクスポート/インポート対応。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD。`CleanserSheetViewController` はクレンジング（DB 一括削除）のシートで Bi-gram・変換履歴タブから呼び出す
 - `ZenzaiSettings` / `ZenzaiViewController` = `keynaco/Settings/` 配下の Zenzai 設定。有効フラグ・プロフィール文字列・推論トークン上限を `UserDefaults` 経由で保存。`AzooKeyConverter.isZenzaiEnabled` が参照する
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
-- `CandidateWindow` = `keynaco/CandidateWindow.swift`。`NSPanel(.borderless, level: .popUpMenu)` + `NSTableView` の自作候補ウィンドウ。`IMKCandidates` は macOS 26 で動作しないため自作（詳細は CLAUDE.md「macOS 26 IME の罠」参照）。`InputController` が所有・制御する
+- `CandidateWindow` = `keynaco/CandidateWindow.swift`。`NSPanel(.borderless, level: .popUpMenu)` + `NSTableView` の自作候補ウィンドウ。`IMKCandidates` は macOS 26 で動作しないため自作（詳細は CLAUDE.md「macOS 26 IME の罠」参照）。`InputController` が所有・制御する。候補が 8 件以下のときはウィンドウ高さを全件分取り、スクロール位置は先頭（`initialRow` より前の行も見える）。9 件以上のときだけ `initialRow` を上端に合わせる
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
 - `SurroundingIMKContext` = カーソル前後テキストの取得ユーティリティ（enum + static func）。`IMKTextInput` の `attributedSubstring(from:)` / `length` / `selectedRange` をラップし、LLM 系コンポーネント（`LLMMisconversionChecker` 等）が文脈テキストを取得するために使用
 - `InputHandlerSnapshot`（`#if DEBUG`）= `InputController` が `InputHandler` と候補ウィンドウから組み立てるデバッグ用スナップショット（`InputHandlerSnapshot.swift` + `InputHandler+Snapshot.swift`）。`DebugSocketServer` が JSON レスポンスのペイロードとして送信
@@ -54,7 +54,7 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 
 `buildCandidateList()` が組み立てる候補リスト（上が高優先）:
 
-1. ひらがな / カタカナ固定候補（`fixedCount` 件、スクロール外の先頭に挿入）
+1. ひらがな / カタカナ固定候補（`hiraganaPreferred`・外来語記号・**autoShow 時の辞書のみ変換**で先頭に挿入。後者は履歴・予測・ユーザー辞書・数値/日時が無いとき読みのひらがなを row 0 に置き、読みのカタカナ表記は辞書ブロックから除外する）
 2. **ユーザー辞書**候補（完全一致のみ、`fixedCount` の直後に挿入）
 3. **Zenzai top-1**（`azooKeyConverter.isZenzaiEnabled` かつ左文脈ありのときのみ、ユーザー辞書の直後に AzooKey 候補先頭を 1 行固定。`isZenzaiEnabled` はユーザー設定でありモデル未ロード時も true になり得る。辞書ブロックからは同じ表層を除き、N-gram 予測との重複も除く）
 4. tri-gram → bi-gram → skip-bigram 予測（`prev2Output` × `lastCommittedOutput` × 読みで tri-gram を優先し、`mostRecentContentWords(n: 2)` × 読みの skip-bigram を `merged` で重複除去のうえ連結）
