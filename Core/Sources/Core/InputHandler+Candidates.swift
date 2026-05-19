@@ -132,7 +132,7 @@ public extension InputHandler {
                     applyMarkedText(candidateText: nil, client: client)
                     if case .show(let candidates, let historyEnd, _, _, _) = action {
                         // ひらがな優先語は辞書候補の有無によらず initialRow を維持
-                        if Self.isHiraganaPreferred(state.composedHiragana) || candidates.count > historyEnd {
+                        if isHiraganaPreferred(state.composedHiragana) || candidates.count > historyEnd {
                             return (true, action)
                         }
                     }
@@ -337,7 +337,7 @@ public extension InputHandler {
         }
 
         let initialRow: Int
-        if Self.isHiraganaPreferred(h) {
+        if isHiraganaPreferred(h) {
             initialRow = candidates.firstIndex(of: h) ?? 0
         } else if hasForeignMarker, !katakanaInHistory, let katRow = candidates.firstIndex(of: katakana) {
             initialRow = katRow
@@ -406,8 +406,8 @@ public extension InputHandler {
     private static let historyRecencyScoreCutoff = 0.5
     private static let maxHighHistoryCount = 3
 
-    static func isHiraganaPreferred(_ h: String) -> Bool {
-        InputHandler.hiraganaPreferred.contains(h)
+    func isHiraganaPreferred(_ h: String) -> Bool {
+        hiraganaPreferredSet.contains(h)
     }
 
     /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。

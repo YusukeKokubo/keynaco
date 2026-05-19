@@ -26,6 +26,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         trigramItem.label = "Tri-gram"
         let userDictItem = NSTabViewItem(viewController: UserDictViewController())
         userDictItem.label = "ユーザー辞書"
+        let hiraganaPreferredItem = NSTabViewItem(viewController: HiraganaPreferredViewController())
+        hiraganaPreferredItem.label = "ひらがな優先"
         let historyItem = NSTabViewItem(viewController: HistoryViewController())
         historyItem.label = "変換履歴"
         let zenzaiVC = ZenzaiViewController()
@@ -34,6 +36,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         tabVC.addTabViewItem(bigramItem)
         tabVC.addTabViewItem(trigramItem)
         tabVC.addTabViewItem(userDictItem)
+        tabVC.addTabViewItem(hiraganaPreferredItem)
         tabVC.addTabViewItem(historyItem)
         tabVC.addTabViewItem(zenzaiItem)
 

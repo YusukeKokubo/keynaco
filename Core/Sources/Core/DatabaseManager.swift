@@ -21,6 +21,7 @@ public final class DatabaseManager: @unchecked Sendable {
     var presetSeedUserDefaults: UserDefaults = .standard
 
     private static let presetSeededUserDefaultsKey = "preset_seeded_v2"
+    private static let hiraganaPreferredSeededKey = "hiragana_preferred_seeded_v1"
 
     private init() {
         writeAsync = true
@@ -28,6 +29,7 @@ public final class DatabaseManager: @unchecked Sendable {
         createTables()
         ensureBigramIsPresetColumn()
         seedPresetBigramsIfNeeded()
+        seedHiraganaPreferredIfNeeded()
     }
 
     /// テスト用: インメモリ DB で初期化
@@ -131,6 +133,9 @@ public final class DatabaseManager: @unchecked Sendable {
             boundaries    TEXT NOT NULL,
             used_at       INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS hiragana_preferred (
+            word TEXT NOT NULL PRIMARY KEY
+        );
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }
@@ -146,6 +151,12 @@ public final class DatabaseManager: @unchecked Sendable {
             "ALTER TABLE bigram ADD COLUMN is_preset INTEGER NOT NULL DEFAULT 0",
             nil, nil, nil
         )
+    }
+
+    private func seedHiraganaPreferredIfNeeded() {
+        guard presetSeedUserDefaults.object(forKey: Self.hiraganaPreferredSeededKey) == nil else { return }
+        seedHiraganaPreferredDefault()
+        presetSeedUserDefaults.set(true, forKey: Self.hiraganaPreferredSeededKey)
     }
 
     /// バンドル内 `preset_bigram.csv` を初回のみ投入（`init(inMemory:)` では呼ばない）。

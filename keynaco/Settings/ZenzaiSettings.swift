@@ -18,4 +18,6 @@ enum ZenzaiSettings {
 extension Notification.Name {
     /// Zenzai 設定の「保存」または設定ウィンドウを閉じた後に投稿。`InputController` が `AzooKeyConverter` を再生成する。
     static let keynacoZenzaiSettingsDidChange = Notification.Name("keynaco.zenzai.settingsDidChange")
+    /// ひらがな優先リストが変更されたときに投稿。`InputController` が `hiraganaPreferredSet` を再読み込みする。
+    static let keynacoHiraganaPreferredDidChange = Notification.Name("keynaco.hiraganaPreferred.didChange")
 }

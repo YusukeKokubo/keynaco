@@ -107,6 +107,7 @@ class InputController: IMKInputController, @unchecked Sendable {
     lazy var handler: InputHandler = InputHandler(azooKeyConverter: ZenzaiSettings.makeConverter())
     /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
     nonisolated(unsafe) private var zenzaiSettingsObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var hiraganaPreferredObserver: NSObjectProtocol?
     /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
     static let successorLLM = LLMSuccessorFetcher()
     static let segmentLLM = LLMSegmentConverter()
@@ -145,11 +146,23 @@ class InputController: IMKInputController, @unchecked Sendable {
                 self?.reloadAzooKeyConverterFromSettings()
             }
         }
+        hiraganaPreferredObserver = NotificationCenter.default.addObserver(
+            forName: .keynacoHiraganaPreferredDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.handler.hiraganaPreferredSet = DatabaseManager.shared.fetchHiraganaPreferredSet()
+            }
+        }
     }
 
     deinit {
         if let zenzaiSettingsObserver {
             NotificationCenter.default.removeObserver(zenzaiSettingsObserver)
+        }
+        if let hiraganaPreferredObserver {
+            NotificationCenter.default.removeObserver(hiraganaPreferredObserver)
         }
     }
 

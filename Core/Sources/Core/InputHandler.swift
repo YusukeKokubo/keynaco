@@ -91,14 +91,8 @@ public struct InputHandler {
     public nonisolated(unsafe) static var isAsciiMode = false
 
     public static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
-    /// ひらがな表記が自然な語彙。候補表示時の `initialRow` 判定に使用（`particles` の上位集合）。
-    public static let hiraganaPreferred: Set<String> = Set(particles + [
-        "けど", "けれど", "ので", "ながら", "でも", "ても",
-        "そして", "しかし", "また", "ただ", "では",
-        "これ", "それ", "あれ", "ここ", "そこ", "あそこ",
-        "ちょっと", "とか", "とりあえず", "なんか",
-        "だけ", "など",
-    ])
+    /// ひらがな優先語彙セット。DB から読み込み、設定変更時に再取得する。
+    public var hiraganaPreferredSet: Set<String> = []
     public static let sentenceTerminators: Set<String> = ["。", "！", "？"]
     /// 文脈をリセットせず、かつ N-gram・履歴にも記録しない句読点。
     /// pushCommitted でスキップすることで直前単語が prev のまま維持される。
@@ -167,6 +161,7 @@ public struct InputHandler {
     public init(db: DatabaseManager = .shared, azooKeyConverter: (any AzooKeyConverting)? = nil) {
         self.db = db
         self.azooKeyConverter = azooKeyConverter ?? AzooKeyConverter()
+        self.hiraganaPreferredSet = db.fetchHiraganaPreferredSet()
     }
 
     // MARK: - 公開インターフェース

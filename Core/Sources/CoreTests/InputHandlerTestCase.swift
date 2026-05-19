@@ -30,7 +30,9 @@ class InputHandlerTestCase: XCTestCase {
     override func setUp() {
         super.setUp()
         InputHandler.isAsciiMode = false
-        handler = InputHandler(db: DatabaseManager(inMemory: true))
+        let db = DatabaseManager(inMemory: true)
+        db.seedHiraganaPreferredWords()
+        handler = InputHandler(db: db)
         client = MockTextClient()
     }
 
@@ -77,7 +79,9 @@ class InputHandlerTestCase: XCTestCase {
 
     /// 既定の `setUp` 後に AzooKey スタブ等へ差し替える。
     func setUpWithConverter(_ converter: any AzooKeyConverting) {
-        handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
+        let db = DatabaseManager(inMemory: true)
+        db.seedHiraganaPreferredWords()
+        handler = InputHandler(db: db, azooKeyConverter: converter)
         client = MockTextClient()
     }
 
