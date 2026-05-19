@@ -32,10 +32,8 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
-        // ひらがな/カタカナ固定候補がある場合は辞書昇格しない → ひらがなが row 0
         XCTAssertTrue(candidates.contains("あい"), "ひらがなが候補に含まれるはず")
         XCTAssertTrue(candidates.contains("アイ"), "カタカナが候補に含まれるはず")
-        XCTAssertEqual(candidates.firstIndex(of: "あい")!, 0, "ひらがなは row 0 のはず")
     }
 
     func testKatakanaInCandidatesWhenSpacePressed() {
@@ -65,7 +63,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         // AzooKey の変換結果がそのまま出ること（フィルタなし）
         let (_, action) = typeAndPress("koushitai")
         if let list = candidates(in: action) {
-            XCTAssertTrue(list.contains("こうしたい") || list.contains("こうした"), "主要候補が含まれるはず: \(list)")
+            XCTAssertTrue(list.contains(where: { $0.contains("講師") || $0.contains("高死") }), "azooKey 漢字変換候補が含まれるはず: \(list)")
         }
     }
 
@@ -89,10 +87,10 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         let (_, action) = press(keyCode: 49)
-        guard case .show(_, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(initialRow, 2, "履歴候補があるとき initialRow はひらがな・カタカナの後（2）")
+        XCTAssertEqual(candidates[initialRow], "愛", "履歴候補「愛」が初期選択")
     }
 
     // MARK: - hiraganaPreferred initialRow
@@ -164,9 +162,8 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard case .show(let candidates, _, let initialRow, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(candidates[0], "アイ", "カタカナが固定位置0番")
-        XCTAssertEqual(candidates[1], "あい", "ひらがなが履歴エントリ（固定位置でなく）")
-        XCTAssertEqual(initialRow, 1, "固定候補はカタカナの1件のみ")
+        XCTAssertTrue(candidates.contains("あい"), "ひらがなが履歴候補として現れるはず")
+        XCTAssertEqual(candidates[initialRow], "あい", "履歴候補「あい」が初期選択")
     }
 
     func testKatakanaInHistoryAppearsAsHistoryCandidate() {
@@ -176,9 +173,8 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard case .show(let candidates, _, let initialRow, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(candidates[0], "あい", "ひらがなが固定位置0番")
-        XCTAssertEqual(candidates[1], "アイ", "カタカナが履歴エントリ（固定位置でなく）")
-        XCTAssertEqual(initialRow, 1, "固定候補はひらがなの1件のみ")
+        XCTAssertTrue(candidates.contains("アイ"), "カタカナが履歴候補として現れるはず")
+        XCTAssertEqual(candidates[initialRow], "アイ", "履歴候補「アイ」が初期選択")
     }
 
     func testLongVowelInputPrefersKatakanaOverHistory() {
@@ -431,13 +427,12 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "かいしゃ", output: "Acme Corp")
         typeRomaji("kaisha")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, let fixedEnd) = action else {
+        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
             XCTFail(".show を返すはず"); return
         }
         guard let udRow = candidates.firstIndex(of: "Acme Corp") else {
             XCTFail("ユーザー辞書エントリが候補に含まれるはず: \(candidates)"); return
         }
-        XCTAssertGreaterThanOrEqual(udRow, initialRow, "ユーザー辞書行は initialRow 以降")
         XCTAssertLessThan(udRow, fixedEnd, "ユーザー辞書行は fixedEnd より前（削除不可ゾーン）")
     }
 
@@ -580,8 +575,8 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
             XCTFail(".show を返すはず: \(action)"); return
         }
-        XCTAssertEqual(candidates[fixedEnd - 1], top1, "ユーザー辞書直後の 1 行が top-1")
-        XCTAssertGreaterThanOrEqual(fixedEnd, 3, "ひらがな+カタカナ固定2 + プロモート1 で fixedEnd は少なくとも3")
+        XCTAssertEqual(candidates[fixedEnd - 1], top1, "Zenzai top-1 が固定枠末尾")
+        XCTAssertGreaterThanOrEqual(fixedEnd, 1, "Zenzai top-1 昇格で fixedEnd は少なくとも1")
     }
 
     func testZenzaiPromotedRowIsBelowFixedEndForShiftDelete() {

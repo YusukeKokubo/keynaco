@@ -81,10 +81,9 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 2, "左文脈なし: ひらがな/カタカナ固定候補があるため辞書昇格なし fixedEnd = 2")
-        XCTAssertEqual(candidates[0], "かいさい", "ひらがな固定候補が row 0")
-        XCTAssertEqual(candidates[1], "カイサイ", "カタカナ固定候補が row 1")
-        XCTAssertTrue(candidates.contains("開催"), "辞書候補に開催が含まれるはず")
+        XCTAssertEqual(fixedEnd, 0, "左文脈なし: fixedCount=0, Zenzai未発火 → fixedEnd=0")
+        XCTAssertEqual(candidates[0], "開催", "辞書先頭候補が row 0")
+        XCTAssertEqual(candidates[1], "快哉", "辞書2番目候補が row 1")
         XCTAssertNil(handler.lastZenzaiRow, "Zenzai 未発火なので lastZenzaiRow は nil")
     }
 
@@ -96,10 +95,8 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 3, "左文脈あり: Zenzai top-1 昇格で fixedEnd = 3 のはず")
-        XCTAssertEqual(candidates[0], "かいさい")
-        XCTAssertEqual(candidates[1], "カイサイ")
-        XCTAssertEqual(candidates[2], "開催", "Zenzai top-1 が固定枠末尾 [fixedEnd-1] に昇格するはず")
+        XCTAssertEqual(fixedEnd, 1, "左文脈あり: Zenzai top-1 昇格で fixedEnd = 1 のはず")
+        XCTAssertEqual(candidates[0], "開催", "Zenzai top-1 が row 0 に昇格するはず")
     }
 
     /// committedHistory から leftSideContext を構築するフロー:
@@ -125,7 +122,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 3, "committedHistory 由来の左文脈で Zenzai 発火 → fixedEnd = 3")
-        XCTAssertEqual(candidates[2], "開催", "Zenzai top-1「開催」が固定枠に昇格するはず")
+        XCTAssertEqual(fixedEnd, 1, "committedHistory 由来の左文脈で Zenzai 発火 → fixedEnd = 1")
+        XCTAssertEqual(candidates[0], "開催", "Zenzai top-1「開催」が row 0 に昇格するはず")
     }
 }

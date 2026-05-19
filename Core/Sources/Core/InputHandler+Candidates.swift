@@ -279,16 +279,26 @@ public extension InputHandler {
 
         let candidateSeen = sources.historySeen.union(Set(sources.azooKeyCandidates))
         let allCandidatesSeen = candidateSeen.union(Set(sources.uniquePredictions))
+
+        // 長音符「ー」・小母音（ぁぃぅぇぉ）を含む読みは外来語・カタカナ語が期待される。
+        let foreignMarkers: Set<Character> = ["ー", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
+        let hasForeignMarker = h.contains(where: { foreignMarkers.contains($0) })
+
         var fixedCount = 0
-        if !katakanaInHistory {
-            if allCandidatesSeen.contains(katakana) { candidates.removeAll { $0 == katakana } }
-            candidates.insert(katakana, at: 0)
-            fixedCount += 1
-        }
-        if !hiraganaInHistory && hiragana != katakana {
-            if allCandidatesSeen.contains(hiragana) { candidates.removeAll { $0 == hiragana } }
-            candidates.insert(hiragana, at: 0)
-            fixedCount += 1
+        if isHiraganaPreferred(h) {
+            // hiraganaPreferred 語（助詞・接続詞等）: ひらがなを先頭固定
+            if !hiraganaInHistory {
+                if allCandidatesSeen.contains(hiragana) { candidates.removeAll { $0 == hiragana } }
+                candidates.insert(hiragana, at: 0)
+                fixedCount += 1
+            }
+        } else if hasForeignMarker {
+            // 外来語マーカーあり: カタカナを先頭固定
+            if !katakanaInHistory {
+                if allCandidatesSeen.contains(katakana) { candidates.removeAll { $0 == katakana } }
+                candidates.insert(katakana, at: 0)
+                fixedCount += 1
+            }
         }
 
         var insertedSet = Set(candidates)
@@ -317,40 +327,21 @@ public extension InputHandler {
             lowHistory: lowHistory
         )
 
-        // 長音符「ー」・小母音（ぁぃぅぇぉ）を含む読みは外来語・カタカナ語が期待される。
-        let foreignMarkers: Set<Character> = ["ー", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
-        let hasForeignMarker = h.contains(where: { foreignMarkers.contains($0) })
-
-        // 履歴/予測/Zenzai/特殊候補/ユーザー辞書がなく辞書候補がある場合、辞書先頭候補を row 0 に昇格
-        // ただし外来語マーカーがある場合やひらがな/カタカナ固定候補がある場合は昇格しない
-        let shouldPromoteFirstDict = fixedCount == 0
-            && !hasForeignMarker
-            && historyEnd == adjustedFixedEnd
-            && zenzaiTop1Count == 0
-            && userDictCount == 0
-            && dateTimeCandidates.isEmpty
-            && numberCandidates.isEmpty
-            && candidates.count > adjustedFixedEnd
-        if shouldPromoteFirstDict {
-            let promoted = candidates.remove(at: adjustedFixedEnd)
-            candidates.insert(promoted, at: 0)
-        }
-
         let initialRow: Int
         if isHiraganaPreferred(h) {
-            initialRow = candidates.firstIndex(of: h) ?? 0
-        } else if hasForeignMarker, !katakanaInHistory, let katRow = candidates.firstIndex(of: katakana) {
-            initialRow = katRow
+            initialRow = candidates.firstIndex(of: hiragana) ?? (adjustedFixedEnd < candidates.count ? adjustedFixedEnd : 0)
+        } else if hasForeignMarker, fixedCount > 0 {
+            initialRow = 0
         } else {
-            initialRow = historyEnd > adjustedFixedEnd ? adjustedFixedEnd : 0
+            initialRow = adjustedFixedEnd < candidates.count ? adjustedFixedEnd : 0
         }
         guard !candidates.isEmpty else { return .dismiss }
 
         return .show(candidates: candidates,
-                     historyEnd: shouldPromoteFirstDict ? 0 : historyEnd,
+                     historyEnd: historyEnd,
                      initialRow: initialRow,
-                     predictionEnd: shouldPromoteFirstDict ? 0 : predictionEnd,
-                     fixedEnd: shouldPromoteFirstDict ? 0 : adjustedFixedEnd)
+                     predictionEnd: predictionEnd,
+                     fixedEnd: adjustedFixedEnd)
     }
 
     private mutating func appendSpecialCandidates(
