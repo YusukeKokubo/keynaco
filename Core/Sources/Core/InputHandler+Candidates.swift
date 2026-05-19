@@ -209,6 +209,7 @@ public extension InputHandler {
             }
         }
         let totalHistoryCount = historyScored.count
+        highHistory = Array(highHistory.prefix(Self.maxHighHistoryCount))
         let highHistoryCount = highHistory.count
 
         let bigramRaw = lastCommittedOutput.map { db.fetchBigram(prev: $0, reading: state.composedHiragana) } ?? []
@@ -400,6 +401,7 @@ public extension InputHandler {
 
     /// これ未満の履歴スコアは AzooKey・数値・日時の後ろに回す（DB の `recencyExpr` と同じ尺度）。
     private static let historyRecencyScoreCutoff = 0.5
+    private static let maxHighHistoryCount = 3
 
     /// 現代日本語でほぼひらがな表記のみが使われる語（助動詞・形式名詞・副助詞等）の末尾パターン。
     /// 学習ゼロ状態でもひらがな候補を初期選択にするために使用する。
