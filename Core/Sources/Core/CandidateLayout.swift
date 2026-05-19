@@ -1,0 +1,145 @@
+// MARK: - CandidateSection
+
+public struct CandidateSection: Sendable {
+    public enum Kind: Hashable, Sendable {
+        case fixedHiragana  // ひらがな先頭固定（hiraganaPreferred 時）
+        case fixedKatakana  // カタカナ先頭固定（foreign marker 時）
+        case userDict       // ユーザー辞書
+        case zenzaiTop1     // Zenzai top-1 プロモート
+        case prediction     // n-gram 予測
+        case highHistory    // 高スコア履歴
+        case number         // 数値変換
+        case dateTime       // 日時変換
+        case azooKeyDict    // AzooKey 辞書候補
+        case lowHistory     // 低スコア履歴（末尾）
+    }
+
+    public let kind: Kind
+    public let items: [String]
+
+    public init(kind: Kind, items: [String]) {
+        self.kind = kind
+        self.items = items
+    }
+}
+
+// MARK: - InitialRowPolicy
+
+public enum InitialRowPolicy: Sendable {
+    /// 該当文字列の最初の出現位置（hiraganaPreferred 用）。見つからなければ afterFixed にフォールバック
+    case firstMatching(String)
+    /// 強制的に 0 行目（foreign marker + 固定セクションあり）
+    case atZero
+    /// 固定セクション直後（既定）
+    case afterFixed
+}
+
+// MARK: - CandidateLayout
+
+/// 候補リストとそのセクション境界をまとめた値。
+/// `0 <= fixedEnd <= predictionEnd <= historyEnd <= candidates.count` を保証する。
+public struct CandidateLayout: Sendable {
+
+    public let candidates: [String]
+    /// .fixedHiragana / .fixedKatakana / .userDict / .zenzaiTop1 の末尾インデックス
+    public let fixedEnd: Int
+    /// fixedEnd + .prediction の末尾
+    public let predictionEnd: Int
+    /// predictionEnd + .highHistory の末尾
+    public let historyEnd: Int
+    public let initialRow: Int
+
+    // MARK: 既存の assembler が使うシンプルなイニシャライザ（Step 3 で段階的に移行）
+
+    public init(
+        candidates: [String],
+        fixedEnd: Int,
+        predictionEnd: Int,
+        historyEnd: Int,
+        initialRow: Int
+    ) {
+        assert(fixedEnd >= 0, "fixedEnd >= 0")
+        assert(predictionEnd >= fixedEnd, "predictionEnd >= fixedEnd")
+        assert(historyEnd >= predictionEnd, "historyEnd >= predictionEnd")
+        assert(historyEnd <= candidates.count, "historyEnd <= candidates.count")
+        assert(initialRow >= 0 && initialRow < max(1, candidates.count), "initialRow in [0, count)")
+        self.candidates = candidates
+        self.fixedEnd = fixedEnd
+        self.predictionEnd = predictionEnd
+        self.historyEnd = historyEnd
+        self.initialRow = initialRow
+    }
+
+    // MARK: セクション宣言的イニシャライザ（Step 2 で追加・Step 3 で assembler が移行）
+
+    // 現行の assembleCandidateList と一致する順序。
+    // .number / .dateTime を .azooKeyDict より前に置くことで historyEnd への挿入と同じ効果を再現する。
+    public static let defaultSectionOrder: [CandidateSection.Kind] = [
+        .fixedHiragana, .fixedKatakana,
+        .userDict,
+        .zenzaiTop1,
+        .prediction,
+        .highHistory,
+        .number, .dateTime,
+        .azooKeyDict,
+        .lowHistory,
+    ]
+
+    private static let fixedSectionKinds: Set<CandidateSection.Kind> = [
+        .fixedHiragana, .fixedKatakana, .userDict, .zenzaiTop1,
+    ]
+
+    public init(
+        sections: [CandidateSection],
+        sectionOrder: [CandidateSection.Kind],
+        initialRowPolicy: InitialRowPolicy
+    ) {
+        let sectionMap = Dictionary(
+            sections.map { ($0.kind, $0.items) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        var seen = Set<String>()
+        var result: [String] = []
+        var fixedEndAcc = 0
+        var predictionEndAcc: Int? = nil
+        var historyEndAcc: Int? = nil
+
+        for kind in sectionOrder {
+            let items = sectionMap[kind] ?? []
+            for item in items where seen.insert(item).inserted {
+                result.append(item)
+            }
+            if Self.fixedSectionKinds.contains(kind) {
+                fixedEndAcc = result.count
+            }
+            if kind == .prediction, predictionEndAcc == nil {
+                predictionEndAcc = result.count
+            }
+            if kind == .highHistory, historyEndAcc == nil {
+                historyEndAcc = result.count
+            }
+        }
+
+        candidates = result
+        fixedEnd = fixedEndAcc
+        predictionEnd = predictionEndAcc ?? fixedEndAcc
+        historyEnd = historyEndAcc ?? predictionEndAcc ?? fixedEndAcc
+
+        assert(fixedEnd <= predictionEnd,
+               "fixedEnd (\(fixedEndAcc)) > predictionEnd (\(predictionEnd))")
+        assert(predictionEnd <= historyEnd,
+               "predictionEnd (\(predictionEnd)) > historyEnd (\(historyEnd))")
+        assert(historyEnd <= result.count,
+               "historyEnd (\(historyEnd)) > candidates.count (\(result.count))")
+
+        switch initialRowPolicy {
+        case .firstMatching(let s):
+            self.initialRow = result.firstIndex(of: s) ?? (fixedEndAcc < result.count ? fixedEndAcc : 0)
+        case .atZero:
+            self.initialRow = 0
+        case .afterFixed:
+            self.initialRow = fixedEndAcc < result.count ? fixedEndAcc : 0
+        }
+    }
+}

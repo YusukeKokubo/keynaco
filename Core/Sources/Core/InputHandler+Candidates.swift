@@ -290,6 +290,117 @@ public extension InputHandler {
         )
     }
 
+    // MARK: - Fixed slot（hiraganaPreferred / foreignMarker 排他）
+
+    /// 先頭固定枠の種別。`hiraganaPreferred` は `foreignMarker` より強い（排他）。
+    private enum FixedSlot {
+        case none
+        case hiragana
+        case katakana
+    }
+
+    private static let foreignMarkers: Set<Character> = ["ー", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
+
+    private func resolveFixedSlot(
+        reading: String,
+        hiragana: String,
+        katakana: String,
+        hiraganaInHistory: Bool,
+        katakanaInHistory: Bool
+    ) -> FixedSlot {
+        if isHiraganaPreferred(reading) {
+            return hiraganaInHistory ? .none : .hiragana
+        }
+        if reading.contains(where: { Self.foreignMarkers.contains($0) }) {
+            return katakanaInHistory ? .none : .katakana
+        }
+        return .none
+    }
+
+    private func resolveInitialRowPolicy(sources: CandidateListSources, fixedSlot: FixedSlot) -> InitialRowPolicy {
+        switch fixedSlot {
+        case .hiragana:
+            return .firstMatching(state.composedHiragana)
+        case .katakana:
+            return .atZero
+        case .none:
+            return .afterFixed
+        }
+    }
+
+    private func buildSections(
+        from sources: CandidateListSources,
+        fixedSlot: FixedSlot,
+        numberCandidates: [String],
+        dateTimeCandidates: [String]
+    ) -> [CandidateSection] {
+        let hiragana = state.composedHiragana
+        let katakana = KanaUtils.hiraganaToKatakana(hiragana)
+
+        let basePool = sources.uniquePredictions + sources.highHistory + sources.azooKeyUniq
+        let allCandidatesSeen = sources.historySeen
+            .union(Set(sources.azooKeyCandidates))
+            .union(Set(sources.uniquePredictions))
+
+        var sections: [CandidateSection] = []
+        var insertedSet = Set(basePool)
+
+        switch fixedSlot {
+        case .hiragana:
+            if allCandidatesSeen.contains(hiragana) { insertedSet.remove(hiragana) }
+            sections.append(CandidateSection(kind: .fixedHiragana, items: [hiragana]))
+            insertedSet.insert(hiragana)
+        case .katakana:
+            if allCandidatesSeen.contains(katakana) { insertedSet.remove(katakana) }
+            sections.append(CandidateSection(kind: .fixedKatakana, items: [katakana]))
+            insertedSet.insert(katakana)
+        case .none:
+            break
+        }
+
+        let uniqueUserDict = sources.userDictRaw.filter { insertedSet.insert($0).inserted }
+        if !uniqueUserDict.isEmpty {
+            sections.append(CandidateSection(kind: .userDict, items: uniqueUserDict))
+        }
+
+        if let top1 = sources.zenzaiPromoted, insertedSet.insert(top1).inserted {
+            sections.append(CandidateSection(kind: .zenzaiTop1, items: [top1]))
+        }
+
+        if !sources.uniquePredictions.isEmpty {
+            sections.append(CandidateSection(kind: .prediction, items: sources.uniquePredictions))
+        }
+        if !sources.highHistory.isEmpty {
+            sections.append(CandidateSection(kind: .highHistory, items: sources.highHistory))
+        }
+
+        let uniqueNumberCandidates = numberCandidates.filter { insertedSet.insert($0).inserted }
+        if !uniqueNumberCandidates.isEmpty {
+            sections.append(CandidateSection(kind: .number, items: uniqueNumberCandidates))
+        }
+        let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
+        if !uniqueDateTimeCandidates.isEmpty {
+            sections.append(CandidateSection(kind: .dateTime, items: uniqueDateTimeCandidates))
+        }
+
+        if !sources.azooKeyUniq.isEmpty {
+            sections.append(CandidateSection(kind: .azooKeyDict, items: sources.azooKeyUniq))
+        }
+
+        let preLowLayout = CandidateLayout(
+            sections: sections,
+            sectionOrder: CandidateLayout.defaultSectionOrder,
+            initialRowPolicy: .afterFixed
+        )
+        var lowHistorySeen = Set(preLowLayout.candidates)
+        let uniqueLowHistory = sources.lowHistory.filter { lowHistorySeen.insert($0).inserted }
+        if !uniqueLowHistory.isEmpty {
+            sections.append(CandidateSection(kind: .lowHistory, items: uniqueLowHistory))
+        }
+
+        return sections
+    }
+
     private func assembleCandidateList(from sources: CandidateListSources, autoShow: Bool) -> CandidateAction {
         let h = sources.h
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
@@ -299,109 +410,43 @@ public extension InputHandler {
             return .dismiss
         }
 
-        var candidates = sources.highHistory + sources.azooKeyUniq
-        candidates.insert(contentsOf: sources.uniquePredictions, at: 0)
-        let predictCount = sources.predictCount
-        let highHistoryCount = sources.highHistoryCount
-        let lowHistory = sources.lowHistory
-
         let hiragana = state.composedHiragana
         let katakana = KanaUtils.hiraganaToKatakana(hiragana)
+        let predictCount = sources.predictCount
+        let highHistoryCount = sources.highHistoryCount
+        let basePool = sources.uniquePredictions + sources.highHistory + sources.azooKeyUniq
+        let hiraganaInHistory = basePool.prefix(predictCount + highHistoryCount).contains(hiragana)
+            || sources.lowHistory.contains(hiragana)
+        let katakanaInHistory = basePool.prefix(predictCount + highHistoryCount).contains(katakana)
+            || sources.lowHistory.contains(katakana)
+        let fixedSlot = resolveFixedSlot(
+            reading: h,
+            hiragana: hiragana,
+            katakana: katakana,
+            hiraganaInHistory: hiraganaInHistory,
+            katakanaInHistory: katakanaInHistory
+        )
 
-        let hiraganaInHistory = candidates.prefix(predictCount + highHistoryCount).contains(hiragana)
-            || lowHistory.contains(hiragana)
-        let katakanaInHistory = candidates.prefix(predictCount + highHistoryCount).contains(katakana)
-            || lowHistory.contains(katakana)
-
-        let candidateSeen = sources.historySeen.union(Set(sources.azooKeyCandidates))
-        let allCandidatesSeen = candidateSeen.union(Set(sources.uniquePredictions))
-
-        // 長音符「ー」・小母音（ぁぃぅぇぉ）を含む読みは外来語・カタカナ語が期待される。
-        let foreignMarkers: Set<Character> = ["ー", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
-        let isPreferred = isHiraganaPreferred(h)
-        let hasForeignMarker = h.contains(where: { foreignMarkers.contains($0) })
-
-        var fixedCount = 0
-        if isPreferred {
-            // hiraganaPreferred 語（助詞・接続詞等）: ひらがなを先頭固定
-            if !hiraganaInHistory {
-                if allCandidatesSeen.contains(hiragana) { candidates.removeAll { $0 == hiragana } }
-                candidates.insert(hiragana, at: 0)
-                fixedCount += 1
-            }
-        } else if hasForeignMarker {
-            // 外来語マーカーあり: カタカナを先頭固定
-            if !katakanaInHistory {
-                if allCandidatesSeen.contains(katakana) { candidates.removeAll { $0 == katakana } }
-                candidates.insert(katakana, at: 0)
-                fixedCount += 1
-            }
-        }
-
-        var insertedSet = Set(candidates)
-        let uniqueUserDict = sources.userDictRaw.filter { insertedSet.insert($0).inserted }
-        candidates.insert(contentsOf: uniqueUserDict, at: fixedCount)
-        let userDictCount = uniqueUserDict.count
-        let fixedEnd = fixedCount + userDictCount
-
-        var zenzaiTop1Count = 0
-        if let top1 = sources.zenzaiPromoted, insertedSet.insert(top1).inserted {
-            candidates.insert(top1, at: fixedEnd)
-            zenzaiTop1Count = 1
-        }
-        let adjustedFixedEnd = fixedEnd + zenzaiTop1Count
-
-        let historyEnd = adjustedFixedEnd + predictCount + highHistoryCount
-        let predictionEnd = adjustedFixedEnd + predictCount
-
-        appendSpecialCandidates(
-            &candidates,
-            insertedSet: &insertedSet,
-            historyEnd: historyEnd,
+        let sections = buildSections(
+            from: sources,
+            fixedSlot: fixedSlot,
             numberCandidates: numberCandidates,
-            dateTimeCandidates: dateTimeCandidates,
-            lowHistory: lowHistory
+            dateTimeCandidates: dateTimeCandidates
         )
-
-        let initialRow: Int
-        if isPreferred {
-            initialRow = candidates.firstIndex(of: hiragana) ?? (adjustedFixedEnd < candidates.count ? adjustedFixedEnd : 0)
-        } else if hasForeignMarker, fixedCount > 0 {
-            initialRow = 0
-        } else {
-            initialRow = adjustedFixedEnd < candidates.count ? adjustedFixedEnd : 0
-        }
-        guard !candidates.isEmpty else { return .dismiss }
-
         let layout = CandidateLayout(
-            candidates: candidates,
-            fixedEnd: adjustedFixedEnd,
-            predictionEnd: predictionEnd,
-            historyEnd: historyEnd,
-            initialRow: initialRow
+            sections: sections,
+            sectionOrder: CandidateLayout.defaultSectionOrder,
+            initialRowPolicy: resolveInitialRowPolicy(sources: sources, fixedSlot: fixedSlot)
         )
-        return .show(candidates: layout.candidates,
-                     historyEnd: layout.historyEnd,
-                     initialRow: layout.initialRow,
-                     predictionEnd: layout.predictionEnd,
-                     fixedEnd: layout.fixedEnd)
-    }
+        guard !layout.candidates.isEmpty else { return .dismiss }
 
-    private func appendSpecialCandidates(
-        _ candidates: inout [String],
-        insertedSet: inout Set<String>,
-        historyEnd: Int,
-        numberCandidates: [String],
-        dateTimeCandidates: [String],
-        lowHistory: [String]
-    ) {
-        let uniqueNumberCandidates = numberCandidates.filter { insertedSet.insert($0).inserted }
-        let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
-        candidates.insert(contentsOf: uniqueNumberCandidates, at: historyEnd)
-        candidates.insert(contentsOf: uniqueDateTimeCandidates, at: historyEnd + uniqueNumberCandidates.count)
-        insertedSet = Set(candidates)
-        let uniqueLowHistory = lowHistory.filter { insertedSet.insert($0).inserted }
-        candidates.append(contentsOf: uniqueLowHistory)
+        return .show(
+            candidates: layout.candidates,
+            historyEnd: layout.historyEnd,
+            initialRow: layout.initialRow,
+            predictionEnd: layout.predictionEnd,
+            fixedEnd: layout.fixedEnd
+        )
     }
 
     /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
@@ -460,31 +505,6 @@ public extension InputHandler {
     }
 }
 
-// MARK: - CandidateLayout
-
-/// 候補リストとそのセクション境界をまとめた値。
-/// init で `0 <= fixedEnd <= predictionEnd <= historyEnd <= candidates.count`
-/// および `initialRow` の範囲を assert する。
-struct CandidateLayout {
-    let candidates: [String]
-    let fixedEnd: Int
-    let predictionEnd: Int
-    let historyEnd: Int
-    let initialRow: Int
-
-    init(candidates: [String], fixedEnd: Int, predictionEnd: Int, historyEnd: Int, initialRow: Int) {
-        assert(fixedEnd >= 0, "fixedEnd >= 0")
-        assert(predictionEnd >= fixedEnd, "predictionEnd >= fixedEnd")
-        assert(historyEnd >= predictionEnd, "historyEnd >= predictionEnd")
-        assert(historyEnd <= candidates.count, "historyEnd <= candidates.count")
-        assert(initialRow >= 0 && initialRow < max(1, candidates.count), "initialRow in [0, count)")
-        self.candidates = candidates
-        self.fixedEnd = fixedEnd
-        self.predictionEnd = predictionEnd
-        self.historyEnd = historyEnd
-        self.initialRow = initialRow
-    }
-}
 
 // MARK: - SegmentizeLRUCache
 
