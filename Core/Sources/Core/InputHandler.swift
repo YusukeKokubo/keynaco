@@ -126,6 +126,8 @@ public struct InputHandler {
     public var documentSurroundingContextInvalidated = false
     public var lastCommittedOutput: String? { committedHistory.last }
     public var segmentCandidateCache: [String: Segment] = [:]
+    /// segmentize 結果の LRU キャッシュ（class なので struct コピー後も共有）。
+    public var segmentizeCache = SegmentizeLRUCache()
     public var prev2Output: String? {
         committedHistory.count >= 2 ? committedHistory[committedHistory.count - 2] : nil
     }

@@ -103,14 +103,24 @@ public extension InputHandler {
             let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
             if !isDateTime && !isNumber {
                 db.recordPrefixes(reading: normalizedInput, output: selected)
-                if !normalizedInput.allSatisfy({ $0.isASCII }) {
+                // 4文字以上の日本語読みのみセグメント分割して部分語を学習
+                if !normalizedInput.allSatisfy({ $0.isASCII }), normalizedInput.count > 3 {
                     let db = db; let conv = azooKeyConverter; let reading = normalizedInput
                     let leftCtx = azooKeyLeftContext
+                    let cache = segmentizeCache
                     Task.detached(priority: .utility) {
-                        let segs = conv.segmentize(reading, leftSideContext: leftCtx)
+                        let segs: [(reading: String, candidates: [String])]
+                        if let cached = cache.get(reading) {
+                            segs = cached
+                        } else {
+                            segs = conv.segmentize(reading, leftSideContext: leftCtx)
+                            cache.set(reading, segs)
+                        }
                         guard segs.count >= 2 else { return }
                         for seg in segs {
                             guard let output = seg.candidates.first else { continue }
+                            // 出力が読みと同じ（漢字化されていない）セグメントは学習価値なしのためスキップ
+                            if output == seg.reading { continue }
                             db.recordPrefixes(reading: seg.reading, output: output)
                         }
                     }
@@ -296,10 +306,11 @@ public extension InputHandler {
 
         // 長音符「ー」・小母音（ぁぃぅぇぉ）を含む読みは外来語・カタカナ語が期待される。
         let foreignMarkers: Set<Character> = ["ー", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
+        let isPreferred = isHiraganaPreferred(h)
         let hasForeignMarker = h.contains(where: { foreignMarkers.contains($0) })
 
         var fixedCount = 0
-        if isHiraganaPreferred(h) {
+        if isPreferred {
             // hiraganaPreferred 語（助詞・接続詞等）: ひらがなを先頭固定
             if !hiraganaInHistory {
                 if allCandidatesSeen.contains(hiragana) { candidates.removeAll { $0 == hiragana } }
@@ -342,7 +353,7 @@ public extension InputHandler {
         )
 
         let initialRow: Int
-        if isHiraganaPreferred(h) {
+        if isPreferred {
             initialRow = candidates.firstIndex(of: hiragana) ?? (adjustedFixedEnd < candidates.count ? adjustedFixedEnd : 0)
         } else if hasForeignMarker, fixedCount > 0 {
             initialRow = 0
@@ -425,5 +436,41 @@ public extension InputHandler {
             }
         }
         return result
+    }
+}
+
+// MARK: - SegmentizeLRUCache
+
+/// segmentize 結果の LRU キャッシュ。`Task.detached` から参照されるため class（参照型）。
+public final class SegmentizeLRUCache: @unchecked Sendable {
+    private let capacity: Int
+    private var keys: [String] = []
+    private var values: [[( reading: String, candidates: [String])]] = []
+    private let lock = NSLock()
+
+    init(capacity: Int = 50) {
+        self.capacity = capacity
+    }
+
+    func get(_ key: String) -> [(reading: String, candidates: [String])]? {
+        lock.withLock {
+            guard let idx = keys.firstIndex(of: key) else { return nil }
+            let val = values[idx]
+            // MRU へ移動
+            keys.remove(at: idx); values.remove(at: idx)
+            keys.append(key); values.append(val)
+            return val
+        }
+    }
+
+    func set(_ key: String, _ value: [(reading: String, candidates: [String])]) {
+        lock.withLock {
+            if let idx = keys.firstIndex(of: key) {
+                keys.remove(at: idx); values.remove(at: idx)
+            } else if keys.count >= capacity {
+                keys.removeFirst(); values.removeFirst()
+            }
+            keys.append(key); values.append(value)
+        }
     }
 }
