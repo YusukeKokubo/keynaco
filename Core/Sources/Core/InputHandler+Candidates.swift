@@ -101,7 +101,21 @@ public extension InputHandler {
         if let selected = candidate.selectedText {
             let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
             let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
-            if !isDateTime && !isNumber { db.recordPrefixes(reading: normalizedInput, output: selected) }
+            if !isDateTime && !isNumber {
+                db.recordPrefixes(reading: normalizedInput, output: selected)
+                if !normalizedInput.allSatisfy({ $0.isASCII }) {
+                    let db = db; let conv = azooKeyConverter; let reading = normalizedInput
+                    let leftCtx = azooKeyLeftContext
+                    Task.detached(priority: .utility) {
+                        let segs = conv.segmentize(reading, leftSideContext: leftCtx)
+                        guard segs.count >= 2 else { return }
+                        for seg in segs {
+                            guard let output = seg.candidates.first else { continue }
+                            db.recordPrefixes(reading: seg.reading, output: output)
+                        }
+                    }
+                }
+            }
             let conv = azooKeyConverter; let r = inputKey; let t = selected
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
             commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
