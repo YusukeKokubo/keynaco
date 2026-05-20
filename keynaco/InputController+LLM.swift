@@ -74,8 +74,8 @@ extension InputController {
             let fromNoun = handler.lastConfirmedNounOutput.map {
                 handler.db.fetchNounBigramTop(prev: $0, limit: 5)
             } ?? []
-            let fromBigram = handler.db.fetchBigramTop(prev: lw, limit: 5)
-            return InputHandler.merged(fromNoun, fromBigram)
+            let fromPreset = handler.db.fetchPresetBigramTop(prev: lw, limit: 5)
+            return InputHandler.merged(fromNoun, fromPreset)
                 .filter { !InputHandler.particles.contains($0) }
                 .map { (prev: lw, next: $0) }
         } ?? []

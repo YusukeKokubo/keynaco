@@ -47,7 +47,7 @@ final class InputHandlerVirtualContextTests: InputHandlerTestCase {
     func testSuggestSuccessorsUsesVirtualBigram() {
         handler.committedHistory = []
         handler.virtualHistoryPrefix = ["東京"]
-        handler.db.recordBigram(prev: "東京", input: "に", output: "に")
+        seedPresetBigram(prev: "東京", input: "に", output: "に")
         _ = handler.suggestSuccessors()
         XCTAssertTrue(handler.isSuccessorMode)
         XCTAssertTrue(handler.pendingSuccessorCandidates.contains("に"))
@@ -56,7 +56,7 @@ final class InputHandlerVirtualContextTests: InputHandlerTestCase {
     func testPendingPreviewUsesVirtualBigram() {
         handler.committedHistory = []
         handler.virtualHistoryPrefix = ["東京"]
-        handler.db.recordBigram(prev: "東京", input: "から", output: "から")
+        seedPresetBigram(prev: "東京", input: "から", output: "から")
         let action = handler.buildPendingCandidateList(pendingChar: "k", client: client)
         XCTAssertTrue(handler.isSuccessorMode)
         guard case .show(let candidates, _, _, _, _) = action else {

@@ -321,12 +321,10 @@ public struct InputHandler {
                 ? committedHistory[committedHistory.count - 2]
                 : nil
             capPrev2 = p2
-            let isParticlePrev = InputHandler.particles.contains(p1)
             lastCommittedReading = state.finalizedText
-            let bigramInput = state.finalizedText
+            let ngramInput = state.finalizedText
             db.recordNgrams(
-                bigram: isParticlePrev ? nil : (prev: p1, input: bigramInput, output: text),
-                trigram: p2.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) }
+                trigram: p2.map { (prev2: $0, prev1: p1, input: ngramInput, output: text) }
             )
         }
         lastConfirmedContext = LastConfirmedContext(

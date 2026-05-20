@@ -189,6 +189,9 @@ LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bi
 #### skip-bigram（参照廃止）
 テーブルは既存 DB 互換のため残すが、確定時の記録および候補参照は廃止。役割は noun-bigram に移行。
 
+#### ユーザー bi-gram 学習（廃止）
+確定時の `recordNgrams` は tri-gram のみ。名詞ペアは noun-bigram、冷スタートはプリセット bi-gram（`is_preset = 1`）のみ参照する。
+
 #### penalizeAll（訂正シグナル）
 確定直後 Backspace 時に呼ばれ、history / bigram / trigram / skip_bigram の該当行を count -1（0以下で削除）、`boundary_pref` 行を DELETE する。
 

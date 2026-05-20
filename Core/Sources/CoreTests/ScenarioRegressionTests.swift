@@ -105,7 +105,7 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         var h = handler!
         h.committedHistory = []
         h.virtualHistoryPrefix = ["東京"]
-        h.db.recordBigram(prev: "東京", input: "に", output: "に")
+        h.db.testInsertBigram(prev: "東京", input: "に", output: "に", count: 3, usedAt: Int64(Date().timeIntervalSince1970), isPreset: true)
         _ = h.suggestSuccessors()
         XCTAssertTrue(h.isSuccessorMode)
         XCTAssertTrue(h.pendingSuccessorCandidates.contains("に"))
@@ -113,7 +113,7 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
 
     /// Successor 1 打目: 長い bi-gram を助詞境界で prefix 展開する（PLAN260520b）
     func testSuccessorPrefixSplit_longBigramOnFirstKey() {
-        handler.db.recordBigram(
+        handler.db.recordNounBigram(
             prev: "東京",
             input: "かいぎにしゅっせきする",
             output: "会議に出席する"

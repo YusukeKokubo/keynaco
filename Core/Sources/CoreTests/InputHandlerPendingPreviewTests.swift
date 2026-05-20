@@ -12,7 +12,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewShowsCandidatesOnFirstChar() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         XCTAssertFalse(handler.isSuccessorMode)
         let (_, action) = type(chars: "k", base: "k")
         XCTAssertTrue(handler.isSuccessorMode, "先読み候補ありで isSuccessorMode になるはず")
@@ -25,7 +25,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewNExcluded() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         let (_, action) = type(chars: "n", base: "n")
         guard case .dismiss = action else {
             XCTFail("n は先読み対象外なので .dismiss を返すはず: \(action)"); return
@@ -48,7 +48,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewElectronSafetySetMarkedText() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         XCTAssertFalse(client.markedText.isEmpty, "Electron 対策: markedText が空でないはず")
     }
@@ -56,7 +56,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewSpaceConfirms() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         XCTAssertTrue(handler.isSuccessorMode)
         press(keyCode: KeyCode.space, candidateVisible: true, selectedRow: 0, selectedText: "から")
@@ -68,7 +68,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewSpaceWithNilSelectedRestoresComposingText() {
         typeRomaji("te")
         press(keyCode: KeyCode.enter)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         XCTAssertTrue(handler.isSuccessorMode)
         let (_, action) = press(keyCode: KeyCode.space)
@@ -84,7 +84,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewAfterNilSelectedSpaceTypingRomajiContinues() {
         typeRomaji("te")
         press(keyCode: KeyCode.enter)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         _ = press(keyCode: KeyCode.space)
         XCTAssertFalse(handler.isSuccessorMode)
@@ -96,7 +96,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewEscapeCancels() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         XCTAssertTrue(handler.isSuccessorMode)
         press(keyCode: 53)
@@ -106,7 +106,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewCancelledByNonMatchingKeyContinuesRomaji() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         XCTAssertTrue(handler.isSuccessorMode)
         let (_, action) = type(chars: "u", base: "u")
@@ -117,7 +117,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewConfirmedClearsPendingRomaji() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "から")
         XCTAssertFalse(handler.isSuccessorMode)
@@ -129,7 +129,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewEscapePreservesRomajiInMarkedText() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "から", output: "から")
+        seedPresetBigram(prev: "て", input: "から", output: "から")
         type(chars: "k", base: "k")
         press(keyCode: 53)
         XCTAssertEqual(client.markedText, "k", "Escape 後に pendingRomaji が markedText に残るはず")
@@ -142,7 +142,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewWithFKeyMatches() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "ふう", output: "風")
+        seedPresetBigram(prev: "て", input: "ふう", output: "風")
         let (_, action) = type(chars: "f", base: "f")
         XCTAssertTrue(handler.isSuccessorMode, "f キーで先読み候補あれば isSuccessorMode になるはず")
         guard case .show(let candidates, _, _, _, _) = action else {
@@ -154,7 +154,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewWithJKeyMatches() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "じゆう", output: "自由")
+        seedPresetBigram(prev: "て", input: "じゆう", output: "自由")
         let (_, action) = type(chars: "j", base: "j")
         XCTAssertTrue(handler.isSuccessorMode, "j キーで先読み候補あれば isSuccessorMode になるはず")
         guard case .show(let candidates, _, _, _, _) = action else {
@@ -166,8 +166,8 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewWithCKeyMatchesKaAndChiRows() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "ちかく", output: "近く")
-        handler.db.recordBigram(prev: "て", input: "かれ", output: "彼")
+        seedPresetBigram(prev: "て", input: "ちかく", output: "近く")
+        seedPresetBigram(prev: "て", input: "かれ", output: "彼")
         let (_, action) = type(chars: "c", base: "c")
         XCTAssertTrue(handler.isSuccessorMode)
         guard case .show(let candidates, _, _, _, _) = action else {
@@ -180,7 +180,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
     func testPendingPreviewNExclusionContinuesAsNormalRomaji() {
         typeRomaji("te")
         press(keyCode: 36)
-        handler.db.recordBigram(prev: "て", input: "にほんご", output: "日本語")
+        seedPresetBigram(prev: "て", input: "にほんご", output: "日本語")
         type(chars: "n", base: "n")
         XCTAssertFalse(handler.isSuccessorMode, "n では先読みに入らないはず")
         XCTAssertEqual(handler.state.pendingRomaji, "n")
@@ -196,7 +196,7 @@ final class InputHandlerPendingPreviewTests: InputHandlerTestCase {
         typeRomaji("toukyou")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         press(keyCode: 53)
-        handler.db.recordBigram(prev: "東京", input: "とさん", output: "都産")
+        seedNounBigramPrediction(prev: "東京", input: "とさん", output: "都産")
         handler.db.recordTrigram(prev2: "昨日", prev1: "東京", input: "いった", output: "行った")
         let (_, action) = type(chars: "i", base: "i")
         guard case .show(let candidates, _, _, _, _) = action else {

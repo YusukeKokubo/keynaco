@@ -1657,7 +1657,11 @@ final class DebugSocketServer: @unchecked Sendable {
         let schedulingEpoch = llmEpoch
 
         let examples: [(prev: String, next: String)] = triggerContext.last.map { lw in
-            handler.db.fetchBigramTop(prev: lw, limit: 5)
+            let fromNoun = handler.lastConfirmedNounOutput.map {
+                handler.db.fetchNounBigramTop(prev: $0, limit: 5)
+            } ?? []
+            let fromPreset = handler.db.fetchPresetBigramTop(prev: lw, limit: 5)
+            return InputHandler.merged(fromNoun, fromPreset)
                 .filter { !InputHandler.particles.contains($0) }
                 .map { (prev: lw, next: $0) }
         } ?? []

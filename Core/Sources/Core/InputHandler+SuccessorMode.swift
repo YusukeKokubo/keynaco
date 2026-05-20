@@ -107,9 +107,9 @@ public extension InputHandler {
             return .dismiss
         }
         let nounBigramTop = db.fetchNounBigramTop(prev: last)
-        let bigramTop = db.fetchBigramTop(prev: last)
+        let presetBigramTop = db.fetchPresetBigramTop(prev: last)
         let trigramTop: [String] = prev2Output.map { db.fetchTrigramTop(prev2: $0, prev1: last) } ?? []
-        let predictTop = InputHandler.merged(nounBigramTop, trigramTop, bigramTop)
+        let predictTop = InputHandler.merged(nounBigramTop, trigramTop, presetBigramTop)
         // 名詞末尾のとき限定で格助詞 fallback を tail に追加
         let particlesFallback = isNounLike(last)
             ? InputHandler.particles.filter { !Set(predictTop).contains($0) }
@@ -143,11 +143,8 @@ public extension InputHandler {
         let capPrev2 = committedHistory.count >= 2
             ? committedHistory[committedHistory.count - 2]
             : nil
-        if let p1 = capPrev1 {
-            db.recordBigram(prev: p1, input: particle, output: particle)
-            if let p2 = capPrev2 {
-                db.recordTrigram(prev2: p2, prev1: p1, input: particle, output: particle)
-            }
+        if let p1 = capPrev1, let p2 = capPrev2 {
+            db.recordTrigram(prev2: p2, prev1: p1, input: particle, output: particle)
         }
         db.recordPrefixes(reading: particle, output: particle)
         lastConfirmedContext = LastConfirmedContext(
@@ -217,11 +214,11 @@ public extension InputHandler {
                         let fromTrigram: [String] = prev2Output.map {
                             db.fetchTrigram(prev2: $0, prev1: last, reading: kana)
                         } ?? []
-                        let fromBigram = db.fetchBigram(prev: last, reading: kana)
+                        let fromPreset = db.fetchPresetBigram(prev: last, reading: kana)
                         let fromNoun = db.fetchNounBigram(prev: last, reading: kana)
                         for s in fromNoun where filteredSeen.insert(s).inserted { filtered.append(s) }
                         for s in fromTrigram where filteredSeen.insert(s).inserted { filtered.append(s) }
-                        for s in fromBigram where filteredSeen.insert(s).inserted { filtered.append(s) }
+                        for s in fromPreset where filteredSeen.insert(s).inserted { filtered.append(s) }
                     }
                     filtered = InputHandler.mergePendingSuccessorMatches(
                         dbOrdered: filtered, pending: pendingSuccessorCandidates, romajiKey: char
@@ -274,11 +271,11 @@ public extension InputHandler {
                             let fromTrigram: [String] = prev2Output.map {
                                 db.fetchTrigram(prev2: $0, prev1: last, reading: newKanaPrefix)
                             } ?? []
-                            let fromBigram = db.fetchBigram(prev: last, reading: newKanaPrefix)
+                            let fromPreset = db.fetchPresetBigram(prev: last, reading: newKanaPrefix)
                             let fromNoun = db.fetchNounBigram(prev: last, reading: newKanaPrefix)
                             for s in fromNoun where seen.insert(s).inserted { narrowed.append(s) }
                             for s in fromTrigram where seen.insert(s).inserted { narrowed.append(s) }
-                            for s in fromBigram where seen.insert(s).inserted { narrowed.append(s) }
+                            for s in fromPreset where seen.insert(s).inserted { narrowed.append(s) }
                             // ひらがな/カタカナ出力の候補はテキストの前方一致でもフィルタ
                             for w in successorActiveCandidates where w.hasPrefix(newKanaPrefix) {
                                 if seen.insert(w).inserted { narrowed.append(w) }

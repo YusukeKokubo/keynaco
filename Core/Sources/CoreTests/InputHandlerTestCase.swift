@@ -77,6 +77,21 @@ class InputHandlerTestCase: XCTestCase {
         }
     }
 
+    /// noun_bigram 予測テスト用: 学習行と `lastConfirmedNounOutput` をセットする。
+    func seedNounBigramPrediction(prev: String, input: String, output: String) {
+        handler.db.recordNounBigram(prev: prev, input: input, output: output)
+        handler.lastConfirmedNounOutput = prev
+    }
+
+    /// プリセット bi-gram 予測テスト用（`is_preset = 1`）。
+    func seedPresetBigram(prev: String, input: String, output: String, count: Int = 3) {
+        let t = Int64(Date().timeIntervalSince1970)
+        handler.db.testInsertBigram(
+            prev: prev, input: input, output: output,
+            count: count, usedAt: t, isPreset: true
+        )
+    }
+
     /// 既定の `setUp` 後に AzooKey スタブ等へ差し替える。
     func setUpWithConverter(_ converter: any AzooKeyConverting) {
         let db = DatabaseManager(inMemory: true)

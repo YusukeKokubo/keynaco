@@ -72,8 +72,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     func testSuccessorChain() {
         // bigram 事前学習: 東京→が, が→好き（読み: すき）
-        handler.db.recordBigram(prev: "東京", input: "が", output: "が")
-        handler.db.recordBigram(prev: "が", input: "すき", output: "好き")
+        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        handler.db.recordNounBigram(prev: "が", input: "すき", output: "好き")
 
         // "東京" 確定 → Successor モード（名詞末尾 → .dismiss）
         typeRomaji("tokyo")
@@ -219,7 +219,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     func testSuccessorModeNotActivatedAfterHiraganaEvenWithBigram() {
         // ひらがな末尾は bi-gram があっても Successor モードにならない
-        handler.db.recordBigram(prev: "おつかれ", input: "です", output: "です")
+        handler.db.recordNounBigram(prev: "おつかれ", input: "です", output: "です")
         typeRomaji("otsukare")
         let commitResult = press(keyCode: 36)  // Enter でひらがな確定
         XCTAssertFalse(handler.isSuccessorMode, "ひらがな末尾は bi-gram があっても Successor モードにならない")
@@ -230,8 +230,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     func testSuccessorModeBigramOrderedByFrequency() {
         // 「東京 → さいきん（最近）」を 3 回、「東京 → さらに」を 1 回 学習（同じさ行で頻度順を検証）
-        for _ in 0..<3 { handler.db.recordBigram(prev: "東京", input: "さいきん", output: "最近") }
-        handler.db.recordBigram(prev: "東京", input: "さらに", output: "さらに")
+        for _ in 0..<3 { handler.db.recordNounBigram(prev: "東京", input: "さいきん", output: "最近") }
+        handler.db.recordNounBigram(prev: "東京", input: "さらに", output: "さらに")
         typeRomaji("tokyo")
         let commitResult = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         // N-gram 候補あり → 確定直後は .dismiss（ウィンドウ閉じて1打目待ち）
@@ -279,7 +279,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     func testSuccessorSecondKeyNarrowsCandidates() {
         // 「確認する」(かくにんする) を bigram に学習（input は読み）
         // 東京確定後に Successor モードで k→a と打っても候補が消えないことを確認
-        handler.db.recordBigram(prev: "東京", input: "かくにんする", output: "確認する")
+        handler.db.recordNounBigram(prev: "東京", input: "かくにんする", output: "確認する")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode)
@@ -303,8 +303,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     func testSuccessorMultipleCharsNarrowToKanaPrefix() {
         // 「確認する」(かくにんする) と「から」を bigram に学習し、k→a→k→u と打つと「かく」で絞り込まれる
-        handler.db.recordBigram(prev: "東京", input: "かくにんする", output: "確認する")
-        handler.db.recordBigram(prev: "東京", input: "から", output: "から")
+        handler.db.recordNounBigram(prev: "東京", input: "かくにんする", output: "確認する")
+        handler.db.recordNounBigram(prev: "東京", input: "から", output: "から")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode)
@@ -344,7 +344,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     func testSuccessorSubsequentKeysMismatchExitsAndReplaysAll() {
         // k→a→i と打ったとき「かい」始まりの候補がなければモード解除し k,a,i を通常入力として再生
-        handler.db.recordBigram(prev: "東京", input: "かくにんする", output: "確認する")
+        handler.db.recordNounBigram(prev: "東京", input: "かくにんする", output: "確認する")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode)
@@ -363,7 +363,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     func testSuccessorModeNotActivatedAfterHiraganaCommitRegardlessOfBigram() {
         // ひらがな末尾確定後は bi-gram があっても Successor モードにならない
-        handler.db.recordBigram(prev: "おつかれ", input: "です", output: "です")
+        handler.db.recordNounBigram(prev: "おつかれ", input: "です", output: "です")
         typeRomaji("otsukare")
         let commitResult = press(keyCode: 36)
         XCTAssertFalse(handler.isSuccessorMode, "ひらがな末尾は Successor モードにならない")
@@ -388,8 +388,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     func testSuccessorChainViaParticleFirstKey() {
         // 1打目で「が」に絞り込み → Space で確定。ひらがな末尾なのでチェーンは継続しない。
-        handler.db.recordBigram(prev: "東京", input: "が", output: "が")
-        handler.db.recordBigram(prev: "が", input: "すき", output: "好き")
+        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        handler.db.recordNounBigram(prev: "が", input: "すき", output: "好き")
 
         typeRomaji("tokyo")
         let commitResult = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
@@ -435,9 +435,9 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         // bigram のみの競合語「一致」を bigram で学習（東京→一致）
         // 別文脈: 「今日」「東京」「一致」で bigram(東京→一致) だけ積む
         let db = handler.db
-        db.recordBigram(prev: "東京", input: "いっち", output: "一致")
-        db.recordBigram(prev: "東京", input: "いっち", output: "一致")
-        db.recordBigram(prev: "東京", input: "いっち", output: "一致")
+        db.recordNounBigram(prev: "東京", input: "いっち", output: "一致")
+        db.recordNounBigram(prev: "東京", input: "いっち", output: "一致")
+        db.recordNounBigram(prev: "東京", input: "いっち", output: "一致")
 
         // 「昨日」「東京」に続く4語目を組成中 → trigram (昨日/東京→一体) が上に来るはず
         typeRomaji("i")
@@ -460,7 +460,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     func testSuccessorImmediateThresholdNotMet() {
         // count = 4（閾値 5 未満）→ 確定後 .dismiss（遅延表示）
         for _ in 0..<4 {
-            handler.db.recordBigram(prev: "東京", input: "について", output: "について")
+            handler.db.recordNounBigram(prev: "東京", input: "について", output: "について")
         }
         typeRomaji("tokyo")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
@@ -474,7 +474,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     func testSuccessorHighCountStillDelaysUntilFirstKey() {
         // count = 5（旧「即時表示」閾値以上）でも確定直後は .dismiss
         for _ in 0..<5 {
-            handler.db.recordBigram(prev: "東京", input: "について", output: "について")
+            handler.db.recordNounBigram(prev: "東京", input: "について", output: "について")
         }
         typeRomaji("tokyo")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
@@ -496,7 +496,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         let ninetyOneDaysAgo = base - 91 * 86400
         handler.db.clock = { ninetyOneDaysAgo }
         for _ in 0..<5 {
-            handler.db.recordBigram(prev: "東京", input: "について", output: "について")
+            handler.db.recordNounBigram(prev: "東京", input: "について", output: "について")
         }
         handler.db.clock = { base }
         typeRomaji("tokyo")
@@ -511,8 +511,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
 
     func testSuccessorModeNKeyShowsBothNiAndNo() {
         // n → particleRomajiMap["n"] = ["に", "の"]、両方 bigram があれば両方表示
-        handler.db.recordBigram(prev: "東京", input: "に", output: "に")
-        handler.db.recordBigram(prev: "東京", input: "の", output: "の")
+        handler.db.recordNounBigram(prev: "東京", input: "に", output: "に")
+        handler.db.recordNounBigram(prev: "東京", input: "の", output: "の")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode)
@@ -530,8 +530,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         // N-gram フィルタ経由（pendingSuccessorCandidates あり）の場合、
         // romajiToInitialKana["n"] = ["な","に","ぬ","ね","の"] の kana 配列順で並ぶ。
         // bigram 頻度（の=3 > に=1）ではなく kana 配列順が優先される。
-        for _ in 0..<3 { handler.db.recordBigram(prev: "東京", input: "の", output: "の") }
-        handler.db.recordBigram(prev: "東京", input: "に", output: "に")
+        for _ in 0..<3 { handler.db.recordNounBigram(prev: "東京", input: "の", output: "の") }
+        handler.db.recordNounBigram(prev: "東京", input: "に", output: "に")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let result = type(chars: "n", base: "n")

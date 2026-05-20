@@ -183,10 +183,44 @@ extension DatabaseManager {
         fetchNgramWithReading(table: .bigram, prev: prev, reading: reading)
     }
 
+    /// プリセット bi-gram（`is_preset = 1`）のみ。ユーザー学習行は含めない。
+    func fetchPresetBigram(prev: String, reading: String) -> [String] {
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM bigram
+            WHERE prev = ? AND input LIKE ? AND is_preset = 1
+            ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
+            LIMIT 10
+            """) {
+                self.bindText($0, 1, prev); self.bindText($0, 2, reading + "%")
+                self.bindRecency($0, at: 3, now: now)
+            }
+        }
+    }
+
     /// prev に続く bi-gram 上位候補を返す（input に依らず output を集約）。
     /// 同じ output が複数 input で学習されている場合は count の合計でソートする。
     public func fetchBigramTop(prev: String, limit: Int = 20) -> [String] {
         fetchNgramTopGrouped(table: .bigram, prev: prev, limit: limit)
+    }
+
+    /// プリセット bi-gram のみ（冷スタート用）。
+    func fetchPresetBigramTop(prev: String, limit: Int = 20) -> [String] {
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryStringsOnQueue("""
+            SELECT output FROM bigram
+            WHERE prev = ? AND is_preset = 1
+            GROUP BY output
+            ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
+            LIMIT ?
+            """) {
+                self.bindText($0, 1, prev)
+                self.bindRecency($0, at: 2, now: now)
+                sqlite3_bind_int($0, 4, Int32(limit))
+            }
+        }
     }
 
     /// prev に続く bi-gram の直近 90 日以内の最大 count を返す（プリセット行は日付窓外でも含む）。統計・テスト用。
@@ -341,41 +375,22 @@ extension DatabaseManager {
         fetchNgramTopGrouped(table: .noun_bigram, prev: prev, limit: limit)
     }
 
-    /// bigram / trigram をまとめて1トランザクションでバックグラウンド書き込みする。
-    /// bigram が nil のとき（prev が格助詞）はその記録をスキップし trigram のみ保存する。
-    func recordNgrams(
-        bigram: (prev: String, input: String, output: String)?,
-        trigram: (prev2: String, prev1: String, input: String, output: String)?
-    ) {
+    /// tri-gram をバックグラウンド書き込みする（ユーザー bi-gram 学習は noun_bigram に移行）。
+    func recordNgrams(trigram: (prev2: String, prev1: String, input: String, output: String)?) {
+        guard let tri = trigram else { return }
         dispatchWrite {
             let t = self.nowEpoch()
-            self.executeOnQueue("BEGIN")
-            if let bigram {
-                self.executeOnQueue("""
-                INSERT INTO bigram (prev, input, output, count, used_at)
-                VALUES (?, ?, ?, 1, ?)
-                ON CONFLICT(prev, input, output) DO UPDATE SET
-                    count   = count + 1,
-                    used_at = excluded.used_at;
-                """) {
-                    self.bindText($0, 1, bigram.prev); self.bindText($0, 2, bigram.input)
-                    self.bindText($0, 3, bigram.output); sqlite3_bind_int64($0, 4, t)
-                }
+            self.executeOnQueue("""
+            INSERT INTO trigram (prev2, prev1, input, output, count, used_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            ON CONFLICT(prev2, prev1, input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, tri.prev2); self.bindText($0, 2, tri.prev1)
+                self.bindText($0, 3, tri.input); self.bindText($0, 4, tri.output)
+                sqlite3_bind_int64($0, 5, t)
             }
-            if let tri = trigram {
-                self.executeOnQueue("""
-                INSERT INTO trigram (prev2, prev1, input, output, count, used_at)
-                VALUES (?, ?, ?, ?, 1, ?)
-                ON CONFLICT(prev2, prev1, input, output) DO UPDATE SET
-                    count   = count + 1,
-                    used_at = excluded.used_at;
-                """) {
-                    self.bindText($0, 1, tri.prev2); self.bindText($0, 2, tri.prev1)
-                    self.bindText($0, 3, tri.input); self.bindText($0, 4, tri.output)
-                    sqlite3_bind_int64($0, 5, t)
-                }
-            }
-            self.executeOnQueue("COMMIT")
         }
     }
 

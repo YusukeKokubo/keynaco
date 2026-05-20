@@ -255,12 +255,13 @@ public extension InputHandler {
         let nounBigramRaw = lastConfirmedNounOutput.map {
             db.fetchNounBigram(prev: $0, reading: state.composedHiragana)
         } ?? []
-        let bigramRaw = lastCommittedOutput.map { db.fetchBigram(prev: $0, reading: state.composedHiragana) } ?? []
+        let presetBigramRaw = lastCommittedOutput.map {
+            db.fetchPresetBigram(prev: $0, reading: state.composedHiragana)
+        } ?? []
         let trigramRaw: [String] = {
             guard let p1 = lastCommittedOutput, let p2 = prev2Output else { return [] }
             return db.fetchTrigram(prev2: p2, prev1: p1, reading: state.composedHiragana)
         }()
-        let predictRaw = Self.merged(nounBigramRaw, trigramRaw, bigramRaw)
 
         let historySeen = Set(historyScored.map(\.output))
         let zenzaiPromoted: String? = {
@@ -276,7 +277,7 @@ public extension InputHandler {
         // noun_bigram は文脈的予測なので AzooKey と重複していても prediction セクションに表示する。
         // bigram/trigram は AzooKey 辞書にある単語を除外してノイズを減らす。
         let nounBigramUniq = nounBigramRaw.filter { !historySeen.contains($0) }
-        let otherPredictUniq = Self.merged(trigramRaw, bigramRaw).filter { !candidateSeen.contains($0) }
+        let otherPredictUniq = Self.merged(trigramRaw, presetBigramRaw).filter { !candidateSeen.contains($0) }
         let uniquePredictions = Self.merged(nounBigramUniq, otherPredictUniq)
         let predictCount = uniquePredictions.count
 
@@ -535,13 +536,13 @@ public extension InputHandler {
             let fromTrigram: [String] = prev2Output.map {
                 db.fetchTrigram(prev2: $0, prev1: prev, reading: kana)
             } ?? []
-            let fromBigram = db.fetchBigram(prev: prev, reading: kana)
+            let fromPreset = db.fetchPresetBigram(prev: prev, reading: kana)
             let fromNoun: [String] = lastConfirmedNounOutput.map {
                 db.fetchNounBigram(prev: $0, reading: kana)
             } ?? []
             for s in fromNoun where seen.insert(s).inserted { candidates.append(s) }
             for s in fromTrigram where seen.insert(s).inserted { candidates.append(s) }
-            for s in fromBigram where seen.insert(s).inserted { candidates.append(s) }
+            for s in fromPreset where seen.insert(s).inserted { candidates.append(s) }
         }
         guard !candidates.isEmpty else { return .dismiss }
         isSuccessorMode = true
