@@ -96,6 +96,13 @@ public extension InputHandler {
     mutating func suggestSuccessors() -> CandidateAction {
         guard let last = lastCommittedOutput else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
+            clearSuccessorLLMAuxiliaryState()
+            return .dismiss
+        }
+        guard isNounLike(last) else {
+            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
             clearSuccessorLLMAuxiliaryState()
             return .dismiss
         }
@@ -113,6 +120,7 @@ public extension InputHandler {
 
         guard !candidates.isEmpty else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
             clearSuccessorLLMAuxiliaryState()
             return .dismiss
         }
@@ -120,6 +128,7 @@ public extension InputHandler {
         successorLLMSurfaceExtras = []
         isSuccessorMode = true
         successorFirstChar = nil
+        successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
         let llmContext = Array(committedHistory.suffix(3))
 
         pendingSuccessorCandidates = candidates
@@ -129,6 +138,7 @@ public extension InputHandler {
 
     mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
         isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+        successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
         clearSuccessorLLMAuxiliaryState()
         state.pendingRomaji = ""
         let capPrev1 = committedHistory.last
@@ -167,6 +177,7 @@ public extension InputHandler {
         case KeyCode.space, KeyCode.enter:
             guard let selected = candidate.selectedText else {
                 isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+                successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
                 clearSuccessorLLMAuxiliaryState()
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, .dismiss)
@@ -190,11 +201,13 @@ public extension InputHandler {
                 lastConfirmedContext = nil
             }
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
             clearSuccessorLLMAuxiliaryState()
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         default:
             let first = successorFirstChar
+            let capturedSubsequentKeys = successorSubsequentKeys
             if !pendingSuccessorCandidates.isEmpty, first == nil {
                 let char = (baseCharacters ?? characters ?? "").lowercased()
                 if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
@@ -234,15 +247,69 @@ public extension InputHandler {
                         clearSuccessorLLMAuxiliaryState()
                         successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
                         let expanded = InputHandler.expandSuccessorPrefixes(candidates: merged)
+                        // 2打目以降の絞り込み用に active candidates とローマ字バッファを初期化
+                        successorActiveCandidates = expanded
+                        successorKanaPrefix = ""
+                        successorRomajiBuffer = char
+                        successorSubsequentKeys = []
                         return (true, .show(candidates: expanded, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+                    }
+                }
+            } else if first != nil, !successorActiveCandidates.isEmpty {
+                // 2打目以降：accumulated romaji でかな prefix を更新し候補を絞り込む
+                let char = (baseCharacters ?? characters ?? "").lowercased()
+                if char.count == 1, let c = char.first, c.isLetter, c.isASCII {
+                    let newRomaji = successorRomajiBuffer + char
+                    let result = RomajiConverter.convert(newRomaji)
+                    let newKanaPrefix = successorKanaPrefix + result.converted
+                    let newRomajiBuffer = result.pending
+                    let romajiIsValid = RomajiConverter.isValidRomajiPrefix(newRomajiBuffer)
+                    if romajiIsValid {
+                        if newKanaPrefix.isEmpty {
+                            // まだかなが確定していない（子音積み中）→ 現在の候補を維持
+                            successorRomajiBuffer = newRomajiBuffer
+                            successorSubsequentKeys.append((keyCode: keyCode, characters: characters, baseCharacters: baseCharacters))
+                            return (true, .show(candidates: successorActiveCandidates, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+                        }
+                        if let last = lastCommittedOutput {
+                            // かなが確定した → DB を reading prefix で再クエリして絞り込む
+                            var seen = Set<String>()
+                            var narrowed: [String] = []
+                            let fromTrigram: [String] = prev2Output.map {
+                                db.fetchTrigram(prev2: $0, prev1: last, reading: newKanaPrefix)
+                            } ?? []
+                            let fromBigram = db.fetchBigram(prev: last, reading: newKanaPrefix)
+                            let fromSkip = mostRecentContentWords(n: 2).flatMap {
+                                db.fetchSkipBigram(prev: $0, reading: newKanaPrefix)
+                            }
+                            for s in fromTrigram where seen.insert(s).inserted { narrowed.append(s) }
+                            for s in fromBigram where seen.insert(s).inserted { narrowed.append(s) }
+                            for s in fromSkip where seen.insert(s).inserted { narrowed.append(s) }
+                            // ひらがな/カタカナ出力の候補はテキストの前方一致でもフィルタ
+                            for w in successorActiveCandidates where w.hasPrefix(newKanaPrefix) {
+                                if seen.insert(w).inserted { narrowed.append(w) }
+                            }
+                            if !narrowed.isEmpty {
+                                successorActiveCandidates = narrowed
+                                successorKanaPrefix = newKanaPrefix
+                                successorRomajiBuffer = newRomajiBuffer
+                                successorSubsequentKeys.append((keyCode: keyCode, characters: characters, baseCharacters: baseCharacters))
+                                return (true, .show(candidates: narrowed, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+                            }
+                        }
                     }
                 }
             }
             // モード解除、バッファがあれば先に通常入力に流す
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
             clearSuccessorLLMAuxiliaryState()
             if let first {
                 _ = handle(keyCode: first.keyCode, characters: first.characters, baseCharacters: first.baseCharacters,
+                           modifiers: modifiers, candidate: .hidden, client: client)
+            }
+            for key in capturedSubsequentKeys {
+                _ = handle(keyCode: key.keyCode, characters: key.characters, baseCharacters: key.baseCharacters,
                            modifiers: modifiers, candidate: .hidden, client: client)
             }
             return handle(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,

@@ -116,7 +116,7 @@ public struct RomajiConverter {
     ]
 
     /// テーブルのキーの prefix になりうる文字列を事前計算
-    private static let prefixes: Set<String> = {
+    static let prefixes: Set<String> = {
         var set = Set<String>()
         for key in table.keys {
             for i in 1...key.count {
@@ -279,6 +279,11 @@ public struct RomajiConverter {
             result += single[c] ?? String(c); i += 1
         }
         return result
+    }
+
+    /// 指定のローマ字文字列がテーブルの prefix として有効か（Successor 多打フィルタ用）。
+    public static func isValidRomajiPrefix(_ romaji: String) -> Bool {
+        romaji.isEmpty || prefixes.contains(romaji.lowercased())
     }
 
     /// 確定時に pending のローマ字を強制変換する。"n" → "ん" 等。

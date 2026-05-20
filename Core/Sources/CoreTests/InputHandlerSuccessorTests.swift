@@ -75,7 +75,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         handler.db.recordBigram(prev: "東京", input: "が", output: "が")
         handler.db.recordBigram(prev: "が", input: "すき", output: "好き")
 
-        // "東京" 確定 → Successor モード（N-gram あり → .dismiss）
+        // "東京" 確定 → Successor モード（名詞末尾 → .dismiss）
         typeRomaji("tokyo")
         let commitResult = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode)
@@ -90,28 +90,12 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         }
         XCTAssertTrue(shown.contains("が"), "bigram 学習済みの「が」が候補に含まれるはず")
 
-        // "が" 確定 → 次の Successor 候補（好き）が出る
+        // "が" 確定 → ひらがな末尾なので Successor モードは継続しない
         let chain1 = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "が")
         XCTAssertTrue(client.inserted.contains("が"))
-        XCTAssertTrue(handler.isSuccessorMode, "が確定後も Successor モードが継続するはず")
-        // 「が」→「好き」は bigram あり → .dismiss（1打目まで遅延）
+        XCTAssertFalse(handler.isSuccessorMode, "ひらがな末尾（が）確定後は Successor モードが起動しない")
         guard case .dismiss = chain1.candidateAction else {
-            XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(chain1.candidateAction)"); return
-        }
-
-        // "s" → 「す」行フィルタで「好き」（読み: すき）を表示
-        let showResult2 = type(chars: "s", base: "s")
-        guard case .show(let cands1, _, _, _, _) = showResult2.candidateAction else {
-            XCTFail(".show を返すはず: \(showResult2.candidateAction)"); return
-        }
-        XCTAssertTrue(cands1.contains("好き"), "bigram 学習済みの「好き」が候補に含まれるはず")
-
-        // "好き" 確定 → bigram なし → Successor モード終了
-        let chain2 = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "好き")
-        XCTAssertTrue(client.inserted.contains("好き"))
-        XCTAssertFalse(handler.isSuccessorMode, "好き確定後は Successor モードが終了するはず")
-        guard case .dismiss = chain2.candidateAction else {
-            XCTFail(".dismiss を返すはず: \(chain2.candidateAction)"); return
+            XCTFail(".dismiss を返すはず: \(chain1.candidateAction)"); return
         }
     }
 
@@ -233,23 +217,15 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     // See: docs/domain/scenarios.md#s-03b-successor-モードの後続語予測trigram--bigram
     // See: docs/domain/scenarios.md#s-03c-successor-チェーン格助詞を経由した連鎖
 
-    func testSuccessorModeShowsBigramTopAfterHiraganaCommit() {
-        // 事前に「おつかれ → です」を学習させる
+    func testSuccessorModeNotActivatedAfterHiraganaEvenWithBigram() {
+        // ひらがな末尾は bi-gram があっても Successor モードにならない
         handler.db.recordBigram(prev: "おつかれ", input: "です", output: "です")
         typeRomaji("otsukare")
         let commitResult = press(keyCode: 36)  // Enter でひらがな確定
-        XCTAssertTrue(handler.isSuccessorMode, "ひらがな末尾でも bi-gram があれば Successor モードになる")
-        // N-gram 候補あり → 確定直後は .dismiss（ウィンドウ閉じて1打目待ち）
+        XCTAssertFalse(handler.isSuccessorMode, "ひらがな末尾は bi-gram があっても Successor モードにならない")
         guard case .dismiss = commitResult.candidateAction else {
-            XCTFail(".none を返すはず: \(commitResult.candidateAction)"); return
+            XCTFail(".dismiss を返すはず: \(commitResult.candidateAction)"); return
         }
-        XCTAssertFalse(handler.pendingSuccessorCandidates.isEmpty, "pendingSuccessorCandidates に候補が保存されているはず")
-        // 任意の1打 → N-gram 候補を表示
-        let showResult = type(chars: "d", base: "d")
-        guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
-            XCTFail("1打後は .show を返すはず: \(showResult.candidateAction)"); return
-        }
-        XCTAssertEqual(candidates, ["です"], "bi-gram 学習済みの output のみ表示（格助詞 fallback なし）")
     }
 
     func testSuccessorModeBigramOrderedByFrequency() {
@@ -300,22 +276,100 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "gz", "「g」→「z」が通常組成（pendingRomaji: gz）に入るはず")
     }
 
-    func testSuccessorModeNonParticleBigramShowsOnFirstKey() {
-        // ひらがな末尾「おつかれ」の後に非格助詞 bi-gram「です」を学習
+    func testSuccessorSecondKeyNarrowsCandidates() {
+        // 「確認する」(かくにんする) を bigram に学習（input は読み）
+        // 東京確定後に Successor モードで k→a と打っても候補が消えないことを確認
+        handler.db.recordBigram(prev: "東京", input: "かくにんする", output: "確認する")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+
+        // 1打目 "k" → か行フィルタで「確認する」を含む候補を表示
+        let firstResult = type(chars: "k", base: "k")
+        XCTAssertTrue(handler.isSuccessorMode, "1打目でモードを維持するはず")
+        guard case .show(let firstCandidates, _, _, _, _) = firstResult.candidateAction else {
+            XCTFail("1打目は .show を返すはず: \(firstResult.candidateAction)"); return
+        }
+        XCTAssertTrue(firstCandidates.contains("確認する"), "「k」で「確認する」が表示されるはず: \(firstCandidates)")
+
+        // 2打目 "a" → "ka" → "か" に解決。DB で「かく...」を再クエリ → 維持
+        let secondResult = type(chars: "a", base: "a")
+        XCTAssertTrue(handler.isSuccessorMode, "「ka」→「か」フィルタ後もモードを維持するはず")
+        guard case .show(let secondCandidates, _, _, _, _) = secondResult.candidateAction else {
+            XCTFail("2打目も .show を返すはず: \(secondResult.candidateAction)"); return
+        }
+        XCTAssertTrue(secondCandidates.contains("確認する"), "「ka」後も「確認する」が残るはず: \(secondCandidates)")
+    }
+
+    func testSuccessorMultipleCharsNarrowToKanaPrefix() {
+        // 「確認する」(かくにんする) と「から」を bigram に学習し、k→a→k→u と打つと「かく」で絞り込まれる
+        handler.db.recordBigram(prev: "東京", input: "かくにんする", output: "確認する")
+        handler.db.recordBigram(prev: "東京", input: "から", output: "から")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+
+        // k → a → k → u と打つ
+        let r1 = type(chars: "k", base: "k")
+        guard case .show(let c1, _, _, _, _) = r1.candidateAction else {
+            XCTFail("k: .show を返すはず: \(r1.candidateAction)"); return
+        }
+        // 「から」と「確認する」どちらも「か」行
+        XCTAssertTrue(c1.contains("確認する"), "k: 確認する が含まれるはず: \(c1)")
+
+        let r2 = type(chars: "a", base: "a")
+        guard case .show(let c2, _, _, _, _) = r2.candidateAction else {
+            XCTFail("a: .show を返すはず: \(r2.candidateAction)"); return
+        }
+        // "ka"→"か": 両方とも「か」始まりなので残る
+        XCTAssertTrue(c2.contains("確認する"), "ka: 確認する が残るはず: \(c2)")
+        XCTAssertTrue(c2.contains("から"), "ka: から も残るはず: \(c2)")
+
+        let r3 = type(chars: "k", base: "k")
+        guard case .show(let c3, _, _, _, _) = r3.candidateAction else {
+            XCTFail("k2: .show を返すはず: \(r3.candidateAction)"); return
+        }
+        // buffer="k", kanaPrefix="か": まだ両方残る（子音積み中で再クエリなし）
+        XCTAssertTrue(c3.contains("確認する"), "kak: 確認する が残るはず: \(c3)")
+
+        let r4 = type(chars: "u", base: "u")
+        guard case .show(let c4, _, _, _, _) = r4.candidateAction else {
+            XCTFail("u: .show を返すはず: \(r4.candidateAction)"); return
+        }
+        // "ku"→"く": kanaPrefix="かく"。「から」は「かく」に一致しないので脱落、「確認する」のみ残る
+        XCTAssertTrue(c4.contains("確認する"), "kaku: 確認する が残るはず: \(c4)")
+        XCTAssertFalse(c4.contains("から"), "kaku: から は脱落するはず: \(c4)")
+        XCTAssertTrue(handler.isSuccessorMode, "kaku 後もモードを維持するはず")
+    }
+
+    func testSuccessorSubsequentKeysMismatchExitsAndReplaysAll() {
+        // k→a→i と打ったとき「かい」始まりの候補がなければモード解除し k,a,i を通常入力として再生
+        handler.db.recordBigram(prev: "東京", input: "かくにんする", output: "確認する")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.isSuccessorMode)
+
+        _ = type(chars: "k", base: "k")  // 1打目
+        _ = type(chars: "a", base: "a")  // 2打目（successorSubsequentKeys に "a" が積まれる）
+
+        // "i" は "か" に続いて "かい" → 「確認する」は「かく...」なので「かい」には一致しない
+        let exitResult = type(chars: "i", base: "i")
+        XCTAssertFalse(handler.isSuccessorMode, "かい不一致でモード解除されるはず")
+        XCTAssertNil(handler.successorFirstChar, "successorFirstChar がクリアされるはず")
+        XCTAssertTrue(exitResult.consumed)
+        // k+a="か", i="い" → markedText = "かい"
+        XCTAssertEqual(client.markedText, "かい", "「k」「a」「i」が通常組成（かい）に入るはず")
+    }
+
+    func testSuccessorModeNotActivatedAfterHiraganaCommitRegardlessOfBigram() {
+        // ひらがな末尾確定後は bi-gram があっても Successor モードにならない
         handler.db.recordBigram(prev: "おつかれ", input: "です", output: "です")
         typeRomaji("otsukare")
-        let commitResult = press(keyCode: 36)  // 「おつかれ」確定 → Successor モードへ（.dismiss）
-        XCTAssertTrue(handler.isSuccessorMode)
+        let commitResult = press(keyCode: 36)
+        XCTAssertFalse(handler.isSuccessorMode, "ひらがな末尾は Successor モードにならない")
         guard case .dismiss = commitResult.candidateAction else {
-            XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(commitResult.candidateAction)"); return
+            XCTFail(".dismiss を返すはず: \(commitResult.candidateAction)"); return
         }
-        // 「d」打鍵 → 1打目の読みフィルタで「です」を表示
-        let showResult = type(chars: "d", base: "d")
-        XCTAssertTrue(handler.isSuccessorMode, "pendingSuccessorCandidates 表示中は Successor モード継続")
-        guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
-            XCTFail(".show を返すはず（N-gram 候補）: \(showResult.candidateAction)"); return
-        }
-        XCTAssertEqual(candidates, ["です"], "bi-gram 学習済みの「です」が表示されるはず")
     }
 
     func testSuccessorModeParticleFallbackOnlyWhenNounLike() {
@@ -333,15 +387,13 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     // See: docs/domain/scenarios.md#s-05-予測候補の表示trigram--bigram
 
     func testSuccessorChainViaParticleFirstKey() {
-        // S-03c: 1打目で「が」に絞り込み → Space で確定した Successor チェーン
-        // testSuccessorChain は Space 直接確定のみ検証。本テストは絞り込み後の確定＋チェーン継続を検証する。
+        // 1打目で「が」に絞り込み → Space で確定。ひらがな末尾なのでチェーンは継続しない。
         handler.db.recordBigram(prev: "東京", input: "が", output: "が")
         handler.db.recordBigram(prev: "が", input: "すき", output: "好き")
 
         typeRomaji("tokyo")
         let commitResult = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.isSuccessorMode)
-        // N-gram 候補あり → 確定直後は .dismiss（ウィンドウ閉じて1打目待ち）
         guard case .dismiss = commitResult.candidateAction else {
             XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(commitResult.candidateAction)"); return
         }
@@ -354,27 +406,12 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         }
         XCTAssertEqual(filtered, ["が"], "「g」で候補が「が」のみに絞り込まれるはず")
 
-        // Space で「が」確定 → bigram から「好き」あり → N-gram 候補 → .none（1打目まで遅延）
+        // Space で「が」確定 → ひらがな末尾なので Successor チェーンは起動しない
         let spaceResult = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "が")
         XCTAssertTrue(client.inserted.contains("が"), "Space で「が」が挿入されるはず")
-        XCTAssertTrue(handler.isSuccessorMode, "「が」確定後も Successor モードが継続するはず")
+        XCTAssertFalse(handler.isSuccessorMode, "ひらがな末尾（が）確定後は Successor モードが起動しない")
         guard case .dismiss = spaceResult.candidateAction else {
-            XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(spaceResult.candidateAction)"); return
-        }
-
-        // "s" → す行フィルタで「好き」（読み: すき）を表示
-        let chainShowResult = type(chars: "s", base: "s")
-        guard case .show(let chain, _, _, _, _) = chainShowResult.candidateAction else {
-            XCTFail(".show を返すはず: \(chainShowResult.candidateAction)"); return
-        }
-        XCTAssertTrue(chain.contains("好き"), "bigram 学習済みの「好き」が後続候補に含まれるはず")
-
-        // Space で「好き」確定 → bigram なし → Successor 終了
-        let endResult = press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "好き")
-        XCTAssertTrue(client.inserted.contains("好き"))
-        XCTAssertFalse(handler.isSuccessorMode, "「好き」確定後は Successor モードが終了するはず")
-        guard case .dismiss = endResult.candidateAction else {
-            XCTFail(".dismiss を返すはず: \(endResult.candidateAction)"); return
+            XCTFail(".dismiss を返すはず: \(spaceResult.candidateAction)"); return
         }
     }
 
