@@ -42,7 +42,8 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 ## 変換候補（Candidates）
 
 ### fixedCount
-候補リスト index 0 から始まる固定枠数（ひらがな・カタカナ）。初期選択行は `fixedCount` から始まるため、↑ キーで遡らないと見えない位置に置かれる。
+候補リスト index 0 から始まる固定枠数（ひらがな・カタカナ）。初期選択行は `fixedCount` から始まるため、↑ キーで遡らないと見えない位置に置かれる。  
+**注意**: `fixedCount` は**セグメントモード専用**（`InputHandler+SegmentMode.swift`）の値。通常モードでは `fixedEnd`（`CandidateLayout`）を使う。
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
@@ -50,9 +51,13 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 カナ固定 + ユーザー辞書 +（条件付き）**Zenzai top-1 プロモート 1 行**の直後のインデックス（末尾+1）。内部では `fixedCount + userDictCount` にプロモート行があれば +1 した値が `CandidateAction.fixedEnd` として返る。
 `fixedEnd` 未満の行は Shift+Delete 削除不可（ユーザー辞書・プロモート行は誤削除から保護）。
 
+### predictionEnd
+`CandidateLayout` の境界インデックス。`fixedEnd + .prediction セクションの件数` の末尾インデックス（末尾+1）。  
+**不変条件**: `fixedEnd <= predictionEnd <= historyEnd`。予測候補が 0 件のとき `predictionEnd == fixedEnd`。
+
 ### historyEnd
 候補リスト内の「カナ固定 + ユーザー辞書 +（あれば）Zenzai top-1 + 予測候補 + **高スコア**履歴候補」セクションの末尾インデックス（時間減衰スコア `recencyExpr` が閾値 **未満**の履歴は含めない）。
-`historyEnd = fixedEnd + predictCount + highHistoryCount`（この式の `fixedEnd` は `CandidateAction` に返すプロモート込みの値。`highHistoryCount` は閾値以上の履歴件数）。
+`historyEnd = predictionEnd + highHistoryCount`（`highHistoryCount` は閾値以上の履歴件数）。
 `fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。
 閾値未満の履歴は数値・日時・AzooKey の**後**に続くため、この範囲外になり Shift+Delete 不可（辞書候補と同様の扱い）。
 
@@ -190,7 +195,7 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 **不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。セグメント全読み確定時のみ `fullReading` が非 `nil`（`boundary_pref` 削除用）。
 
 ### DatabaseManager
-変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）の **6 テーブル**を持つ SQLite ストア。  
+変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）・ひらがな優先語彙（`hiragana_preferred`）の **7 テーブル**を持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。  
 **`clock` var** でエポック秒を注入可能（テスト用）。全 record/fetch で `nowEpoch()` を使うことで時系列が一貫する。
 
