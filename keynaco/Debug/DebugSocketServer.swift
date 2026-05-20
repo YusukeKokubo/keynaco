@@ -1492,8 +1492,8 @@ final class DebugSocketServer: @unchecked Sendable {
         applyLLMScheduling()
         for text in insertedTexts {
             let db = handler.db
-            InputController.nounClassifier.classify(output: text) { classifiedOutput, isNoun in
-                db.updateNounFlag(output: classifiedOutput, isNoun: isNoun)
+            InputController.posClassifier.classify(output: text) { classifiedOutput, pos in
+                db.updatePOS(output: classifiedOutput, pos: pos)
             }
         }
 

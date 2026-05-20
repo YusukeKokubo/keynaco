@@ -28,7 +28,7 @@ public final class DatabaseManager: @unchecked Sendable {
         openDatabase()
         createTables()
         ensureBigramIsPresetColumn()
-        ensureHistoryIsNounColumn()
+        ensureHistoryPOSColumn()
         seedPresetBigramsIfNeeded()
         seedHiraganaPreferredIfNeeded()
     }
@@ -87,7 +87,7 @@ public final class DatabaseManager: @unchecked Sendable {
             output  TEXT    NOT NULL,
             count   INTEGER NOT NULL DEFAULT 1,
             used_at INTEGER NOT NULL,
-            is_noun INTEGER DEFAULT NULL,
+            pos TEXT DEFAULT NULL,
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
@@ -155,9 +155,12 @@ public final class DatabaseManager: @unchecked Sendable {
         )
     }
 
-    /// 既存 DB（is_noun 列がない）向けマイグレーション。
-    func ensureHistoryIsNounColumn() {
-        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN is_noun INTEGER DEFAULT NULL", nil, nil, nil)
+    /// 既存 DB（pos 列がない）向けマイグレーション。is_noun からの変換も行う。
+    func ensureHistoryPOSColumn() {
+        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos TEXT DEFAULT NULL", nil, nil, nil)
+        // is_noun=1 → 'noun'、is_noun=0 → 'other' に変換（NULL はそのまま未分類）
+        sqlite3_exec(db, "UPDATE history SET pos = 'noun' WHERE is_noun = 1 AND pos IS NULL", nil, nil, nil)
+        sqlite3_exec(db, "UPDATE history SET pos = 'other' WHERE is_noun = 0 AND pos IS NULL", nil, nil, nil)
     }
 
     private func seedHiraganaPreferredIfNeeded() {
@@ -320,6 +323,7 @@ public final class DatabaseManager: @unchecked Sendable {
         public let input: String
         public let output: String
         public let count: Int
+        public let pos: String?
     }
 
     public struct UserDictEntry: Sendable {

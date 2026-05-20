@@ -31,22 +31,22 @@ extension InputController {
         return historyJoined
     }
 
-    /// 確定語の品詞を LLM で非同期判定し、DB の is_noun フラグを更新する。
-    func scheduleNounClassification(output: String) {
+    /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。
+    func schedulePOSClassification(output: String) {
         let db = handler.db
-        Self.nounClassifier.classify(output: output) { classifiedOutput, isNoun in
-            db.updateNounFlag(output: classifiedOutput, isNoun: isNoun)
+        Self.posClassifier.classify(output: output) { classifiedOutput, pos in
+            db.updatePOS(output: classifiedOutput, pos: pos)
         }
     }
 
-    /// 未分類（is_noun = NULL）の履歴エントリを最大 50 件バックグラウンドで分類する（起動時に1回呼ぶ）。
+    /// 未分類（pos = NULL）の履歴エントリを最大 50 件バックグラウンドで分類する（起動時に1回呼ぶ）。
     @MainActor
-    static func performNounBackfill() {
+    static func performPOSBackfill() {
         let db = DatabaseManager.shared
         let outputs = db.fetchUnclassifiedHistory(limit: 50)
         for output in outputs {
-            nounClassifier.classify(output: output) { classifiedOutput, isNoun in
-                db.updateNounFlag(output: classifiedOutput, isNoun: isNoun)
+            posClassifier.classify(output: output) { classifiedOutput, pos in
+                db.updatePOS(output: classifiedOutput, pos: pos)
             }
         }
     }

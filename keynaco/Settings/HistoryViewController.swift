@@ -47,8 +47,9 @@ final class HistoryViewController: NSViewController {
     }
 
     private let columns: [(String, String, CGFloat)] = [
-        ("input",  "読み",         220),
-        ("output", "確定テキスト", 300),
+        ("input",  "読み",         200),
+        ("output", "確定テキスト", 260),
+        ("pos",    "品詞",          80),
         ("count",  "回数",          60),
     ]
 
@@ -119,6 +120,7 @@ extension HistoryViewController: NSTableViewDelegate {
         switch id.rawValue {
         case "input":  text = entry.input
         case "output": text = entry.output
+        case "pos":    text = Self.posLabel(entry.pos)
         case "count":  text = "\(entry.count)"
         default: return nil
         }
@@ -133,5 +135,15 @@ extension HistoryViewController: NSTableViewDelegate {
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         deleteButton.isEnabled = tableView.selectedRow >= 0
+    }
+
+    private static func posLabel(_ pos: String?) -> String {
+        switch pos {
+        case "noun":      return "名詞"
+        case "verb":      return "動詞"
+        case "adjective": return "形容詞"
+        case "other":     return "その他"
+        default:          return "―"
+        }
     }
 }

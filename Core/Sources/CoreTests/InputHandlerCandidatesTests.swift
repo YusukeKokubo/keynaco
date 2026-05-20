@@ -698,7 +698,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     }
 
     func testSnap_C3_HiraganaPreferredHiraganaInHistory() {
-        // 「の」が履歴にある: is_noun=NULL（未分類）は通過するため履歴として出る（固定スロットなし）
+        // 「の」が履歴にある: pos=NULL（未分類）は通過するため履歴として出る（固定スロットなし）
         useStub(SnapStub(["辞書A", "辞書B"]))
         handler.db.record(input: "の", output: "の")
         typeRomaji("no")

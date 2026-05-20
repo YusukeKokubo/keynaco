@@ -40,7 +40,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             DatabaseManager.shared.performGCIfNeeded()
         }
         Task { @MainActor in
-            InputController.performNounBackfill()
+            InputController.performPOSBackfill()
         }
     }
 

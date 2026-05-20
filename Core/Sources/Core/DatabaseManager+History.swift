@@ -45,7 +45,7 @@ extension DatabaseManager {
             return self.queryOutputScorePairsOnQueue("""
             SELECT output, SUM((\(Self.recencyExpr))) AS s FROM history
             WHERE input LIKE ?
-              AND (is_noun IS NULL OR is_noun = 1)
+              AND (pos IS NULL OR pos = 'noun')
             GROUP BY output
             ORDER BY s DESC, MAX(used_at) DESC
             LIMIT 20
@@ -56,21 +56,21 @@ extension DatabaseManager {
         }
     }
 
-    /// `output` に対応する全履歴行の is_noun フラグを更新する。
-    public func updateNounFlag(output: String, isNoun: Bool) {
+    /// `output` に対応する全履歴行の pos を更新する。
+    public func updatePOS(output: String, pos: String) {
         dispatchWrite {
-            self.executeOnQueue("UPDATE history SET is_noun = ? WHERE output = ?") {
-                sqlite3_bind_int($0, 1, isNoun ? 1 : 0)
+            self.executeOnQueue("UPDATE history SET pos = ? WHERE output = ?") {
+                self.bindText($0, 1, pos)
                 self.bindText($0, 2, output)
             }
         }
     }
 
-    /// is_noun が未分類（NULL）の出力語を最大 `limit` 件返す（重複排除）。
+    /// pos が未分類（NULL）の出力語を最大 `limit` 件返す（重複排除）。
     public func fetchUnclassifiedHistory(limit: Int) -> [String] {
         dbQueue.sync {
             var results: [String] = []
-            let sql = "SELECT DISTINCT output FROM history WHERE is_noun IS NULL LIMIT ?"
+            let sql = "SELECT DISTINCT output FROM history WHERE pos IS NULL LIMIT ?"
             guard let stmt = self.cachedStmt(for: sql) else { return results }
             sqlite3_bind_int(stmt, 1, Int32(limit))
             while sqlite3_step(stmt) == SQLITE_ROW {
@@ -82,7 +82,7 @@ extension DatabaseManager {
 
     public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
-            let sql = "SELECT input, output, count FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+            let sql = "SELECT input, output, count, pos FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -90,9 +90,10 @@ extension DatabaseManager {
             while sqlite3_step(stmt) == SQLITE_ROW {
                 guard let i = sqlite3_column_text(stmt, 0),
                       let o = sqlite3_column_text(stmt, 1) else { continue }
+                let pos = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
                 results.append(HistoryEntry(
                     input: String(cString: i), output: String(cString: o),
-                    count: Int(sqlite3_column_int(stmt, 2))
+                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos
                 ))
             }
             return results
