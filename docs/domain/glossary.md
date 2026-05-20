@@ -134,6 +134,12 @@ Successor モードで候補を 1 打目まで遅延表示するためのバッ�
 ### successorLLMSurfaceExtras
 オンデバイス LLM が返した表層形の後続語候補。1 打目表示時に `pendingSuccessorCandidates` 由来の候補末尾に連結する。
 
+### Successor prefix 展開（`expandSuccessorPrefixes`）
+1 打目の候補マージ後、長い表層形を `InputHandler.particles` の助詞境界で prefix に分割して挿入する（形態素解析は使わない）。  
+**不変条件**: 元の全体候補は各親の直後に必ず残す。助詞単独 prefix は出さない。体言で終わる prefix を助詞末尾より先に並べる。同一親からの prefix は最大 2 個。表示全体は `successorMaxCandidates`（5）を超えない。先頭が助詞の表層は分割しない。
+
+*Tests: `Tests/InputHandlerSuccessorPrefixTests.swift`*
+
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。2 打目がマッチしなければ 1 打目を通常入力として流してからモード解除する。
 

@@ -41,7 +41,7 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。**カーソルが文末でない（文中挿入）場合も `suggestSuccessors()` は Successor モードに入らず `.dismiss` を返す。**
 
-**N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加してから **`successorLLMSurfaceExtras` を末尾に連結**して `.show` する（いずれにも一致しなければモード解除）。利用可能なら `LLMSuccessorFetcher` が `committedHistory.suffix(3)` を文脈にオンデバイス LLM で表層形の後続語を非同期取得し、`successorLLMSurfaceExtras` に蓄える（コールバックは `suffix(3)` がトリガ時スナップショットと一致するときのみ反映。遅延到着で画面は更新しない場合あり）。
+**N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加してから **`successorLLMSurfaceExtras` を末尾に連結**し、**`expandSuccessorPrefixes`** で長い表層を助詞境界の部分候補に展開してから `.show` する（いずれにも一致しなければモード解除）。利用可能なら `LLMSuccessorFetcher` が `committedHistory.suffix(3)` を文脈にオンデバイス LLM で表層形の後続語を非同期取得し、`successorLLMSurfaceExtras` に蓄える（コールバックは `suffix(3)` がトリガ時スナップショットと一致するときのみ反映。遅延到着で画面は更新しない場合あり）。
 
 - `successorFirstChar`: 頭文字 1 打目のバッファリング。1打目で `pendingSuccessorCandidates` を表示したあと、2 打目でモード解除する際にも使用する。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。

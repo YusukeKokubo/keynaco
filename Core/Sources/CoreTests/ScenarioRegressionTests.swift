@@ -111,6 +111,34 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         XCTAssertTrue(h.pendingSuccessorCandidates.contains("に"))
     }
 
+    /// Successor 1 打目: 長い bi-gram を助詞境界で prefix 展開する（PLAN260520b）
+    func testSuccessorPrefixSplit_longBigramOnFirstKey() {
+        handler.db.recordBigram(
+            prev: "東京",
+            input: "かいぎにしゅっせきする",
+            output: "会議に出席する"
+        )
+        typeRomaji("tokyo")
+        press(
+            keyCode: KeyCode.enter,
+            candidateVisible: true,
+            selectedRow: 0,
+            selectedText: "東京"
+        )
+        XCTAssertTrue(handler.isSuccessorMode)
+        handler.pendingSuccessorCandidates = ["会議に出席する"]
+        let showResult = type(chars: "k", base: "k")
+        guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
+            XCTFail("1 打目で .show: \(showResult.candidateAction)")
+            return
+        }
+        XCTAssertEqual(
+            candidates,
+            ["会議", "会議に", "会議に出席する"],
+            "長い後続語は体言切り prefix を先に、全体候補を末尾に並べる"
+        )
+    }
+
     func testS02_trace_ka_down_down_right_confirms_hiragana() {
         typeRomaji("ka")
         _ = press(keyCode: KeyCode.downArrow, candidateVisible: true)

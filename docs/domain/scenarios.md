@@ -72,6 +72,18 @@
 
 ---
 
+## S-03a: Successor 長い後続語の prefix 展開
+
+**前提**: `東京` 確定後、保留に `会議に出席する`（bi-gram または LLM extras）。1 打目 `k` で読みフィルタを通過。
+
+| ステップ | キー | candidates（例） | 動作 |
+|---------|------|------------------|------|
+| 1 | `k` | `会議`, `会議に`, `会議に出席する` | 助詞境界で体言切り prefix を親の直前に挿入。全体候補は末尾に残す |
+
+*Tests: `Tests/ScenarioRegressionTests.swift`（`testSuccessorPrefixSplit_longBigramOnFirstKey`）、`Tests/InputHandlerSuccessorPrefixTests.swift`*
+
+---
+
 ## S-03b: Successor モードの後続語予測（trigram + bigram）
 
 **前提**: `おつかれ`（ひらがな末尾）を確定。事前に bigram `(おつかれ, です, です)` を学習済み。  

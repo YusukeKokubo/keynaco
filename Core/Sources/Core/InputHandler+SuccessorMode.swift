@@ -28,6 +28,69 @@ public extension InputHandler {
         return out
     }
 
+    /// 表層文字列を「助詞境界」で分割した prefix 候補列を返す（元の文字列は含めない）。
+    nonisolated static func splitSurfaceAtParticles(_ surface: String) -> [String] {
+        guard surface.count >= 2 else { return [] }
+        let sortedParticles = particles.sorted { $0.count > $1.count }
+        if sortedParticles.contains(where: { surface.hasPrefix($0) }) { return [] }
+        var out: [String] = []
+        var seen: Set<String> = []
+        var idx = surface.startIndex
+        while idx < surface.endIndex {
+            var matchedParticle: String?
+            var matchedLen = 0
+            for p in sortedParticles {
+                if surface[idx...].hasPrefix(p) { matchedParticle = p; matchedLen = p.count; break }
+            }
+            if matchedLen > 0, let p = matchedParticle {
+                let afterIdx = surface.index(idx, offsetBy: matchedLen)
+                if p == "で", afterIdx < surface.endIndex, surface[afterIdx...].hasPrefix("す") {
+                    idx = surface.index(after: idx)
+                    continue
+                }
+                let beforePrefix = String(surface[..<idx])
+                if !beforePrefix.isEmpty, beforePrefix != surface, seen.insert(beforePrefix).inserted {
+                    out.append(beforePrefix)
+                }
+                let withParticle = String(surface[..<afterIdx])
+                if withParticle != surface, seen.insert(withParticle).inserted {
+                    out.append(withParticle)
+                }
+                idx = afterIdx
+            } else {
+                idx = surface.index(after: idx)
+            }
+        }
+        return out
+    }
+
+    /// 親フレーズ毎に最大 maxPerParent 個の prefix だけ採用し、元の親の直前に挿入する。
+    /// 体言切り（助詞を含まない）を優先する。
+    nonisolated static func expandSuccessorPrefixes(
+        candidates: [String],
+        maxPerParent: Int = 2,
+        totalLimit: Int = LearningThresholds.successorMaxCandidates
+    ) -> [String] {
+        var out: [String] = []
+        var seen: Set<String> = []
+        for c in candidates {
+            let prefixes = splitSurfaceAtParticles(c)
+            let nounEnd = prefixes.filter { p in !particles.contains(where: { p.hasSuffix($0) }) }
+            let particleEnd = prefixes.filter { p in particles.contains(where: { p.hasSuffix($0) }) }
+            var picked: [String] = []
+            for p in nounEnd + particleEnd {
+                if picked.count >= maxPerParent { break }
+                if seen.contains(p) { continue }
+                picked.append(p)
+                seen.insert(p)
+            }
+            for p in picked { out.append(p) }
+            if seen.insert(c).inserted { out.append(c) }
+            if out.count >= totalLimit { break }
+        }
+        return Array(out.prefix(totalLimit))
+    }
+
     /// 後続語候補を組み立ててモードに入る／出る判定をする。
     /// 候補がある場合は `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目まで表示を遅延）。
     mutating func suggestSuccessors() -> CandidateAction {
@@ -170,7 +233,8 @@ public extension InputHandler {
                         successorLLMSurfaceExtras = []
                         clearSuccessorLLMAuxiliaryState()
                         successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                        return (true, .show(candidates: Array(merged.prefix(LearningThresholds.successorMaxCandidates)), historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+                        let expanded = InputHandler.expandSuccessorPrefixes(candidates: merged)
+                        return (true, .show(candidates: expanded, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
                     }
                 }
             }
