@@ -148,7 +148,8 @@ public extension InputHandler {
         case KeyCode.tab where modifiers.contains(.shift):
             return (true, .selectPrev)
         case KeyCode.space:
-            if !state.composedHiragana.isEmpty {
+            // 候補選択中（↑↓操作済み）は再変換せず次候補へ
+            if !candidate.isExplicitlySelected, !state.composedHiragana.isEmpty {
                 let action = enterSegmentMode()
                 if state.isSegmentMode {
                     applySegmentMarkedText(client: client)

@@ -311,6 +311,16 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
     }
 
+    func testSpaceSelectsNextWhenExplicitlySelected() {
+        typeRomaji("kanzi")
+        let result = press(keyCode: 49, candidateVisible: true,
+                           selectedRow: 1, selectedText: "感じ", isExplicitlySelected: true)
+        XCTAssertTrue(result.consumed)
+        guard case .selectNext = result.candidateAction else {
+            XCTFail("候補選択中（isExplicitlySelected=true）の space は .selectNext を返すはず"); return
+        }
+    }
+
     func testDownArrowPassesThroughWithoutCandidates() {
         type(chars: "a", base: "a")
         let result = press(keyCode: 125, candidateVisible: false)
