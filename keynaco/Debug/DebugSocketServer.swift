@@ -1447,7 +1447,12 @@ final class DebugSocketServer: @unchecked Sendable {
         let base  = cmd["base"]  as? String ?? chars
         let mods  = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
 
+        let composingTextWasEmpty = handler.state.composingText.isEmpty
         handler.leftSideContext = llmDocumentContextPrefix()
+        // virtualHistoryPrefix は handler.handle 前にセット（buildPendingCandidateList が参照するため）。
+        if composingTextWasEmpty {
+            handler.virtualHistoryPrefix = VirtualHistoryExtractor.extract(from: mockClient.documentBefore)
+        }
         let before = makeResponse(inserted: [])
         let (_, action) = handler.handle(
             keyCode: keyCode,
@@ -1458,6 +1463,10 @@ final class DebugSocketServer: @unchecked Sendable {
             client: mockClient
         )
         candidateWindow.apply(action: action)
+        // composingText が空に戻ったらクリア
+        if handler.state.composingText.isEmpty {
+            handler.virtualHistoryPrefix = []
+        }
         // Successor 抑制: documentAfter が非空（文中挿入）のとき候補を出さない
         if handler.isSuccessorMode,
            let ctx = SurroundingIMKContext.fetch(from: mockClient),
@@ -1503,6 +1512,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "fixedEnd":           snap.fixedEnd,
             "candidates":         snap.candidates,
             "committedHistory":   snap.committedHistory,
+            "virtualHistoryPrefix": snap.virtualHistoryPrefix,
             "segmentTexts":       snap.segmentTexts,
             "focusedSegmentIndex": snap.focusedSegmentIndex,
             "successorLLMSurfaceExtras": handler.successorLLMSurfaceExtras,

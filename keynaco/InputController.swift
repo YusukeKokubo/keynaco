@@ -301,20 +301,19 @@ class InputController: IMKInputController, @unchecked Sendable {
         }
         if handler.state.composedHiragana.isEmpty {
             cachedSurroundingContext = nil
-            handler.virtualHistoryPrefix = []
         } else if composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty {
             // Space での再取得は冗長のため行わない（カーソル移動は location 不一致で無効化）。
             if let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding) {
                 let loc = adapter.selectedRange().location
                 if loc != NSNotFound {
                     cachedSurroundingContext = (loc, ctx)
-                    if VirtualHistorySettings.isEnabled {
-                        handler.virtualHistoryPrefix = Self.extractVirtualHistory(from: ctx.before)
-                    } else {
-                        handler.virtualHistoryPrefix = []
-                    }
                 }
             }
+        }
+        // virtualHistoryPrefix のセットは handler.handle の前で済ませる（buildPendingCandidateList
+        // など handle 内で参照されるため）。ここでは composingText が空に戻ったときのクリアのみ。
+        if handler.state.composingText.isEmpty {
+            handler.virtualHistoryPrefix = []
         }
 
         applySuccessorLLMScheduling(adapter: adapter)
@@ -380,6 +379,12 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
             let composingWasEmpty = ic.handler.state.composingText.isEmpty
             let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
+            // 新規組成開始時の virtualHistoryPrefix セットは handler.handle の前に行う
+            // （buildPendingCandidateList など handle 内で参照されるため）。
+            if composingWasEmpty, VirtualHistorySettings.isEnabled,
+               let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding) {
+                ic.handler.virtualHistoryPrefix = VirtualHistoryExtractor.extract(from: ctx.before)
+            }
             let (consumed, action) = ic.handler.handle(
                 keyCode: keyCode,
                 characters: characters,
@@ -420,6 +425,10 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
             let composingWasEmpty = ic.handler.state.composingText.isEmpty
             let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
+            if composingWasEmpty, VirtualHistorySettings.isEnabled,
+               let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding) {
+                ic.handler.virtualHistoryPrefix = VirtualHistoryExtractor.extract(from: ctx.before)
+            }
             let (consumed, action) = ic.handler.handle(
                 keyCode: keyCode,
                 characters: characters,
