@@ -113,10 +113,10 @@ stateDiagram-v2
 | ↑ | フォーカス文節の前候補へ |
 | Shift+→ | フォーカス文節を右に1文字拡張（次文節の先頭1文字を奪う） |
 | Shift+← | フォーカス文節を左に1文字縮小（末尾1文字を次文節の先頭に渡す） |
-| Enter | 通常は全文節の選択候補を連結確定 → 待機。例外として `llmWholeText` 設定済みかつ `focusedIndex == 0` で **多文節パス**（全文節が先頭行選択かつ各 `candidates[0]` の連結が `llmWholeText` と一致し、かつフォーカス文節の確定テキストが `candidates[0]` と一致）または **フォールバックパス**（先頭文節の `candidates[0]` が `llmWholeText` 全文かつ先頭行選択）を満たすときは **LLM 全文のみ**を 1 回確定する（どちらでもない場合は通常確定へフォールスルーし、stale `llmWholeText` の誤確定を防ぐ） |
+| Enter | 通常は全文節の選択候補を連結確定 → 待機。`llmWholeText` が設定済みかつ短絡確定条件を満たすときは LLM 全文のみを 1 回確定する（条件詳細: `isLlmWholeTextShortcut`。満たさない場合は通常確定へフォールスルー） |
 | Escape / Backspace | セグメントモード解除 → 組成に戻す |
 
-セグメント突入時（`boundary_pref` ヒットでも `segmentize` でも）、`InputController` がオンデバイス LLM で読み全体の一括変換を非同期開始する。AzooKey の初期分割は突入直後にそのまま表示される。結果が返れば `inferSegmentBoundaries` で読みと整合する場合は文節境界と候補列を再構築する（`llmWholeText` を設定し候補ウィンドウをリフレッシュ）。**Zenzai 無効**のとき、整合しない場合は従来どおり先頭文節の候補先頭に LLM 全文を挿入する。**Zenzai 有効**のとき、整合しない場合は突入時の候補列を維持し全文挿入は行わない（`llmWholeText` も立てず、ウィンドウはそのまま）。**Zenzai 有効**かつアライメント成功時は、各文節で `candidatesForSegment` の先頭表層（辞書ブロック先頭）が LLM トークンより前に並ぶ（`zenTop == token` の文節は従来どおりトークン先頭化のみ）。このため多文節の LLM 一括ショートカット（各文節 `candidates[0]` の連結が `llmWholeText` と一致）は成立しにくく、Enter は通常の全文節連結確定にフォールスルーしうる。`inferSegmentBoundaries` が **2 ペア以上**で成功した場合の `boundary_pref` 保存条件は従来どおり（`llmWholeText` は設定される）。
+セグメント突入時、`InputController` がオンデバイス LLM で読み全体の一括変換を非同期開始する。AzooKey の初期分割は突入直後にそのまま表示される。LLM 結果が返れば `inferSegmentBoundaries` でアライメントを試み、成功時は文節境界と候補列を再構築（`llmWholeText` を設定）、失敗時は Zenzai 無効なら先頭文節に全文を挿入し Zenzai 有効なら候補列を維持する。`inferSegmentBoundaries` が 2 ペア以上で成功した確定では境界を `boundary_pref` に保存する。
 
 *Tests: `Tests/InputHandlerSegmentTests.swift`、`Tests/InputHandlerSegmentLLMTests.swift`、`Tests/SegmentBoundaryTests.swift`*
 
@@ -142,12 +142,8 @@ stateDiagram-v2
 - **Successor の文中挿入抑制**: カーソルが文末でない（文中挿入モード）場合、`suggestSuccessors()` は Successor モードに入らず `.dismiss` を返す
 - **候補取得の優先順位**: `prev2Output`（2語前）× `lastCommittedOutput`（1語前）で trigram を引き、なければ `lastCommittedOutput` だけで bigram をフォールバック
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
-- **N-gram 遅延表示と読みフィルタ**: 後続候補がある場合、確定直後は常に候補ウィンドウを閉じ（`.dismiss`）`pendingSuccessorCandidates` に保存。1打目の入力で `romajiToInitialKana` によるかな先頭一致で DB を再照会し、**同じ条件で** `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる格助詞を追加して併合（DB 由来を先、重複は除外）し、続けて **`successorLLMSurfaceExtras`**（LLM 表層形）を末尾に連結して表示する。一致なしはモード解除して通常入力に流す。LLM は直近3語文脈で非同期補完する。
-- **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき `buildPendingCandidateList` が bi-gram/trigram/skip-bigram を先読みし、候補があれば `isSuccessorMode = true` へ移行。`n` は `ん` との曖昧さがあるため除外。候補ゼロなら `pendingRomaji` はそのまま通常組成を続ける
+- **N-gram 遅延表示**: 確定直後は常に候補ウィンドウを閉じ 1 打目待ち。1 打目でかな先頭一致で DB を再照会し、`pendingSuccessorCandidates` 内の語を併合し、`successorLLMSurfaceExtras`（LLM 表層形）を末尾に連結して表示する
+- **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき bi-gram/trigram/skip-bigram を先読みし、候補があれば Successor モードへ移行
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
-- **ASCII モードの F キー**: F6–F10 は ASCII モード中では無効（組成が空のため）
-- **セグメント境界学習**: Shift+矢印で手動調整した境界に加え、`inferSegmentBoundaries` が **2 ペア以上**で成功し多文節に再構築された LLM 境界は、確定時に `boundary_pref` へ保存される。次回同じ読みで Space を押すと AzooKey の初期分割より保存済み境界が優先される
-- **日時候補**: 読みが `きょう` / `いま` / `ことし` 等のとき、`historyEnd` の直後（AzooKey 辞書候補の前）に日付・時刻・年の文字列を動的に追加（`InputHandler.generateDateTimeCandidates(for:)`）。確定しても history / bigram / trigram には記録しない
-- **セグメントモードのテスト**: `Tests/InputHandlerSegmentTests.swift`
-- **ASCII モードのテスト**: `Tests/InputHandlerAsciiTests.swift`
+- **セグメント境界学習**: Shift+矢印で手動調整した境界、または LLM 2ペア以上の再構築成功確定では `boundary_pref` へ保存される。次回同じ読みで Space を押すと保存済み境界が優先される

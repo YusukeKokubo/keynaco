@@ -41,25 +41,14 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 
 ## 変換候補（Candidates）
 
-### fixedCount
-候補リスト index 0 から始まる固定枠数（ひらがな・カタカナ）。初期選択行は `fixedCount` から始まるため、↑ キーで遡らないと見えない位置に置かれる。  
-**注意**: `fixedCount` は**セグメントモード専用**（`InputHandler+SegmentMode.swift`）の値。通常モードでは `fixedEnd`（`CandidateLayout`）を使う。
-
-*Tests: `Tests/InputHandlerCandidatesTests.swift`*
-
 ### fixedEnd
-カナ固定 + ユーザー辞書 +（条件付き）**Zenzai top-1 プロモート 1 行**の直後のインデックス（末尾+1）。内部では `fixedCount + userDictCount` にプロモート行があれば +1 した値が `CandidateAction.fixedEnd` として返る。
-`fixedEnd` 未満の行は Shift+Delete 削除不可（ユーザー辞書・プロモート行は誤削除から保護）。
-
-### predictionEnd
-`CandidateLayout` の境界インデックス。`fixedEnd + .prediction セクションの件数` の末尾インデックス（末尾+1）。  
-**不変条件**: `fixedEnd <= predictionEnd <= historyEnd`。予測候補が 0 件のとき `predictionEnd == fixedEnd`。
+候補リスト先頭の固定枠（カナ固定 + ユーザー辞書 + Zenzai top-1）の末尾インデックス（末尾+1）。  
+`fixedEnd` 未満の行は Shift+Delete 削除不可（ユーザー辞書・プロモート行を誤削除から保護）。
 
 ### historyEnd
-候補リスト内の「カナ固定 + ユーザー辞書 +（あれば）Zenzai top-1 + 予測候補 + **高スコア**履歴候補」セクションの末尾インデックス（時間減衰スコア `recencyExpr` が閾値 **未満**の履歴は含めない）。
-`historyEnd = predictionEnd + highHistoryCount`（`highHistoryCount` は閾値以上の履歴件数）。
-`fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。
-閾値未満の履歴は数値・日時・AzooKey の**後**に続くため、この範囲外になり Shift+Delete 不可（辞書候補と同様の扱い）。
+「カナ固定〜高スコア履歴候補」セクションの末尾インデックス。  
+`fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。  
+閾値未満の低スコア履歴は数値・日時・AzooKey の後に続くためこの範囲外になる。
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
@@ -68,38 +57,37 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 **役割**: `true` のとき、文字キー入力で選択候補をまず確定してから新しい文字を処理する。`false` のときは文字入力しても候補を確定せず組成に追加する。Enter は `isExplicitlySelected` に関係なく `selectedText`（現在の視覚的選択）をそのまま確定する。
 
 ### autoShow
-文字入力中に候補ウィンドウを自動表示するかどうか。履歴・AzooKey 辞書候補・予測候補（tri-gram + bi-gram）・ユーザー辞書候補・日時候補がすべて 0 件なら表示しない。
+文字入力中に候補ウィンドウを自動表示するかどうか。履歴・AzooKey 辞書候補・予測候補・ユーザー辞書候補・日時候補がすべて 0 件なら表示しない。
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### particles
-格助詞の固定リスト（`InputHandler.particles`）。Successor モードの名詞末尾 fallback、bigram 文脈スキップ（`mostRecentContentWords`）等に使用する。候補の `initialRow` 判定には使わない。
+格助詞の固定リスト（`InputHandler.particles`）。Successor モードの名詞末尾 fallback、bigram 文脈スキップ（`mostRecentContentWords`）等に使用する。
 
 ### hiraganaPreferred
-ひらがな表記が自然な語彙の集合（`InputHandler.hiraganaPreferred`）。`particles` の上位集合。  
-**役割**: `assembleCandidateList` で組成読み `h` がこの集合に含まれるとき、履歴スコア・予測候補の有無に関わらず `initialRow` を候補リスト内のひらがな行（`candidates.firstIndex(of: h)`）にする。固定枠にあれば row 0、ひらがなが履歴枠に移動していればその行を選ぶ。リスト外の語は従来どおり履歴・予測の先頭行を優先する。
+ひらがな表記が自然な語彙の集合。`particles` の上位集合。  
+**役割**: この集合に含まれる読みのとき、履歴スコア・予測候補の有無に関わらず `initialRow` をひらがな行にする（`assembleCandidateList`）。
 
 *Tests: `Core/Sources/CoreTests/InputHandlerCandidatesTests.swift`*
 
 ### F4（誤変換検出）
 確定直後（`insertText`）、カーソル直前最大 200 文字をオンデバイス LLM で検査するオプション機能。前文が 5 文字未満ならスキップ。0.5 秒デバウンス後に起動。  
-**メニューバー**: 指摘あり時はタイトルを `⌨?` にし、左クリックでポップオーバーに全文を表示（問題なし時・クリア時は通常の `⌨` または Successor 保留の `⌨…`）。  
-**不変条件**: 次の通常組成（ひらがな入力）が始まると通知でポップオーバーを閉じステータスをクリア。入力ソースの非アクティブ化（`activateServer`）でもキャンセル。
+**メニューバー**: 指摘あり時はタイトルを `⌨?` にし、左クリックでポップオーバーに全文を表示。  
+**不変条件**: 次の通常組成が始まると通知でポップオーバーを閉じステータスをクリア。入力ソースの非アクティブ化（`activateServer`）でもキャンセル。
 
 ### 候補優先順位
-1. ひらがな / カタカナ（`fixedCount` 件）
+1. ひらがな / カタカナ（固定枠）
 2. ユーザー辞書（完全一致 + 前方一致）
-3. **Zenzai top-1**（Zenzai 設定 ON かつ左文脈ありのときのみ、ユーザー辞書の直後に辞書先頭候補を 1 行。設定フラグはモデル未ロード時も true になり得る）
-4. 予測候補（trigram を優先し、重複を除いた bigram で常に補完。`prev2Output` × `lastCommittedOutput` で trigram を引き、trigram にない bigram 候補を後に連結。さらに `mostRecentContentWords(n: 2)` の各語 × 現読みで skip-bigram を引き（近い内容語の結果を先）、`merged` で重複除去のうえ trigram・bigram にない候補を末尾に追加。辞書先頭と同じ表層は予測から除外）
-5. 履歴（`fetchHistoryScoredMerged`：exact → prefix 重複除去。スコアが閾値**以上**の行のみこのブロックに置く。閾値**未満**は 8 の直前に回す。**読みが完全一致する履歴のみ** `highHistory`（上位グループ）に昇格し、複合語（前方一致のみ）は末尾に移動する）
-6. 数字候補（`generateNumberCandidates`、数字のみ読みのとき。`historyEnd` 直後に挿入）
-7. 日時候補（`きょう` / `いま` 等のとき。数字候補の直後に挿入）
-8. AzooKey 辞書候補（プロモート済み先頭は除外）
-9. 低スコア履歴（同じく `fetchHistoryScoredMerged` 由来。閾値未満の行を重複除外して末尾に追記）
+3. **Zenzai top-1**（Zenzai 設定 ON かつ左文脈ありのときのみ）
+4. 予測候補（trigram → bigram → skip-bigram の順。2語前コンテキスト優先）
+5. 履歴（時間減衰スコアが閾値以上の行。完全一致読みのみ上位グループ）
+6. 数字候補（数字のみ読みのとき）
+7. 日時候補（`きょう` / `いま` 等のとき）
+8. AzooKey 辞書候補（Zenzai プロモート済みは除外）
+9. 低スコア履歴（閾値未満の履歴を末尾に）
 
 ### 括弧モード（isBracketMode）
 `[` / `(` / `!` / `?` / `/` / `.` / `,` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補リストを候補ウィンドウで表示するモード（`bracketCandidates != nil`）。  
-`handleBracketModeKey()` がキーを処理し、`bracketOptions` マップで ASCII 記号 → 全角候補列に変換する（例: `[` → `「`/`【`/`〔`/...、`!` → `！`/`!`、`/` → `・`/`÷`/`…`、`.` → `。`/`．`/`…`、`,` → `、`/`，`）。  
 US キーボードの `Shift+/`（`?`）と `Shift+1`（`!`）は `baseCharacters` で判定し bracketOptions を発動する。  
 **組成中**に記号キーを入力した場合は候補ウィンドウは表示せず、全角1文字目を `composedHiragana` に追加して通常の組成継続。
 
@@ -109,76 +97,45 @@ US キーボードの `Shift+/`（`?`）と `Shift+1`（`!`）は `baseCharacter
 
 ### SegmentState / isSegmentMode
 Space 押下時に AzooKey の変換結果をセグメント（文節）分割して遷移した状態。  
-Shift+Tab / Shift+矢印でセグメント境界を 1 文字単位で調整できる。
+Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 
 *Tests: `Tests/InputHandlerSegmentTests.swift`*
 
 ### SegmentState.llmWholeText（セグメント LLM 全文候補）
-読み全体（`composedHiragana`）をオンデバイス LLM で一括変換した全文テキスト。`inferSegmentBoundaries` が成功した場合は各文節の `candidates` 先頭にその文節の LLM トークンが入り、連結がこの文字列になる。失敗時のフォールバックでは先頭文節のみに全文を先頭挿入する。  
-**不変条件（短絡確定）**: `doConfirmSegments` / `commitComposition` で LLM 全文のみ確定するのは `focusedIndex == 0` のうえ、**(A) 多文節再構築後**: 全文節が先頭行選択かつ各行先頭の連結が `llmWholeText` で、かつフォーカス文節の確定テキストがその文節の `candidates[0]` と一致するとき、または **(B) 旧フォールバック**: `segments[0].candidates[0] == llmWholeText` かつ先頭行選択で確定テキストが `llmWholeText` そのものとき。**`inferSegmentBoundaries` が 2 ペア以上を返して `applyLLMBoundaries` で多文節に再構築された場合**（`isLlmBoundaryInferred == true`）は、その読み境界を確定時に `boundary_pref` にも保存する（1 ペアのみの再構築・先頭文節への全文フォールバック挿入では保存しない）。確定時は全文節を破棄し `commitText(llmWholeText)` のみ行う。  
-フォールバック挿入時は `segments[0].historyEnd` を 1 増やし、`segments[0].selectedIndex` は先頭挿入に合わせて 1 増やす（リフレッシュ前の視覚選択を維持）。
+読み全体をオンデバイス LLM で一括変換した全文テキスト。`inferSegmentBoundaries` が成功した場合は各文節の候補先頭にその文節の LLM トークンが入り、連結がこの文字列になる。失敗時のフォールバックでは先頭文節のみに全文を挿入する。  
+**短絡確定**: `focusedIndex == 0` かつ確定条件を満たすとき Enter で全文節を破棄し `llmWholeText` だけを確定する（詳細: `isLlmWholeTextShortcut`）。`inferSegmentBoundaries` が 2 ペア以上で成功した確定では境界を `boundary_pref` にも保存する。
 
 ### LLMSegmentConverter
-セグメントモード用の FoundationModels ラッパー。`SystemLanguageModel.default` が利用可能なときのみ `convert(hiragana:onResult:)` が推論を走らせる。失敗時は空文字でコールバックし既存 UX を壊さない。  
-静的メソッド `inferSegmentBoundaries` は LLM 出力と読みのアライメントを試みる（辞書は `candidatesForSegment` のみ利用）。
+セグメントモード用の FoundationModels ラッパー。`SystemLanguageModel.default` が利用可能なときのみ推論を走らせる。失敗時は空文字でコールバックし既存 UX を壊さない。
 
 *Tests: `Tests/InputHandlerSegmentLLMTests.swift`、`Tests/SegmentBoundaryTests.swift`*
 
 ### boundary_pref（境界学習）
-手動調整した境界、または **LLM 多文節境界推定が成功した確定**の読み分割を保存する `boundary_pref` テーブルのエントリ。  
-`enterSegmentMode()` は `azooKeyConverter.segmentize()` を呼ぶ前に `fetchBoundaryPref` を確認し、
-ヒットすれば保存済み境界を優先して使う。ヒットしなければ AzooKey の初期分割にフォールバック。  
-**取得の前方一致**: 完全一致だけでなく、入力のフル読みが保存キー（`full_reading`）で始まる行のうち、**最長の `full_reading`** を 1 件選んでその `boundaries` を使う（より長い読みへの入力でも、短いキーで学習した境界を再利用できる）。  
-**保存の最短長**: `full_reading` の Swift `String.count` が 4 未満のときは `saveBoundaryPref` が保存しない（一律ガード）。  
-**保存条件**: `doConfirmSegments()` 時に **`isManuallyAdjusted` なセグメントが 1 つ以上ある**、または **`SegmentState.isLlmBoundaryInferred` が真**（`inferSegmentBoundaries` が 2 ペア以上返し多文節に再構築済み）のとき記録する。AzooKey 初期分割のままかつ上記 LLM 条件も満たさない確定では記録しない。  
-**手動調整時の履歴・bi-gram ブースト**: 同上の確定処理では、各文節の `recordPrefixes` と隣接ペアの `recordBigram` を **通常1回**記録したうえで、手動境界調整のあった文節（および手動調整を含む隣接ペア）に限り **同じ引数でもう1回だけ** 追加記録する（2倍まで。3回以上の連続呼び出しはしない）。  
-**上書きポリシー**: 同じ `full_reading` に対して再調整・確定すると前回エントリが上書きされる（`ON CONFLICT DO UPDATE`）。  
-**GC**: 180日未使用のエントリを `performGCIfNeeded()` で削除する（`count` カラムなし、`used_at` のみで判定）。
+手動調整した境界、または LLM 多文節境界推定が成功した確定の読み分割を保存するテーブルエントリ。  
+次回同じ読みで Space を押すと AzooKey の初期分割より保存済み境界が優先される（前方一致で最長キーを採用）。  
+**保存条件**: 手動境界調整ありの確定、または `isLlmBoundaryInferred`（2ペア以上再構築）のとき。AzooKey 初期分割のままかつ LLM 条件も満たさない確定では保存しない。  
+**上書きポリシー**: 同じ読みに対して再調整・確定すると前回エントリが上書きされる。GC: 180日未使用で削除。
 
 ---
 
 ## Successor モード（SuccessorMode）
 
 ### isSuccessorMode
-確定直後に学習済みの後続語候補を **`pendingSuccessorCandidates` に保持し**、ユーザーの 1 打目で候補ウィンドウを開く状態。
-候補は `fetchTrigramTop(prev2:prev1:)` + `fetchBigramTop(prev:)` + `mostRecentContentWords(n: 2)` ごとの `fetchSkipBigramTop`（`merged` で重複除去、近い内容語を優先）で引く。
-2語前文脈（trigram）を優先し、trigram にない候補を bigram で補完する。  
-漢字・カタカナ末尾（`isNounLike`）のときのみ、固定格助詞リスト（`InputHandler.particles`）を
-tail に fallback として並べる。ひらがな末尾の語では格助詞 fallback は出さず、予測候補のみ表示する。
-確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば
-連鎖表示を継続する（格助詞チェックは廃止。候補空なら自然に `.dismiss`）。
-
-**N-gram 候補の遅延表示と読みフィルタ**:
-N-gram 由来の候補（tri-gram + bi-gram + skip-bigram）がある場合でも、**確定直後は常に**候補を `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目待ち。高信頼 bi-gram の即時表示は行わない）。  
-1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、
-DB を再クエリして一致する候補に加え、**同一条件で** `pendingSuccessorCandidates` 内の語を `mergePendingSuccessorMatches` で併合し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を末尾側に追加して `.show` する（DB 候補の後ろに追加。読み・格助詞マップのいずれにも一致しなければモード解除）。  
-`fetchBigramTopCount` は直近 **90 日以内**の bi-gram の `MAX(count)` を取るが、**プリセット行**（`is_preset = 1`）は `used_at` に関係なく常に集計に含まれる。プリセット seed の初期 `count` に `successorImmediateThreshold`（デフォルト 5）を使うが、**閾値による即時表示には用いない**。
-
-**オンデバイス LLM 補完**（`LLMSuccessorFetcher`、Foundation Models / Apple Intelligence 利用可能時のみ）:
-`pendingSuccessorCandidates` に積んで `.dismiss` を返した直後に、`committedHistory` の末尾最大3語（`"、"` 結合した文脈）を渡して続く語を非同期取得する。
-返答は **表層形**（漢字・カタカナ・ひらがな）とし、別バッファ **`successorLLMSurfaceExtras`** に蓄える（`pendingSuccessorCandidates` には混ぜない。読み前方一致は N-gram 側のみ）。
-1打目で候補を開くときは、DB 照会＋`mergePendingSuccessorMatches` ＋格助詞マップ併合の結果の **末尾**に `successorLLMSurfaceExtras` を重複除外で連結する。
-非同期コールバックは `Array(committedHistory.suffix(3))` がフェッチ開始時のスナップショットと一致するときだけ反映する。
-LLM が1打目表示より遅れて届いた場合、**画面は更新しない**（extras にのみ溜まりうる仕様）。
+確定直後に学習済みの後続語候補を `pendingSuccessorCandidates` に保持し、ユーザーの 1 打目で候補ウィンドウを開く状態。  
+trigram → bigram → skip-bigram の順で候補を取得し、漢字・カタカナ末尾（`isNounLike`）のときのみ格助詞リストを fallback として並べる。  
+確定後は次の候補があれば連鎖表示を継続する。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`、`Tests/LLMSuccessorFetcherTests.swift`*
 
 ### pendingSuccessorCandidates
-Successor モードで候補を1打目まで遅延表示するためのバッファ（**N-gram 予測語と、名詞末尾時の格助詞 fallback**。オンデバイス LLM の表層形は含めない）。  
-**不変条件**: `suggestSuccessors()` が候補を計算した際に設定され、1打目の入力時に
-`romajiToInitialKana` で読み前方一致フィルタを行い（併せて `mergePendingSuccessorMatches` と `particleRomajiMap` で本バッファ内の語を併合）、`.show` して空になる。
-読み・格助詞マップのいずれにも一致しない場合はモード解除して空になる。
-`isSuccessorMode = false` になるすべての経路でクリアされる。  
-LLM 由来の語は `successorLLMSurfaceExtras` を参照する。
+Successor モードで候補を 1 打目まで遅延表示するためのバッファ（N-gram 予測語と格助詞 fallback）。  
+1 打目でかな先頭一致フィルタを行い一致候補を表示。一致なしはモード解除。`isSuccessorMode = false` になるすべての経路でクリアされる。
 
 ### successorLLMSurfaceExtras
-オンデバイス LLM が返した **表層形**の後続語候補。`mergePendingSuccessorMatches` の `pending` には渡さない。
-`suggestSuccessors()` が Successor に入るたびにクリアされ、補助状態クリア時にも空になる。
+オンデバイス LLM が返した表層形の後続語候補。1 打目表示時に `pendingSuccessorCandidates` 由来の候補末尾に連結する。
 
 ### successorFirstChar
-Successor モード中の 1 打目をバッファリングするフィールド。  
-**不変条件**: 1 打目が `pendingSuccessorCandidates` を読みフィルタして `.show` した直後に設定し、
-2 打目が同じ読みフィルタにマッチしなければ 1 打目を通常入力として流してからモード解除する。
+Successor モード中の 1 打目をバッファリングするフィールド。2 打目がマッチしなければ 1 打目を通常入力として流してからモード解除する。
 
 ---
 
@@ -191,46 +148,30 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。
 
 ### lastConfirmedContext
-確定直後の Backspace を「誤変換の訂正」として扱うために、`commitText` / `confirmSuccessor` が保持する直前 **1 件**の学習キー。`(input, output, prev1, prev2, skipPrevs, fullReading)`。`skipPrevs` は助詞直前確定時に記録した skip-bigram の `prev` 語の列（最大 2 語。格助詞のみ確定パスでは空配列）。  
-**不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。セグメント全読み確定時のみ `fullReading` が非 `nil`（`boundary_pref` 削除用）。
+確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。  
+**不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。
 
 ### DatabaseManager
 変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）・ひらがな優先語彙（`hiragana_preferred`）の **7 テーブル**を持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。  
-**`clock` var** でエポック秒を注入可能（テスト用）。全 record/fetch で `nowEpoch()` を使うことで時系列が一貫する。
+全 fetch/record で時間減衰スコア `count / (1 + age_days / τ)`（τ=30日）を使用。`user_dict` のみ time-decay なし。
 
 #### プリセット bi-gram（`is_preset`）
-冷スタートでも後続予測が効くよう、アプリバンドル内の `preset_bigram.csv`（`prev,input,output`）から **初回起動時のみ**（`UserDefaults` の `preset_seeded_v1` が未セットのとき。保存先は `DatabaseManager.presetSeedUserDefaults`、既定は `standard`）`bigram` に投入する。各行は `is_preset = 1`・初期 `count = successorImmediateThreshold`・`INSERT OR IGNORE`（ユーザー既存行と衝突したら無視）。  
-設定画面の Bi-gram **インポート**（`replaceBigram`）では `is_preset = 0` の行のみ全削除し、プリセット行は残す。**GC**（`performGCIfNeeded`）でもプリセット行は削除しない。ユーザーが `recordBigram` で同じ `(prev,input,output)` に学習した場合、`ON CONFLICT` で `count` / `used_at` のみ更新され、`is_preset` は変わらない。
-
-**データ出典**: `Sources/PresetBigram/preset_bigram.csv` はリポジトリ内スクリプト `scripts/generate_preset_bigram_csv.py` で生成した汎用連語リストであり、**プロジェクトオリジナル（独自編集）**。第三者コーパスの転載ではない。
+冷スタートでも後続予測が効くよう、バンドル内 `preset_bigram.csv` から初回起動時のみ `bigram` に投入する。  
+Bi-gram インポート・GC でプリセット行は消えない。データ出典はプロジェクトオリジナル（第三者コーパスの転載ではない）。
 
 #### recordPrefixes
-読みが **3 文字以上**のひらがなを確定するとき、len=2 から N-1 までの前方一致パターンも同時に `history` に記録する。  
-例: 「おはよう」（4文字）を確定 → `おはよう`/`おはよ`/`おは` の3エントリを記録。  
-「おは」と打つだけで「おはよう」が履歴候補に出るようになる。ASCII のみの読み（`github` など）は prefix 記録しない。  
-**ひらがなパススルー確定**（`input == output` かつ全ひらがな）は記録しない（`isHiraganaPassthrough` ガード）。  
-**句読点確定**（`readingPunctuations`：`「、」「・」「…」` 等。`sentenceTerminators` の `「。」「！」「？」` とは別）は `recordPrefixes` / `recordNgrams` をスキップし `pushCommitted` でも `committedHistory` に追加しない。
-
-#### recency / 時間減衰
-全 fetch SQL は `score = count / (1 + age_days / τ)` でソートする（τ = 30日）。  
-古い高頻度語より直近の語が優先されやすくなり、今日のタスクに合った語が上位に出やすい。  
-テストでは `db.clock = { fixedEpoch }` で時刻を固定して検証する。
-
-#### committedHistory
-直近に確定した変換出力のリスト。`mostRecentContentWord` / `mostRecentContentWords` および skip-bigram 記録で参照される。  
-**不変条件**: 上限は **5 件**。6 件目が追加されると先頭がドロップされる。  
-**注意**: `mostRecentContentWord()` は `mostRecentContentWords(n: 1).first` と同じ。`mostRecentContentWords(n:)` は末尾から 2 語目以降を遡り、助詞をスキップして最大 `n` 件の内容語を**近い順**に返す。履歴が 2 件未満、または内容語が 1 件もない場合は空配列（単一取得 API では `nil`）。
-
-*Tests: `Tests/SkipBigramTests.swift` — `testCommittedHistoryCapAt5`, `testMostRecentContentWordSkipsParticle`*
+3 文字以上のひらがな確定時、len=2〜N-1 の前方一致パターンも同時に `history` に記録する。  
+「おはよう」を確定すると「おはよ」「おは」でも履歴候補に出るようになる。  
+ひらがなパススルー確定・句読点確定はスキップ。
 
 #### skip-bigram
-助詞（`InputHandler.particles`）が直前に確定されたとき、`mostRecentContentWords(n: 2)` が返す各内容語（最大 2 語）と現在の確定語のペアを `skip_bigram` テーブルに記録する（同一トランザクションで複数行になりうる）。  
-`今日 → を → 行く` `今日 → が → 走る` のように助詞でバラけたペアが「今日 → 行く/走る」として統合される。  
-**格助詞を prev とする bigram は記録しない**: `recordNgrams` は `isParticlePrev`（直前確定語が格助詞）のとき `bigram` 引数を `nil` で渡し、bigram テーブルへの記録をスキップする（trigram・skip-bigram は通常どおり記録）。格助詞汎用ペア（`を → ～する` 等）が bigram に蓄積してノイズになるのを防ぐ設計。
+助詞が直前に確定されたとき、直近内容語と現確定語のペアを `skip_bigram` に記録する。  
+助詞でバラけた語のペアを統合することで「今日 → 行く」のような候補を学習できる。  
+格助詞を prev とする bigram は記録しない（ノイズ抑制）。
 
 #### penalizeAll（訂正シグナル）
-確定直後 Backspace 時に呼ばれる。`history` の該当行を count -1（0 以下で削除）、同じ確定に対応する `bigram`（**`is_preset = 0` のみ**）/`trigram`/`skip_bigram` も同様に -1、`fullReading` があればそのキーの `boundary_pref` 行を DELETE。`withTransaction` で一括実行。
+確定直後 Backspace 時に呼ばれ、history / bigram / trigram / skip_bigram の該当行を count -1（0以下で削除）、`boundary_pref` 行を DELETE する。
 
 *Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/SkipBigramTests.swift`*
 
