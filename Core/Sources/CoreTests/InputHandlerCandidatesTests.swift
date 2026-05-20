@@ -155,7 +155,8 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(candidates[initialRow], "これ")
     }
 
-    func testBareConversionPutsHiraganaBeforeKatakanaReadingSurface() {
+    func testBareConversionWithZenzaiPutsZenzaiFirstThenHiragana() {
+        // Zenzai あり・履歴なし・autoShow: Zenzai が先頭、ひらがなは直後
         setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: true))
         handler.leftSideContext = "前文"
         handler.state.composedHiragana = "よいのでは"
@@ -164,11 +165,24 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard case .show(let candidates, _, let initialRow, _, let fixedEnd) = action else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(candidates.first, "よいのでは", "row 0 は読みのひらがな")
-        XCTAssertEqual(initialRow, 0)
+        XCTAssertEqual(candidates[0], "良いのでは", "Zenzai top-1 が row 0")
+        XCTAssertEqual(initialRow, 0, "Zenzai 先頭なら initialRow=0")
         XCTAssertFalse(candidates.contains("ヨイノデハ"), "読みのカタカナ表記は辞書から除外")
-        XCTAssertEqual(candidates[1], "良いのでは", "Zenzai top-1 はひらがなの直後")
+        XCTAssertEqual(candidates[1], "よいのでは", "ひらがなは Zenzai の直後")
         XCTAssertGreaterThanOrEqual(fixedEnd, 2)
+    }
+
+    func testBareConversionWithoutZenzaiPutsHiraganaFirst() {
+        // Zenzai なし・履歴なし・autoShow: ひらがなが先頭
+        setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: false))
+        handler.state.composedHiragana = "よいのでは"
+        handler.state.pendingRomaji = ""
+        let action = handler.buildCandidateList(autoShow: true)
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(candidates.first, "よいのでは", "Zenzai なしでは row 0 はひらがな")
+        XCTAssertEqual(initialRow, 0)
     }
 
     func testHiraganaInHistoryAppearsAsHistoryCandidate() {
@@ -813,6 +827,26 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "Zen先頭", "辞書B", "アイ"],
                      historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 2)
+    }
+
+    func testSnap_F6_ZenzaiFirstWithAutoShow() {
+        // autoShow + Zenzai + 履歴なし: Zenzai が先頭、ひらがな固定は直後
+        // fixedEnd = zenzai(1) + fixedHiragana(1) = 2, initialRow = 0
+        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
+        handler.leftSideContext = "前文"
+        typeRomaji("ai")
+        assertLayout(handler.buildCandidateList(autoShow: true),
+                     candidates: ["Zen先頭", "あい", "辞書B", "アイ"],
+                     historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
+    }
+
+    func testSnap_F7_ZenzaiFirstAutoShowNoContext() {
+        // autoShow + Zenzai + leftContext なし: プロモートなし → ひらがなが先頭
+        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
+        typeRomaji("ai")
+        assertLayout(handler.buildCandidateList(autoShow: true),
+                     candidates: ["あい", "Zen先頭", "辞書B", "アイ"],
+                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
     }
 
     // MARK: - G: 数値・日時候補

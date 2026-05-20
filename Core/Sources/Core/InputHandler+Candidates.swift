@@ -327,6 +327,8 @@ public extension InputHandler {
             return .atZero
         case .none:
             if addsDefaultFixedHiragana {
+                // Zenzai が先頭に来る場合は row 0 を初期選択にする
+                if sources.zenzaiPromoted != nil { return .atZero }
                 return .firstMatching(state.composedHiragana)
             }
             return .afterFixed
@@ -494,9 +496,10 @@ public extension InputHandler {
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
         )
+        let zenzaiLeads = addsDefaultFixedHiragana && sources.zenzaiPromoted != nil
         let layout = CandidateLayout(
             sections: sections,
-            sectionOrder: CandidateLayout.defaultSectionOrder,
+            sectionOrder: zenzaiLeads ? CandidateLayout.zenzaiFirstSectionOrder : CandidateLayout.defaultSectionOrder,
             initialRowPolicy: resolveInitialRowPolicy(
                 sources: sources,
                 fixedSlot: fixedSlot,

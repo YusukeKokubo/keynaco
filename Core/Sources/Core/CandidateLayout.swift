@@ -87,6 +87,20 @@ public struct CandidateLayout: Sendable {
         .lowHistory,
     ]
 
+    /// Zenzai top-1 をひらがな固定より前に置く順序（履歴・予測なしでZenzai提案ありの場合に使用）
+    public static let zenzaiFirstSectionOrder: [CandidateSection.Kind] = [
+        .fixedKatakana,
+        .userDict,
+        .zenzaiTop1,
+        .fixedHiragana,
+        .prediction,
+        .highHistory,
+        .number, .dateTime,
+        .azooKeyDict,
+        .katakana,
+        .lowHistory,
+    ]
+
     private static let fixedSectionKinds: Set<CandidateSection.Kind> = [
         .fixedHiragana, .fixedKatakana, .userDict, .zenzaiTop1,
     ]
