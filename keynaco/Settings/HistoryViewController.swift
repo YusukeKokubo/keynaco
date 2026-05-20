@@ -16,12 +16,19 @@ final class HistoryViewController: NSViewController {
         view.addSubview(scrollView)
 
         tableView.usesAlternatingRowBackgroundColors = true
-        tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        for (id, title, width) in columns {
+        tableView.columnAutoresizingStyle = .noColumnAutoresizing
+        for (id, title, width, flexible) in columns {
             let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             col.title = title
             col.width = width
-            col.minWidth = 40
+            if flexible {
+                col.minWidth = 80
+                col.resizingMask = .autoresizingMask
+            } else {
+                col.minWidth = width
+                col.maxWidth = width
+                col.resizingMask = []
+            }
             tableView.addTableColumn(col)
         }
         tableView.delegate = self
@@ -46,11 +53,11 @@ final class HistoryViewController: NSViewController {
         ])
     }
 
-    private let columns: [(String, String, CGFloat)] = [
-        ("input",  "読み",         200),
-        ("output", "確定テキスト", 260),
-        ("pos",    "品詞",          80),
-        ("count",  "回数",          60),
+    private let columns: [(String, String, CGFloat, Bool)] = [
+        ("input",  "読み",         150, true),
+        ("output", "確定テキスト", 200, true),
+        ("pos",    "品詞",          70, false),
+        ("count",  "回数",          60, false),
     ]
 
     private func makeBottomBar() -> NSView {
