@@ -209,10 +209,21 @@ final class DebugSocketServer: @unchecked Sendable {
         ]
     }
 
+    private static func buildInfo() -> [String: Any] {
+        let info = Bundle.main.infoDictionary
+        return [
+            "commit": (info?["KeynacoBuildCommit"] as? String) ?? "unknown",
+            "builtAt": (info?["KeynacoBuildTime"] as? String) ?? "unknown",
+            "shortVersion": (info?["CFBundleShortVersionString"] as? String) ?? "0.0.0",
+            "build": (info?["CFBundleVersion"] as? String) ?? "0",
+        ]
+    }
+
     private static func withProtocolMetadata(_ dict: [String: Any]) -> [String: Any] {
         var out = dict
         out["protocolVersion"] = protocolVersion
         out["capabilities"] = capabilities()
+        out["buildInfo"] = buildInfo()
         return out
     }
 

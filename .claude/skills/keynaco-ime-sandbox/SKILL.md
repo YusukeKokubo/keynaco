@@ -28,6 +28,24 @@ pgrep -x keynaco && echo "keynaco running" || echo "keynaco not running — Debu
 
 接続エラー（`Connection refused` / `ECONNREFUSED`）が出た場合も同様に keynaco 未起動が原因。ソケットファイルの有無は関係ない。
 
+### バイナリ stale 検知（**起動確認と同時に必ず実行**）
+
+走っている keynaco が直近のソースより古いと、テスト結果がコードと食い違う。最初の `{"state": true}` 等のレスポンスに `buildInfo.commit` が入っているので、ワークツリーの HEAD と比較する:
+
+```python
+r = send({"state": True})
+running_commit = r.get("buildInfo", {}).get("commit", "unknown")
+import subprocess
+head = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+if running_commit != head:
+    print(f"WARNING: running={running_commit} HEAD={head}")
+    print(f"  built at: {r.get('buildInfo', {}).get('builtAt')}")
+    print(f"  → /deploy で再ビルドしてから再実行してください")
+    sys.exit(1)
+```
+
+`buildInfo.commit` が `"unknown"` の場合は古い DebugSocketServer（buildInfo 未対応）が走っているので、同様に stale 扱いで `/deploy` を促す。ワークツリーに未コミット変更があるときは HEAD 一致だけでは不十分なので、`git status --porcelain Core/Sources keynaco/` も併せて見て、変更があれば警告する。
+
 ## ソケットクライアント
 
 `scripts/debug_ime.py` が用意されている。対話モードとバッチモードがある。
