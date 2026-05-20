@@ -67,3 +67,16 @@ bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末�
 `autoShow=true`（文字入力中の自動表示）のとき、履歴（高+低のいずれか）・辞書・bi-gram・ユーザー辞書がすべて 0 件なら表示しない。
 
 Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（`fixedCount <= row < fixedEnd` のユーザー辞書行・Zenzai プロモート行は削除不可。`CandidateAction.fixedEnd` は Zenzai 行を含む）。
+
+## handler フィールドのライフサイクル
+
+`InputController` が `handler.handle()` の前後でセットする handler フィールドは 2 種類に分かれる。
+
+| タイミング | 例 | 理由 |
+|------|----|----|
+| **handle の前** | `leftSideContext` / `virtualHistoryPrefix` | `handle` 内（`buildCandidateList` / `buildPendingCandidateList` 等）から読まれる |
+| **handle の後**（`applyPostKeyDownEffects`） | `cachedSurroundingContext` 更新・`successorLLMContext` 発火・候補ウィンドウ更新 | 次キー以降のための準備・非同期スケジュール |
+
+**判定基準**: そのフィールドが現在のキー処理中に参照されるなら pre、次以降のキー処理 or 非同期コールバックでのみ参照されるなら post。post に置くと「1 キーストローク遅延」バグになる。
+
+**組成判定の軸**: 「組成中かどうか」を扱う条件は `composedHiragana` ではなく `composingText`（= `composedHiragana + pendingRomaji`）を見る。前者だと pendingRomaji 1 文字の先読み経路（`buildPendingCandidateList`）が判定漏れになる。
