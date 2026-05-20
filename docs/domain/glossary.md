@@ -122,8 +122,9 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 
 ### isSuccessorMode
 確定直後に学習済みの後続語候補を `pendingSuccessorCandidates` に保持し、ユーザーの 1 打目で候補ウィンドウを開く状態。  
-trigram → bigram → skip-bigram の順で候補を取得し、漢字・カタカナ末尾（`isNounLike`）のときのみ格助詞リストを fallback として並べる。  
-確定後は次の候補があれば連鎖表示を継続する。
+**起動条件**: 漢字・カタカナ末尾（`isNounLike` 真）のときのみ起動。ひらがな末尾（動詞・助詞・副詞等）の後は bi-gram があっても起動しない。  
+trigram → bigram → skip-bigram の順で候補を取得し、格助詞リストを fallback として末尾に並べる。  
+確定後は次の候補があれば連鎖表示を継続する（ただし確定語が名詞末尾の場合のみ）。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`、`Tests/LLMSuccessorFetcherTests.swift`*
 

@@ -39,13 +39,13 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 3. `mostRecentContentWords(n: 2)` ごとの `db.fetchSkipBigramTop(prev:)` を `merged` で連結した上位（近い内容語を優先。tri-gram・bi-gram にない候補を追加）
 4. `isNounLike(last)` が真のときのみ、格助詞固定リスト（`InputHandler.particles`）を tail に fallback として並べる
 
-bi-gram が空かつ格助詞 fallback も出ないケース（ひらがな末尾 + 学習ゼロ等）では `.dismiss` を返しモードには入らない。**カーソルが文末でない（文中挿入）場合も `suggestSuccessors()` は Successor モードに入らず `.dismiss` を返す。**
+**起動条件**: `isNounLike(last)` が偽（ひらがな末尾の動詞・助詞・副詞等）のときは bi-gram / tri-gram があっても即 `.dismiss` を返しモードには入らない。名詞末尾でも bi-gram・格助詞 fallback がともに空なら `.dismiss`。**カーソルが文末でない（文中挿入）場合も `.dismiss`。**
 
 **N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加してから **`successorLLMSurfaceExtras` を末尾に連結**し、**`expandSuccessorPrefixes`** で長い表層を助詞境界の部分候補に展開してから `.show` する（いずれにも一致しなければモード解除）。利用可能なら `LLMSuccessorFetcher` が `committedHistory.suffix(3)` を文脈にオンデバイス LLM で表層形の後続語を非同期取得し、`successorLLMSurfaceExtras` に蓄える（コールバックは `suffix(3)` がトリガ時スナップショットと一致するときのみ反映。遅延到着で画面は更新しない場合あり）。
 
 - `successorFirstChar`: 頭文字 1 打目のバッファリング。1打目で `pendingSuccessorCandidates` を表示したあと、2 打目でモード解除する際にも使用する。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
-- 候補確定後は `suggestSuccessors()` を再呼び出しし、次の bi-gram / tri-gram 候補があれば連鎖表示を継続する。候補が空なら自然に `.dismiss`（格助詞チェックは廃止）。
+- 候補確定後は `suggestSuccessors()` を再呼び出しし、確定語が `isNounLike` かつ次の bi-gram / tri-gram 候補があれば連鎖表示を継続する。格助詞（ひらがな末尾）確定後はチェーンしない。
 - Successor モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。
 - 最大候補数: `successorMaxCandidates = 5`（`LearningThresholds`）。
 - **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき `buildPendingCandidateList` が bi-gram/trigram/skip-bigram を先読みし、候補があれば `isSuccessorMode = true` へ移行。`n` は `ん` との曖昧さがあるため除外。候補ゼロなら `pendingRomaji` はそのまま通常組成を続ける。確定時（Space/Enter）に `confirmSuccessor()` が `pendingRomaji` をクリアする（`buildPendingCandidateList` 内ではクリアしない。Escape 後に続きのローマ字を入力できるようにするため）。

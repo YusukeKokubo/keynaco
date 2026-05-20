@@ -66,7 +66,7 @@
 
 2b のケースでは、1 打目 `g` が組成バッファに入り直し、`gz` の途中状態から通常の組成処理が続く。  
 **注意**: `g` の後に `a` を打つと 2b 同様にモード解除→通常組成になり `が` が markedText に入る（自動確定はしない）。
-**注意**: 1打目のマージは `pendingSuccessorCandidates` がある場合の経路。ひらがな末尾の語の後は Successor に入らないか、入っても保留が空なら 1 打目で通常組成へフォールスルーする。
+**注意**: 1打目のマージは `pendingSuccessorCandidates` がある場合の経路。ひらがな末尾の語の後は bi-gram があっても Successor には入らない（通常組成へ）。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
@@ -86,35 +86,34 @@
 
 ## S-03b: Successor モードの後続語予測（trigram + bigram）
 
-**前提**: `おつかれ`（ひらがな末尾）を確定。事前に bigram `(おつかれ, です, です)` を学習済み。  
-さらに 2 語前に `今日` を確定済みなら trigram `(今日, おつかれ, *, さまです)` があれば trigram が優先される。
+**前提**: `東京`（漢字末尾）を確定。事前に bigram `(東京, について, について)` と trigram `(昨日, 東京, *, 行った)` を学習済み。
 
 | ステップ | キー | 状態 | candidates | 動作 |
 |---------|------|------|-----------|------|
 | 0a | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram あり → 確定直後は `.dismiss`（ウィンドウは開かない） |
-| 0b | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram なし → bigram のみ。格助詞 fallback なし（`isNounLike` 偽）|
-| 1a | `d`（「で」行） | Successor モード | `["さまです", "です"]` or `["です"]` | 1打目 `romajiToInitialKana["d"]`→「で」行フィルタで一致候補を表示 |
+| 0b | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram なし → bigram のみ + 格助詞 fallback |
+| 1a | `n`（「に」「の」行） | Successor モード | `["について", "に", "の", ...]` | 1打目 `romajiToInitialKana["n"]`→「な」行フィルタで一致候補を表示 |
 | 1b | Space | 待機 | — | 1打後、先頭候補を確定 |
 | 1c | マッチしないキー | 待機 | — | 一致候補なし → モード解除→通常入力 |
 
-trigram も bigram も空で `isNounLike` も偽なら、確定直後に `.dismiss` が返り Successor モードには入らない。  
+`isNounLike` が偽（ひらがな末尾）なら bi-gram / tri-gram があっても Successor モードには入らない。  
 名詞末尾で N-gram が空でも、格助詞 fallback は **`pendingSuccessorCandidates` に積まれ**、1打目で表示する。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
 ---
 
-## S-03c: Successor チェーン（格助詞を経由した連鎖）
+## S-03c: Successor チェーン（名詞→格助詞確定後）
 
-**前提**: `東京` を確定。bigram `(東京, が)` および `(が, 好き)` を学習済み。
+**前提**: `東京` を確定。bigram `(東京, が)` を学習済み。
 
 | ステップ | キー | 状態 | 動作 |
 |---------|------|------|------|
 | 0 | — | Successor モード | N-gram あり（`が` が bigram 学習済み）→ `.dismiss`（確定直後はウィンドウなし） |
-| 1 | 任意キー | Successor モード | 1打目で `pendingSuccessorCandidates` を読みフィルタして表示（例: `g` → `["が", ...]`）|
-| 2 | Space | Successor モード | 「が」確定 → `suggestSuccessors()` → N-gram あり（`好き`）→ `.dismiss`（1打目待ち） |
-| 3 | 任意キー | Successor モード | `pendingSuccessorCandidates` を表示（candidates: `["好き"]`）|
-| 4 | Space | 待機 | 「好き」確定 → bigram なし → `.dismiss` |
+| 1 | `g` | Successor モード | `pendingSuccessorCandidates` を読みフィルタして表示（`["が", ...]`）|
+| 2 | Space | 待機 | 「が」確定 → ひらがな末尾（`isNounLike` 偽）→ Successor 終了 |
+
+**変更点（旧仕様との差異）**: 以前は「が」確定後も `suggestSuccessors()` が再呼び出しされ、`(が, 好き)` など bigram があればチェーンが継続していた。現在はひらがな末尾確定後は Successor に入らないため、格助詞の後は通常の組成に戻る。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
