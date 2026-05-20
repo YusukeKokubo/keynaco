@@ -77,10 +77,17 @@ final class ZenzaiViewController: NSViewController {
     @objc private func applyTapped() {
         saveToDefaults()
         NotificationCenter.default.post(name: .keynacoZenzaiSettingsDidChange, object: nil)
+        applyButton.title = "保存しました"
+        applyButton.isEnabled = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.applyButton.title = "保存"
+            self?.applyButton.isEnabled = true
+        }
     }
 
     /// 設定ウィンドウを閉じる前に未保存の UI を反映する（`SettingsWindowController` から呼ぶ）
     func saveToDefaults() {
+        guard isViewLoaded else { return }
         let d = UserDefaults.standard
         d.set(enabledSwitch.state == .on, forKey: ZenzaiSettings.enabledKey)
         d.set(profileField.stringValue, forKey: ZenzaiSettings.profileKey)
