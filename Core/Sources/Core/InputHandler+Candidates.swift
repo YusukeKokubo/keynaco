@@ -438,6 +438,10 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
         }
 
+        if !hiragana.allSatisfy({ $0.isASCII }), insertedSet.insert(katakana).inserted {
+            sections.append(CandidateSection(kind: .katakana, items: [katakana]))
+        }
+
         let preLowLayout = CandidateLayout(
             sections: sections,
             sectionOrder: CandidateLayout.defaultSectionOrder,

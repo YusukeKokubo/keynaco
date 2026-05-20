@@ -11,6 +11,7 @@ public struct CandidateSection: Sendable {
         case number         // 数値変換
         case dateTime       // 日時変換
         case azooKeyDict    // AzooKey 辞書候補
+        case katakana       // カタカナ変換（末尾固定）
         case lowHistory     // 低スコア履歴（末尾）
     }
 
@@ -82,6 +83,7 @@ public struct CandidateLayout: Sendable {
         .highHistory,
         .number, .dateTime,
         .azooKeyDict,
+        .katakana,
         .lowHistory,
     ]
 

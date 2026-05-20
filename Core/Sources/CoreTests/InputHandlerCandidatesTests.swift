@@ -586,7 +586,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub(["辞書A", "辞書B"]))
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["辞書A", "辞書B"],
+                     candidates: ["辞書A", "辞書B", "アイ"],
                      historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -596,7 +596,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛", "辞書A", "辞書B"],
+                     candidates: ["愛", "辞書A", "辞書B", "アイ"],
                      historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -610,12 +610,12 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.clock = { t + 3 }
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛3", "愛2", "愛1", "辞書A", "辞書B"],
+                     candidates: ["愛3", "愛2", "愛1", "辞書A", "辞書B", "アイ"],
                      historyEnd: 3, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_A4_LowHistoryOnly() {
-        // 低スコア履歴のみ: AzooKey の後ろに追加される
+        // 低スコア履歴のみ: AzooKey の後ろ、lowHistory の前に追加される
         useStub(SnapStub(["辞書A", "辞書B"]))
         let t = Int64(1_000_000_000)
         handler.db.clock = { t }
@@ -623,12 +623,12 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.clock = { t + 40 * 86400 }  // 40日後 = low score
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["辞書A", "辞書B", "哀"],
+                     candidates: ["辞書A", "辞書B", "アイ", "哀"],
                      historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_A5_HighAndLowHistory() {
-        // 高スコア+低スコア: 高スコアは先頭、低スコアは AzooKey 末尾
+        // 高スコア+低スコア: 高スコアは先頭、低スコアは katakana 末尾
         useStub(SnapStub(["辞書A", "辞書B"]))
         let t = Int64(1_000_000_000)
         handler.db.clock = { t }
@@ -637,7 +637,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")  // high (now)
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛", "辞書A", "辞書B", "哀"],
+                     candidates: ["愛", "辞書A", "辞書B", "アイ", "哀"],
                      historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -650,7 +650,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.committedHistory = ["東京"]
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["予測A", "辞書A", "辞書B"],
+                     candidates: ["予測A", "辞書A", "辞書B", "アイ"],
                      historyEnd: 1, predictionEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
@@ -662,7 +662,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["予測A", "愛", "辞書A", "辞書B"],
+                     candidates: ["予測A", "愛", "辞書A", "辞書B", "アイ"],
                      historyEnd: 2, predictionEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
@@ -673,7 +673,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub(["辞書A", "辞書B"]))
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["の", "辞書A", "辞書B"],
+                     candidates: ["の", "辞書A", "辞書B", "ノ"],
                      historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
     }
 
@@ -683,7 +683,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "の", output: "ノックアウト")
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["の", "ノックアウト", "辞書A", "辞書B"],
+                     candidates: ["の", "ノックアウト", "辞書A", "辞書B", "ノ"],
                      historyEnd: 2, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
     }
 
@@ -693,7 +693,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "の", output: "の")
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["の", "辞書A", "辞書B"],
+                     candidates: ["の", "辞書A", "辞書B", "ノ"],
                      historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -703,7 +703,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "とか", output: "UD戸籍")
         typeRomaji("toka")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["とか", "UD戸籍", "辞書A", "辞書B"],
+                     candidates: ["とか", "UD戸籍", "辞書A", "辞書B", "トカ"],
                      historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 
@@ -755,7 +755,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "Acme")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Acme", "辞書A", "辞書B"],
+                     candidates: ["Acme", "辞書A", "辞書B", "アイ"],
                      historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 1)
     }
 
@@ -766,7 +766,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Acme", "愛", "辞書A", "辞書B"],
+                     candidates: ["Acme", "愛", "辞書A", "辞書B", "アイ"],
                      historyEnd: 2, predictionEnd: 1, fixedEnd: 1, initialRow: 1)
     }
 
@@ -776,7 +776,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "Acme")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Acme", "辞書B"],
+                     candidates: ["Acme", "辞書B", "アイ"],
                      historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -788,7 +788,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.leftSideContext = "前文"
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Zen先頭", "辞書B"],
+                     candidates: ["Zen先頭", "辞書B", "アイ"],
                      historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 1)
     }
 
@@ -798,7 +798,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // leftSideContext = "" (default) → azooKeyLeftContext = nil → no promotion
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Zen先頭", "辞書B"],
+                     candidates: ["Zen先頭", "辞書B", "アイ"],
                      historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -808,7 +808,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.leftSideContext = "前文"
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Zen先頭", "辞書B"],
+                     candidates: ["Zen先頭", "辞書B", "アイ"],
                      historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -819,7 +819,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "Zen先頭")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Zen先頭", "辞書B"],
+                     candidates: ["Zen先頭", "辞書B", "アイ"],
                      historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -830,7 +830,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["UD合い", "Zen先頭", "辞書B"],
+                     candidates: ["UD合い", "Zen先頭", "辞書B", "アイ"],
                      historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 2)
     }
 
@@ -860,8 +860,8 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         XCTAssertEqual(hEnd, 0, "履歴なしなら historyEnd=0")
         XCTAssertEqual(Array(cands[0..<expectedDates.count]), expectedDates,
                        "日時候補が先頭（historyEnd=0 の位置）から並ぶはず: \(cands)")
-        XCTAssertEqual(Array(cands.suffix(2)), ["今日", "本日"],
-                       "AzooKey 候補は日時候補の後ろに続くはず: \(cands)")
+        XCTAssertEqual(Array(cands.suffix(3)), ["今日", "本日", "キョウ"],
+                       "AzooKey 候補は日時候補の後ろ・カタカナは末尾: \(cands)")
     }
 
     // MARK: - H: autoShow
@@ -881,7 +881,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(autoShow: true),
-                     candidates: ["愛"],
+                     candidates: ["愛", "アイ"],
                      historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -902,7 +902,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         // fixedEnd=2(userDict+zenzai), predictionEnd=3, historyEnd=4
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["UD合い", "辞書A", "予測A", "愛", "哀"],
+                     candidates: ["UD合い", "辞書A", "予測A", "愛", "アイ", "哀"],
                      historyEnd: 4, predictionEnd: 3, fixedEnd: 2, initialRow: 2)
     }
 
@@ -912,7 +912,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.leftSideContext = "前文"
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["の", "Zen先頭"],
+                     candidates: ["の", "Zen先頭", "ノ"],
                      historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 }
