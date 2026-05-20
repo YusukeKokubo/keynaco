@@ -66,6 +66,7 @@ AzooKey（`AzooKeyKanaKanjiConverter`）が仮名漢字変換の中核エンジ�
   ```
   モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る
 - LLM 機能（`LLMSuccessorFetcher` / `LLMSegmentConverter` / `LLMMisconversionChecker`）は `FoundationModels` フレームワーク（Apple Intelligence）を使用。macOS 26 で Apple Intelligence が有効なデバイスでないと `SystemLanguageModel.default.availability` が `.unavailable` を返しスキップされる（IME 基本動作は継続）
+- **Apple Intelligence は必須前提**：noun_bigram の蓄積・POS 分類など学習機能のコアは Apple Intelligence に依存する設計。Apple Intelligence なし環境でのフォールバックは論点にしない。
 
 ## テスト実行
 
