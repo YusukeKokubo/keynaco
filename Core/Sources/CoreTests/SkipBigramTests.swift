@@ -116,16 +116,10 @@ final class SkipBigramTests: InputHandlerTestCase {
         XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["今日"])
     }
 
-    func testRecordNgramsMultipleSkipBigrams() {
+    func testRecordMultipleSkipBigramsDirect() {
         let mem = DatabaseManager(inMemory: true)
-        mem.recordNgrams(
-            bigram: (prev: "を", input: "いく", output: "行く"),
-            trigram: nil,
-            skipBigrams: [
-                (prev: "今日", input: "いく", output: "行く"),
-                (prev: "昨日", input: "いく", output: "行く"),
-            ]
-        )
+        mem.recordSkipBigram(prev: "今日", input: "いく", output: "行く")
+        mem.recordSkipBigram(prev: "昨日", input: "いく", output: "行く")
         XCTAssertTrue(mem.fetchSkipBigramTop(prev: "今日").contains("行く"))
         XCTAssertTrue(mem.fetchSkipBigramTop(prev: "昨日").contains("行く"))
     }

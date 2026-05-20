@@ -123,6 +123,16 @@ public final class DatabaseManager: @unchecked Sendable {
             UNIQUE(prev, input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_skip_bigram ON skip_bigram(prev, input);
+        CREATE TABLE IF NOT EXISTS noun_bigram (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            prev    TEXT    NOT NULL,
+            input   TEXT    NOT NULL,
+            output  TEXT    NOT NULL,
+            count   INTEGER NOT NULL DEFAULT 1,
+            used_at INTEGER NOT NULL,
+            UNIQUE(prev, input, output)
+        );
+        CREATE INDEX IF NOT EXISTS idx_noun_bigram ON noun_bigram(prev, input);
         CREATE TABLE IF NOT EXISTS user_dict (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             input   TEXT    NOT NULL,
@@ -413,7 +423,7 @@ public final class DatabaseManager: @unchecked Sendable {
 
         dispatchWrite {
             let cutoff = self.nowEpoch() - 180 * 86400
-            let tables = ["history", "trigram", "skip_bigram"]
+            let tables = ["history", "trigram", "skip_bigram", "noun_bigram"]
             for table in tables {
                 self.executeOnQueue("DELETE FROM \(table) WHERE count = 1 AND used_at < ?") { stmt in
                     sqlite3_bind_int64(stmt, 1, cutoff)

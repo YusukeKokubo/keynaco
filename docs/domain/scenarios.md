@@ -196,22 +196,20 @@
 
 ---
 
-## S-10: skip-bigram 経由で助詞をまたぐ予測
+## S-10: noun-bigram 経由で助詞をまたぐ予測
 
-**前提**: `今日 → を → 行く` および `今日 → が → 走る` の順で確定済み。
+**前提**: `今日 → を → 行く` の順で確定済み。`今日` と `行く` が LLM 品詞分類で名詞と判定されている。
 
-- `今日` 確定 → committedHistory に追記
-- `を` 確定（助詞）→ bigram `(今日, を, を)` 記録。`particles.contains("を")` が真で `mostRecentContentWords(n: 2)` が `["今日"]`（この例では 1 語のみ）→ skip-bigram `(今日, いく, 行く)` 記録
-- 同様に `今日 → が → 走る` でも `(今日, はしる, 走る)` が記録される
-- 助詞が連続する文脈（例: `今日 → を → 駅 → へ → …`）では、`へ` 確定時に `mostRecentContentWords(n: 2)` が `["駅", "今日"]` となり、両方を `prev` とする skip-bigram が記録されうる
+- `今日` 確定 → POS 分類完了後 `lastConfirmedNounOutput = "今日"`
+- `を` 確定（助詞）→ bigram `(今日, を, を)` のみ記録（格助詞 prev の bigram はスキップ）
+- `行く` 確定 → POS 分類で名詞と判定 → noun-bigram `(prev="今日", input=読み, output="行く")` を記録 → `lastConfirmedNounOutput = "行く"`
 
-**次回**: `今日` の後に `い` を打つと、通常 bigram には `(を → い*)` のみだが、
-skip-bigram `(今日, い*, ...)` から `行く` が予測候補に追加される。
+**次回**: `を` の直後に `い` を打つと、通常 bigram には `(を → い*)` のみだが、
+`lastConfirmedNounOutput == "今日"` により noun-bigram `(今日, い*, ...)` から `行く` が予測候補の先頭付近に追加される。
 
-**committedHistory の上限**: `mostRecentContentWords` が参照する `committedHistory` は最大 **5 件**。
-6 件目が追加されると先頭がドロップされる。非常に長い文章を連続確定した場合、5語以上前の内容語は skip-bigram 検索に使われない。
+**制約**: 文頭の最初の名詞は `prevNoun == nil` のため noun-bigram は記録されない。Apple Intelligence 無効時は noun-bigram は蓄積されず bigram のみがフォールバック。
 
-*Tests: `Tests/SkipBigramTests.swift`*
+*Tests: `Tests/NounBigramTests.swift`*
 
 ---
 

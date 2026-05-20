@@ -79,7 +79,7 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 1. ひらがな / カタカナ（固定枠）
 2. ユーザー辞書（完全一致 + 前方一致）
 3. **Zenzai top-1**（Zenzai 設定 ON かつ左文脈ありのときのみ）
-4. 予測候補（trigram → bigram → skip-bigram の順。2語前コンテキスト優先）
+4. 予測候補（noun-bigram → trigram → bigram の順。2語前コンテキスト優先）
 5. 履歴（時間減衰スコアが閾値以上の行。完全一致読みのみ上位グループ）
 6. 数字候補（数字のみ読みのとき）
 7. 日時候補（`きょう` / `いま` 等のとき）
@@ -123,7 +123,7 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 ### isSuccessorMode
 確定直後に学習済みの後続語候補を `pendingSuccessorCandidates` に保持し、ユーザーの 1 打目で候補ウィンドウを開く状態。  
 **起動条件**: 漢字・カタカナ末尾（`isNounLike` 真）のときのみ起動。ひらがな末尾（動詞・助詞・副詞等）の後は bi-gram があっても起動しない。  
-trigram → bigram → skip-bigram の順で候補を取得し、格助詞リストを fallback として末尾に並べる。  
+noun-bigram → trigram → bigram の順で候補を取得し、格助詞リストを fallback として末尾に並べる。  
 確定後は次の候補があれば連鎖表示を継続する（ただし確定語が名詞末尾の場合のみ）。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`、`Tests/LLMSuccessorFetcherTests.swift`*
@@ -165,7 +165,7 @@ IMK `before` テキスト末尾から抽出した仮想末尾語列（最大 2 �
 **不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。
 
 ### DatabaseManager
-変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）・ひらがな優先語彙（`hiragana_preferred`）の **7 テーブル**を持つ SQLite ストア。  
+変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・noun-bigram（`noun_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）・ひらがな優先語彙（`hiragana_preferred`）の **8 テーブル**を持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。  
 全 fetch/record で時間減衰スコア `count / (1 + age_days / τ)`（τ=30日）を使用。`user_dict` のみ time-decay なし。
 
@@ -178,15 +178,21 @@ Bi-gram インポート・GC でプリセット行は消えない。データ出
 「おはよう」を確定すると「おはよ」「おは」でも履歴候補に出るようになる。  
 ひらがなパススルー確定・句読点確定はスキップ。
 
-#### skip-bigram
-助詞が直前に確定されたとき、直近内容語と現確定語のペアを `skip_bigram` に記録する。  
-助詞でバラけた語のペアを統合することで「今日 → 行く」のような候補を学習できる。  
-格助詞を prev とする bigram は記録しない（ノイズ抑制）。
+#### noun-bigram
+名詞→名詞のペアのみを `noun_bigram` に記録する。`prev` は直前に確定した名詞（助詞・動詞が間にあってよい）。  
+確定時に `lastConfirmedNounOutput` をキャプチャし、LLM 品詞分類（`LLMPOSClassifier`）完了後 `pos == "noun"` のとき `recordNounBigram` する。  
+Apple Intelligence 無効時は蓄積されず bigram がフォールバック。
+
+#### lastConfirmedNounOutput
+LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` および助詞を挟んだ予測の参照キー。セッションをまたいでリセットしない。
+
+#### skip-bigram（参照廃止）
+テーブルは既存 DB 互換のため残すが、確定時の記録および候補参照は廃止。役割は noun-bigram に移行。
 
 #### penalizeAll（訂正シグナル）
 確定直後 Backspace 時に呼ばれ、history / bigram / trigram / skip_bigram の該当行を count -1（0以下で削除）、`boundary_pref` 行を DELETE する。
 
-*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/SkipBigramTests.swift`*
+*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/NounBigramTests.swift`, `Tests/SkipBigramTests.swift`*
 
 ---
 

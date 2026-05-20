@@ -119,6 +119,10 @@ public struct InputHandler {
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }
     public var lastConfirmedContext: LastConfirmedContext? = nil
+    /// 直前の確定の読み（`commitText` 時の `finalizedText`）。POS 分類後の noun_bigram 記録用。
+    public var lastCommittedReading: String? = nil
+    /// LLM 品詞分類で最後に確定した名詞の表層。noun_bigram の prev として使う。
+    public var lastConfirmedNounOutput: String? = nil
     public var lastAzooKeyInput: String = ""
     /// `buildCandidateList` の AzooKey 候補キャッシュ照合用（`leftSideContext` が変わると再取得）
     public var lastAzooKeyContext: String = ""
@@ -310,7 +314,6 @@ public struct InputHandler {
             || InputHandler.sentenceTerminators.contains(text)
         var capPrev1: String?
         var capPrev2: String?
-        var capSkipPrevs: [String] = []
         if !state.composingText.isEmpty && !skipHistory && !isPunctuation,
            let p1 = committedHistory.last {
             capPrev1 = p1
@@ -319,12 +322,11 @@ public struct InputHandler {
                 : nil
             capPrev2 = p2
             let isParticlePrev = InputHandler.particles.contains(p1)
-            if isParticlePrev { capSkipPrevs = committedContentWords(n: 2) }
+            lastCommittedReading = state.finalizedText
             let bigramInput = state.finalizedText
             db.recordNgrams(
                 bigram: isParticlePrev ? nil : (prev: p1, input: bigramInput, output: text),
-                trigram: p2.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) },
-                skipBigrams: capSkipPrevs.map { (prev: $0, input: bigramInput, output: text) }
+                trigram: p2.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) }
             )
         }
         lastConfirmedContext = LastConfirmedContext(
@@ -332,7 +334,7 @@ public struct InputHandler {
             output: text,
             prev1: capPrev1,
             prev2: capPrev2,
-            skipPrevs: capSkipPrevs,
+            skipPrevs: [],
             fullReading: fullReading
         )
         pushCommitted(text)

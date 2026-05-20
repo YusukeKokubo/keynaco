@@ -326,7 +326,10 @@ class InputController: IMKInputController, @unchecked Sendable {
 
         if adapter.didInsertText {
             scheduleMisconversionCheck(adapter: adapter)
-            schedulePOSClassification(output: adapter.lastInsertedText)
+            schedulePOSClassification(
+                output: adapter.lastInsertedText,
+                reading: handler.lastCommittedReading ?? ""
+            )
         }
         if !handler.isSuccessorMode, !handler.isBracketMode,
            composingWasEmpty, !handler.state.composingText.isEmpty {

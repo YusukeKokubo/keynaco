@@ -31,11 +31,18 @@ extension InputController {
         return historyJoined
     }
 
-    /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。
-    func schedulePOSClassification(output: String) {
+    /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。名詞なら noun_bigram を記録する。
+    func schedulePOSClassification(output: String, reading: String) {
         let db = handler.db
-        Self.posClassifier.classify(output: output) { classifiedOutput, pos in
+        let prevNoun = handler.lastConfirmedNounOutput
+        Self.posClassifier.classify(output: output) { [weak self] classifiedOutput, pos in
             db.updatePOS(output: classifiedOutput, pos: pos)
+            if pos == "noun" {
+                if let prev = prevNoun {
+                    db.recordNounBigram(prev: prev, input: reading, output: classifiedOutput)
+                }
+                self?.handler.lastConfirmedNounOutput = classifiedOutput
+            }
         }
     }
 
@@ -64,7 +71,11 @@ extension InputController {
         handler.successorLLMContext = nil
 
         let examples: [(prev: String, next: String)] = triggerContext.last.map { lw in
-            handler.db.fetchBigramTop(prev: lw, limit: 5)
+            let fromNoun = handler.lastConfirmedNounOutput.map {
+                handler.db.fetchNounBigramTop(prev: $0, limit: 5)
+            } ?? []
+            let fromBigram = handler.db.fetchBigramTop(prev: lw, limit: 5)
+            return InputHandler.merged(fromNoun, fromBigram)
                 .filter { !InputHandler.particles.contains($0) }
                 .map { (prev: lw, next: $0) }
         } ?? []

@@ -5,9 +5,10 @@ extension DatabaseManager {
     private enum NgramSinglePrevTable: String {
         case bigram
         case skip_bigram
+        case noun_bigram
     }
 
-    /// `prev` 1列・`input` で読み前方一致する N-gram 行から output を返す（bigram / skip_bigram 共通）。
+    /// `prev` 1列・`input` で読み前方一致する N-gram 行から output を返す（bigram / skip_bigram / noun_bigram 共通）。
     private func fetchNgramWithReading(table: NgramSinglePrevTable, prev: String, reading: String) -> [String] {
         dbQueue.sync {
             let now = self.nowEpoch()
@@ -313,12 +314,38 @@ extension DatabaseManager {
         fetchNgramTopGrouped(table: .skip_bigram, prev: prev, limit: limit)
     }
 
-    /// bigram / trigram / skip-bigram をまとめて1トランザクションでバックグラウンド書き込みする。
-    /// bigram が nil のとき（prev が格助詞）はその記録をスキップし trigram / skip-bigram のみ保存する。
+    // MARK: - Noun-Bigram
+
+    func recordNounBigram(prev: String, input: String, output: String) {
+        guard !prev.isEmpty else { return }
+        dispatchWrite {
+            let t = self.nowEpoch()
+            self.executeOnQueue("""
+            INSERT INTO noun_bigram (prev, input, output, count, used_at)
+            VALUES (?, ?, ?, 1, ?)
+            ON CONFLICT(prev, input, output) DO UPDATE SET
+                count   = count + 1,
+                used_at = excluded.used_at;
+            """) {
+                self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
+                sqlite3_bind_int64($0, 4, t)
+            }
+        }
+    }
+
+    func fetchNounBigram(prev: String, reading: String) -> [String] {
+        fetchNgramWithReading(table: .noun_bigram, prev: prev, reading: reading)
+    }
+
+    func fetchNounBigramTop(prev: String, limit: Int = 20) -> [String] {
+        fetchNgramTopGrouped(table: .noun_bigram, prev: prev, limit: limit)
+    }
+
+    /// bigram / trigram をまとめて1トランザクションでバックグラウンド書き込みする。
+    /// bigram が nil のとき（prev が格助詞）はその記録をスキップし trigram のみ保存する。
     func recordNgrams(
         bigram: (prev: String, input: String, output: String)?,
-        trigram: (prev2: String, prev1: String, input: String, output: String)?,
-        skipBigrams: [(prev: String, input: String, output: String)]
+        trigram: (prev2: String, prev1: String, input: String, output: String)?
     ) {
         dispatchWrite {
             let t = self.nowEpoch()
@@ -346,18 +373,6 @@ extension DatabaseManager {
                     self.bindText($0, 1, tri.prev2); self.bindText($0, 2, tri.prev1)
                     self.bindText($0, 3, tri.input); self.bindText($0, 4, tri.output)
                     sqlite3_bind_int64($0, 5, t)
-                }
-            }
-            for skip in skipBigrams {
-                self.executeOnQueue("""
-                INSERT INTO skip_bigram (prev, input, output, count, used_at)
-                VALUES (?, ?, ?, 1, ?)
-                ON CONFLICT(prev, input, output) DO UPDATE SET
-                    count   = count + 1,
-                    used_at = excluded.used_at;
-                """) {
-                    self.bindText($0, 1, skip.prev); self.bindText($0, 2, skip.input)
-                    self.bindText($0, 3, skip.output); sqlite3_bind_int64($0, 4, t)
                 }
             }
             self.executeOnQueue("COMMIT")
