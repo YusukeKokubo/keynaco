@@ -1488,9 +1488,16 @@ final class DebugSocketServer: @unchecked Sendable {
             handler.clearSuccessorLLMAuxiliaryState()
             candidateWindow.apply(action: .dismiss)
         }
+        let insertedTexts = mockClient.consume()
         applyLLMScheduling()
+        for text in insertedTexts {
+            let db = handler.db
+            InputController.nounClassifier.classify(output: text) { classifiedOutput, isNoun in
+                db.updateNounFlag(output: classifiedOutput, isNoun: isNoun)
+            }
+        }
 
-        var result = makeResponse(inserted: mockClient.consume())
+        var result = makeResponse(inserted: insertedTexts)
         result["changed"] = Self.computeChangedFields(before: before, after: result)
         return Self.finalize(result, cmd: cmd)
     }
