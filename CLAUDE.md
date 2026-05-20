@@ -41,7 +41,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | スクリプト | 用途 |
 |-----------|------|
 | `generate_preset_bigram_csv.py` | `preset_bigram.csv` 生成 |
-| `debug_ime.py` | デバッグソケットの Python クライアント（キーシーケンス手動送信） |
+| `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
 | `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
 
@@ -54,6 +54,8 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 ## ビルド・インストール
 
 `/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。
+
+AzooKey（`AzooKeyKanaKanjiConverter`）が仮名漢字変換の中核エンジン。`Core/Package.swift` で SPM 依存として管理。
 
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
 - **Zenzai モデルのセットアップ**: `keynaco/Resources/zenz-v3.1-small-gguf/` は HuggingFace の git submodule（LFS 管理）。初回 clone 後に以下が必要:
@@ -83,13 +85,14 @@ cd Core && swift test
 
 ## コンポーネント構成
 
-[`docs/domain/architecture.md`](docs/domain/architecture.md) を参照。
+[`docs/domain/architecture.md`](docs/domain/architecture.md) を参照。アプリ層（`keynaco/`）が `InputMethodKit` を通じてキーイベントを受け取り、`KeynacoCore`（`Core/`）の `InputHandler` struct でロジックを処理。変換は AzooKey API 経由。候補ウィンドウは自作 `NSWindow`（`CandidateWindow.swift`）。
 
 ## テスト方針
 
 - `Core/` の公開型は `public` 必須（`@testable import` はテストのみ有効。App からは `internal` は不可）
 - XCUITest / CGEvent は不採用（`typeText()` は IME をバイパス。CGEvent は Accessibility 権限依存で CI 不安定）
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
+- `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト。`docs/domain/scenarios.md` と対応
 
 ## キー入力の挙動（特殊ケース）
 
