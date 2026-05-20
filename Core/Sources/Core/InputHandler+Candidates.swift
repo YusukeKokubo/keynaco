@@ -273,7 +273,11 @@ public extension InputHandler {
             !historySeen.contains($0) && $0 != zenzaiPromoted
         }
         let candidateSeen = historySeen.union(Set(azooKeyCandidates))
-        let uniquePredictions = predictRaw.filter { !candidateSeen.contains($0) }
+        // noun_bigram は文脈的予測なので AzooKey と重複していても prediction セクションに表示する。
+        // bigram/trigram は AzooKey 辞書にある単語を除外してノイズを減らす。
+        let nounBigramUniq = nounBigramRaw.filter { !historySeen.contains($0) }
+        let otherPredictUniq = Self.merged(trigramRaw, bigramRaw).filter { !candidateSeen.contains($0) }
+        let uniquePredictions = Self.merged(nounBigramUniq, otherPredictUniq)
         let predictCount = uniquePredictions.count
 
         return CandidateListSources(

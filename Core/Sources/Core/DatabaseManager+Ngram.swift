@@ -316,7 +316,7 @@ extension DatabaseManager {
 
     // MARK: - Noun-Bigram
 
-    func recordNounBigram(prev: String, input: String, output: String) {
+    public func recordNounBigram(prev: String, input: String, output: String) {
         guard !prev.isEmpty else { return }
         dispatchWrite {
             let t = self.nowEpoch()
@@ -333,11 +333,11 @@ extension DatabaseManager {
         }
     }
 
-    func fetchNounBigram(prev: String, reading: String) -> [String] {
+    public func fetchNounBigram(prev: String, reading: String) -> [String] {
         fetchNgramWithReading(table: .noun_bigram, prev: prev, reading: reading)
     }
 
-    func fetchNounBigramTop(prev: String, limit: Int = 20) -> [String] {
+    public func fetchNounBigramTop(prev: String, limit: Int = 20) -> [String] {
         fetchNgramTopGrouped(table: .noun_bigram, prev: prev, limit: limit)
     }
 

@@ -763,8 +763,8 @@ final class DebugSocketServer: @unchecked Sendable {
     ]
 
     private static let knownCommandKeys: Set<String> = [
-        "reset", "state", "wait_until", "assert_eventually", "seed_bigram", "seed_history",
-        "set_surrounding",
+        "reset", "state", "wait_until", "assert_eventually", "seed_bigram", "seed_noun_bigram", "seed_history",
+        "set_last_noun", "set_surrounding",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
         "capture", "vars", "schema", "with_examples", "explain",
     ]
@@ -1085,6 +1085,30 @@ final class DebugSocketServer: @unchecked Sendable {
             return Self.finalize(["ok": true], cmd: cmd)
         }
 
+        // {"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}}
+        if let seed = cmd["seed_noun_bigram"] as? [String: Any] {
+            guard let prev   = seed["prev"]   as? String,
+                  let input  = seed["input"]  as? String,
+                  let output = seed["output"] as? String else {
+                return Self.finalize(
+                    Self.errorPayload(
+                        code: "SEED_NOUN_BIGRAM_MISSING_FIELDS",
+                        message: "seed_noun_bigram requires prev, input, output",
+                        hint: #"Use {"seed_noun_bigram":{"prev":"東京","input":"あめ","output":"雨"}}."#,
+                        suggestedFixes: [
+                            ["seed_noun_bigram": ["prev": "東京", "input": "あめ", "output": "雨", "count": 5]]
+                        ]
+                    ),
+                    cmd: cmd
+                )
+            }
+            let count = seed["count"] as? Int ?? 1
+            for _ in 0..<count {
+                handler.db.recordNounBigram(prev: prev, input: input, output: output)
+            }
+            return Self.finalize(["ok": true], cmd: cmd)
+        }
+
         // {"seed_history": {"input": "かんじ", "output": "漢字"}}
         if let seed = cmd["seed_history"] as? [String: Any] {
             guard let input  = seed["input"]  as? String,
@@ -1103,6 +1127,12 @@ final class DebugSocketServer: @unchecked Sendable {
             }
             let times = seed["times"] as? Int ?? 1
             for _ in 0..<times { handler.db.debugSeedHistory(input: input, output: output) }
+            return Self.finalize(["ok": true], cmd: cmd)
+        }
+
+        // {"set_last_noun": "東京"} — LLM 分類なしで lastConfirmedNounOutput を直接セット（テスト用）
+        if let noun = cmd["set_last_noun"] as? String {
+            handler.lastConfirmedNounOutput = noun.isEmpty ? nil : noun
             return Self.finalize(["ok": true], cmd: cmd)
         }
 
