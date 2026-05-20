@@ -113,7 +113,7 @@ stateDiagram-v2
 | ↑ | フォーカス文節の前候補へ |
 | Shift+→ | フォーカス文節を右に1文字拡張（次文節の先頭1文字を奪う） |
 | Shift+← | フォーカス文節を左に1文字縮小（末尾1文字を次文節の先頭に渡す） |
-| Enter | 通常は全文節の選択候補を連結確定 → 待機。例外として `llmWholeText` 設定済みかつ `focusedIndex == 0` で **多文節パス**（全文節が先頭行選択かつ連結が `llmWholeText`）または **フォールバックパス**（先頭文節の `candidates[0]` が `llmWholeText` 全文かつ先頭行選択）を満たすときは **LLM 全文のみ**を 1 回確定する（どちらでもない場合は通常確定へフォールスルーし、stale `llmWholeText` の誤確定を防ぐ） |
+| Enter | 通常は全文節の選択候補を連結確定 → 待機。例外として `llmWholeText` 設定済みかつ `focusedIndex == 0` で **多文節パス**（全文節が先頭行選択かつ各 `candidates[0]` の連結が `llmWholeText` と一致し、かつフォーカス文節の確定テキストが `candidates[0]` と一致）または **フォールバックパス**（先頭文節の `candidates[0]` が `llmWholeText` 全文かつ先頭行選択）を満たすときは **LLM 全文のみ**を 1 回確定する（どちらでもない場合は通常確定へフォールスルーし、stale `llmWholeText` の誤確定を防ぐ） |
 | Escape / Backspace | セグメントモード解除 → 組成に戻す |
 
 セグメント突入時（`boundary_pref` ヒットでも `segmentize` でも）、`InputController` がオンデバイス LLM で読み全体の一括変換を非同期開始する。AzooKey の初期分割は突入直後にそのまま表示される。結果が返れば `inferSegmentBoundaries` で読みと整合する場合は文節境界と候補列を再構築する（`llmWholeText` を設定し候補ウィンドウをリフレッシュ）。**Zenzai 無効**のとき、整合しない場合は従来どおり先頭文節の候補先頭に LLM 全文を挿入する。**Zenzai 有効**のとき、整合しない場合は突入時の候補列を維持し全文挿入は行わない（`llmWholeText` も立てず、ウィンドウはそのまま）。**Zenzai 有効**かつアライメント成功時は、各文節で `candidatesForSegment` の先頭表層（辞書ブロック先頭）が LLM トークンより前に並ぶ（`zenTop == token` の文節は従来どおりトークン先頭化のみ）。このため多文節の LLM 一括ショートカット（各文節 `candidates[0]` の連結が `llmWholeText` と一致）は成立しにくく、Enter は通常の全文節連結確定にフォールスルーしうる。`inferSegmentBoundaries` が **2 ペア以上**で成功した場合の `boundary_pref` 保存条件は従来どおり（`llmWholeText` は設定される）。
