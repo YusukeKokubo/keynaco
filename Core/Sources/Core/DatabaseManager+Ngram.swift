@@ -184,7 +184,7 @@ extension DatabaseManager {
     }
 
     /// プリセット bi-gram（`is_preset = 1`）のみ。ユーザー学習行は含めない。
-    func fetchPresetBigram(prev: String, reading: String) -> [String] {
+    public func fetchPresetBigram(prev: String, reading: String) -> [String] {
         dbQueue.sync {
             let now = self.nowEpoch()
             return self.queryStringsOnQueue("""
@@ -206,7 +206,7 @@ extension DatabaseManager {
     }
 
     /// プリセット bi-gram のみ（冷スタート用）。
-    func fetchPresetBigramTop(prev: String, limit: Int = 20) -> [String] {
+    public func fetchPresetBigramTop(prev: String, limit: Int = 20) -> [String] {
         dbQueue.sync {
             let now = self.nowEpoch()
             return self.queryStringsOnQueue("""
