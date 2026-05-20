@@ -427,31 +427,31 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         press(keyCode: 53)
 
-        // 3語目「行った」確定（bigram: 東京→行った、trigram: 昨日/東京→行った が学習される）
+        // 3語目「一体」確定（bigram: 東京→一体、trigram: 昨日/東京→一体 が学習される）
         typeRomaji("itta")
-        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "行った")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "一体")
         press(keyCode: 53)
 
-        // bigram のみの競合語「住んだ」を bigram で学習（東京→住んだ）
-        // 別文脈: 「今日」「東京」「住んだ」で bigram(東京→住んだ) だけ積む
+        // bigram のみの競合語「一致」を bigram で学習（東京→一致）
+        // 別文脈: 「今日」「東京」「一致」で bigram(東京→一致) だけ積む
         let db = handler.db
-        db.recordBigram(prev: "東京", input: "すんだ", output: "住んだ")
-        db.recordBigram(prev: "東京", input: "すんだ", output: "住んだ")
-        db.recordBigram(prev: "東京", input: "すんだ", output: "住んだ")
+        db.recordBigram(prev: "東京", input: "いっち", output: "一致")
+        db.recordBigram(prev: "東京", input: "いっち", output: "一致")
+        db.recordBigram(prev: "東京", input: "いっち", output: "一致")
 
-        // 「昨日」「東京」に続く4語目を組成中 → trigram (昨日/東京→行った) が上に来るはず
+        // 「昨日」「東京」に続く4語目を組成中 → trigram (昨日/東京→一体) が上に来るはず
         typeRomaji("i")
         let action = type(chars: "t", base: "t")
         guard case .show(let candidates, _, _, _, _) = action.candidateAction else {
             XCTFail("候補が表示されるはず"); return
         }
-        // bigram のみ持つ「住んだ」より trigram で学習済みの「行った」が上位にあること
-        let idxItta = candidates.firstIndex(of: "行った")
-        let idxSunda = candidates.firstIndex(of: "住んだ")
+        // bigram のみ持つ「一致」より trigram で学習済みの「一体」が上位にあること
+        let idxItta = candidates.firstIndex(of: "一体")
+        let idxSunda = candidates.firstIndex(of: "一致")
         if let i = idxItta, let s = idxSunda {
             XCTAssertLessThan(i, s, "trigram 由来の候補が bigram のみの候補より上に並ぶ")
         } else if idxItta == nil {
-            XCTFail("行った が候補に含まれていない: \(candidates)")
+            XCTFail("一体 が候補に含まれていない: \(candidates)")
         }
     }
 

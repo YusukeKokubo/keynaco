@@ -45,6 +45,7 @@ extension DatabaseManager {
             return self.queryOutputScorePairsOnQueue("""
             SELECT output, SUM((\(Self.recencyExpr))) AS s FROM history
             WHERE input LIKE ?
+              AND (is_noun IS NULL OR is_noun = 1)
             GROUP BY output
             ORDER BY s DESC, MAX(used_at) DESC
             LIMIT 20
@@ -52,6 +53,30 @@ extension DatabaseManager {
                 self.bindRecency($0, at: 1, now: now)
                 self.bindText($0, 3, reading + "%")
             }
+        }
+    }
+
+    /// `output` に対応する全履歴行の is_noun フラグを更新する。
+    public func updateNounFlag(output: String, isNoun: Bool) {
+        dispatchWrite {
+            self.executeOnQueue("UPDATE history SET is_noun = ? WHERE output = ?") {
+                sqlite3_bind_int($0, 1, isNoun ? 1 : 0)
+                self.bindText($0, 2, output)
+            }
+        }
+    }
+
+    /// is_noun が未分類（NULL）の出力語を最大 `limit` 件返す（重複排除）。
+    public func fetchUnclassifiedHistory(limit: Int) -> [String] {
+        dbQueue.sync {
+            var results: [String] = []
+            let sql = "SELECT DISTINCT output FROM history WHERE is_noun IS NULL LIMIT ?"
+            guard let stmt = self.cachedStmt(for: sql) else { return results }
+            sqlite3_bind_int(stmt, 1, Int32(limit))
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let p = sqlite3_column_text(stmt, 0) { results.append(String(cString: p)) }
+            }
+            return results
         }
     }
 

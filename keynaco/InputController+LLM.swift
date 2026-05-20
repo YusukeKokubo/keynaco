@@ -31,6 +31,26 @@ extension InputController {
         return historyJoined
     }
 
+    /// 確定語の品詞を LLM で非同期判定し、DB の is_noun フラグを更新する。
+    func scheduleNounClassification(output: String) {
+        let db = handler.db
+        Self.nounClassifier.classify(output: output) { classifiedOutput, isNoun in
+            db.updateNounFlag(output: classifiedOutput, isNoun: isNoun)
+        }
+    }
+
+    /// 未分類（is_noun = NULL）の履歴エントリを最大 50 件バックグラウンドで分類する（起動時に1回呼ぶ）。
+    @MainActor
+    static func performNounBackfill() {
+        let db = DatabaseManager.shared
+        let outputs = db.fetchUnclassifiedHistory(limit: 50)
+        for output in outputs {
+            nounClassifier.classify(output: output) { classifiedOutput, isNoun in
+                db.updateNounFlag(output: classifiedOutput, isNoun: isNoun)
+            }
+        }
+    }
+
     /// 確定 `insertText` 後にカーソル前文を誤変換検出で検査（0.5 秒デバウンス）。
     func scheduleMisconversionCheck(adapter: IMKTextInputAdapter) {
         let prefix = adapter.surroundingText(maxLength: 200).prefix

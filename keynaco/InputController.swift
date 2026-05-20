@@ -112,6 +112,7 @@ class InputController: IMKInputController, @unchecked Sendable {
     static let successorLLM = LLMSuccessorFetcher()
     static let segmentLLM = LLMSegmentConverter()
     static let misconversionChecker = LLMMisconversionChecker()
+    static let nounClassifier = LLMNounClassifier()
 
     static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -325,6 +326,7 @@ class InputController: IMKInputController, @unchecked Sendable {
 
         if adapter.didInsertText {
             scheduleMisconversionCheck(adapter: adapter)
+            scheduleNounClassification(output: adapter.lastInsertedText)
         }
         if !handler.isSuccessorMode, !handler.isBracketMode,
            composingWasEmpty, !handler.state.composingText.isEmpty {

@@ -520,7 +520,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
     func testLowScoreHistoryAppendedAfterAzooKey() {
         let t0: Int64 = 2_000_000_000
         handler.db.clock = { t0 }
-        let marker = "⌘P4LowScore"
+        let marker = "⌘愛媛ア"  // 末尾カタカナ → isNounLike = true
         handler.db.record(input: "あい", output: marker)
         // count=1 かつ age > τ(30日) なら recencyExpr < 0.5
         handler.db.clock = { t0 + 40 * 86400 }
@@ -614,13 +614,13 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // 高スコア履歴 3件（maxHighHistoryCount=3）: 最新順で並ぶ
         useStub(SnapStub(["辞書A", "辞書B"]))
         let t = Int64(1_000_000_000)
-        handler.db.clock = { t };     handler.db.record(input: "あい", output: "愛1")
-        handler.db.clock = { t + 1 }; handler.db.record(input: "あい", output: "愛2")
-        handler.db.clock = { t + 2 }; handler.db.record(input: "あい", output: "愛3")
+        handler.db.clock = { t };     handler.db.record(input: "あい", output: "愛知")
+        handler.db.clock = { t + 1 }; handler.db.record(input: "あい", output: "愛媛")
+        handler.db.clock = { t + 2 }; handler.db.record(input: "あい", output: "愛情")
         handler.db.clock = { t + 3 }
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛3", "愛2", "愛1", "辞書A", "辞書B", "アイ"],
+                     candidates: ["愛情", "愛媛", "愛知", "辞書A", "辞書B", "アイ"],
                      historyEnd: 3, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -698,7 +698,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     }
 
     func testSnap_C3_HiraganaPreferredHiraganaInHistory() {
-        // 「の」が履歴にある: 固定セクションなし（履歴として出る）
+        // 「の」が履歴にある: is_noun=NULL（未分類）は通過するため履歴として出る（固定スロットなし）
         useStub(SnapStub(["辞書A", "辞書B"]))
         handler.db.record(input: "の", output: "の")
         typeRomaji("no")

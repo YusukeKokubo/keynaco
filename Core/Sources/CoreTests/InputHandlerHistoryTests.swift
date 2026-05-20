@@ -47,16 +47,16 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
     }
 
     func testConversionHistoryBoostsNextConversion() {
-        typeRomaji("tanoshii")
-        press(keyCode: 36, candidateVisible: true, selectedText: "楽しい")
+        typeRomaji("toukyou")
+        press(keyCode: 36, candidateVisible: true, selectedText: "東京")
         press(keyCode: 53)  // Escape でSuccessor モードを解除
-        typeRomaji("tanoshii")
+        typeRomaji("toukyou")
         let (_, action) = press(keyCode: 49)
         guard case .show(let candidates, let historyEnd, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertTrue(candidates.prefix(historyEnd).contains("楽しい"),
-                      "前回確定した「楽しい」が次回変換で履歴候補として現れるはず")
+        XCTAssertTrue(candidates.prefix(historyEnd).contains("東京"),
+                      "前回確定した「東京」が次回変換で履歴候補として現れるはず")
     }
 
     // MARK: - 読み前方一致による履歴ヒット（recordPrefixes はフル読みのみ記録）

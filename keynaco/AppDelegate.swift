@@ -39,6 +39,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         Task.detached(priority: .background) {
             DatabaseManager.shared.performGCIfNeeded()
         }
+        Task { @MainActor in
+            InputController.performNounBackfill()
+        }
     }
 
     // アクセサリアプリはデフォルトでメインメニューを持たず Cmd+V/A 等が無視される。

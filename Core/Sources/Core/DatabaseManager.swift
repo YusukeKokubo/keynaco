@@ -28,6 +28,7 @@ public final class DatabaseManager: @unchecked Sendable {
         openDatabase()
         createTables()
         ensureBigramIsPresetColumn()
+        ensureHistoryIsNounColumn()
         seedPresetBigramsIfNeeded()
         seedHiraganaPreferredIfNeeded()
     }
@@ -86,6 +87,7 @@ public final class DatabaseManager: @unchecked Sendable {
             output  TEXT    NOT NULL,
             count   INTEGER NOT NULL DEFAULT 1,
             used_at INTEGER NOT NULL,
+            is_noun INTEGER DEFAULT NULL,
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
@@ -151,6 +153,11 @@ public final class DatabaseManager: @unchecked Sendable {
             "ALTER TABLE bigram ADD COLUMN is_preset INTEGER NOT NULL DEFAULT 0",
             nil, nil, nil
         )
+    }
+
+    /// 既存 DB（is_noun 列がない）向けマイグレーション。
+    func ensureHistoryIsNounColumn() {
+        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN is_noun INTEGER DEFAULT NULL", nil, nil, nil)
     }
 
     private func seedHiraganaPreferredIfNeeded() {
