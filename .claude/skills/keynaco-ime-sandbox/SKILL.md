@@ -119,7 +119,7 @@ send({"reset": True})
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
 | フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
 | インラインアサート | `{"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}}` |
-| bi-gram シード | `{"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}` |
+| noun-bigram シード | `{"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}}` |
 | 履歴シード | `{"seed_history": {"input": "かんじ", "output": "漢字", "times": 3}}` |
 
 `then` に指定できる名前: `space` / `enter` / `backspace` / `escape` / `tab` / `down` / `up` / `left` / `right` / `f6`–`f10` / `eisu` / `kana`
@@ -144,7 +144,7 @@ r_regex = send({"state": True, "assert_regex": {"composedHiragana": ".*"}})
 print("regex_ok?", "assertion_failed" not in r_regex)
 
 # bi-gram をシードしてから Successor を確認
-send({"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}})
+send({"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}})
 r = send({"type_string": "kyou", "then": "enter"})
 print(f"isSuccessorMode: {r['isSuccessorMode']}, candidates: {r['candidates'][:3]}")
 
@@ -185,7 +185,7 @@ print(suite["summary"])  # {"total": 1, "passed": 1, "failed": 0}
 # before_each / after_each で共通セットアップを DRY にする
 suite2 = send({
     "before_each": [
-        {"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}
+        {"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}}
     ],
     "after_each": [
         {"state": True, "describe": "終了時状態確認"}
@@ -269,10 +269,10 @@ print("eventually_ok?", "assertion_failed" not in ae)
 
 | コマンド | 説明 |
 |---------|------|
-| `{"reset": true}` | インメモリ DB（`preset_bigram.csv` シード済み）でリセット。Successor の preset 候補が本番に近い。 |
-| `{"reset": true, "useRealDB": true}` | 実体の `~/Library/Application Support/keynaco/history.db` を一時コピーして開く。変換履歴・ユーザー辞書・`boundary_pref`・学習 bigram などがそのまま使える。 |
+| `{"reset": true}` | インメモリ DB でリセット。必要なら `seed_noun_bigram` / `seed_history` でデータを注入する。 |
+| `{"reset": true, "useRealDB": true}` | 実体の `~/Library/Application Support/keynaco/history.db` を一時コピーして開く。変換履歴・ユーザー辞書・`boundary_pref`・学習 noun-bigram などがそのまま使える。 |
 
-`history.db` が存在しない、またはコピー失敗（DB ロック等）のときは `useRealDB` は無視され、上と同じインメモリ（preset シード済み）にフォールバックする。スナップショットにはユーザーの変換履歴・語彙が含まれるため、ログ共有時は取り扱いに注意する。
+`history.db` が存在しない、またはコピー失敗（DB ロック等）のときは `useRealDB` は無視され、上と同じインメモリ DB にフォールバックする。スナップショットにはユーザーの変換履歴・語彙が含まれるため、ログ共有時は取り扱いに注意する。
 
 **modifier フラグ（mods）:** Shift=131072、Command=1048576、Option=524288。複数は OR で合成。
 
@@ -413,7 +413,7 @@ print(f"segments: {r['segmentTexts']}")
 ## 注意点
 
 - **IMK パイプラインをバイパス**するため、クライアントアプリ依存の挙動（Electron の Enter 問題など）は再現しない
-- デフォルトのリセットではソケットサーバーは**インメモリ DB**（`preset_bigram.csv` シード済み）。本番の `history.db` は **`{"reset": true, "useRealDB": true}`** を使ったときのみ一時コピーで参照する
+- デフォルトのリセットではソケットサーバーは**インメモリ DB**。本番の `history.db` は **`{"reset": true, "useRealDB": true}`** を使ったときのみ一時コピーで参照する
 - **LLM は Debug ビルドのサーバー上で動く**（上記「LLM（Debug ビルド）」）。完了タイミングを見るときは `{"state": true}` ポーリング
 - セッションをまたぐときは必ず `{"reset": true}` を送信して状態をリセットすること（`reset` で LLM フェッチもキャンセルされ `llmEpoch` が進む）
 - 調査結果を報告するときは、各キー入力後の状態を表形式か箇条書きで整理して示すと読みやすい

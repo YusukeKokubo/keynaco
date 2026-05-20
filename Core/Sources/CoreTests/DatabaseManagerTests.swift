@@ -105,100 +105,6 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(db.fetchHistoryExact(reading: "かいぎ").contains("会議"))
     }
 
-    // MARK: - fetchBigramTop
-
-    func testFetchBigramTopEmptyDBReturnsEmpty() {
-        let results = db.fetchBigramTop(prev: "東京")
-        XCTAssertTrue(results.isEmpty, "学習ゼロなら空配列を返す")
-    }
-
-    func testFetchBigramTopSinglePrevReturnsLimited() {
-        db.recordBigram(prev: "東京", input: "で", output: "で")
-        db.recordBigram(prev: "東京", input: "に", output: "に")
-        db.recordBigram(prev: "東京", input: "から", output: "から")
-        let results = db.fetchBigramTop(prev: "東京", limit: 2)
-        XCTAssertEqual(results.count, 2, "limit で切られる")
-    }
-
-    func testFetchBigramTopAggregatesByOutput() {
-        // 同じ output ("が") が 2 つの input で学習されている
-        db.recordBigram(prev: "東京", input: "が", output: "が")
-        db.recordBigram(prev: "東京", input: "がね", output: "が")
-        db.recordBigram(prev: "東京", input: "に", output: "に")
-        let results = db.fetchBigramTop(prev: "東京")
-        let gaCount = results.filter { $0 == "が" }.count
-        XCTAssertEqual(gaCount, 1, "同じ output は 1 件に集約される")
-        XCTAssertTrue(results.contains("に"))
-    }
-
-    func testFetchBigramTopOrderedByCountDesc() {
-        // "で" を 3 回、"に" を 1 回学習
-        db.recordBigram(prev: "東京", input: "で", output: "で")
-        db.recordBigram(prev: "東京", input: "で", output: "で")
-        db.recordBigram(prev: "東京", input: "で", output: "で")
-        db.recordBigram(prev: "東京", input: "に", output: "に")
-        let results = db.fetchBigramTop(prev: "東京")
-        let idxDe = results.firstIndex(of: "で")!
-        let idxNi = results.firstIndex(of: "に")!
-        XCTAssertLessThan(idxDe, idxNi, "count が多い output が先頭")
-    }
-
-    func testFetchBigramTopIgnoresOtherPrev() {
-        db.recordBigram(prev: "東京", input: "で", output: "で")
-        db.recordBigram(prev: "京都", input: "に", output: "に")
-        let results = db.fetchBigramTop(prev: "東京")
-        XCTAssertTrue(results.contains("で"))
-        XCTAssertFalse(results.contains("に"), "別の prev のエントリは混ざらない")
-    }
-
-    // MARK: - fetchTrigramTop
-
-    func testFetchTrigramTopEmptyDBReturnsEmpty() {
-        let results = db.fetchTrigramTop(prev2: "昨日", prev1: "東京")
-        XCTAssertTrue(results.isEmpty, "学習ゼロなら空配列を返す")
-    }
-
-    func testFetchTrigramTopAggregatesByOutput() {
-        // 同じ output ("行った") が 2 つの input で学習されている
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "い", output: "行った")
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "いった", output: "行った")
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "に", output: "に")
-        let results = db.fetchTrigramTop(prev2: "昨日", prev1: "東京")
-        let ittaCount = results.filter { $0 == "行った" }.count
-        XCTAssertEqual(ittaCount, 1, "同じ output は 1 件に集約される")
-        XCTAssertTrue(results.contains("に"))
-    }
-
-    func testFetchTrigramTopOrderedByCountDesc() {
-        // "行った" を 3 回、"住んだ" を 1 回学習
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "い", output: "行った")
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "い", output: "行った")
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "い", output: "行った")
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "す", output: "住んだ")
-        let results = db.fetchTrigramTop(prev2: "昨日", prev1: "東京")
-        let idxItta = results.firstIndex(of: "行った")!
-        let idxSunda = results.firstIndex(of: "住んだ")!
-        XCTAssertLessThan(idxItta, idxSunda, "count が多い output が先頭")
-    }
-
-    func testFetchTrigramTopIsolatedByPrev2Prev1() {
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "に", output: "行った")
-        db.recordTrigram(prev2: "今日", prev1: "東京", input: "に", output: "戻った")
-        db.recordTrigram(prev2: "昨日", prev1: "大阪", input: "に", output: "来た")
-        let results = db.fetchTrigramTop(prev2: "昨日", prev1: "東京")
-        XCTAssertTrue(results.contains("行った"))
-        XCTAssertFalse(results.contains("戻った"), "prev2 が違えば混ざらない")
-        XCTAssertFalse(results.contains("来た"), "prev1 が違えば混ざらない")
-    }
-
-    func testFetchTrigramByReadingPrefix() {
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "いった", output: "行った")
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "うえ", output: "上")
-        let results = db.fetchTrigram(prev2: "昨日", prev1: "東京", reading: "い")
-        XCTAssertTrue(results.contains("行った"), "前方一致で行った が取れる")
-        XCTAssertFalse(results.contains("上"), "前方一致しない候補は除外")
-    }
-
     // MARK: - 時間減衰スコアリング（改善 G）
 
     func testRecencySameCountRecentWins() {
@@ -285,51 +191,6 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("古い"), "7日以内は GC を実行しない")
     }
 
-    // MARK: - プリセット bi-gram（is_preset）
-
-    func testFetchBigramTopCountIncludesStalePresetRows() {
-        let base: Int64 = 1_700_000_000
-        let stale = base - 100 * 86400
-        db.clock = { stale }
-        db.testInsertBigram(
-            prev: "東京", input: "へ", output: "行く", count: 5, usedAt: stale, isPreset: true
-        )
-        db.clock = { base }
-        XCTAssertEqual(db.fetchBigramTopCount(prev: "東京"), 5, "90日超のプリセットも閾値に乗る")
-    }
-
-    func testReplaceBigramKeepsPresetRows() {
-        let t = db.clock()
-        db.testInsertBigram(prev: "保持", input: "あ", output: "ア", count: 5, usedAt: t, isPreset: true)
-        db.testInsertBigram(prev: "削除対象", input: "い", output: "イ", count: 2, usedAt: t, isPreset: false)
-        db.replaceBigram([
-            DatabaseManager.BigramEntry(prev: "新規", input: "う", output: "ウ", count: 3),
-        ])
-        XCTAssertFalse(db.fetchBigram(prev: "保持", reading: "あ").isEmpty, "プリセット行は残る")
-        XCTAssertTrue(db.fetchBigram(prev: "削除対象", reading: "い").isEmpty, "非プリセットはインポートで消える")
-        XCTAssertFalse(db.fetchBigram(prev: "新規", reading: "う").isEmpty, "インポート行が入る")
-    }
-
-    func testGCDoesNotDeleteStalePresetBigram() {
-        UserDefaults.standard.removeObject(forKey: "lastGCDate")
-        let base: Int64 = 1_700_000_000
-        db.clock = { base }
-        db.testInsertBigram(prev: "P", input: "x", output: "X", count: 1, usedAt: base, isPreset: true)
-        db.clock = { base + 181 * 86400 }
-        db.performGCIfNeeded()
-        XCTAssertFalse(db.fetchBigram(prev: "P", reading: "x").isEmpty, "プリセットは GC 対象外")
-    }
-
-    func testGCDeletesStaleNonPresetBigram() {
-        UserDefaults.standard.removeObject(forKey: "lastGCDate")
-        let base: Int64 = 1_700_000_000
-        db.clock = { base }
-        db.testInsertBigram(prev: "U", input: "y", output: "Y", count: 1, usedAt: base, isPreset: false)
-        db.clock = { base + 181 * 86400 }
-        db.performGCIfNeeded()
-        XCTAssertTrue(db.fetchBigram(prev: "U", reading: "y").isEmpty, "非プリセットの count=1 古い行は削除")
-    }
-
     // MARK: - ユーザー辞書
 
     func testUserDictAddAndFetch() {
@@ -394,49 +255,14 @@ final class DatabaseManagerTests: XCTestCase {
 
     func testPenalizeAllDeletesHistoryWhenCountReachesZero() {
         db.record(input: "あ", output: "阿")
-        db.penalizeAll(input: "あ", output: "阿", prev1: nil, prev2: nil, skipPrevs: [], fullReading: nil)
+        db.penalizeAll(input: "あ", output: "阿", fullReading: nil)
         XCTAssertTrue(db.fetchHistoryExact(reading: "あ").isEmpty)
-    }
-
-    func testPenalizeAllDecrementsBigramNonPreset() {
-        db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 2, usedAt: 0, isPreset: false)
-        db.penalizeAll(input: "きょう", output: "今日", prev1: "東京", prev2: nil, skipPrevs: [], fullReading: nil)
-        let row = db.fetchAllBigram().first { $0.prev == "東京" && $0.input == "きょう" && $0.output == "今日" }
-        XCTAssertEqual(row?.count, 1)
-        db.penalizeAll(input: "きょう", output: "今日", prev1: "東京", prev2: nil, skipPrevs: [], fullReading: nil)
-        let row2 = db.fetchAllBigram().first { $0.prev == "東京" && $0.input == "きょう" && $0.output == "今日" }
-        XCTAssertNil(row2)
-    }
-
-    func testPenalizeAllDoesNotDecrementPresetBigram() {
-        db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 2, usedAt: 0, isPreset: true)
-        db.penalizeAll(input: "きょう", output: "今日", prev1: "東京", prev2: nil, skipPrevs: [], fullReading: nil)
-        let row = db.fetchAllBigram().first { $0.prev == "東京" && $0.input == "きょう" && $0.output == "今日" }
-        XCTAssertEqual(row?.count, 2)
-    }
-
-    func testPenalizeAllDecrementsTrigram() {
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "い", output: "行った")
-        db.recordTrigram(prev2: "昨日", prev1: "東京", input: "い", output: "行った")
-        db.penalizeAll(input: "い", output: "行った", prev1: "東京", prev2: "昨日", skipPrevs: [], fullReading: nil)
-        XCTAssertTrue(db.fetchTrigramTop(prev2: "昨日", prev1: "東京").contains("行った"))
-        db.penalizeAll(input: "い", output: "行った", prev1: "東京", prev2: "昨日", skipPrevs: [], fullReading: nil)
-        XCTAssertFalse(db.fetchTrigramTop(prev2: "昨日", prev1: "東京").contains("行った"))
-    }
-
-    func testPenalizeAllDecrementsSkipBigram() {
-        db.recordSkipBigram(prev: "今日", input: "いく", output: "行く")
-        db.recordSkipBigram(prev: "今日", input: "いく", output: "行く")
-        db.penalizeAll(input: "いく", output: "行く", prev1: nil, prev2: nil, skipPrevs: ["今日"], fullReading: nil)
-        XCTAssertTrue(db.fetchSkipBigramTop(prev: "今日").contains("行く"))
-        db.penalizeAll(input: "いく", output: "行く", prev1: nil, prev2: nil, skipPrevs: ["今日"], fullReading: nil)
-        XCTAssertFalse(db.fetchSkipBigramTop(prev: "今日").contains("行く"))
     }
 
     func testPenalizeAllDeletesBoundaryPref() {
         db.saveBoundaryPref(fullReading: "あいうえ", segments: ["あい", "うえ"])
         XCTAssertNotNil(db.fetchBoundaryPref(fullReading: "あいうえお"))
-        db.penalizeAll(input: "x", output: "y", prev1: nil, prev2: nil, skipPrevs: [], fullReading: "あいうえ")
+        db.penalizeAll(input: "x", output: "y", fullReading: "あいうえ")
         XCTAssertNil(db.fetchBoundaryPref(fullReading: "あいうえお"))
     }
 

@@ -23,7 +23,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
 | `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 8 ファイル。Zenzai タブ含む） |
 | `keynaco/Resources/` | バンドルリソース（`zenz-v3.1-small-gguf/` = Zenzai モデル git submodule） |
-| `keynaco/PresetBigram/` | `preset_bigram.csv`（プリセット Bi-gram バンドルリソース） |
 | `keynaco/Debug/` | デバッグ用ツール（`EventViewerWindow` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
 | `Core/Sources/CoreTests/` | `KeynacoCore` のユニットテスト（XCTest） |
@@ -40,7 +39,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 | スクリプト | 用途 |
 |-----------|------|
-| `generate_preset_bigram_csv.py` | `preset_bigram.csv` 生成 |
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
 | `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |

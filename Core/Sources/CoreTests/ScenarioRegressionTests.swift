@@ -105,7 +105,8 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         var h = handler!
         h.committedHistory = []
         h.virtualHistoryPrefix = ["東京"]
-        h.db.testInsertBigram(prev: "東京", input: "に", output: "に", count: 3, usedAt: Int64(Date().timeIntervalSince1970), isPreset: true)
+        h.db.recordNounBigram(prev: "東京", input: "に", output: "に")
+        h.lastConfirmedNounOutput = "東京"
         _ = h.suggestSuccessors()
         XCTAssertTrue(h.isSuccessorMode)
         XCTAssertTrue(h.pendingSuccessorCandidates.contains("に"))

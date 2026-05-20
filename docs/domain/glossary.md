@@ -62,7 +62,7 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### particles
-格助詞の固定リスト（`InputHandler.particles`）。Successor モードの名詞末尾 fallback、bigram 文脈スキップ（`mostRecentContentWords`）等に使用する。
+格助詞の固定リスト（`InputHandler.particles`）。Successor モードの名詞末尾 fallback、LLM 例示のフィルタ（`applySuccessorLLMScheduling`）等に使用する。
 
 ### hiraganaPreferred
 ひらがな表記が自然な語彙の集合。`particles` の上位集合。  
@@ -79,7 +79,7 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 1. ひらがな / カタカナ（固定枠）
 2. ユーザー辞書（完全一致 + 前方一致）
 3. **Zenzai top-1**（Zenzai 設定 ON かつ左文脈ありのときのみ）
-4. 予測候補（noun-bigram → trigram → bigram の順。2語前コンテキスト優先）
+4. 予測候補（noun-bigram。`lastConfirmedNounOutput` が必要）
 5. 履歴（時間減衰スコアが閾値以上の行。完全一致読みのみ上位グループ）
 6. 数字候補（数字のみ読みのとき）
 7. 日時候補（`きょう` / `いま` 等のとき）
@@ -123,7 +123,7 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 ### isSuccessorMode
 確定直後に学習済みの後続語候補を `pendingSuccessorCandidates` に保持し、ユーザーの 1 打目で候補ウィンドウを開く状態。  
 **起動条件**: 漢字・カタカナ末尾（`isNounLike` 真）のときのみ起動。ひらがな末尾（動詞・助詞・副詞等）の後は bi-gram があっても起動しない。  
-noun-bigram → trigram → bigram の順で候補を取得し、格助詞リストを fallback として末尾に並べる。  
+noun-bigram で候補を取得し、格助詞リストを fallback として末尾に並べる。  
 確定後は次の候補があれば連鎖表示を継続する（ただし確定語が名詞末尾の場合のみ）。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`、`Tests/LLMSuccessorFetcherTests.swift`*
@@ -149,29 +149,21 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 ## 学習・履歴
 
 ### lastCommittedOutput
-直前に確定した変換結果（`committedHistory.last`）。trigram の prev1 および bigram の prev として使う。  
+直前に確定した変換結果（`committedHistory.last`）。Successor の格助詞 fallback 判定等に使う。  
 `committedHistory` が空のときは `virtualHistoryPrefix.last` でフォールバックする（**予測のみ**。学習は `committedHistory` 直参照）。
-
-### prev2Output
-2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。  
-`committedHistory` が 1 件のときは `virtualHistoryPrefix.last`、0 件のときは virtual の 2 語目を参照する。
 
 ### virtualHistoryPrefix
 IMK `before` テキスト末尾から抽出した仮想末尾語列（最大 2 語、古→新）。組成開始時に `InputController` がセットする。  
-**不変条件**: `recordNgrams` / `pushCommitted` / `successorLLMContext` には流さない。`UserDefaults` の `virtualHistoryEnabled`（デフォルト true）で無効化可能。
+**不変条件**: `pushCommitted` / `successorLLMContext` には流さない。`UserDefaults` の `virtualHistoryEnabled`（デフォルト true）で無効化可能。
 
 ### lastConfirmedContext
 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。  
 **不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。
 
 ### DatabaseManager
-変換履歴（`history`）・bi-gram（`bigram`）・tri-gram（`trigram`）・skip-bigram（`skip_bigram`）・noun-bigram（`noun_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）・ひらがな優先語彙（`hiragana_preferred`）の **8 テーブル**を持つ SQLite ストア。  
-`InputHandler` のイニシャライザで DI。テストは `inMemory: true`。  
+変換履歴（`history`）・noun-bigram（`noun_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）・ひらがな優先語彙（`hiragana_preferred`）の **5 テーブル**を持つ SQLite ストア。  
+`InputHandler` のイニシャライザで DI。テストは `inMemory: true`。起動時に廃止した `bigram` / `trigram` / `skip_bigram` を DROP する。  
 全 fetch/record で時間減衰スコア `count / (1 + age_days / τ)`（τ=30日）を使用。`user_dict` のみ time-decay なし。
-
-#### プリセット bi-gram（`is_preset`）
-冷スタートでも後続予測が効くよう、バンドル内 `preset_bigram.csv` から初回起動時のみ `bigram` に投入する。  
-Bi-gram インポート・GC でプリセット行は消えない。データ出典はプロジェクトオリジナル（第三者コーパスの転載ではない）。
 
 #### recordPrefixes
 3 文字以上のひらがな確定時、len=2〜N-1 の前方一致パターンも同時に `history` に記録する。  
@@ -181,21 +173,15 @@ Bi-gram インポート・GC でプリセット行は消えない。データ出
 #### noun-bigram
 名詞→名詞のペアのみを `noun_bigram` に記録する。`prev` は直前に確定した名詞（助詞・動詞が間にあってよい）。  
 確定時に `lastConfirmedNounOutput` をキャプチャし、LLM 品詞分類（`LLMPOSClassifier`）完了後 `pos == "noun"` のとき `recordNounBigram` する。  
-Apple Intelligence 無効時は蓄積されず bigram がフォールバック。
+Apple Intelligence 必須前提。無効時は noun-bigram は蓄積されず予測候補も出ない。
 
 #### lastConfirmedNounOutput
-LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` および助詞を挟んだ予測の参照キー。セッションをまたいでリセットしない。
-
-#### skip-bigram（参照廃止）
-テーブルは既存 DB 互換のため残すが、確定時の記録および候補参照は廃止。役割は noun-bigram に移行。
-
-#### ユーザー bi-gram 学習（廃止）
-確定時の `recordNgrams` は tri-gram のみ。名詞ペアは noun-bigram、冷スタートはプリセット bi-gram（`is_preset = 1`）のみ参照する。
+LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` および Successor / pending 先読みの参照キー。セッションをまたいでリセットしない。
 
 #### penalizeAll（訂正シグナル）
-確定直後 Backspace 時に呼ばれ、history / bigram / trigram / skip_bigram の該当行を count -1（0以下で削除）、`boundary_pref` 行を DELETE する。
+確定直後 Backspace 時に呼ばれ、history の該当行を count -1（0以下で削除）、`boundary_pref` 行を DELETE する。
 
-*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/NounBigramTests.swift`, `Tests/SkipBigramTests.swift`*
+*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/NounBigramTests.swift`*
 
 ---
 

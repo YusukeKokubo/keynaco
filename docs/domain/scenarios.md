@@ -55,18 +55,18 @@
 
 ## S-03: Successor モードの 1 打目（保留 + 読み／格助詞マージ）
 
-**前提**: `東京` を確定した直後（末尾カタカナ → `isNounLike` 真 → bi-gram 候補 + 格助詞 fallback を **`pendingSuccessorCandidates` に保存し `.dismiss`**）
+**前提**: `東京` を確定した直後（末尾カタカナ → `isNounLike` 真 → noun-bigram 候補 + 格助詞 fallback を **`pendingSuccessorCandidates` に保存し `.dismiss`**）
 
 | ステップ | キー | successorFirstChar | 動作 |
 |---------|------|--------------------|------|
 | 0 | — | — | 確定直後はウィンドウを出さず Successor モードのみ |
 | 1 | `g` | `g` | `particleRomajiMap["g"]` と DB 併合で候補を「が」に絞り込み |
-| 2a | Space | — | 絞り込み中の先頭候補「が」を確定 → bigram があれば Successor 継続、なければ待機 |
+| 2a | Space | — | 絞り込み中の先頭候補「が」を確定 → noun-bigram があれば Successor 継続、なければ待機 |
 | 2b | `z` | — | `g` を通常入力として流す（`g` → pendingRomaji）、モード解除 |
 
 2b のケースでは、1 打目 `g` が組成バッファに入り直し、`gz` の途中状態から通常の組成処理が続く。  
 **注意**: `g` の後に `a` を打つと 2b 同様にモード解除→通常組成になり `が` が markedText に入る（自動確定はしない）。
-**注意**: 1打目のマージは `pendingSuccessorCandidates` がある場合の経路。ひらがな末尾の語の後は bi-gram があっても Successor には入らない（通常組成へ）。
+**注意**: 1打目のマージは `pendingSuccessorCandidates` がある場合の経路。ひらがな末尾の語の後は noun-bigram があっても Successor には入らない（通常組成へ）。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
@@ -74,7 +74,7 @@
 
 ## S-03a: Successor 長い後続語の prefix 展開
 
-**前提**: `東京` 確定後、保留に `会議に出席する`（bi-gram または LLM extras）。1 打目 `k` で読みフィルタを通過。
+**前提**: `東京` 確定後、保留に `会議に出席する`（noun-bigram または LLM extras）。1 打目 `k` で読みフィルタを通過。
 
 | ステップ | キー | candidates（例） | 動作 |
 |---------|------|------------------|------|
@@ -84,20 +84,19 @@
 
 ---
 
-## S-03b: Successor モードの後続語予測（trigram + bigram）
+## S-03b: Successor モードの後続語予測（noun-bigram）
 
-**前提**: `東京`（漢字末尾）を確定。事前に bigram `(東京, について, について)` と trigram `(昨日, 東京, *, 行った)` を学習済み。
+**前提**: `東京`（漢字末尾）を確定。事前に noun-bigram `(prev=東京, について, について)` を学習済み。`lastConfirmedNounOutput = 東京`。
 
 | ステップ | キー | 状態 | candidates | 動作 |
 |---------|------|------|-----------|------|
-| 0a | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram あり → 確定直後は `.dismiss`（ウィンドウは開かない） |
-| 0b | — | Successor モード | 保存（`pendingSuccessorCandidates`） | trigram なし → bigram のみ + 格助詞 fallback |
+| 0 | — | Successor モード | 保存（`pendingSuccessorCandidates`） | noun-bigram あり → 確定直後は `.dismiss`（ウィンドウは開かない） |
 | 1a | `n`（「に」「の」行） | Successor モード | `["について", "に", "の", ...]` | 1打目 `romajiToInitialKana["n"]`→「な」行フィルタで一致候補を表示 |
 | 1b | Space | 待機 | — | 1打後、先頭候補を確定 |
 | 1c | マッチしないキー | 待機 | — | 一致候補なし → モード解除→通常入力 |
 
-`isNounLike` が偽（ひらがな末尾）なら bi-gram / tri-gram があっても Successor モードには入らない。  
-名詞末尾で N-gram が空でも、格助詞 fallback は **`pendingSuccessorCandidates` に積まれ**、1打目で表示する。
+`isNounLike` が偽（ひらがな末尾）なら noun-bigram があっても Successor モードには入らない。  
+名詞末尾で noun-bigram が空でも、格助詞 fallback は **`pendingSuccessorCandidates` に積まれ**、1打目で表示する。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
@@ -105,15 +104,15 @@
 
 ## S-03c: Successor チェーン（名詞→格助詞確定後）
 
-**前提**: `東京` を確定。bigram `(東京, が)` を学習済み。
+**前提**: `東京` を確定。noun-bigram `(東京, が)` を学習済み。
 
 | ステップ | キー | 状態 | 動作 |
 |---------|------|------|------|
-| 0 | — | Successor モード | N-gram あり（`が` が bigram 学習済み）→ `.dismiss`（確定直後はウィンドウなし） |
+| 0 | — | Successor モード | noun-bigram あり（`が` が学習済み）→ `.dismiss`（確定直後はウィンドウなし） |
 | 1 | `g` | Successor モード | `pendingSuccessorCandidates` を読みフィルタして表示（`["が", ...]`）|
 | 2 | Space | 待機 | 「が」確定 → ひらがな末尾（`isNounLike` 偽）→ Successor 終了 |
 
-**変更点（旧仕様との差異）**: 以前は「が」確定後も `suggestSuccessors()` が再呼び出しされ、`(が, 好き)` など bigram があればチェーンが継続していた。現在はひらがな末尾確定後は Successor に入らないため、格助詞の後は通常の組成に戻る。
+**変更点（旧仕様との差異）**: 以前は「が」確定後も `suggestSuccessors()` が再呼び出しされ、`(が, 好き)` など N-gram があればチェーンが継続していた。現在はひらがな末尾確定後は Successor に入らないため、格助詞の後は通常の組成に戻る。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
@@ -133,16 +132,15 @@
 
 ---
 
-## S-05: 予測候補の表示（trigram + bigram）
+## S-05: 予測候補の表示（noun-bigram）
 
-**前提**: `lastCommittedOutput = "東京"`、`prev2Output = "行った"` とする。
+**前提**: `lastCommittedOutput = "東京"`、`lastConfirmedNounOutput = "東京"` とする。
 
 **入力**: `ni` (「に」組成中)
 
-- まず `trigram` テーブルを `(行った, 東京) × に*` で検索 → ヒットがあれば優先
-- 次に `bigram` テーブルを `東京 × に*` で検索して trigram にない候補を補完
-- ヒット例（bigram のみ）: `に` → 候補: `に` / `は` / `の`（東京の後によく続く助詞）
-- 候補リスト優先順位: ひらがな・カタカナ固定 → ユーザー辞書 →（Zenzai ON かつ左文脈ありなら）**辞書先頭 1 行** → **予測（trigram + bigram）** → 履歴 → 残りの辞書
+- `noun_bigram` を `lastConfirmedNounOutput × 読み` で検索（例: prev=`東京`, reading=`に*`）
+- ヒット例: `に` → 候補: `に` / `は` / `の`
+- 候補リスト優先順位: ひらがな・カタカナ固定 → ユーザー辞書 →（Zenzai ON かつ左文脈ありなら）**辞書先頭 1 行** → **予測（noun-bigram）** → 履歴 → 残りの辞書
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
@@ -201,13 +199,12 @@
 **前提**: `今日 → を → 行く` の順で確定済み。`今日` と `行く` が LLM 品詞分類で名詞と判定されている。
 
 - `今日` 確定 → POS 分類完了後 `lastConfirmedNounOutput = "今日"`
-- `を` 確定（助詞）→ bigram `(今日, を, を)` のみ記録（格助詞 prev の bigram はスキップ）
+- `を` 確定（助詞）→ noun-bigram は記録されない（助詞は `lastConfirmedNounOutput` を更新しない）
 - `行く` 確定 → POS 分類で名詞と判定 → noun-bigram `(prev="今日", input=読み, output="行く")` を記録 → `lastConfirmedNounOutput = "行く"`
 
-**次回**: `を` の直後に `い` を打つと、通常 bigram には `(を → い*)` のみだが、
-`lastConfirmedNounOutput == "今日"` により noun-bigram `(今日, い*, ...)` から `行く` が予測候補の先頭付近に追加される。
+**次回**: `を` の直後に `い` を打つと、`lastConfirmedNounOutput == "今日"` により noun-bigram `(今日, い*, ...)` から `行く` が予測候補の先頭付近に追加される。
 
-**制約**: 文頭の最初の名詞は `prevNoun == nil` のため noun-bigram は記録されない。Apple Intelligence 無効時は noun-bigram は蓄積されず bigram のみがフォールバック。
+**制約**: 文頭の最初の名詞は `prevNoun == nil` のため noun-bigram は記録されない。Apple Intelligence 無効時は noun-bigram は蓄積・参照されない。
 
 *Tests: `Tests/NounBigramTests.swift`*
 
@@ -215,20 +212,20 @@
 
 ## S-03d: pendingRomaji 先読み予測（1打削減）
 
-**前提**: `東京` を確定。bigram `(東京, について, について)` を学習済み（Successor の閾値未満で遅延表示中）。
+**前提**: `東京` を確定。noun-bigram `(東京, について, について)` を学習済み（Successor の閾値未満で遅延表示中）。
 
 | ステップ | キー | 状態 | pendingRomaji | composedHiragana | 動作 |
 |---------|------|------|--------------|-----------------|------|
-| 0 | — | Successor モード | — | — | N-gram 遅延表示中（`pendingSuccessorCandidates = ["について"]`） |
+| 0 | — | Successor モード | — | — | noun-bigram 遅延表示中（`pendingSuccessorCandidates = ["について"]`） |
 | 1 | Escape | 待機 | — | — | Successor モードキャンセル（`lastCommittedOutput = "東京"` は保持） |
 | 2 | `n` | 組成中 | `n` | `` | **先読み除外**（`n` は `ん` との曖昧さあり） → `.dismiss` |
-| — | `i` | 組成中 | `` | `に` | 「に」が組成 → bigram フィルタで候補表示 |
+| — | `i` | 組成中 | `` | `に` | 「に」が組成 → noun-bigram フィルタで候補表示 |
 
-**先読みが効くケース**: `t` を入力すると `romajiToInitialKana["t"]` → 「た行」全体で先読み → 「て」「と」「た」始まりの bi-gram があれば即座に候補表示 → Space で確定（`i` 打鍵を省略）。
+**先読みが効くケース**: `t` を入力すると `romajiToInitialKana["t"]` → 「た行」全体で先読み → 「て」「と」「た」始まりの noun-bigram があれば即座に候補表示 → Space で確定（`i` 打鍵を省略）。
 
 | ステップ | キー | 状態 | 動作 |
 |---------|------|------|------|
-| 0 | — | 待機 | `lastCommittedOutput = "て"`、bi-gram `(て, から)` 学習済み |
+| 0 | — | 待機 | `lastCommittedOutput = "て"`、noun-bigram `(て, から)` 学習済み |
 | 1 | `k` | Successor モード | `buildPendingCandidateList("k")` → `["か", "き", ..., "から"]` → `.show`（`pendingRomaji = "k"` は保持） |
 | 2 | Space | 待機 | `confirmSuccessor("から")` → 「から」確定（`i` を打たず1打削減） |
 
@@ -299,7 +296,7 @@
 | 1 | `k`,`y`,`o`,`u` | 組成中 | `きょう` | ローマ字変換 |
 | 2 | Space | 候補選択中 | `今日`（選択中） | `buildCandidateList` が候補を組み立て。リスト末尾側（historyEnd 直後）に `2026年4月29日` / `4月29日` / `2026-04-29` / `2026/04/29` を追加 |
 | 3 | ↓×N | 候補選択中 | `2026-04-29` | 日時候補まで移動 |
-| 4 | Enter | 待機 | — | `2026-04-29` を確定。`recordPrefixes` / bigram / trigram には**記録しない** |
+| 4 | Enter | 待機 | — | `2026-04-29` を確定。`recordPrefixes` には**記録しない**（数字・日時確定） |
 
 **制約**:
 - 日時候補は `historyEnd` より後（AzooKey 辞書候補と同じゾーン）に挿入されるため Shift+Delete 不可

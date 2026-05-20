@@ -229,6 +229,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     #endif
 
     @objc private func openUserDict() {
-        SettingsWindowController.shared.showSettings(selectingTab: 1)
+        SettingsWindowController.shared.showSettings(selectingTab: 0)
     }
 }

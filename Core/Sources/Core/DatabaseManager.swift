@@ -17,30 +17,23 @@ public final class DatabaseManager: @unchecked Sendable {
     var clock: () -> Int64 = { Int64(Date().timeIntervalSince1970) }
     func nowEpoch() -> Int64 { clock() }
 
-    /// `preset_seeded_v1` の保存先。統合テスト等で `UserDefaults(suiteName:)` に差し替え可能（既定は `standard`）。
-    var presetSeedUserDefaults: UserDefaults = .standard
-
-    private static let presetSeededUserDefaultsKey = "preset_seeded_v2"
     private static let hiraganaPreferredSeededKey = "hiragana_preferred_seeded_v1"
 
     private init() {
         writeAsync = true
         openDatabase()
         createTables()
-        ensureBigramIsPresetColumn()
+        dropDeprecatedNgramTables()
         ensureHistoryPOSColumn()
-        seedPresetBigramsIfNeeded()
         seedHiraganaPreferredIfNeeded()
     }
 
     /// テスト用: インメモリ DB で初期化
-    /// - Parameter seedPresets: `true` のとき UserDefaults を踏まず `preset_bigram.csv` を投入（デバッグサンドボックス用）
-    public init(inMemory: Bool, seedPresets: Bool = false) {
+    public init(inMemory: Bool) {
         writeAsync = false
         guard sqlite3_open(":memory:", &db) == SQLITE_OK else { return }
         createTables()
-        ensureBigramIsPresetColumn()
-        if seedPresets { forceSeedPresets() }
+        dropDeprecatedNgramTables()
     }
 
     /// デバッグ用: 既存ファイル DB を開く（一時スナップショット等）。`CREATE` は付けず、誤った空ファイル生成を避ける。
@@ -48,7 +41,7 @@ public final class DatabaseManager: @unchecked Sendable {
         writeAsync = false
         guard sqlite3_open_v2(snapshotPath, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { return }
         createTables()
-        ensureBigramIsPresetColumn()
+        dropDeprecatedNgramTables()
     }
 
     deinit {
@@ -91,38 +84,6 @@ public final class DatabaseManager: @unchecked Sendable {
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
-        CREATE TABLE IF NOT EXISTS bigram (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            prev      TEXT    NOT NULL,
-            input     TEXT    NOT NULL,
-            output    TEXT    NOT NULL,
-            count     INTEGER NOT NULL DEFAULT 1,
-            used_at   INTEGER NOT NULL,
-            is_preset INTEGER NOT NULL DEFAULT 0,
-            UNIQUE(prev, input, output)
-        );
-        CREATE INDEX IF NOT EXISTS idx_bigram ON bigram(prev, input);
-        CREATE TABLE IF NOT EXISTS trigram (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            prev2   TEXT    NOT NULL,
-            prev1   TEXT    NOT NULL,
-            input   TEXT    NOT NULL,
-            output  TEXT    NOT NULL,
-            count   INTEGER NOT NULL DEFAULT 1,
-            used_at INTEGER NOT NULL,
-            UNIQUE(prev2, prev1, input, output)
-        );
-        CREATE INDEX IF NOT EXISTS idx_trigram ON trigram(prev2, prev1, input);
-        CREATE TABLE IF NOT EXISTS skip_bigram (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            prev    TEXT    NOT NULL,
-            input   TEXT    NOT NULL,
-            output  TEXT    NOT NULL,
-            count   INTEGER NOT NULL DEFAULT 1,
-            used_at INTEGER NOT NULL,
-            UNIQUE(prev, input, output)
-        );
-        CREATE INDEX IF NOT EXISTS idx_skip_bigram ON skip_bigram(prev, input);
         CREATE TABLE IF NOT EXISTS noun_bigram (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             prev    TEXT    NOT NULL,
@@ -156,13 +117,11 @@ public final class DatabaseManager: @unchecked Sendable {
         if writeAsync { dbQueue.async(execute: block) } else { dbQueue.sync(execute: block) }
     }
 
-    /// 既存 DB（is_preset 列がない）向け。新規 CREATE 済みの場合は duplicate column エラーで無視する。
-    private func ensureBigramIsPresetColumn() {
-        sqlite3_exec(
-            db,
-            "ALTER TABLE bigram ADD COLUMN is_preset INTEGER NOT NULL DEFAULT 0",
-            nil, nil, nil
-        )
+    /// 廃止した bigram / trigram / skip_bigram テーブルを既存 DB から削除する。
+    private func dropDeprecatedNgramTables() {
+        for table in ["skip_bigram", "trigram", "bigram"] {
+            sqlite3_exec(db, "DROP TABLE IF EXISTS \(table)", nil, nil, nil)
+        }
     }
 
     /// 既存 DB（pos 列がない）向けマイグレーション。is_noun からの変換も行う。
@@ -174,52 +133,9 @@ public final class DatabaseManager: @unchecked Sendable {
     }
 
     private func seedHiraganaPreferredIfNeeded() {
-        guard presetSeedUserDefaults.object(forKey: Self.hiraganaPreferredSeededKey) == nil else { return }
+        guard UserDefaults.standard.object(forKey: Self.hiraganaPreferredSeededKey) == nil else { return }
         seedHiraganaPreferredDefault()
-        presetSeedUserDefaults.set(true, forKey: Self.hiraganaPreferredSeededKey)
-    }
-
-    /// バンドル内 `preset_bigram.csv` を初回のみ投入（`init(inMemory:)` では呼ばない）。
-    private func seedPresetBigramsIfNeeded() {
-        guard presetSeedUserDefaults.object(forKey: Self.presetSeededUserDefaultsKey) == nil else { return }
-        forceSeedPresets()
-        presetSeedUserDefaults.set(true, forKey: Self.presetSeededUserDefaultsKey)
-    }
-
-    /// UserDefaults チェックなしで `preset_bigram.csv` を投入する（デバッグサンドボックス専用）。
-    private func forceSeedPresets() {
-        guard let url = Bundle.main.url(forResource: "preset_bigram", withExtension: "csv") else {
-            NSLog("keynaco: preset_bigram.csv がバンドルに含まれていません")
-            return
-        }
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-            NSLog("keynaco: preset_bigram.csv を読めませんでした")
-            return
-        }
-        let initialCount = Int64(LearningThresholds.successorImmediateThreshold)
-        let t = nowEpoch()
-        executeOnQueue("BEGIN")
-        for line in text.split(whereSeparator: \.isNewline) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
-            if trimmed.hasPrefix("prev,") { continue }
-            let parts = trimmed.split(separator: ",", maxSplits: 2, omittingEmptySubsequences: false)
-                .map(String.init)
-            guard parts.count == 3 else { continue }
-            let prev = parts[0], input = parts[1], output = parts[2]
-            if prev.isEmpty || input.isEmpty || output.isEmpty { continue }
-            executeOnQueue("""
-            INSERT OR IGNORE INTO bigram (prev, input, output, count, used_at, is_preset)
-            VALUES (?, ?, ?, ?, ?, 1)
-            """) { stmt in
-                self.bindText(stmt, 1, prev)
-                self.bindText(stmt, 2, input)
-                self.bindText(stmt, 3, output)
-                sqlite3_bind_int64(stmt, 4, initialCount)
-                sqlite3_bind_int64(stmt, 5, t)
-            }
-        }
-        executeOnQueue("COMMIT")
+        UserDefaults.standard.set(true, forKey: Self.hiraganaPreferredSeededKey)
     }
 
     // MARK: - SQLite ヘルパー（dbQueue 上でのみ呼び出す）
@@ -299,36 +215,6 @@ public final class DatabaseManager: @unchecked Sendable {
 
     // MARK: - 設定画面用（型定義）
 
-    public struct BigramEntry: Sendable {
-        public let prev: String
-        public let input: String
-        public let output: String
-        public let count: Int
-
-        public init(prev: String, input: String, output: String, count: Int) {
-            self.prev = prev
-            self.input = input
-            self.output = output
-            self.count = count
-        }
-    }
-
-    public struct TrigramEntry: Sendable {
-        public let prev2: String
-        public let prev1: String
-        public let input: String
-        public let output: String
-        public let count: Int
-
-        public init(prev2: String, prev1: String, input: String, output: String, count: Int) {
-            self.prev2 = prev2
-            self.prev1 = prev1
-            self.input = input
-            self.output = output
-            self.count = count
-        }
-    }
-
     public struct HistoryEntry: Sendable {
         public let input: String
         public let output: String
@@ -342,13 +228,10 @@ public final class DatabaseManager: @unchecked Sendable {
         public let output: String
     }
 
-    /// 確定直後 Backspace（誤変換訂正）で history / bigram / trigram / skip_bigram / boundary_pref を一括ペナルティする。
+    /// 確定直後 Backspace（誤変換訂正）で history / boundary_pref を一括ペナルティする。
     func penalizeAll(
         input: String,
         output: String,
-        prev1: String?,
-        prev2: String?,
-        skipPrevs: [String],
         fullReading: String?
     ) {
         dispatchWrite {
@@ -358,50 +241,6 @@ public final class DatabaseManager: @unchecked Sendable {
             }
             self.executeOnQueue("DELETE FROM history WHERE input = ? AND output = ? AND count <= 0") {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
-            }
-            if let p1 = prev1 {
-                self.executeOnQueue("""
-                    UPDATE bigram SET count = count - 1
-                    WHERE prev = ? AND input = ? AND output = ? AND is_preset = 0
-                    """) {
-                    self.bindText($0, 1, p1); self.bindText($0, 2, input); self.bindText($0, 3, output)
-                }
-                self.executeOnQueue("""
-                    DELETE FROM bigram
-                    WHERE prev = ? AND input = ? AND output = ? AND count <= 0 AND is_preset = 0
-                    """) {
-                    self.bindText($0, 1, p1); self.bindText($0, 2, input); self.bindText($0, 3, output)
-                }
-            }
-            if let p2 = prev2, let p1 = prev1 {
-                self.executeOnQueue("""
-                    UPDATE trigram SET count = count - 1
-                    WHERE prev2 = ? AND prev1 = ? AND input = ? AND output = ?
-                    """) {
-                    self.bindText($0, 1, p2); self.bindText($0, 2, p1)
-                    self.bindText($0, 3, input); self.bindText($0, 4, output)
-                }
-                self.executeOnQueue("""
-                    DELETE FROM trigram
-                    WHERE prev2 = ? AND prev1 = ? AND input = ? AND output = ? AND count <= 0
-                    """) {
-                    self.bindText($0, 1, p2); self.bindText($0, 2, p1)
-                    self.bindText($0, 3, input); self.bindText($0, 4, output)
-                }
-            }
-            for sp in skipPrevs {
-                self.executeOnQueue("""
-                    UPDATE skip_bigram SET count = count - 1
-                    WHERE prev = ? AND input = ? AND output = ?
-                    """) {
-                    self.bindText($0, 1, sp); self.bindText($0, 2, input); self.bindText($0, 3, output)
-                }
-                self.executeOnQueue("""
-                    DELETE FROM skip_bigram
-                    WHERE prev = ? AND input = ? AND output = ? AND count <= 0
-                    """) {
-                    self.bindText($0, 1, sp); self.bindText($0, 2, input); self.bindText($0, 3, output)
-                }
             }
             if let fr = fullReading {
                 self.executeOnQueue("DELETE FROM boundary_pref WHERE full_reading = ?") {
@@ -423,15 +262,11 @@ public final class DatabaseManager: @unchecked Sendable {
 
         dispatchWrite {
             let cutoff = self.nowEpoch() - 180 * 86400
-            let tables = ["history", "trigram", "skip_bigram", "noun_bigram"]
-            for table in tables {
+            for table in ["history", "noun_bigram"] {
                 self.executeOnQueue("DELETE FROM \(table) WHERE count = 1 AND used_at < ?") { stmt in
                     sqlite3_bind_int64(stmt, 1, cutoff)
                 }
             }
-            self.executeOnQueue(
-                "DELETE FROM bigram WHERE count = 1 AND used_at < ? AND is_preset = 0"
-            ) { sqlite3_bind_int64($0, 1, cutoff) }
             self.executeOnQueue("DELETE FROM boundary_pref WHERE used_at < ?") { sqlite3_bind_int64($0, 1, cutoff) }
             sqlite3_exec(self.db, "VACUUM;", nil, nil, nil)
             defaults.set(self.nowEpoch(), forKey: key)

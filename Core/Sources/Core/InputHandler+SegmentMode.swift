@@ -195,16 +195,8 @@ public extension InputHandler {
             candidates.insert(hiragana, at: 0); seen.insert(hiragana); fixedCount += 1
         }
 
-        var bigramCount = 0
-        if let p = prev {
-            for b in db.fetchBigram(prev: p, reading: reading) where seen.insert(b).inserted {
-                candidates.append(b)
-                bigramCount += 1
-            }
-        }
-
         for h in historyCandidates where seen.insert(h).inserted { candidates.append(h) }
-        let historyEnd = fixedCount + bigramCount + historyCandidates.count
+        let historyEnd = fixedCount + historyCandidates.count
 
         for d in dictCandidates where seen.insert(d).inserted { candidates.append(d) }
 
@@ -440,15 +432,6 @@ public extension InputHandler {
             db.recordPrefixes(reading: fullReading, output: confirmed)
         }
         let segs = segmentState.segments
-        for i in 0..<segs.count - 1 {
-            let prevSeg = segs[i]
-            let next = segs[i + 1]
-            db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
-            // 隣接いずれかが手動調整なら bi-gram も1回追加（計2回）。
-            if next.isManuallyAdjusted || prevSeg.isManuallyAdjusted {
-                db.recordBigram(prev: prevSeg.selectedText, input: next.reading, output: next.selectedText)
-            }
-        }
         if segs.contains(where: { $0.isManuallyAdjusted }) || segmentState.isLlmBoundaryInferred {
             db.saveBoundaryPref(fullReading: fullReading, segments: segs.map { $0.reading })
         }

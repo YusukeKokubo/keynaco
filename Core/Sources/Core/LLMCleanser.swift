@@ -7,14 +7,8 @@ public enum CleanserError: Error, Sendable, Equatable {
     case unavailable
 }
 
-public enum CleanserScope: Sendable {
-    case history
-    case bigram
-}
-
 public enum EntrySource: Sendable {
     case history(input: String, output: String)
-    case bigram(prev: String, input: String, output: String)
 }
 
 public enum Verdict: String, Sendable {
@@ -66,7 +60,6 @@ private struct BatchResult {
 private struct PromptLine: Encodable {
     let id: Int
     let type: String
-    let prev: String?
     let input: String
     let output: String
 }
@@ -86,7 +79,7 @@ private struct WorkRow: Sendable {
     let display: String
 }
 
-/// `history` / `bigram` をオンデバイス LLM で評価し、怪しいエントリを列挙する。
+/// `history` をオンデバイス LLM で評価し、怪しいエントリを列挙する。
 public actor LLMCleanser {
 
     public init() {}
@@ -96,12 +89,11 @@ public actor LLMCleanser {
         return false
     }
 
-    /// history または bigram を評価して suspect/delete エントリを返す。
+    /// 変換履歴を評価して suspect/delete エントリを返す。
     /// `maxCount` が nil でなければ使用回数がその値以下のエントリのみ対象にする。
     /// `onProgress(completed:total:)` と `onEntry(_:)` は Main Actor から呼ばれる。
     public func evaluate(
         db: DatabaseManager,
-        scope: CleanserScope,
         maxCount: Int? = nil,
         onProgress: @MainActor @Sendable (Int, Int) -> Void = { _, _ in },
         onEntry: @MainActor @Sendable ([FlaggedEntry]) -> Void = { _ in }
@@ -111,29 +103,15 @@ public actor LLMCleanser {
         var rows: [WorkRow] = []
         var nextId = 0
 
-        switch scope {
-        case .history:
-            let all = db.fetchAllHistory()
-            let filtered = maxCount.map { mc in all.filter { $0.count <= mc } } ?? all
-            for h in filtered {
-                rows.append(WorkRow(
-                    id: nextId,
-                    source: .history(input: h.input, output: h.output),
-                    display: "\(h.input) → \(h.output)"
-                ))
-                nextId += 1
-            }
-        case .bigram:
-            let all = db.fetchAllBigramExcludingPresets()
-            let filtered = maxCount.map { mc in all.filter { $0.count <= mc } } ?? all
-            for b in filtered {
-                rows.append(WorkRow(
-                    id: nextId,
-                    source: .bigram(prev: b.prev, input: b.input, output: b.output),
-                    display: "\(b.prev) | \(b.input) → \(b.output)"
-                ))
-                nextId += 1
-            }
+        let all = db.fetchAllHistory()
+        let filtered = maxCount.map { mc in all.filter { $0.count <= mc } } ?? all
+        for h in filtered {
+            rows.append(WorkRow(
+                id: nextId,
+                source: .history(input: h.input, output: h.output),
+                display: "\(h.input) → \(h.output)"
+            ))
+            nextId += 1
         }
 
         let total = rows.count
@@ -143,7 +121,6 @@ public actor LLMCleanser {
         }
         await onProgress(0, total)
 
-        // PromptClip で長文を短縮。コンテキスト超過は runBatchResilient が分割して吸収する。
         let batchSize = 20
         var flagged: [FlaggedEntry] = []
         var batchStart = 0
@@ -162,7 +139,6 @@ public actor LLMCleanser {
         return flagged
     }
 
-    /// コンテキスト上限っぽい失敗のときだけ行を半分に分けて再帰的に再試行する。
     private nonisolated static func runBatchResilient(rows: [WorkRow]) async throws -> [FlaggedEntry] {
         guard !rows.isEmpty else { return [] }
         do {
@@ -192,14 +168,7 @@ public actor LLMCleanser {
             switch row.source {
             case let .history(input, output):
                 PromptLine(
-                    id: row.id, type: "history", prev: nil,
-                    input: PromptClip.field(input),
-                    output: PromptClip.field(output)
-                )
-            case let .bigram(prev, input, output):
-                PromptLine(
-                    id: row.id, type: "bigram",
-                    prev: PromptClip.field(prev),
+                    id: row.id, type: "history",
                     input: PromptClip.field(input),
                     output: PromptClip.field(output)
                 )
@@ -217,7 +186,6 @@ public actor LLMCleanser {
         - delete : 明らかな誤変換・ノイズ（読みと変換が意味的に無関係、記号列など）
 
         history エントリ: 読み → 確定テキスト のペア
-        bigram エントリ : 直前の語 | 読み → 確定テキスト の組
 
         ---
         \(json)

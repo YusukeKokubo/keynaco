@@ -78,6 +78,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         // "東京" 確定 → Successor モード（名詞末尾 → .dismiss）
         typeRomaji("tokyo")
         let commitResult = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        handler.lastConfirmedNounOutput = "東京"
         XCTAssertTrue(handler.isSuccessorMode)
         guard case .dismiss = commitResult.candidateAction else {
             XCTFail(".dismiss を返すはず（N-gram 候補あり）: \(commitResult.candidateAction)"); return
@@ -415,47 +416,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         }
     }
 
-    func testTrigramLearnedAndPrioritizedOverBigram() {
-        // 1語目「昨日」確定
-        typeRomaji("kinou")
-        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "昨日")
-        // Successor モード終了
-        press(keyCode: 53) // Escape
-
-        // 2語目「東京」確定
-        typeRomaji("toukyou")
-        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
-        press(keyCode: 53)
-
-        // 3語目「一体」確定（bigram: 東京→一体、trigram: 昨日/東京→一体 が学習される）
-        typeRomaji("itta")
-        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "一体")
-        press(keyCode: 53)
-
-        // bigram のみの競合語「一致」を bigram で学習（東京→一致）
-        // 別文脈: 「今日」「東京」「一致」で bigram(東京→一致) だけ積む
-        let db = handler.db
-        db.recordNounBigram(prev: "東京", input: "いっち", output: "一致")
-        db.recordNounBigram(prev: "東京", input: "いっち", output: "一致")
-        db.recordNounBigram(prev: "東京", input: "いっち", output: "一致")
-
-        // 「昨日」「東京」に続く4語目を組成中 → trigram (昨日/東京→一体) が上に来るはず
-        typeRomaji("i")
-        let action = type(chars: "t", base: "t")
-        guard case .show(let candidates, _, _, _, _) = action.candidateAction else {
-            XCTFail("候補が表示されるはず"); return
-        }
-        // bigram のみ持つ「一致」より trigram で学習済みの「一体」が上位にあること
-        let idxItta = candidates.firstIndex(of: "一体")
-        let idxSunda = candidates.firstIndex(of: "一致")
-        if let i = idxItta, let s = idxSunda {
-            XCTAssertLessThan(i, s, "trigram 由来の候補が bigram のみの候補より上に並ぶ")
-        } else if idxItta == nil {
-            XCTFail("一体 が候補に含まれていない: \(candidates)")
-        }
-    }
-
-    // MARK: - 高信頼 bi-gram でも確定直後は遅延表示
+    // MARK: - 高信頼 noun-bigram でも確定直後は遅延表示
 
     func testSuccessorImmediateThresholdNotMet() {
         // count = 4（閾値 5 未満）→ 確定後 .dismiss（遅延表示）

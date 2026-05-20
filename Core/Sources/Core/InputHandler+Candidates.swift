@@ -255,13 +255,6 @@ public extension InputHandler {
         let nounBigramRaw = lastConfirmedNounOutput.map {
             db.fetchNounBigram(prev: $0, reading: state.composedHiragana)
         } ?? []
-        let presetBigramRaw = lastCommittedOutput.map {
-            db.fetchPresetBigram(prev: $0, reading: state.composedHiragana)
-        } ?? []
-        let trigramRaw: [String] = {
-            guard let p1 = lastCommittedOutput, let p2 = prev2Output else { return [] }
-            return db.fetchTrigram(prev2: p2, prev1: p1, reading: state.composedHiragana)
-        }()
 
         let historySeen = Set(historyScored.map(\.output))
         let zenzaiPromoted: String? = {
@@ -275,10 +268,7 @@ public extension InputHandler {
         }
         let candidateSeen = historySeen.union(Set(azooKeyCandidates))
         // noun_bigram は文脈的予測なので AzooKey と重複していても prediction セクションに表示する。
-        // bigram/trigram は AzooKey 辞書にある単語を除外してノイズを減らす。
-        let nounBigramUniq = nounBigramRaw.filter { !historySeen.contains($0) }
-        let otherPredictUniq = Self.merged(trigramRaw, presetBigramRaw).filter { !candidateSeen.contains($0) }
-        let uniquePredictions = Self.merged(nounBigramUniq, otherPredictUniq)
+        let uniquePredictions = nounBigramRaw.filter { !historySeen.contains($0) }
         let predictCount = uniquePredictions.count
 
         return CandidateListSources(
@@ -525,24 +515,16 @@ public extension InputHandler {
         )
     }
 
-    /// composedHiragana が空で pendingRomaji が1文字のときに bi-gram を先読みして候補表示する。
+    /// composedHiragana が空で pendingRomaji が1文字のときに noun-bigram を先読みして候補表示する。
     /// 候補が存在すれば isSuccessorMode = true を立てて返す。pendingRomaji は confirmSuccessor() で破棄される。
     mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
         guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
-              let prev = lastCommittedOutput else { return .dismiss }
+              let nounPrev = lastConfirmedNounOutput else { return .dismiss }
         var seen = Set<String>()
         var candidates: [String] = []
         for kana in kanas {
-            let fromTrigram: [String] = prev2Output.map {
-                db.fetchTrigram(prev2: $0, prev1: prev, reading: kana)
-            } ?? []
-            let fromPreset = db.fetchPresetBigram(prev: prev, reading: kana)
-            let fromNoun: [String] = lastConfirmedNounOutput.map {
-                db.fetchNounBigram(prev: $0, reading: kana)
-            } ?? []
+            let fromNoun = db.fetchNounBigram(prev: nounPrev, reading: kana)
             for s in fromNoun where seen.insert(s).inserted { candidates.append(s) }
-            for s in fromTrigram where seen.insert(s).inserted { candidates.append(s) }
-            for s in fromPreset where seen.insert(s).inserted { candidates.append(s) }
         }
         guard !candidates.isEmpty else { return .dismiss }
         isSuccessorMode = true

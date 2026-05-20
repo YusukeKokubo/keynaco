@@ -140,10 +140,10 @@ stateDiagram-v2
 
 - **Successor の再帰防止**: 格助詞チェックは廃止。候補が空なら自然に `.dismiss` になるため、無限ループは起きない
 - **Successor の文中挿入抑制**: カーソルが文末でない（文中挿入モード）場合、`suggestSuccessors()` は Successor モードに入らず `.dismiss` を返す
-- **候補取得の優先順位**: `prev2Output`（2語前）× `lastCommittedOutput`（1語前）で trigram を引き、なければ `lastCommittedOutput` だけで bigram をフォールバック。`committedHistory` が空のときは IMK `before` 由来の `virtualHistoryPrefix` で prev を補完する（学習経路は対象外）
-- **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補（trigram + bigram）の後ろに格助詞固定リストを並べる
+- **候補取得**: `lastConfirmedNounOutput`（なければ `lastCommittedOutput`）で noun-bigram を引く。`committedHistory` が空のときは IMK `before` 由来の `virtualHistoryPrefix` で `lastCommittedOutput` を補完する（学習経路は対象外）
+- **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補の後ろに格助詞固定リストを並べる
 - **N-gram 遅延表示**: 確定直後は常に候補ウィンドウを閉じ 1 打目待ち。1 打目でかな先頭一致で DB を再照会し、`pendingSuccessorCandidates` 内の語を併合し、`successorLLMSurfaceExtras`（LLM 表層形）を末尾に連結したあと `expandSuccessorPrefixes` で長い候補を部分表層に展開して表示する（元の全体候補は必ず残す）
-- **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき noun-bigram/bi-gram/trigram を先読みし、候補があれば Successor モードへ移行
+- **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき `lastConfirmedNounOutput` で noun-bigram を先読みし、候補があれば Successor モードへ移行
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
 - **セグメント境界学習**: Shift+矢印で手動調整した境界、または LLM 2ペア以上の再構築成功確定では `boundary_pref` へ保存される。次回同じ読みで Space を押すと保存済み境界が優先される

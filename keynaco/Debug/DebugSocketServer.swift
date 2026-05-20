@@ -22,7 +22,7 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     private var serverFd: Int32 = -1
-    private var handler = InputHandler(db: DatabaseManager(inMemory: true, seedPresets: true), azooKeyConverter: ZenzaiSettings.makeConverter())
+    private var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
     private let mockClient = SocketMockClient()
     private var candidateWindow = DebugCandidateWindow()
 
@@ -763,7 +763,7 @@ final class DebugSocketServer: @unchecked Sendable {
     ]
 
     private static let knownCommandKeys: Set<String> = [
-        "reset", "state", "wait_until", "assert_eventually", "seed_bigram", "seed_noun_bigram", "seed_history",
+        "reset", "state", "wait_until", "assert_eventually", "seed_noun_bigram", "seed_history",
         "set_last_noun", "set_surrounding",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
         "capture", "vars", "schema", "with_examples", "explain",
@@ -1032,7 +1032,7 @@ final class DebugSocketServer: @unchecked Sendable {
             if useRealDB, let db = makeRealDBSnapshot() {
                 handler = InputHandler(db: db, azooKeyConverter: converter)
             } else {
-                handler = InputHandler(db: DatabaseManager(inMemory: true, seedPresets: true), azooKeyConverter: converter)
+                handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
             }
             InputHandler.isAsciiMode = false
             candidateWindow = DebugCandidateWindow()
@@ -1061,28 +1061,6 @@ final class DebugSocketServer: @unchecked Sendable {
         // {"assert_eventually": {"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}
         if let wait = cmd["assert_eventually"] as? [String: Any] {
             return assertEventually(wait, cmd: cmd)
-        }
-
-        // {"seed_bigram": {"prev": "今日", "input": "は", "output": "は", "count": 10}}
-        if let seed = cmd["seed_bigram"] as? [String: Any] {
-            guard let prev   = seed["prev"]   as? String,
-                  let input  = seed["input"]  as? String,
-                  let output = seed["output"] as? String else {
-                return Self.finalize(
-                    Self.errorPayload(
-                        code: "SEED_BIGRAM_MISSING_FIELDS",
-                        message: "seed_bigram requires prev, input, output",
-                        hint: #"Use {"seed_bigram":{"prev":"今日","input":"は","output":"は"}}."#,
-                        suggestedFixes: [
-                            ["seed_bigram": ["prev": "今日", "input": "は", "output": "は", "count": 10]]
-                        ]
-                    ),
-                    cmd: cmd
-                )
-            }
-            let count = seed["count"] as? Int ?? 1
-            handler.db.debugSeedBigram(prev: prev, input: input, output: output, count: count)
-            return Self.finalize(["ok": true], cmd: cmd)
         }
 
         // {"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}}
@@ -1659,9 +1637,8 @@ final class DebugSocketServer: @unchecked Sendable {
         let examples: [(prev: String, next: String)] = triggerContext.last.map { lw in
             let fromNoun = handler.lastConfirmedNounOutput.map {
                 handler.db.fetchNounBigramTop(prev: $0, limit: 5)
-            } ?? []
-            let fromPreset = handler.db.fetchPresetBigramTop(prev: lw, limit: 5)
-            return InputHandler.merged(fromNoun, fromPreset)
+            } ?? handler.db.fetchNounBigramTop(prev: lw, limit: 5)
+            return fromNoun
                 .filter { !InputHandler.particles.contains($0) }
                 .map { (prev: lw, next: $0) }
         } ?? []

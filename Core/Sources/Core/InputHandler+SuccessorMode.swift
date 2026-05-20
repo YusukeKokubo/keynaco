@@ -3,7 +3,7 @@ import AppKit
 // MARK: - Successor モード
 //
 // 確定直後に「次に来そうな語」を自動表示するモード。
-// bi-gram / tri-gram の上位、必要なら格助詞 fallback を候補にする。
+// noun-bigram の上位、必要なら格助詞 fallback を候補にする。
 
 public extension InputHandler {
 
@@ -106,10 +106,7 @@ public extension InputHandler {
             clearSuccessorLLMAuxiliaryState()
             return .dismiss
         }
-        let nounBigramTop = db.fetchNounBigramTop(prev: last)
-        let presetBigramTop = db.fetchPresetBigramTop(prev: last)
-        let trigramTop: [String] = prev2Output.map { db.fetchTrigramTop(prev2: $0, prev1: last) } ?? []
-        let predictTop = InputHandler.merged(nounBigramTop, trigramTop, presetBigramTop)
+        let predictTop = db.fetchNounBigramTop(prev: lastConfirmedNounOutput ?? last)
         // 名詞末尾のとき限定で格助詞 fallback を tail に追加
         let particlesFallback = isNounLike(last)
             ? InputHandler.particles.filter { !Set(predictTop).contains($0) }
@@ -139,20 +136,10 @@ public extension InputHandler {
         successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
         clearSuccessorLLMAuxiliaryState()
         state.pendingRomaji = ""
-        let capPrev1 = committedHistory.last
-        let capPrev2 = committedHistory.count >= 2
-            ? committedHistory[committedHistory.count - 2]
-            : nil
-        if let p1 = capPrev1, let p2 = capPrev2 {
-            db.recordTrigram(prev2: p2, prev1: p1, input: particle, output: particle)
-        }
         db.recordPrefixes(reading: particle, output: particle)
         lastConfirmedContext = LastConfirmedContext(
             input: particle,
             output: particle,
-            prev1: capPrev1,
-            prev2: capPrev2,
-            skipPrevs: [],
             fullReading: nil
         )
         pushCommitted(particle)
@@ -188,9 +175,6 @@ public extension InputHandler {
                 db.penalizeAll(
                     input: ctx.input,
                     output: ctx.output,
-                    prev1: ctx.prev1,
-                    prev2: ctx.prev2,
-                    skipPrevs: ctx.skipPrevs,
                     fullReading: ctx.fullReading
                 )
                 lastConfirmedContext = nil
@@ -210,15 +194,10 @@ public extension InputHandler {
                     let kanas = InputHandler.romajiToInitialKana[char] ?? []
                     var filteredSeen = Set<String>()
                     var filtered: [String] = []
+                    let nounPrev = lastConfirmedNounOutput ?? last
                     for kana in kanas {
-                        let fromTrigram: [String] = prev2Output.map {
-                            db.fetchTrigram(prev2: $0, prev1: last, reading: kana)
-                        } ?? []
-                        let fromPreset = db.fetchPresetBigram(prev: last, reading: kana)
-                        let fromNoun = db.fetchNounBigram(prev: last, reading: kana)
+                        let fromNoun = db.fetchNounBigram(prev: nounPrev, reading: kana)
                         for s in fromNoun where filteredSeen.insert(s).inserted { filtered.append(s) }
-                        for s in fromTrigram where filteredSeen.insert(s).inserted { filtered.append(s) }
-                        for s in fromPreset where filteredSeen.insert(s).inserted { filtered.append(s) }
                     }
                     filtered = InputHandler.mergePendingSuccessorMatches(
                         dbOrdered: filtered, pending: pendingSuccessorCandidates, romajiKey: char
@@ -268,14 +247,9 @@ public extension InputHandler {
                             // かなが確定した → DB を reading prefix で再クエリして絞り込む
                             var seen = Set<String>()
                             var narrowed: [String] = []
-                            let fromTrigram: [String] = prev2Output.map {
-                                db.fetchTrigram(prev2: $0, prev1: last, reading: newKanaPrefix)
-                            } ?? []
-                            let fromPreset = db.fetchPresetBigram(prev: last, reading: newKanaPrefix)
-                            let fromNoun = db.fetchNounBigram(prev: last, reading: newKanaPrefix)
+                            let nounPrev = lastConfirmedNounOutput ?? last
+                            let fromNoun = db.fetchNounBigram(prev: nounPrev, reading: newKanaPrefix)
                             for s in fromNoun where seen.insert(s).inserted { narrowed.append(s) }
-                            for s in fromTrigram where seen.insert(s).inserted { narrowed.append(s) }
-                            for s in fromPreset where seen.insert(s).inserted { narrowed.append(s) }
                             // ひらがな/カタカナ出力の候補はテキストの前方一致でもフィルタ
                             for w in successorActiveCandidates where w.hasPrefix(newKanaPrefix) {
                                 if seen.insert(w).inserted { narrowed.append(w) }

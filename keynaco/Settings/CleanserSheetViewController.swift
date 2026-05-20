@@ -4,7 +4,6 @@ import KeynacoCore
 final class CleanserSheetViewController: NSViewController {
     private static let appleIntelligenceHelpURL = "https://support.apple.com/ja-jp/guide/mac-help/mchl46361784/mac"
 
-    private let scope: CleanserScope
     private let tableView = DeletableTableView()
     private let scrollView = NSScrollView()
     private let statusLabel = NSTextField(labelWithString: "")
@@ -34,51 +33,17 @@ final class CleanserSheetViewController: NSViewController {
     private var data: [FlaggedEntry] = []
     private var scanTask: Task<Void, Never>?
 
-    init(scope: CleanserScope) {
-        self.scope = scope
-        super.init(nibName: nil, bundle: nil)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    private var tableColumns: [(String, String, CGFloat)] {
-        switch scope {
-        case .history:
-            return [
-                ("input",   "読み",         180),
-                ("output",  "確定テキスト", 200),
-                ("verdict", "判定",          80),
-                ("reason",  "理由",         180),
-            ]
-        case .bigram:
-            return [
-                ("prev",    "直前の語",     130),
-                ("input",   "読み",         110),
-                ("output",  "確定テキスト", 170),
-                ("verdict", "判定",          80),
-                ("reason",  "理由",         150),
-            ]
-        }
-    }
-
-    private var titleText: String {
-        switch scope {
-        case .history: return "変換履歴 AI スキャン"
-        case .bigram:  return "Bi-gram AI スキャン"
-        }
-    }
-
-    private var emptyText: String {
-        switch scope {
-        case .history: return "「スキャン」を押して変換履歴をオンデバイス AI で検査します。"
-        case .bigram:  return "「スキャン」を押して Bi-gram をオンデバイス AI で検査します。"
-        }
-    }
+    private let tableColumns: [(String, String, CGFloat)] = [
+        ("input",   "読み",         180),
+        ("output",  "確定テキスト", 200),
+        ("verdict", "判定",          80),
+        ("reason",  "理由",         180),
+    ]
 
     override func loadView() {
         view = NSView()
 
-        let titleLabel = NSTextField(labelWithString: titleText)
+        let titleLabel = NSTextField(labelWithString: "変換履歴 AI スキャン")
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = .boldSystemFont(ofSize: 13)
         view.addSubview(titleLabel)
@@ -106,7 +71,7 @@ final class CleanserSheetViewController: NSViewController {
         view.addSubview(timeHintLabel)
 
         emptyStateLabel.translatesAutoresizingMaskIntoConstraints = false
-        emptyStateLabel.stringValue = emptyText
+        emptyStateLabel.stringValue = "「スキャン」を押して変換履歴をオンデバイス AI で検査します。"
         emptyStateLabel.alignment = .center
         emptyStateLabel.textColor = .tertiaryLabelColor
         emptyStateLabel.font = .systemFont(ofSize: 13)
@@ -248,8 +213,6 @@ final class CleanserSheetViewController: NSViewController {
         scanTask = nil
     }
 
-    // MARK: - Availability
-
     private func applyAvailabilityUI() {
         if LLMCleanser.isModelAvailable {
             scrollView.isHidden = false
@@ -275,8 +238,6 @@ final class CleanserSheetViewController: NSViewController {
         NSWorkspace.shared.open(url)
     }
 
-    // MARK: - Scan
-
     @objc private func scanOrCancelTapped() {
         if scanTask != nil {
             scanTask?.cancel()
@@ -300,7 +261,6 @@ final class CleanserSheetViewController: NSViewController {
         deleteAllButton.isEnabled = false
 
         let maxCount = selectedMaxCount
-        let scope = self.scope
         scanTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer {
@@ -310,7 +270,6 @@ final class CleanserSheetViewController: NSViewController {
             do {
                 let result = try await self.cleanser.evaluate(
                     db: .shared,
-                    scope: scope,
                     maxCount: maxCount,
                     onProgress: { processed, total in
                         if total == 0 {
@@ -339,7 +298,7 @@ final class CleanserSheetViewController: NSViewController {
                 self.finishScanningUI()
             } catch is CancellationError {
                 self.statusLabel.stringValue = "スキャンを中止しました。"
-                self.emptyStateLabel.stringValue = self.emptyText
+                self.emptyStateLabel.stringValue = "「スキャン」を押して変換履歴をオンデバイス AI で検査します。"
                 self.emptyStateLabel.isHidden = self.data.isEmpty ? false : true
                 self.finishScanningUI()
             } catch let err as CleanserError where err == .unavailable {
@@ -356,7 +315,7 @@ final class CleanserSheetViewController: NSViewController {
                     alert.beginSheetModal(for: window, completionHandler: nil)
                 }
                 self.statusLabel.stringValue = "スキャンに失敗しました。"
-                self.emptyStateLabel.stringValue = self.emptyText
+                self.emptyStateLabel.stringValue = "「スキャン」を押して変換履歴をオンデバイス AI で検査します。"
                 self.emptyStateLabel.isHidden = self.data.isEmpty ? false : true
                 self.finishScanningUI()
             }
@@ -368,8 +327,6 @@ final class CleanserSheetViewController: NSViewController {
         progressIndicator.stopAnimation(nil)
         timeHintLabel.isHidden = true
     }
-
-    // MARK: - Delete
 
     @objc private func deleteSelected() {
         let row = tableView.selectedRow
@@ -390,11 +347,8 @@ final class CleanserSheetViewController: NSViewController {
     }
 
     private func deleteEntry(_ entry: FlaggedEntry) {
-        switch entry.source {
-        case let .history(input, output):
+        if case let .history(input, output) = entry.source {
             DatabaseManager.shared.deleteHistoryEntry(input: input, output: output)
-        case let .bigram(prev, input, output):
-            DatabaseManager.shared.deleteBigram(prev: prev, input: input, output: output)
         }
     }
 
@@ -428,23 +382,11 @@ extension CleanserSheetViewController: NSTableViewDelegate {
         let text: String
         let textColor: NSColor?
         switch id.rawValue {
-        case "prev":
-            switch entry.source {
-            case .history:              text = "—"
-            case let .bigram(prev, _, _): text = prev
-            }
-            textColor = nil
         case "input":
-            switch entry.source {
-            case let .history(input, _):    text = input
-            case let .bigram(_, input, _):  text = input
-            }
+            if case let .history(input, _) = entry.source { text = input } else { return nil }
             textColor = nil
         case "output":
-            switch entry.source {
-            case let .history(_, output):   text = output
-            case let .bigram(_, _, output): text = output
-            }
+            if case let .history(_, output) = entry.source { text = output } else { return nil }
             textColor = nil
         case "verdict":
             switch entry.verdict {

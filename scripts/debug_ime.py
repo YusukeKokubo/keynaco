@@ -247,10 +247,6 @@ class IMEClient:
             cmd["describe"] = describe
         return self._send_recv(cmd)
 
-    def seed_bigram(self, prev: str, input: str, output: str, count: int = 1) -> dict:
-        """bi-gram をテスト用に DB へ直接挿入する。"""
-        return self._send_recv({"seed_bigram": {"prev": prev, "input": input, "output": output, "count": count}})
-
     def seed_history(self, input: str, output: str, times: int = 1) -> dict:
         """変換履歴をテスト用に DB へ直接挿入する。"""
         return self._send_recv({"seed_history": {"input": input, "output": output, "times": times}})

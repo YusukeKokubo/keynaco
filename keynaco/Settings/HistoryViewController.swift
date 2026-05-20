@@ -95,7 +95,7 @@ final class HistoryViewController: NSViewController {
     }
 
     @objc private func openCleanserSheet() {
-        presentAsSheet(CleanserSheetViewController(scope: .history))
+        presentAsSheet(CleanserSheetViewController())
     }
 
     @objc private func reload() {

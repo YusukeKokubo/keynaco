@@ -15,7 +15,6 @@
 		417423818A8C02627A56F0D9 /* KeynacoCore in Frameworks */ = {isa = PBXBuildFile; productRef = EC543AEB962323EE3612849B /* KeynacoCore */; };
 		4608E7508D63979CA6ABD403 /* InputSource.tiff in Resources */ = {isa = PBXBuildFile; fileRef = 7D792FEB7E1E5625244BE8C4 /* InputSource.tiff */; };
 		48F352724005237B685D8E35 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = AC5B60092B9315A5731AEF44 /* README.md */; };
-		54C6A7E0B755C0C9EDDFF520 /* preset_bigram.csv in Resources */ = {isa = PBXBuildFile; fileRef = 389579979B22B7F2D6298743 /* preset_bigram.csv */; };
 		57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19DE79F93A3BDB8CDBC90A08 /* AppDelegate.swift */; };
 		6095BA557731F8320F694AF8 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A89E465235280624AF1A85 /* FoundationModels.framework */; };
 		6341605E1C0AA49D7B745FD7 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */; };
@@ -32,8 +31,6 @@
 		BECB3D246AF08901817AFD4E /* EventViewerWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96925E03EBB4612285CA9FF /* EventViewerWindow.swift */; };
 		CC81B691B4422E5779491EE0 /* UserDictViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */; };
 		CF5D2357CC1B6C7209F9918F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC83CA0F9C13530D08702297 /* main.swift */; };
-		D28C670A95E553BA2AADB935 /* BigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4EE68A42BB389946C522BC2 /* BigramViewController.swift */; };
-		B3F1A2C4D5E6F7A8B9C0D1E2 /* TrigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F1A2C4D5E6F7A8B9C0D1E3 /* TrigramViewController.swift */; };
 		A8C9D0E12F3A4B5C6D7E8F04 /* CleanserSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C9D0E12F3A4B5C6D7E8F03 /* CleanserSheetViewController.swift */; };
 		E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A755C9097E561BF05FF3D11 /* InputController.swift */; };
 		7C3D2E1F4051627384A5B6C7 /* InputController+LLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */; };
@@ -58,7 +55,6 @@
 		184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		19DE79F93A3BDB8CDBC90A08 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		312B6C32AF05015A07740280 /* .gitattributes */ = {isa = PBXFileReference; path = .gitattributes; sourceTree = "<group>"; };
-		389579979B22B7F2D6298743 /* preset_bigram.csv */ = {isa = PBXFileReference; path = preset_bigram.csv; sourceTree = "<group>"; };
 		3A755C9097E561BF05FF3D11 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+LLM.swift"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* InputController+VirtualContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+VirtualContext.swift"; sourceTree = "<group>"; };
@@ -82,8 +78,6 @@
 		B35A13234A024ED9F84F3147 /* SurroundingIMKContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundingIMKContext.swift; sourceTree = "<group>"; };
 		BC83CA0F9C13530D08702297 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C4EE68A42BB389946C522BC2 /* BigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigramViewController.swift; sourceTree = "<group>"; };
-		B3F1A2C4D5E6F7A8B9C0D1E3 /* TrigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrigramViewController.swift; sourceTree = "<group>"; };
 		A8C9D0E12F3A4B5C6D7E8F03 /* CleanserSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanserSheetViewController.swift; sourceTree = "<group>"; };
 		C9289632F6594D9EE9A07926 /* IMESandboxWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMESandboxWindow.swift; sourceTree = "<group>"; };
 		E6A89E465235280624AF1A85 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
@@ -137,7 +131,6 @@
 				B35A13234A024ED9F84F3147 /* SurroundingIMKContext.swift */,
 				96DC1F9B346A9426962FF324 /* Debug */,
 				FD84BA0A9E7DB8EC8968D9D1 /* InfoPlist.strings */,
-				996742E2D87AC77EC5442D2B /* PresetBigram */,
 				AFA24DA201BD47BD8CBC270C /* Resources */,
 				1C8A83DDFE8CB25CA31F9835 /* Settings */,
 			);
@@ -156,8 +149,6 @@
 		1C8A83DDFE8CB25CA31F9835 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
-				C4EE68A42BB389946C522BC2 /* BigramViewController.swift */,
-				B3F1A2C4D5E6F7A8B9C0D1E3 /* TrigramViewController.swift */,
 				A8C9D0E12F3A4B5C6D7E8F03 /* CleanserSheetViewController.swift */,
 				45BB50D896044E0EB5C1CC28 /* HiraganaPreferredViewController.swift */,
 			FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */,
@@ -216,14 +207,6 @@
 				C9289632F6594D9EE9A07926 /* IMESandboxWindow.swift */,
 			);
 			path = Debug;
-			sourceTree = "<group>";
-		};
-		996742E2D87AC77EC5442D2B /* PresetBigram */ = {
-			isa = PBXGroup;
-			children = (
-				389579979B22B7F2D6298743 /* preset_bigram.csv */,
-			);
-			path = PresetBigram;
 			sourceTree = "<group>";
 		};
 		AFA24DA201BD47BD8CBC270C /* Resources */ = {
@@ -324,7 +307,6 @@
 				B1F3B8643749DE7DAA9B3E40 /* InputSource@2x.tiff in Resources */,
 				48F352724005237B685D8E35 /* README.md in Resources */,
 				8FCAA57CD336913498802E45 /* ggml-model-Q5_K_M.gguf in Resources */,
-				54C6A7E0B755C0C9EDDFF520 /* preset_bigram.csv in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -344,8 +326,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */,
-				D28C670A95E553BA2AADB935 /* BigramViewController.swift in Sources */,
-				B3F1A2C4D5E6F7A8B9C0D1E2 /* TrigramViewController.swift in Sources */,
 				A8C9D0E12F3A4B5C6D7E8F04 /* CleanserSheetViewController.swift in Sources */,
 				8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
 				1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */,

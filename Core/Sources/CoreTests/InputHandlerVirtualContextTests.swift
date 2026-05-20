@@ -28,35 +28,35 @@ final class InputHandlerVirtualContextTests: InputHandlerTestCase {
         XCTAssertEqual(handler.lastCommittedOutput, "東京")
     }
 
-    func testPrev2CombinesCommittedAndVirtual() {
+    func testCommittedUsesVirtualWhenSingleCommitted() {
         handler.committedHistory = ["昨日"]
         handler.virtualHistoryPrefix = ["東京"]
         XCTAssertEqual(handler.lastCommittedOutput, "昨日")
-        XCTAssertEqual(handler.prev2Output, "東京")
+        XCTAssertEqual(handler.committedHistory.count, 1)
     }
 
     func testVirtualIgnoredWhenCommittedHistoryHasTwoOrMore() {
         handler.committedHistory = ["昨日", "は"]
         handler.virtualHistoryPrefix = ["東京"]
-        XCTAssertEqual(handler.prev2Output, "昨日")
+        XCTAssertEqual(handler.lastCommittedOutput, "は")
         XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["昨日"])
     }
 
-    // MARK: - N-gram prediction
+    // MARK: - Noun-bigram prediction
 
-    func testSuggestSuccessorsUsesVirtualBigram() {
+    func testSuggestSuccessorsUsesVirtualNounBigram() {
         handler.committedHistory = []
         handler.virtualHistoryPrefix = ["東京"]
-        seedPresetBigram(prev: "東京", input: "に", output: "に")
+        seedNounBigramPrediction(prev: "東京", input: "に", output: "に")
         _ = handler.suggestSuccessors()
         XCTAssertTrue(handler.isSuccessorMode)
         XCTAssertTrue(handler.pendingSuccessorCandidates.contains("に"))
     }
 
-    func testPendingPreviewUsesVirtualBigram() {
+    func testPendingPreviewUsesVirtualNounBigram() {
         handler.committedHistory = []
         handler.virtualHistoryPrefix = ["東京"]
-        seedPresetBigram(prev: "東京", input: "から", output: "から")
+        seedNounBigramPrediction(prev: "東京", input: "から", output: "から")
         let action = handler.buildPendingCandidateList(pendingChar: "k", client: client)
         XCTAssertTrue(handler.isSuccessorMode)
         guard case .show(let candidates, _, _, _, _) = action else {
@@ -68,12 +68,12 @@ final class InputHandlerVirtualContextTests: InputHandlerTestCase {
 
     // MARK: - Learning isolation
 
-    func testVirtualDoesNotFlowIntoRecordNgrams() {
+    func testVirtualDoesNotRecordNounBigramOnCommit() {
         handler.virtualHistoryPrefix = ["東京"]
         handler.committedHistory = []
         typeRomaji("ik")
         press(keyCode: KeyCode.enter)
-        XCTAssertTrue(handler.db.fetchBigramTop(prev: "東京").isEmpty,
-                      "virtual のみのとき確定で bigram が記録されないはず")
+        XCTAssertTrue(handler.db.fetchNounBigramTop(prev: "東京").isEmpty,
+                      "virtual のみのとき確定で noun_bigram が記録されないはず")
     }
 }

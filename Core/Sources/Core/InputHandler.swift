@@ -53,9 +53,6 @@ public struct CandidateContext: Sendable {
 public struct LastConfirmedContext: Equatable {
     public let input: String
     public let output: String
-    public let prev1: String?
-    public let prev2: String?
-    public let skipPrevs: [String]
     public let fullReading: String?
 }
 
@@ -144,17 +141,6 @@ public struct InputHandler {
     public var segmentCandidateCache: [String: Segment] = [:]
     /// segmentize 結果の LRU キャッシュ（class なので struct コピー後も共有）。
     public var segmentizeCache = SegmentizeLRUCache()
-    public var prev2Output: String? {
-        if committedHistory.count >= 2 {
-            return committedHistory[committedHistory.count - 2]
-        }
-        if committedHistory.count == 1 {
-            return virtualHistoryPrefix.last
-        }
-        return virtualHistoryPrefix.count >= 2
-            ? virtualHistoryPrefix[virtualHistoryPrefix.count - 2]
-            : nil
-    }
     public mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
             committedHistory.removeAll()
@@ -312,27 +298,13 @@ public struct InputHandler {
     ) {
         let isPunctuation = InputHandler.readingPunctuations.contains(text)
             || InputHandler.sentenceTerminators.contains(text)
-        var capPrev1: String?
-        var capPrev2: String?
         if !state.composingText.isEmpty && !skipHistory && !isPunctuation,
-           let p1 = committedHistory.last {
-            capPrev1 = p1
-            let p2 = committedHistory.count >= 2
-                ? committedHistory[committedHistory.count - 2]
-                : nil
-            capPrev2 = p2
+           committedHistory.last != nil {
             lastCommittedReading = state.finalizedText
-            let ngramInput = state.finalizedText
-            db.recordNgrams(
-                trigram: p2.map { (prev2: $0, prev1: p1, input: ngramInput, output: text) }
-            )
         }
         lastConfirmedContext = LastConfirmedContext(
             input: state.finalizedText,
             output: text,
-            prev1: capPrev1,
-            prev2: capPrev2,
-            skipPrevs: [],
             fullReading: fullReading
         )
         pushCommitted(text)
@@ -381,9 +353,6 @@ public struct InputHandler {
             db.penalizeAll(
                 input: ctx.input,
                 output: ctx.output,
-                prev1: ctx.prev1,
-                prev2: ctx.prev2,
-                skipPrevs: ctx.skipPrevs,
                 fullReading: ctx.fullReading
             )
             lastConfirmedContext = nil

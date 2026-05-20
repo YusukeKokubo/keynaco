@@ -140,37 +140,11 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(hist.contains("阿"), "別キー後の Backspace では penalize されないはず")
     }
 
-    /// 組成空で Backspace したとき、`lastConfirmedContext` に応じて bi-gram にペナルティする。
-    func testPenalizeAllRemovesBigramWhenBackspaceAfterSyntheticConfirm() {
-        handler.db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 1, usedAt: 0, isPreset: false)
-        handler.lastConfirmedContext = LastConfirmedContext(
-            input: "きょう", output: "今日",
-            prev1: "東京", prev2: nil, skipPrevs: [], fullReading: nil
-        )
-        let (_, _) = press(keyCode: 51)
-        XCTAssertNil(handler.lastConfirmedContext)
-        XCTAssertNil(
-            handler.db.fetchAllBigram().first { $0.prev == "東京" && $0.output == "今日" },
-            "count=1 をペナルティして削除されるはず"
-        )
-    }
-
-    func testPenalizeAllSkipsPresetBigramOnBackspace() {
-        handler.db.testInsertBigram(prev: "東京", input: "きょう", output: "今日", count: 1, usedAt: 0, isPreset: true)
-        handler.lastConfirmedContext = LastConfirmedContext(
-            input: "きょう", output: "今日",
-            prev1: "東京", prev2: nil, skipPrevs: [], fullReading: nil
-        )
-        _ = press(keyCode: 51)
-        let row = handler.db.fetchAllBigram().first { $0.prev == "東京" && $0.output == "今日" }
-        XCTAssertEqual(row?.count, 1, "プリセット行はペナルティ対象外")
-    }
-
     func testSecondBackspaceDoesNotPenalizeAgain() {
         handler.db.record(input: "あ", output: "阿")
         handler.lastConfirmedContext = LastConfirmedContext(
             input: "あ", output: "阿",
-            prev1: nil, prev2: nil, skipPrevs: [], fullReading: nil
+            fullReading: nil
         )
         _ = press(keyCode: 51)
         XCTAssertTrue(handler.db.fetchHistoryExact(reading: "あ").isEmpty)
@@ -269,5 +243,91 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         // ASCII モード中に Enter → committedHistory がクリアされるはず
         press(keyCode: 36)
         XCTAssertTrue(handler.committedHistory.isEmpty, "ASCII モード中の Enter で committedHistory がクリアされるはず")
+    }
+
+    // MARK: - committedHistory / content word（旧 SkipBigramTests より移設）
+
+    func testCommittedHistoryCapAt5() {
+        for i in 0..<6 {
+            handler.commitText(text: "word\(i)", client: client)
+        }
+        XCTAssertEqual(handler.lastCommittedOutput, "word5")
+        XCTAssertFalse(handler.committedHistory.contains("word0"))
+        XCTAssertEqual(handler.committedHistory.count, 5)
+    }
+
+    func testMostRecentContentWordSkipsParticle() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        XCTAssertEqual(handler.mostRecentContentWord(), "今日")
+    }
+
+    func testMostRecentContentWordNilWhenAllParticles() {
+        handler.commitText(text: "を", client: client)
+        handler.commitText(text: "に", client: client)
+        XCTAssertNil(handler.mostRecentContentWord())
+    }
+
+    func testMostRecentContentWordReturnsWordWhenHistoryTooShort() {
+        handler.commitText(text: "今日", client: client)
+        XCTAssertEqual(handler.mostRecentContentWord(), "今日")
+    }
+
+    func testMostRecentContentWordsReturnsOneWhenHistoryTooShort() {
+        handler.commitText(text: "今日", client: client)
+        XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["今日"])
+    }
+
+    func testMostRecentContentWordsN1MatchesMostRecentContentWord() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        XCTAssertEqual(handler.mostRecentContentWords(n: 1).first, handler.mostRecentContentWord())
+    }
+
+    func testMostRecentContentWordsN2SkipsConsecutiveParticles() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        handler.commitText(text: "駅", client: client)
+        handler.commitText(text: "へ", client: client)
+        XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["駅", "今日"])
+    }
+
+    func testMostRecentContentWordsN2ReturnsOneWhenOnlyOneContentWord() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["今日"])
+    }
+
+    func testSentenceTerminatorClearsHistory() {
+        handler.commitText(text: "日本語", client: client)
+        handler.commitText(text: "。", client: client)
+        XCTAssertTrue(handler.committedHistory.isEmpty)
+    }
+
+    func testMostRecentContentWordNilAfterSentenceBreak() {
+        handler.commitText(text: "今日", client: client)
+        handler.commitText(text: "を", client: client)
+        handler.commitText(text: "。", client: client)
+        XCTAssertTrue(handler.committedHistory.isEmpty)
+        XCTAssertNil(handler.mostRecentContentWord())
+    }
+
+    func testSentenceTerminatorClearsCommittedOutputs() {
+        handler.commitText(text: "昨日", client: client)
+        handler.commitText(text: "東京", client: client)
+        XCTAssertEqual(handler.lastCommittedOutput, "東京")
+        XCTAssertEqual(handler.committedHistory.count, 2)
+
+        handler.commitText(text: "。", client: client)
+        XCTAssertTrue(handler.committedHistory.isEmpty)
+        XCTAssertNil(handler.lastCommittedOutput)
+    }
+
+    func testSentenceTerminatorPreventsCrossSentenceContext() {
+        handler.commitText(text: "東京", client: client)
+        handler.commitText(text: "。", client: client)
+        handler.commitText(text: "大阪", client: client)
+        XCTAssertEqual(handler.lastCommittedOutput, "大阪")
+        XCTAssertEqual(handler.committedHistory, ["大阪"])
     }
 }

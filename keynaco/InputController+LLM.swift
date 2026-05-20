@@ -73,9 +73,8 @@ extension InputController {
         let examples: [(prev: String, next: String)] = triggerContext.last.map { lw in
             let fromNoun = handler.lastConfirmedNounOutput.map {
                 handler.db.fetchNounBigramTop(prev: $0, limit: 5)
-            } ?? []
-            let fromPreset = handler.db.fetchPresetBigramTop(prev: lw, limit: 5)
-            return InputHandler.merged(fromNoun, fromPreset)
+            } ?? handler.db.fetchNounBigramTop(prev: lw, limit: 5)
+            return fromNoun
                 .filter { !InputHandler.particles.contains($0) }
                 .map { (prev: lw, next: $0) }
         } ?? []
