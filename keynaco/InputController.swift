@@ -210,6 +210,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.successorLLMContext = nil
             ic.handler.segmentLLMTrigger = .none
             ic.cachedSurroundingContext = nil
+            ic.handler.virtualHistoryPrefix = []
             ic.handler.leftSideContext = ""
             Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: true)
             ic.handler.ignoreNextModeSwitch = true
@@ -295,16 +296,23 @@ class InputController: IMKInputController, @unchecked Sendable {
 
         if handler.documentSurroundingContextInvalidated {
             cachedSurroundingContext = nil
+            handler.virtualHistoryPrefix = []
             handler.documentSurroundingContextInvalidated = false
         }
         if handler.state.composedHiragana.isEmpty {
             cachedSurroundingContext = nil
+            handler.virtualHistoryPrefix = []
         } else if composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty {
             // Space での再取得は冗長のため行わない（カーソル移動は location 不一致で無効化）。
             if let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding) {
                 let loc = adapter.selectedRange().location
                 if loc != NSNotFound {
                     cachedSurroundingContext = (loc, ctx)
+                    if VirtualHistorySettings.isEnabled {
+                        handler.virtualHistoryPrefix = Self.extractVirtualHistory(from: ctx.before)
+                    } else {
+                        handler.virtualHistoryPrefix = []
+                    }
                 }
             }
         }
@@ -469,6 +477,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.successorLLMContext = nil
             ic.handler.segmentLLMTrigger = .none
             ic.cachedSurroundingContext = nil
+            ic.handler.virtualHistoryPrefix = []
             ic.handler.leftSideContext = ""
             Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: false)
             ic.candidateWindow.dismiss()

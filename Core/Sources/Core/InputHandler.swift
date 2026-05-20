@@ -122,14 +122,26 @@ public struct InputHandler {
     /// Zenzai がプロモートした候補の行インデックス。文脈なし・Zenzai 無効時は `nil`。
     public var lastZenzaiRow: Int? = nil
     public var committedHistory: [String] = []
+    /// IMK before 末尾から抽出した仮想末尾語列（最大2語、古→新）。学習経路には流さない。
+    public var virtualHistoryPrefix: [String] = []
     /// `pushCommitted` で文末記号により `committedHistory` を消した直後に立て、`InputController` が IMK 文脈キャッシュを捨てる。
     public var documentSurroundingContextInvalidated = false
-    public var lastCommittedOutput: String? { committedHistory.last }
+    public var lastCommittedOutput: String? {
+        committedHistory.last ?? virtualHistoryPrefix.last
+    }
     public var segmentCandidateCache: [String: Segment] = [:]
     /// segmentize 結果の LRU キャッシュ（class なので struct コピー後も共有）。
     public var segmentizeCache = SegmentizeLRUCache()
     public var prev2Output: String? {
-        committedHistory.count >= 2 ? committedHistory[committedHistory.count - 2] : nil
+        if committedHistory.count >= 2 {
+            return committedHistory[committedHistory.count - 2]
+        }
+        if committedHistory.count == 1 {
+            return virtualHistoryPrefix.last
+        }
+        return virtualHistoryPrefix.count >= 2
+            ? virtualHistoryPrefix[virtualHistoryPrefix.count - 2]
+            : nil
     }
     public mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
@@ -147,6 +159,21 @@ public struct InputHandler {
     }
 
     public func mostRecentContentWords(n: Int) -> [String] {
+        let combined = committedHistory.count >= 2
+            ? committedHistory
+            : virtualHistoryPrefix + committedHistory
+        var result: [String] = []
+        for i in stride(from: combined.count - 1, through: 0, by: -1) {
+            if !InputHandler.particles.contains(combined[i]) {
+                result.append(combined[i])
+                if result.count >= n { break }
+            }
+        }
+        return result
+    }
+
+    /// 学習用: `committedHistory` のみから content word を収集（virtual は含めない）。
+    func committedContentWords(n: Int) -> [String] {
         guard committedHistory.count >= 2 else { return [] }
         var result: [String] = []
         for i in stride(from: committedHistory.count - 2, through: 0, by: -1) {
@@ -276,15 +303,19 @@ public struct InputHandler {
         var capPrev1: String?
         var capPrev2: String?
         var capSkipPrevs: [String] = []
-        if !state.composingText.isEmpty && !skipHistory && !isPunctuation, let p1 = lastCommittedOutput {
+        if !state.composingText.isEmpty && !skipHistory && !isPunctuation,
+           let p1 = committedHistory.last {
             capPrev1 = p1
-            capPrev2 = prev2Output
+            let p2 = committedHistory.count >= 2
+                ? committedHistory[committedHistory.count - 2]
+                : nil
+            capPrev2 = p2
             let isParticlePrev = InputHandler.particles.contains(p1)
-            if isParticlePrev { capSkipPrevs = mostRecentContentWords(n: 2) }
+            if isParticlePrev { capSkipPrevs = committedContentWords(n: 2) }
             let bigramInput = state.finalizedText
             db.recordNgrams(
                 bigram: isParticlePrev ? nil : (prev: p1, input: bigramInput, output: text),
-                trigram: prev2Output.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) },
+                trigram: p2.map { (prev2: $0, prev1: p1, input: bigramInput, output: text) },
                 skipBigrams: capSkipPrevs.map { (prev: $0, input: bigramInput, output: text) }
             )
         }

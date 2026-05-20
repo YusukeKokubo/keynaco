@@ -142,10 +142,16 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 ## 学習・履歴
 
 ### lastCommittedOutput
-直前に確定した変換結果。trigram の prev1 および bigram の prev として使う。
+直前に確定した変換結果（`committedHistory.last`）。trigram の prev1 および bigram の prev として使う。  
+`committedHistory` が空のときは `virtualHistoryPrefix.last` でフォールバックする（**予測のみ**。学習は `committedHistory` 直参照）。
 
 ### prev2Output
-2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。
+2語前に確定した変換結果。trigram 候補の検索キー（prev2）として使う。  
+`committedHistory` が 1 件のときは `virtualHistoryPrefix.last`、0 件のときは virtual の 2 語目を参照する。
+
+### virtualHistoryPrefix
+IMK `before` テキスト末尾から抽出した仮想末尾語列（最大 2 語、古→新）。組成開始時に `InputController` がセットする。  
+**不変条件**: `recordNgrams` / `pushCommitted` / `successorLLMContext` には流さない。`UserDefaults` の `virtualHistoryEnabled`（デフォルト true）で無効化可能。
 
 ### lastConfirmedContext
 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。  

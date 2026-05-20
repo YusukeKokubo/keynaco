@@ -32,6 +32,7 @@ private let aiPrompt = """
 final class BigramViewController: NSViewController {
     private let tableView = DeletableTableView()
     private let deleteButton = NSButton(title: "選択を削除", target: nil, action: nil)
+    private let virtualHistoryCheckbox = NSButton(checkboxWithTitle: "カーソル前文を N-gram 予測に使う", target: nil, action: nil)
 
     // NSTextView.scrollableTextView() でスクロールビューとテキストビューをセットで生成する
     private let exportScrollView: NSScrollView = NSTextView.scrollableTextView()
@@ -99,6 +100,12 @@ final class BigramViewController: NSViewController {
         let bar = NSView()
         bar.translatesAutoresizingMaskIntoConstraints = false
 
+        virtualHistoryCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        virtualHistoryCheckbox.state = VirtualHistorySettings.isEnabled ? .on : .off
+        virtualHistoryCheckbox.target = self
+        virtualHistoryCheckbox.action = #selector(virtualHistoryToggled(_:))
+        bar.addSubview(virtualHistoryCheckbox)
+
         deleteButton.translatesAutoresizingMaskIntoConstraints = false
         deleteButton.target = self
         deleteButton.action = #selector(deleteSelected)
@@ -114,6 +121,8 @@ final class BigramViewController: NSViewController {
         bar.addSubview(scanButton)
 
         NSLayoutConstraint.activate([
+            virtualHistoryCheckbox.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 12),
+            virtualHistoryCheckbox.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             deleteButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             deleteButton.trailingAnchor.constraint(equalTo: refreshButton.leadingAnchor, constant: -8),
             refreshButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
@@ -211,6 +220,10 @@ final class BigramViewController: NSViewController {
     }
 
     // MARK: - Actions
+
+    @objc private func virtualHistoryToggled(_ sender: NSButton) {
+        VirtualHistorySettings.isEnabled = sender.state == .on
+    }
 
     @objc private func openCleanserSheet() {
         presentAsSheet(CleanserSheetViewController(scope: .bigram))

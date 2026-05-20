@@ -149,7 +149,8 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate {
 
         lines.append("")
         lines.append("【確定履歴】")
-        lines.append("committedHistory : \(snap.committedHistory)")
+        lines.append("committedHistory     : \(snap.committedHistory)")
+        lines.append("virtualHistoryPrefix : \(snap.virtualHistoryPrefix)")
 
         if snap.isSegmentMode {
             lines.append("")

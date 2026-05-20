@@ -31,6 +31,7 @@ public extension InputHandler {
             fixedEnd: 0,
             candidates: [],
             committedHistory: Array(committedHistory.suffix(5)),
+            virtualHistoryPrefix: virtualHistoryPrefix,
             segmentTexts: segTexts,
             focusedSegmentIndex: segFocus
         )

@@ -100,6 +100,17 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
 
     /// **S-02**（参照）: `ka` の候補が開いている状態で ↓↓→ はひらがな「か」を確定。
     /// 詳細は `InputHandlerCandidatesTests.testRightArrowDuringCandidateCommitsHiragana` と同等。
+    /// アプリ切替相当: `committedHistory` 空 + IMK before 由来の virtual で N-gram 予測が立つ
+    func testVirtualContext_successorFromDocumentPrefix() {
+        var h = handler!
+        h.committedHistory = []
+        h.virtualHistoryPrefix = ["東京"]
+        h.db.recordBigram(prev: "東京", input: "に", output: "に")
+        _ = h.suggestSuccessors()
+        XCTAssertTrue(h.isSuccessorMode)
+        XCTAssertTrue(h.pendingSuccessorCandidates.contains("に"))
+    }
+
     func testS02_trace_ka_down_down_right_confirms_hiragana() {
         typeRomaji("ka")
         _ = press(keyCode: KeyCode.downArrow, candidateVisible: true)

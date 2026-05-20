@@ -83,17 +83,16 @@ final class SkipBigramTests: InputHandlerTestCase {
         XCTAssertNil(result, "全て助詞なら nil")
     }
 
-    func testMostRecentContentWordNilWhenHistoryTooShort() {
+    func testMostRecentContentWordReturnsWordWhenHistoryTooShort() {
         handler.commitText(text: "今日", client: client)
-        let result = handler.mostRecentContentWord()
-        XCTAssertNil(result, "履歴が1件以下なら nil")
+        XCTAssertEqual(handler.mostRecentContentWord(), "今日")
     }
 
     // MARK: - mostRecentContentWords(n:)
 
-    func testMostRecentContentWordsEmptyWhenHistoryTooShort() {
+    func testMostRecentContentWordsReturnsOneWhenHistoryTooShort() {
         handler.commitText(text: "今日", client: client)
-        XCTAssertTrue(handler.mostRecentContentWords(n: 2).isEmpty)
+        XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["今日"])
     }
 
     func testMostRecentContentWordsN1MatchesMostRecentContentWord() {

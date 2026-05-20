@@ -68,8 +68,10 @@ public extension InputHandler {
         isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
         clearSuccessorLLMAuxiliaryState()
         state.pendingRomaji = ""
-        let capPrev1 = lastCommittedOutput
-        let capPrev2 = prev2Output
+        let capPrev1 = committedHistory.last
+        let capPrev2 = committedHistory.count >= 2
+            ? committedHistory[committedHistory.count - 2]
+            : nil
         if let p1 = capPrev1 {
             db.recordBigram(prev: p1, input: particle, output: particle)
             if let p2 = capPrev2 {
