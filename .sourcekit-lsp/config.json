@@ -1,0 +1,5 @@
+{
+  "buildSystem": {
+    "default": "xcode"
+  }
+}
