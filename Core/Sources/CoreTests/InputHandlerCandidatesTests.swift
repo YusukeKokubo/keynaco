@@ -784,7 +784,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 1)
+                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
     }
 
     func testSnap_F2_ZenzaiNoContext() {
@@ -826,7 +826,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 2)
+                     historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 
     func testSnap_F6_ZenzaiFirstWithAutoShow() {
@@ -918,7 +918,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // fixedEnd=2(userDict+zenzai), predictionEnd=3, historyEnd=4
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "辞書A", "予測A", "愛", "アイ", "哀"],
-                     historyEnd: 4, predictionEnd: 3, fixedEnd: 2, initialRow: 2)
+                     historyEnd: 4, predictionEnd: 3, fixedEnd: 2, initialRow: 0)
     }
 
     func testSnap_I2_HiraganaPreferredWithZenzai() {

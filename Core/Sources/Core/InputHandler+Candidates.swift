@@ -331,6 +331,8 @@ public extension InputHandler {
                 if sources.zenzaiPromoted != nil { return .atZero }
                 return .firstMatching(state.composedHiragana)
             }
+            // 履歴があっても Zenzai がプロモートされとれば row 0 を初期選択にする
+            if sources.zenzaiPromoted != nil { return .atZero }
             return .afterFixed
         }
     }
