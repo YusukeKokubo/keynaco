@@ -9,6 +9,7 @@ description: |
   - 候補の並び順・historyEnd・fixedEnd の値を確認したいとき
   - 複数の入力パターンを比較して IME のロジックを調べたいとき
   - ユーザーが「このシーケンスを試して」「このケースをデバッグして」と言ったとき
+  - Zenzai top-1 プロモーションの動作を検証したいとき（set_left_context + isZenzaiEnabled を使う）
 ---
 
 # keynaco IME サンドボックスの使い方
@@ -121,6 +122,7 @@ send({"reset": True})
 | インラインアサート | `{"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}}` |
 | noun-bigram シード | `{"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}}` |
 | 履歴シード | `{"seed_history": {"input": "かんじ", "output": "漢字", "times": 3}}` |
+| Zenzai 左コンテキスト固定 | `{"set_left_context": "申請書を"}` — Zenzai プロモートの有効化に必須。空文字で解除 |
 
 `then` に指定できる名前: `space` / `enter` / `backspace` / `escape` / `tab` / `down` / `up` / `left` / `right` / `f6`–`f10` / `eisu` / `kana`
 
@@ -311,6 +313,8 @@ eisu(英数)=102  kana(かな)=104
   "focusedSegmentIndex": 0,
   "predictionEnd": 0,            // 予測ブロック末尾（本番の CandidateWindow と同様）
   "successorLLMSurfaceExtras": [], // 後続語 LLM が返した表層形（コールバック後に増える）
+  "isZenzaiEnabled": true,        // AzooKeyConverter の zenzaiEnabled フラグ
+  "leftSideContext": "申請書を",  // 現在の leftSideContext（空なら Zenzai プロモートなし）
   "candidateEntries": [          // candidates の行ごとのメタデータ
     {"index": 0, "text": "漢字", "section": "fixed|prediction|history|dictionary_or_special"}
   ],
@@ -409,6 +413,33 @@ r = send({"type_string": "kyounohawaaidesu", "then": "space"})
 print(f"isSegmentMode: {r['isSegmentMode']}")
 print(f"segments: {r['segmentTexts']}")
 ```
+
+### 6. Zenzai top-1 プロモーションの確認
+
+Zenzai プロモーションには **isZenzaiEnabled=true** かつ **leftSideContext が非空** の両方が必要。
+`set_left_context` で左コンテキストを強制セットして検証する。
+
+```python
+send({"reset": True, "useRealDB": True})
+send({"set_left_context": "申請書を"})           # leftSideContext を固定（reset で解除される）
+send({"seed_history": {"input": "しんせい", "output": "申請フォーム", "times": 5}})
+
+r = send({"type_string": "shinsei", "then": "space",
+          "fields": ["isZenzaiEnabled", "leftSideContext",
+                     "fixedEnd", "historyEnd", "selectedRow", "selectedText", "candidateEntries"]})
+
+print(f"isZenzaiEnabled={r['isZenzaiEnabled']}, leftSideContext={r['leftSideContext']!r}")
+print(f"fixedEnd={r['fixedEnd']}, historyEnd={r['historyEnd']}")
+print(f"selectedRow={r['selectedRow']}, selectedText={r['selectedText']!r}")
+# fixedEnd >= 1 かつ selectedRow == 0 なら Zenzai top-1 が初期選択されている
+```
+
+**診断チェックリスト:**
+- `isZenzaiEnabled=false` → 設定画面で Zenzai をオンにする
+- `leftSideContext=''` → `set_left_context` でコンテキストをセットする
+- `fixedEnd=0` → Zenzai プロモートなし（上 2 点を確認）
+- `fixedEnd>=1, selectedRow>0` → initialRow がプロモート行をスキップしとる（バグ候補）
+- `fixedEnd>=1, selectedRow=0` → 正常（Zenzai top-1 が初期表示）
 
 ## 注意点
 
