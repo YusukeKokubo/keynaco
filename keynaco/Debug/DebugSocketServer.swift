@@ -32,6 +32,9 @@ final class DebugSocketServer: @unchecked Sendable {
     /// `reset` のたびに増やし、直前のキー処理で飛ばした LLM 完了コールバックを無効化する。
     private var llmEpoch: UInt64 = 0
 
+    /// `set_left_context` で明示指定した左コンテキスト。nil なら committedHistory から自動計算。
+    private var debugLeftContextOverride: String? = nil
+
     /// `deinit` から参照するため `nonisolated(unsafe)`。書き込みは MainActor のみ。
     nonisolated(unsafe) private var snapshotURL: URL?
 
@@ -183,6 +186,8 @@ final class DebugSocketServer: @unchecked Sendable {
         "segmentTexts": "array<string>",
         "focusedSegmentIndex": "int",
         "successorLLMSurfaceExtras": "array<string>",
+        "isZenzaiEnabled": "bool",
+        "leftSideContext": "string",
         "candidateEntries": "array<object>",
         "changed": "array<string>",
         "explain": "object",
@@ -764,7 +769,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private static let knownCommandKeys: Set<String> = [
         "reset", "state", "wait_until", "assert_eventually", "seed_noun_bigram", "seed_history",
-        "set_last_noun", "set_surrounding",
+        "set_last_noun", "set_surrounding", "set_left_context",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
         "capture", "vars", "schema", "with_examples", "explain",
     ]
@@ -1037,6 +1042,7 @@ final class DebugSocketServer: @unchecked Sendable {
             InputHandler.isAsciiMode = false
             candidateWindow = DebugCandidateWindow()
             mockClient.reset()
+            debugLeftContextOverride = nil
             return Self.finalize(["ok": true], cmd: cmd)
         }
 
@@ -1119,6 +1125,13 @@ final class DebugSocketServer: @unchecked Sendable {
         if let sur = cmd["set_surrounding"] as? [String: Any] {
             if let b = sur["before"] as? String { mockClient.documentBefore = b }
             if let a = sur["after"] as? String { mockClient.documentAfter = a }
+            return Self.finalize(["ok": true], cmd: cmd)
+        }
+
+        // {"set_left_context": "申請書を"} — Zenzai テスト用に leftSideContext を固定
+        // 空文字列を渡すと override を解除して committedHistory による自動計算に戻る
+        if let ctx = cmd["set_left_context"] as? String {
+            debugLeftContextOverride = ctx.isEmpty ? nil : ctx
             return Self.finalize(["ok": true], cmd: cmd)
         }
 
@@ -1542,6 +1555,8 @@ final class DebugSocketServer: @unchecked Sendable {
             "segmentTexts":       snap.segmentTexts,
             "focusedSegmentIndex": snap.focusedSegmentIndex,
             "successorLLMSurfaceExtras": handler.successorLLMSurfaceExtras,
+            "isZenzaiEnabled":    handler.azooKeyConverter.isZenzaiEnabled,
+            "leftSideContext":    handler.leftSideContext,
             "surroundingAfter":   mockClient.documentAfter,
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,
@@ -1613,7 +1628,8 @@ final class DebugSocketServer: @unchecked Sendable {
     // MARK: - LLM スケジューリング（InputController と同順・文脈は committedHistory のみ）
 
     private func llmDocumentContextPrefix() -> String {
-        handler.committedHistory.suffix(5).joined()
+        if let override = debugLeftContextOverride { return override }
+        return handler.committedHistory.suffix(5).joined()
     }
 
     private func applyLLMScheduling() {
