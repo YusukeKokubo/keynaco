@@ -42,7 +42,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
 | `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
-| `generate_preset_bigram_csv.py` | プリセット bigram データを CSV 生成するスクリプト |
 
 ### 起動チェーン（IMK ブートストラップ）
 
