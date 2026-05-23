@@ -27,7 +27,6 @@ final class DebugSocketServer: @unchecked Sendable {
     var candidateWindow = DebugCandidateWindow()
 
     let successorLLM = LLMSuccessorFetcher()
-    let segmentLLM = LLMSegmentConverter()
 
     /// `reset` のたびに増やし、直前のキー処理で飛ばした LLM 完了コールバックを無効化する。
     var llmEpoch: UInt64 = 0
@@ -1160,15 +1159,6 @@ final class DebugSocketServer: @unchecked Sendable {
 
     func applyLLMScheduling() {
         applySuccessorLLMScheduling()
-        applySegmentPrefetchIfNeeded()
-        applySegmentLLMScheduling()
-    }
-
-    /// `InputController.applyPostKeyDownEffects` と同様。デバッグ用 `segmentLLM` は本番の static インスタンスとは別。
-    func applySegmentPrefetchIfNeeded() {
-        guard !handler.state.isSegmentMode,
-              handler.state.composedHiragana.count >= LLMSegmentConverter.segmentPrefetchMinHiraganaCount else { return }
-        segmentLLM.prefetch(hiragana: handler.state.composedHiragana)
     }
 
     func applySuccessorLLMScheduling() {
@@ -1198,33 +1188,6 @@ final class DebugSocketServer: @unchecked Sendable {
             let extra = words.filter { !seen.contains($0) }
             guard !extra.isEmpty else { return }
             self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
-        }
-    }
-
-    func applySegmentLLMScheduling() {
-        let trigger = handler.segmentLLMTrigger
-        guard case .start(let hiragana) = trigger else { return }
-        handler.segmentLLMTrigger = .none
-        guard let trimmed = segmentLLM.takePrefetchIfMatching(hiragana: hiragana) else { return }
-        guard !trimmed.isEmpty,
-              let segState = handler.state.segmentState,
-              segState.segments.map(\.reading).joined() == hiragana else { return }
-        handler.applyLLMSegmentResult(text: trimmed)
-        guard let updated = handler.state.segmentState,
-              updated.llmWholeText != nil,
-              !updated.segments.isEmpty else { return }
-        let action = handler.makeCandidateActionForFocusedSegment()
-        if case .show(let cands, let historyEnd, let initialRow, let predictionEnd, let fixedEnd) = action {
-            candidateWindow.apply(
-                action: .show(
-                    candidates: cands,
-                    historyEnd: historyEnd,
-                    initialRow: initialRow,
-                    predictionEnd: predictionEnd,
-                    fixedEnd: fixedEnd
-                )
-            )
-            handler.applySegmentMarkedText(client: mockClient)
         }
     }
 

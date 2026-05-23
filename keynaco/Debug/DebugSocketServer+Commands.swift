@@ -9,7 +9,6 @@ extension DebugSocketServer {
     func handleReset(cmd: [String: Any]) -> [String: Any] {
     cleanupSnapshot()
     successorLLM.cancel()
-    segmentLLM.cancel()
     llmEpoch &+= 1
     let useRealDB = cmd["useRealDB"] as? Bool ?? false
     let converter = ZenzaiSettings.makeConverter()

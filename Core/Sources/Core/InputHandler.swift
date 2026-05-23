@@ -10,12 +10,6 @@ public enum CandidateAction: Sendable {
     case deleteSelected
 }
 
-/// セグメントモード用：`InputController` が `LLMSegmentConverter` を起動するタイミング。
-public enum SegmentLLMTrigger: Equatable {
-    case none
-    case start(hiragana: String)
-}
-
 public struct CandidateContext: Sendable {
     public var isVisible: Bool
     public var selectedRow: Int
@@ -112,7 +106,6 @@ public struct InputHandler {
     public var successorLLMSurfaceExtras: [String] = []
     /// `suggestSuccessors()` が候補を積んだ直後にセットされる LLM コンテキスト（`committedHistory.suffix(3)` のスナップショット）。nil = トリガーなし。
     public var successorLLMContext: [String]? = nil
-    public var segmentLLMTrigger: SegmentLLMTrigger = .none
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }
     public var lastConfirmedContext: LastConfirmedContext? = nil
@@ -242,17 +235,6 @@ public struct InputHandler {
         // セグメントモード中の強制確定（アプリ切り替えなど）
         if let segmentState = state.segmentState {
             let selectedText = candidate.selectedText ?? segmentState.focusedSegment.selectedText
-            if let llmText = segmentState.llmWholeText,
-               isLlmWholeTextShortcut(segmentState: segmentState, candidateSelectedText: candidate.selectedText) {
-                let fullReading = segmentState.segments.map(\.reading).joined()
-                state.segmentState = nil
-                segmentCandidateCache.removeAll()
-                segmentLLMTrigger = .none
-                db.recordPrefixes(reading: fullReading, output: llmText)
-                azooKeyConverter.commit(reading: fullReading, text: llmText)
-                commitText(text: llmText, fullReading: fullReading, client: client)
-                return
-            }
             var confirmed = ""
             var fullReading = ""
             for (i, seg) in segmentState.segments.enumerated() {
@@ -266,7 +248,6 @@ public struct InputHandler {
             if segmentState.segments.count >= 2 {
                 db.recordPrefixes(reading: fullReading, output: confirmed)
             }
-            segmentLLMTrigger = .none
             commitText(text: confirmed, fullReading: fullReading, client: client)
             return
         }
@@ -318,7 +299,6 @@ public struct InputHandler {
             state.composedHiragana = segmentState.segments.map(\.reading).joined()
             state.segmentState = nil
             segmentCandidateCache.removeAll()
-            segmentLLMTrigger = .none
         }
         guard !state.composingText.isEmpty else { return false }
         state.absorbPendingIntoComposed()
@@ -365,7 +345,6 @@ public struct InputHandler {
 
     public mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         guard state.reset() else { return (false, .none) }
-        segmentLLMTrigger = .none
         applyMarkedText(candidateText: nil, client: client)
         return (true, .dismiss)
     }

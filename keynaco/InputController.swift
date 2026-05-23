@@ -14,7 +14,6 @@ class InputController: IMKInputController, @unchecked Sendable {
     nonisolated(unsafe) private var hiraganaPreferredObserver: NSObjectProtocol?
     /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
     static let successorLLM = LLMSuccessorFetcher()
-    static let segmentLLM = LLMSegmentConverter()
     static let misconversionChecker = LLMMisconversionChecker()
     static let posClassifier = LLMPOSClassifier()
 
@@ -113,7 +112,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.pendingSuccessorCandidates = []
             ic.handler.successorLLMSurfaceExtras = []
             ic.handler.successorLLMContext = nil
-            ic.handler.segmentLLMTrigger = .none
             ic.cachedSurroundingContext = nil
             ic.handler.virtualHistoryPrefix = []
             ic.handler.leftSideContext = ""
@@ -222,11 +220,6 @@ class InputController: IMKInputController, @unchecked Sendable {
         }
 
         applySuccessorLLMScheduling(adapter: adapter)
-        if !handler.state.isSegmentMode,
-           handler.state.composedHiragana.count >= LLMSegmentConverter.segmentPrefetchMinHiraganaCount {
-            Self.segmentLLM.prefetch(hiragana: handler.state.composedHiragana)
-        }
-        applySegmentLLMScheduling(adapter: adapter)
 
         if adapter.didInsertText {
             scheduleMisconversionCheck(adapter: adapter)
@@ -393,7 +386,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.pendingSuccessorCandidates = []
             ic.handler.successorLLMSurfaceExtras = []
             ic.handler.successorLLMContext = nil
-            ic.handler.segmentLLMTrigger = .none
             ic.cachedSurroundingContext = nil
             ic.handler.virtualHistoryPrefix = []
             ic.handler.leftSideContext = ""
@@ -415,14 +407,12 @@ class InputController: IMKInputController, @unchecked Sendable {
     private static func cancelOnDeviceLLMTasks(includeMisconversionCancel: Bool) {
         if Thread.isMainThread {
             successorLLM.cancel()
-            segmentLLM.cancel()
             if includeMisconversionCancel {
                 misconversionChecker.cancel()
             }
         } else {
             DispatchQueue.main.sync {
                 successorLLM.cancel()
-                segmentLLM.cancel()
                 if includeMisconversionCancel {
                     misconversionChecker.cancel()
                 }

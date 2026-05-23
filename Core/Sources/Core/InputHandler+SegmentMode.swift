@@ -44,7 +44,6 @@ public extension InputHandler {
                 // 辞書候補なし（未知複合語等）のみ手動2分割を試みる
                 if let manualSegs = tryManualBisection(fullReading: fullReading) {
                     state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
-                    segmentLLMTrigger = .start(hiragana: fullReading)
                     return makeCandidateActionForFocusedSegment()
                 }
                 return listAction
@@ -62,116 +61,13 @@ public extension InputHandler {
                let manualSegs = tryManualBisection(fullReading: fullReading),
                manualSegs[0].reading.count > rawSegments[0].reading.count {
                 state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
-                segmentLLMTrigger = .start(hiragana: fullReading)
                 return makeCandidateActionForFocusedSegment()
             }
             segments = built
         }
 
         state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
-        segmentLLMTrigger = .start(hiragana: fullReading)
         return makeCandidateActionForFocusedSegment()
-    }
-
-    /// `LLMSegmentConverter` の結果を文節境界推定に成功すれば再構築、失敗時は先頭文節に全文候補を挿入（`InputController` から呼ぶ）。
-    mutating func applyLLMSegmentResult(text raw: String) {
-        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        guard var ss = state.segmentState, ss.llmWholeText == nil else { return }
-        let fullReading = ss.segments.map(\.reading).joined()
-        guard fullReading == state.composedHiragana else { return }
-        if text == fullReading { return }
-        if text == ss.allSelectedText { return }
-        guard !ss.segments.isEmpty else { return }
-
-        let baseline = ss.segments.map(\.reading)
-        if let pairs = LLMSegmentConverter.inferSegmentBoundaries(
-            hiragana: fullReading,
-            llmText: text,
-            azooKey: azooKeyConverter,
-            baselineSegmentReadings: baseline,
-            leftSideContext: azooKeyLeftContext
-        ) {
-            applyLLMBoundaries(pairs: pairs, llmWholeText: text)
-            return
-        }
-
-        // Zenzai 有効時は segmentize / candidatesForSegment ベースの候補を維持し、全文挿入フォールバックしない。
-        if azooKeyConverter.isZenzaiEnabled { return }
-
-        if ss.segments[0].candidates.contains(text) { return }
-
-        ss.segments[0].candidates.insert(text, at: 0)
-        ss.segments[0].historyEnd += 1
-        let newCount = ss.segments[0].candidates.count
-        ss.segments[0].selectedIndex = min(ss.segments[0].selectedIndex + 1, newCount - 1)
-        ss.llmWholeText = text
-        state.segmentState = ss
-    }
-
-    private mutating func applyLLMBoundaries(pairs: [(reading: String, token: String)], llmWholeText: String) {
-        let zenzaiOn = azooKeyConverter.isZenzaiEnabled
-        var built: [Segment] = []
-        for i in pairs.indices {
-            let reading = pairs[i].reading
-            let token = pairs[i].token
-            let prev: String? = (i == 0) ? lastCommittedOutput : pairs[i - 1].token
-            let dictCandidates = azooKeyConverter.candidatesForSegment(reading: reading, leftSideContext: azooKeyLeftContext)
-            var seg = buildSegmentCandidates(reading: reading, dictCandidates: dictCandidates, prev: prev)
-            let zenTop = dictCandidates.first
-
-            if zenzaiOn, let z = zenTop, z != token, seg.candidates.contains(z) {
-                Self.reorderSegmentCandidatesZenzaiBeforeLLM(segment: &seg, zenTop: z, token: token)
-            } else if let idx = seg.candidates.firstIndex(of: token) {
-                if idx != 0 {
-                    seg.candidates.remove(at: idx)
-                    seg.candidates.insert(token, at: 0)
-                }
-                let newCount = seg.candidates.count
-                seg.selectedIndex = min(seg.selectedIndex + 1, newCount - 1)
-            } else {
-                seg.candidates.insert(token, at: 0)
-                seg.historyEnd += 1
-                let newCount = seg.candidates.count
-                seg.selectedIndex = min(seg.selectedIndex + 1, newCount - 1)
-            }
-            built.append(seg)
-        }
-        if pairs.count >= 2 {
-            for i in built.indices {
-                built[i].selectedIndex = 0
-            }
-        }
-        var newState = SegmentState(segments: built, focusedIndex: 0)
-        newState.llmWholeText = llmWholeText
-        newState.isLlmBoundaryInferred = pairs.count >= 2
-        state.segmentState = newState
-        segmentCandidateCache.removeAll()
-    }
-
-    /// LLM 全文一発確定: 以下のいずれかを満たすとき。
-    /// - 多文節境界パス: 全文節が先頭候補選択かつ連結が llmWholeText と一致
-    /// - 旧フォールバックパス: focusedSegment の candidates[0] が llmWholeText そのもの
-    func isLlmWholeTextShortcut(segmentState: SegmentState, candidateSelectedText: String?) -> Bool {
-        guard let whole = segmentState.llmWholeText else { return false }
-        guard segmentState.focusedIndex == 0 else { return false }
-        guard !segmentState.segments.isEmpty else { return false }
-        let focused = segmentState.focusedSegment
-        guard !focused.candidates.isEmpty else { return false }
-        let effective = candidateSelectedText ?? focused.selectedText
-
-        // 多文節境界パス: applyLLMBoundaries が全文節を再構築している
-        if segmentState.segments.allSatisfy({ !$0.candidates.isEmpty && $0.selectedIndex == 0 }),
-           segmentState.segments.map({ $0.candidates[0] }).joined() == whole {
-            return effective == focused.candidates[0]
-        }
-
-        // 旧フォールバックパス: LLM 全文が segments[0].candidates[0] にのみ挿入されている
-        if focused.candidates[0] == whole {
-            return focused.selectedIndex == 0 && effective == whole
-        }
-
-        return false
     }
 
     func buildSegmentCandidates(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
@@ -273,7 +169,6 @@ public extension InputHandler {
         case KeyCode.escape:
             state.segmentState = nil
             segmentCandidateCache.removeAll()
-            segmentLLMTrigger = .none
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
 
@@ -281,14 +176,12 @@ public extension InputHandler {
             if keyCode == KeyCode.backspace {
                 state.segmentState = nil
                 segmentCandidateCache.removeAll()
-                segmentLLMTrigger = .none
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, .dismiss)
             }
             // その他のキー → セグメントモード解除してそのキーをスルー
             state.segmentState = nil
             segmentCandidateCache.removeAll()
-            segmentLLMTrigger = .none
             return (false, .dismiss)
         }
     }
@@ -397,24 +290,6 @@ public extension InputHandler {
         syncFocusedSegmentSelection(from: candidate)
         guard let segmentState = state.segmentState else { return .none }
 
-        if let llmText = segmentState.llmWholeText,
-           isLlmWholeTextShortcut(segmentState: segmentState, candidateSelectedText: candidate.selectedText) {
-            let fullReading = segmentState.segments.map(\.reading).joined()
-            if segmentState.isLlmBoundaryInferred {
-                db.saveBoundaryPref(
-                    fullReading: fullReading,
-                    segments: segmentState.segments.map(\.reading)
-                )
-            }
-            state.segmentState = nil
-            segmentCandidateCache.removeAll()
-            segmentLLMTrigger = .none
-            db.recordPrefixes(reading: fullReading, output: llmText)
-            azooKeyConverter.commit(reading: fullReading, text: llmText)
-            commitText(text: llmText, fullReading: fullReading, client: client)
-            return suggestSuccessors()
-        }
-
         var confirmed = ""
         var fullReading = ""
         for seg in segmentState.segments {
@@ -432,10 +307,9 @@ public extension InputHandler {
             db.recordPrefixes(reading: fullReading, output: confirmed)
         }
         let segs = segmentState.segments
-        if segs.contains(where: { $0.isManuallyAdjusted }) || segmentState.isLlmBoundaryInferred {
+        if segs.contains(where: { $0.isManuallyAdjusted }) {
             db.saveBoundaryPref(fullReading: fullReading, segments: segs.map { $0.reading })
         }
-        segmentLLMTrigger = .none
         commitText(text: confirmed, fullReading: fullReading, client: client)
         return suggestSuccessors()
     }
@@ -444,47 +318,6 @@ public extension InputHandler {
         guard let segmentState = state.segmentState else { return }
         let str = segmentState.attributedString()
         client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
-    }
-
-    /// Zenzai 有効かつ `zenTop != token` のとき、辞書先頭表層を LLM トークンより前に並べ替える（`candidatesForSegment` の先頭は `zenTop` と一致し候補列に含まれること）。
-    private static func reorderSegmentCandidatesZenzaiBeforeLLM(segment: inout Segment, zenTop: String, token: String) {
-        func remove(_ s: String) {
-            guard let idx = segment.candidates.firstIndex(of: s) else { return }
-            if idx < segment.historyEnd {
-                segment.historyEnd -= 1
-            }
-            segment.candidates.remove(at: idx)
-        }
-
-        let ti = segment.candidates.firstIndex(of: token)
-        let zi = segment.candidates.firstIndex(of: zenTop)
-        if let ti = ti, let zi = zi {
-            if ti > zi {
-                remove(token)
-                remove(zenTop)
-            } else {
-                remove(zenTop)
-                remove(token)
-            }
-        } else if ti != nil {
-            remove(token)
-            if segment.candidates.contains(zenTop) {
-                remove(zenTop)
-            }
-        } else if zi != nil {
-            remove(zenTop)
-        }
-
-        segment.candidates.insert(zenTop, at: 0)
-        if zenTop != token {
-            segment.candidates.insert(token, at: 1)
-        }
-
-        // `remove()` が `idx < historyEnd` なら都度 -1 済み。先頭へ zenTop/token を2行挿入するので、履歴境界 index は常に +2
-        //（`netInserted == 1` のように見えるケースでも、新規 token のみ +1 では履歴行の index が足りず Shift+Delete 範囲が壊れる）。
-        segment.historyEnd += 2
-
-        segment.selectedIndex = 0
     }
 
     /// AzooKey が1セグメントのみ返す場合・促音終わり誤分割の場合に前から順に2分割を試みる。
