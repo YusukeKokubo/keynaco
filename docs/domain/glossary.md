@@ -94,12 +94,6 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 
 *Tests: `Tests/InputHandlerSegmentTests.swift`*
 
-### SegmentState.llmWholeText（セグメント LLM 全文候補）
-読み全体をオンデバイス LLM で一括変換した全文テキスト。`inferSegmentBoundaries` が成功した場合は各文節の候補先頭にその文節の LLM トークンが入り、連結がこの文字列になる。失敗時のフォールバックでは先頭文節のみに全文を挿入する。  
-**短絡確定**: `focusedIndex == 0` かつ確定条件を満たすとき Enter で全文節を破棄し `llmWholeText` だけを確定する（詳細: `isLlmWholeTextShortcut`）。
-
-*Tests: `Tests/InputHandlerSegmentLLMTests.swift`、`Tests/SegmentBoundaryTests.swift`*
-
 ---
 
 ## Successor モード（SuccessorMode）

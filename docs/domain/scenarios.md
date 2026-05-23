@@ -226,30 +226,6 @@
 
 ---
 
-## S-11b: セグメント LLM 境界（アライメント成功 / 失敗）
-
-**前提**: `きかいがくしゅうをする` を入力し Space でセグメントモードへ。AzooKey は複数文節に分割済みとする。
-
-**アライメント成功**（辞書・読みが整合し `inferSegmentBoundaries` が非 nil）:
-
-| ステップ | イベント | セグメント表示のイメージ |
-|---------|-----------|-------------------------|
-| 1 | （突入直後） | AzooKey 初期境界のまま |
-| 2 | LLM が `機械学習をする` を返す | 読みが `きかいがくしゅう` / `を` / `する` に対応するよう境界が置き換わり、各文節の先頭候補に LLM トークンが並ぶ |
-| 3 | Enter（各行先頭選択のまま） | LLM 全文を 1 回確定 → 待機。多文節再構築済みなら `boundary_pref` に当該読み境界を保存 |
-
-**アライメント失敗**（推論が `nil`）:
-
-| ステップ | イベント | 動作 |
-|---------|-----------|------|
-| 1 | LLM が返すが読みと整合しない | 先頭文節の候補先頭に全文テキストのみ挿入（境界は AzooKey のまま）。`boundary_pref` には保存しない |
-
-**1 ペアのみ整合**（`inferSegmentBoundaries` が 1 文節に収まる）: `applyLLMBoundaries` は走るが `boundary_pref` には保存しない（多文節再構築ではない）。
-
-*Tests: `Tests/SegmentBoundaryTests.swift`、`Tests/InputHandlerSegmentLLMTests.swift`、`Tests/InputHandlerSegmentTests.swift`（LLM 境界の `boundary_pref` 保存）*
-
----
-
 ## S-12: 日時候補の選択
 
 **前提**: `lastCommittedOutput` は空（文頭）。

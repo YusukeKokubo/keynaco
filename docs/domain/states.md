@@ -112,12 +112,12 @@ stateDiagram-v2
 | ↑ | フォーカス文節の前候補へ |
 | Shift+→ | フォーカス文節を右に1文字拡張（次文節の先頭1文字を奪う） |
 | Shift+← | フォーカス文節を左に1文字縮小（末尾1文字を次文節の先頭に渡す） |
-| Enter | 通常は全文節の選択候補を連結確定 → 待機。`llmWholeText` が設定済みかつ短絡確定条件を満たすときは LLM 全文のみを 1 回確定する（条件詳細: `isLlmWholeTextShortcut`。満たさない場合は通常確定へフォールスルー） |
+| Enter | 全文節の選択候補を連結確定 → 待機 |
 | Escape / Backspace | セグメントモード解除 → 組成に戻す |
 
 セグメント突入時、AzooKey の `segmentize` で初期分割を表示する。手動境界調整（Shift+矢印）時は `isManuallyAdjusted` を立て、確定時に history へ二重記録する。
 
-*Tests: `Tests/InputHandlerSegmentTests.swift`、`Tests/InputHandlerSegmentLLMTests.swift`、`Tests/SegmentBoundaryTests.swift`*
+*Tests: `Tests/InputHandlerSegmentTests.swift`*
 
 ### Successor モード
 
