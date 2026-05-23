@@ -1046,6 +1046,7 @@ final class DebugSocketServer: @unchecked Sendable {
             candidateWindow = DebugCandidateWindow()
             mockClient.reset()
             debugLeftContextOverride = nil
+            IMESandboxWindow.shared.clearSandbox()
             return Self.finalize(["ok": true], cmd: cmd)
         }
 
@@ -1537,6 +1538,14 @@ final class DebugSocketServer: @unchecked Sendable {
         var result = makeResponse(inserted: insertedTexts)
         result["changed"] = Self.computeChangedFields(before: before, after: result)
         IMESandboxWindow.shared.appendSocketSnapshot(result, inserted: insertedTexts)
+        if keyCode == 36 {
+            let stillComposing = !handler.state.composedHiragana.isEmpty
+                || !handler.state.composingText.isEmpty
+                || !handler.state.pendingRomaji.isEmpty
+            if !stillComposing {
+                IMESandboxWindow.shared.finishCurrentLine()
+            }
+        }
         return Self.finalize(result, cmd: cmd)
     }
 

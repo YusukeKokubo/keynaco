@@ -319,7 +319,10 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         return lines[selectedLineIndex].events.map { (selectedLineIndex, $0) }
     }
 
-    private func clearLog() {
+    private func clearLog() { clearSandbox() }
+
+    /// 行・イベントログをすべてクリアする（reset コマンド・Clear ボタン用）。
+    func clearSandbox() {
         lines = [SandboxLine(index: 0, committedSegments: [], events: [])]
         currentLineIndex = 0
         pendingLineAdvance = false
