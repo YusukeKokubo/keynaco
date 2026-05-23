@@ -65,10 +65,28 @@ final class CompositionStateTests: XCTestCase {
         XCTAssertEqual(s.pendingRomaji, "")
     }
 
-    func testAddRomajiNNBeforeVowelStillKeepsN() {
+    func testAddRomajiNNBeforeVowelDiscardsPendingN() {
+        // "nn" 後に母音が来た場合、hidden pending n は破棄されて母音単体になる。
+        // "kanna" → "かんあ"（"かんな" にはならない）
         var s = CompositionState()
         "kanna".forEach { _ = s.addRomaji(String($0)) }
-        XCTAssertEqual(s.composedHiragana, "かんな")
+        XCTAssertEqual(s.composedHiragana, "かんあ")
+        XCTAssertEqual(s.pendingRomaji, "")
+    }
+
+    func testAddRomajiNNBeforeIGivesNI() {
+        // "hanni" → "はんい"（範囲 の読みが変換できること）
+        var s = CompositionState()
+        "hanni".forEach { _ = s.addRomaji(String($0)) }
+        XCTAssertEqual(s.composedHiragana, "はんい")
+        XCTAssertEqual(s.pendingRomaji, "")
+    }
+
+    func testAddRomajiNNBeforeYouonKeepsPendingN() {
+        // "hannya" → "はんにゃ"（般若: y は hiddenNKeepFollowers に残すので拗音になる）
+        var s = CompositionState()
+        "hannya".forEach { _ = s.addRomaji(String($0)) }
+        XCTAssertEqual(s.composedHiragana, "はんにゃ")
         XCTAssertEqual(s.pendingRomaji, "")
     }
 

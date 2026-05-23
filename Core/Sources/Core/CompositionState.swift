@@ -4,10 +4,10 @@ import AppKit
 /// IMK ランタイムに依存しないため、ユニットテストで検証可能。
 public struct CompositionState {
 
-    /// "nn" 後の hidden n を保持すべき入力（母音/ y / n）
-    /// それ以外の子音が続いた場合は、typo 許容として hidden n を破棄して
-    /// "hennkann..." のような入力で "んん" が増殖しないようにする。
-    private static let hiddenNKeepFollowers: Set<Character> = ["a", "i", "u", "e", "o", "y", "n"]
+    /// "nn" 後の hidden n を保持すべき入力（y / n のみ）
+    /// 母音が続く場合は hidden n を破棄して、"hanni" → "はんい" になるようにする。
+    /// y は "nyu/nya" 等の拗音を拾うために保持する。
+    private static let hiddenNKeepFollowers: Set<Character> = ["y", "n"]
 
     public init() {}
 
