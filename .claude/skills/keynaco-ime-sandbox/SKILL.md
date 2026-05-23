@@ -414,7 +414,50 @@ print(f"isSegmentMode: {r['isSegmentMode']}")
 print(f"segments: {r['segmentTexts']}")
 ```
 
-### 6. Zenzai top-1 プロモーションの確認
+### 6. 行単位でケースを分けてログを取る（Sandbox 連携）
+
+Sandbox ウィンドウの左ペインは **1行 = 1テストケース**。Enter で行が確定し次の行へ進む。
+`reset` は Sandbox のログもクリアするので、複数ケースを比較するときのテンプレート:
+
+```python
+send({"reset": True})   # Sandbox ログもリセット
+
+# ケース1: こんにちは
+send({"type_string": "konnitiha", "then": "enter"})   # Enter で行1確定
+
+# ケース2: ありがとう
+send({"type_string": "arigatou", "then": "enter"})    # Enter で行2確定
+
+# ログを行単位で取得
+r_all = send({"get_log": True})
+for block in r_all["log"]:
+    print(f"line #{block['lineIndex']+1}: {block['displayText']!r}  ({len(block['events'])} events)")
+
+# 特定行だけ取得（lineIndex は 0 始まり）
+r1 = send({"get_log": True, "line": 0})   # 行1
+r2 = send({"get_log": True, "line": 1})   # 行2
+print(r1["log"][0]["events"][-1]["summary"])   # 行1の最終イベント
+```
+
+`get_log` レスポンスの構造:
+```json
+{
+  "log": [
+    {
+      "lineIndex": 0,
+      "displayText": "こんにちは",
+      "events": [ { "composedHiragana": "...", "summary": "...", "source": "ime", ... }, ... ]
+    }
+  ],
+  "count": 1
+}
+```
+
+- `displayText` — その行で確定されたテキストの結合（`insertText` の累積）
+- `events` — その行に紐づく全スナップショット（`source`: `"ime"` / `"socket"` / `"annotation"`）
+- Enter をソケット経由で送ると行が自動的に進む（`keyCode 36` 後に組成がなければ `finishCurrentLine` が走る）
+
+### 7. Zenzai top-1 プロモーションの確認
 
 Zenzai プロモーションには **isZenzaiEnabled=true** かつ **leftSideContext が非空** の両方が必要。
 `set_left_context` で左コンテキストを強制セットして検証する。
