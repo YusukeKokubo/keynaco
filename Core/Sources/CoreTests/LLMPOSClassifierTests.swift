@@ -3,38 +3,83 @@ import XCTest
 
 final class LLMPOSClassifierTests: XCTestCase {
 
-    func testNounVariants() {
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("noun"), "noun")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("名詞"), "noun")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("**noun**"), "noun")
-    }
-
-    func testProperNounVariants() {
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("proper_noun"), "proper_noun")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("固有名詞"), "proper_noun")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("固有名詞（東京など）"), "proper_noun")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("**proper_noun**"), "proper_noun")
-    }
+    // MARK: - normalizeTag
 
     func testMarkdownStripping() {
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("`verb`"), "verb")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("_adjective_"), "adjective")
+        XCTAssertEqual(LLMPOSClassifier.normalizeTag("**noun/common**"), "noun/common")
+        XCTAssertEqual(LLMPOSClassifier.normalizeTag("`verb/te`"), "verb/te")
+        XCTAssertEqual(LLMPOSClassifier.normalizeTag("_proper_noun/place_"), "proper_noun/place")
     }
 
-    func testVerbVariants() {
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("verb"), "verb")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("動詞"), "verb")
+    func testConfidenceParsing() {
+        XCTAssertEqual(LLMPOSClassifier.normalizeTag("proper_noun/place:high"), "proper_noun/place:high")
+        XCTAssertEqual(LLMPOSClassifier.normalizeTag("noun/suru:mid"),          "noun/suru:mid")
+        XCTAssertEqual(LLMPOSClassifier.normalizeTag("verb/te:low"),            "verb/te:low")
     }
 
-    func testAdjectiveVariants() {
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("adjective"), "adjective")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("形容詞"), "adjective")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("副詞"), "adjective")
+    func testExplanatoryResponseExtraction() {
+        // 説明文が混入しても known タグを抽出できる
+        XCTAssertEqual(LLMPOSClassifier.normalizeTag("田中 → proper_noun/person:mid"),               "proper_noun/person:mid")
+        XCTAssertEqual(LLMPOSClassifier.normalizeTag("「山田太郎」の品詞タグは proper_noun/person です。"), "proper_noun/person")
     }
 
-    func testOtherFallback() {
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("other"), "other")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("助詞"), "other")
-        XCTAssertEqual(LLMPOSClassifier.parsePOSString("unknown"), "other")
+    func testCategoryIgnoresConfidence() {
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/place:high"),  "proper_noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("noun/suru:mid"),           "noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/ta:low"),             "verb")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("adjective/na:high"),       "adjective")
+    }
+
+    // MARK: - categoryFromTag
+
+    func testCategoryFromTagHierarchical() {
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("noun/common"),          "noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("noun/suru"),            "noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/place"),    "proper_noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/person"),   "proper_noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/org"),      "proper_noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/te"),              "verb")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/ta"),              "verb")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/dict"),            "verb")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("adjective/i"),          "adjective")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("adjective/na"),         "adjective")
+        // particle/* と other/* はすべて pos="other"、理由は posTag に残る
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("particle/case"),        "other")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("particle/topic"),       "other")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("particle/aux"),         "other")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/conjunction"),    "other")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/interjection"),   "other")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/clause"),         "other")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/unknown"),        "other")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other"),                "other")
+    }
+
+    func testCategoryFromTagJapanese() {
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("固有名詞"),             "proper_noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("名詞"),                 "noun")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("動詞"),                 "verb")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("形容詞"),               "adjective")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("助詞"),                 "other")
+    }
+
+    // MARK: - needsRetry
+
+    func testNeedsRetry() {
+        XCTAssertFalse(LLMPOSClassifier.needsRetry(posTag: "proper_noun/place:high"))
+        XCTAssertFalse(LLMPOSClassifier.needsRetry(posTag: "noun/suru:mid"))
+        XCTAssertTrue(LLMPOSClassifier.needsRetry(posTag: "noun/common:low"))
+        XCTAssertTrue(LLMPOSClassifier.needsRetry(posTag: "proper_noun/place"))  // confidence なし
+        XCTAssertTrue(LLMPOSClassifier.needsRetry(posTag: "verb/te:confidence")) // 不正トークン
+    }
+
+    // MARK: - parsePOSString（後方互換）
+
+    func testParsePOSStringBackcompat() {
+        XCTAssertEqual(LLMPOSClassifier.parsePOSString("noun"),         "noun")
+        XCTAssertEqual(LLMPOSClassifier.parsePOSString("proper_noun"),  "proper_noun")
+        XCTAssertEqual(LLMPOSClassifier.parsePOSString("verb"),         "verb")
+        XCTAssertEqual(LLMPOSClassifier.parsePOSString("adjective"),    "adjective")
+        XCTAssertEqual(LLMPOSClassifier.parsePOSString("other"),        "other")
+        XCTAssertEqual(LLMPOSClassifier.parsePOSString("**noun/suru**"),"noun")
     }
 }

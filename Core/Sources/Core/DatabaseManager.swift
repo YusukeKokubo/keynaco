@@ -81,7 +81,8 @@ public final class DatabaseManager: @unchecked Sendable {
             count   INTEGER NOT NULL DEFAULT 1,
             used_at INTEGER NOT NULL,
             pos TEXT DEFAULT NULL,
-            pos_raw TEXT DEFAULT NULL,
+            pos_tag TEXT DEFAULT NULL,
+            pos_retry INTEGER NOT NULL DEFAULT 0,
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
@@ -127,6 +128,10 @@ public final class DatabaseManager: @unchecked Sendable {
         sqlite3_exec(db, "UPDATE history SET pos = 'noun' WHERE is_noun = 1 AND pos IS NULL", nil, nil, nil)
         sqlite3_exec(db, "UPDATE history SET pos = 'other' WHERE is_noun = 0 AND pos IS NULL", nil, nil, nil)
         sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_raw TEXT DEFAULT NULL", nil, nil, nil)
+        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_tag TEXT DEFAULT NULL", nil, nil, nil)
+        // pos_raw から pos_tag へデータを移行（pos_raw は互換のため残す）
+        sqlite3_exec(db, "UPDATE history SET pos_tag = pos_raw WHERE pos_tag IS NULL AND pos_raw IS NOT NULL", nil, nil, nil)
+        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_retry INTEGER NOT NULL DEFAULT 0", nil, nil, nil)
     }
 
     private func seedHiraganaPreferredIfNeeded() {
@@ -217,7 +222,8 @@ public final class DatabaseManager: @unchecked Sendable {
         public let output: String
         public let count: Int
         public let pos: String?
-        public let posRaw: String?
+        public let posTag: String?
+        public let posRetry: Bool
     }
 
     public struct UserDictEntry: Sendable {

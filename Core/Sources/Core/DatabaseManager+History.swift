@@ -57,21 +57,23 @@ extension DatabaseManager {
     }
 
     /// `output` に対応する全履歴行の pos を更新する。
-    public func updatePOS(output: String, pos: String, posRaw: String? = nil) {
+    /// `posRetry=true` の場合は次回分類時に再実行対象となる（低信頼度・フォーマット崩れ時に使用）。
+    public func updatePOS(output: String, pos: String, posTag: String? = nil, posRetry: Bool = false) {
         dispatchWrite {
-            self.executeOnQueue("UPDATE history SET pos = ?, pos_raw = ? WHERE output = ?") {
+            self.executeOnQueue("UPDATE history SET pos = ?, pos_tag = ?, pos_retry = ? WHERE output = ?") {
                 self.bindText($0, 1, pos)
-                if let raw = posRaw { self.bindText($0, 2, raw) } else { sqlite3_bind_null($0, 2) }
-                self.bindText($0, 3, output)
+                if let tag = posTag { self.bindText($0, 2, tag) } else { sqlite3_bind_null($0, 2) }
+                sqlite3_bind_int($0, 3, posRetry ? 1 : 0)
+                self.bindText($0, 4, output)
             }
         }
     }
 
-    /// pos が未分類（NULL）の出力語を最大 `limit` 件返す（重複排除）。
+    /// 未分類（pos IS NULL）または再試行待ち（pos_retry = 1）の出力語を最大 `limit` 件返す（重複排除）。
     public func fetchUnclassifiedHistory(limit: Int) -> [String] {
         dbQueue.sync {
             var results: [String] = []
-            let sql = "SELECT DISTINCT output FROM history WHERE pos IS NULL LIMIT ?"
+            let sql = "SELECT DISTINCT output FROM history WHERE pos IS NULL OR pos_retry = 1 LIMIT ?"
             guard let stmt = self.cachedStmt(for: sql) else { return results }
             sqlite3_bind_int(stmt, 1, Int32(limit))
             while sqlite3_step(stmt) == SQLITE_ROW {
@@ -83,7 +85,7 @@ extension DatabaseManager {
 
     public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
-            let sql = "SELECT input, output, count, pos, pos_raw FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+            let sql = "SELECT input, output, count, pos, pos_tag, pos_retry FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -92,10 +94,11 @@ extension DatabaseManager {
                 guard let i = sqlite3_column_text(stmt, 0),
                       let o = sqlite3_column_text(stmt, 1) else { continue }
                 let pos = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
-                let posRaw = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
+                let posTag = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
+                let posRetry = sqlite3_column_int(stmt, 5) != 0
                 results.append(HistoryEntry(
                     input: String(cString: i), output: String(cString: o),
-                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, posRaw: posRaw
+                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, posTag: posTag, posRetry: posRetry
                 ))
             }
             return results

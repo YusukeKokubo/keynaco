@@ -57,7 +57,7 @@ final class HistoryViewController: NSViewController {
         ("input",   "読み",         150, true),
         ("output",  "確定テキスト", 200, true),
         ("pos",     "品詞",          70, false),
-        ("pos_raw", "LLM応答",      120, true),
+        ("pos_tag", "LLMタグ",       120, true),
         ("count",   "回数",          60, false),
     ]
 
@@ -129,7 +129,7 @@ extension HistoryViewController: NSTableViewDelegate {
         case "input":   text = entry.input
         case "output":  text = entry.output
         case "pos":     text = Self.posLabel(entry.pos)
-        case "pos_raw": text = entry.posRaw ?? "―"
+        case "pos_tag": text = entry.posTag ?? "―"
         case "count":   text = "\(entry.count)"
         default: return nil
         }

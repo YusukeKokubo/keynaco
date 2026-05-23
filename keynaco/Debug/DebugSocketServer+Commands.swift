@@ -506,8 +506,8 @@ extension DebugSocketServer {
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
     let db = handler.db
-    InputController.posClassifier.classify(output: text) { classifiedOutput, pos, rawResponse in
-        db.updatePOS(output: classifiedOutput, pos: pos, posRaw: rawResponse)
+    InputController.posClassifier.classify(output: text) { classifiedOutput, pos, posTag, posRetry in
+        db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
     }
     }
 
@@ -523,6 +523,22 @@ extension DebugSocketServer {
     }
     }
     return Self.finalize(result, cmd: cmd)
+    }
+
+    /// `{"query_pos": ["東京", "確認して", ...]}` → `{"results": [{"output":"東京","pos":"proper_noun","pos_tag":"proper_noun/place"}, ...]}`
+    func handleQueryPos(cmd: [String: Any]) -> [String: Any] {
+        guard let outputs = cmd["query_pos"] as? [String] else {
+            return ["error": "query_pos must be an array of strings"]
+        }
+        let entries = handler.db.fetchAllHistory()
+        let map = Dictionary(grouping: entries, by: \.output)
+        let results: [[String: Any]] = outputs.map { output in
+            if let entry = map[output]?.first {
+                return ["output": output, "pos": entry.pos ?? "(nil)", "pos_tag": entry.posTag ?? "(未分類)"]
+            }
+            return ["output": output, "pos": "(not in db)", "pos_tag": "(not in db)"]
+        }
+        return ["results": results]
     }
 }
 

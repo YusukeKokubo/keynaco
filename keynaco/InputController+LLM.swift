@@ -35,8 +35,8 @@ extension InputController {
     func schedulePOSClassification(output: String, reading: String) {
         let db = handler.db
         let prevNoun = handler.lastConfirmedNounOutput
-        Self.posClassifier.classify(output: output) { [weak self] classifiedOutput, pos, rawResponse in
-            db.updatePOS(output: classifiedOutput, pos: pos, posRaw: rawResponse)
+        Self.posClassifier.classify(output: output) { [weak self] classifiedOutput, pos, posTag, posRetry in
+            db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
             if pos == "noun" || pos == "proper_noun" {
                 if let prev = prevNoun {
                     db.recordNounBigram(prev: prev, input: reading, output: classifiedOutput)
@@ -46,14 +46,14 @@ extension InputController {
         }
     }
 
-    /// 未分類（pos = NULL）の履歴エントリを最大 50 件バックグラウンドで分類する（起動時に1回呼ぶ）。
+    /// 未分類（pos IS NULL）または再試行待ち（pos_retry = 1）の履歴エントリを最大 50 件バックグラウンドで分類する（起動時に1回呼ぶ）。
     @MainActor
     static func performPOSBackfill() {
         let db = DatabaseManager.shared
         let outputs = db.fetchUnclassifiedHistory(limit: 50)
         for output in outputs {
-            posClassifier.classify(output: output) { classifiedOutput, pos, rawResponse in
-                db.updatePOS(output: classifiedOutput, pos: pos, posRaw: rawResponse)
+            posClassifier.classify(output: output) { classifiedOutput, pos, posTag, posRetry in
+                db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
             }
         }
     }
