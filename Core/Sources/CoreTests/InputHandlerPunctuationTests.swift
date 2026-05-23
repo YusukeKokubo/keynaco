@@ -401,7 +401,6 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     func testShiftAngleBracketConfirmedNotNounLikeNoSuccessor() {
         type(chars: "<", base: ",", modifiers: .shift)
         let result = press(keyCode: KeyCode.enter)
-        XCTAssertFalse(handler.isSuccessorMode, "「＜」は名詞でないため Successor モードは起動しないはず")
         XCTAssertEqual(client.inserted.last, "＜")
         guard case .dismiss = result.candidateAction else {
             XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return

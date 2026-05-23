@@ -480,13 +480,13 @@ extension DebugSocketServer {
     )
     candidateWindow.apply(action: action)
     // Successor 抑制: documentAfter が非空（文中挿入）のとき候補を出さない
-    if handler.isSuccessorMode,
+    if case .show = action,
+       handler.state.composedHiragana.isEmpty,
+       !handler.isBracketMode,
+       !handler.state.isSegmentMode,
        let ctx = SurroundingIMKContext.fetch(from: mockClient),
        !ctx.after.isEmpty {
-    handler.isSuccessorMode = false
-    handler.successorFirstChar = nil
-    handler.pendingSuccessorCandidates = []
-    candidateWindow.apply(action: .dismiss)
+        candidateWindow.apply(action: .dismiss)
     }
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {

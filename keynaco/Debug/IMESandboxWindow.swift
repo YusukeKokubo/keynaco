@@ -693,7 +693,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             "composingText":       s.composingText,
             "markedText":          s.markedText,
             "isAsciiMode":         s.isAsciiMode,
-            "isSuccessorMode":     s.isSuccessorMode,
+            "isSuccessorCandidateActive": s.successorCandidateActive,
             "isSegmentMode":       s.isSegmentMode,
             "isBracketMode":       s.isBracketMode,
             "isExplicitlySelected": s.isExplicitlySelected,
@@ -713,7 +713,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
     private nonisolated static func formatSummaryFromSnapshot(_ s: InputHandlerSnapshot) -> String {
         let modeFlags = [
             s.isAsciiMode          ? "ASCII"   : nil,
-            s.isSuccessorMode      ? "Succ"    : nil,
+            s.successorCandidateActive ? "Succ"    : nil,
             s.isSegmentMode        ? "Seg"     : nil,
             s.isBracketMode        ? "Brkt"    : nil,
             s.isExplicitlySelected ? "ExplSel" : nil,
@@ -733,7 +733,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("")
         lines.append("【モード】")
         lines.append("isAsciiMode           : \(s.isAsciiMode)")
-        lines.append("isSuccessorMode       : \(s.isSuccessorMode)")
+        lines.append("isSuccessorCandidateActive: \(s.successorCandidateActive)")
         lines.append("isSegmentMode         : \(s.isSegmentMode)")
         lines.append("isBracketMode         : \(s.isBracketMode)")
         lines.append("isExplicitlySelected  : \(s.isExplicitlySelected)")
@@ -785,7 +785,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("")
         lines.append("【モード】")
         lines.append("isAsciiMode           : \(bool("isAsciiMode"))")
-        lines.append("isSuccessorMode       : \(bool("isSuccessorMode"))")
+        lines.append("isSuccessorCandidateActive: \(bool("isSuccessorCandidateActive"))")
         lines.append("isSegmentMode         : \(bool("isSegmentMode"))")
         lines.append("isBracketMode         : \(bool("isBracketMode"))")
         lines.append("isExplicitlySelected  : \(bool("isExplicitlySelected"))")

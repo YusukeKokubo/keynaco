@@ -95,20 +95,21 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 
 ## Successor モード（SuccessorMode）
 
-### isSuccessorMode
-確定直後に学習済みの後続語候補を `pendingSuccessorCandidates` に保持し、ユーザーの 1 打目で候補ウィンドウを開く状態。  
-**起動条件**: 漢字・カタカナ末尾（`isNounLike` 真）のときのみ起動。ひらがな末尾（動詞・助詞・副詞等）の後は bi-gram があっても起動しない。  
-noun-bigram で候補を取得する。1 打目では noun-bigram 再照会に加え `fetchHistoryPrefix` も参照する。  
-確定後は次の候補があれば連鎖表示を継続する（ただし確定語が名詞末尾の場合のみ）。
+組成なし・ASCII モードでない状態で ASCII 英字 1 文字を入力した瞬間、後続語候補を表示する機能。`isSuccessorMode` 等の事前フラグは持たず、`candidate.isVisible && composedHiragana.isEmpty` で候補選択中のキー処理を分岐する。
 
-*Tests: `Tests/InputHandlerSuccessorTests.swift`*
+### trySuccessorCandidates
+`leftSideContext` 末尾の名詞らしい語（`extractNounFromContext`）または確定直後の `lastCommittedOutput`（`successorEligible` 時）を prev に、入力 1 文字の読み前方一致で noun-bigram + 履歴を照会する。候補があれば `.show`、なければ通常入力へ。
 
-### pendingSuccessorCandidates
-Successor モードで候補を 1 打目まで遅延表示するためのバッファ（noun-bigram 予測語）。  
-1 打目でかな先頭一致フィルタを行い一致候補を表示（noun-bigram 再照会 + `fetchHistoryPrefix` + pending merge）。2 打目以降の絞り込みは行わない（不一致時は 1 打目を通常入力に流してモード解除）。`isSuccessorMode = false` になるすべての経路でクリアされる。
+### extractNounFromContext
+`leftSideContext` 末尾の非漢字・非カタカナをスキップし、続く漢字・カタカナ連続スパンを返す（例: `"今日は東京に"` → `"東京"`）。
 
-### successorFirstChar
-Successor モード中の 1 打目をバッファリングするフィールド。2 打目がマッチしなければ 1 打目を通常入力として流してからモード解除する。
+### successorEligible
+`commitText` / `confirmSuccessor` 確定直後に立ち、次の 1 打目だけ `leftSideContext` が空でも `lastCommittedOutput` を prev に Successor を試す。1 打目処理後または Escape でクリア。
+
+### successorBufferedRomaji
+Successor 候補表示中の 1 打目ローマ字。2 打目不一致時に通常組成へ流す。
+
+*Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`*
 
 ---
 

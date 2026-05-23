@@ -10,7 +10,6 @@ public struct InputHandlerSnapshot: Sendable {
     public var markedText: String
 
     public var isAsciiMode: Bool
-    public var isSuccessorMode: Bool
     public var isSegmentMode: Bool
     public var isBracketMode: Bool
     public var isExplicitlySelected: Bool
@@ -26,6 +25,11 @@ public struct InputHandlerSnapshot: Sendable {
 
     public var segmentTexts: [String]
     public var focusedSegmentIndex: Int
+
+    /// 組成なし Successor 候補ウィンドウ表示中（旧 `isSuccessorMode` の代替）。
+    public var successorCandidateActive: Bool {
+        candidateVisible && composedHiragana.isEmpty && !isBracketMode && !isSegmentMode
+    }
 }
 
 #endif

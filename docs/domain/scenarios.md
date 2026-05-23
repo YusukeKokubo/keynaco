@@ -53,22 +53,18 @@
 
 ---
 
-## S-03: Successor モードの 1 打目（保留 + 読みマージ）
+## S-03: Successor モードの 1 打目（入力起動）
 
-**前提**: `東京` を確定した直後（末尾カタカナ → `isNounLike` 真）。noun-bigram `(東京, が)` を学習済み。`pendingSuccessorCandidates` に noun-bigram を保存し `.dismiss`。
+**前提**: `東京` を確定済み（`successorEligible = true`）または `leftSideContext` が `"今日は東京に"` 等。noun-bigram `(東京, が)` を学習済み。
 
-| ステップ | キー | successorFirstChar | 動作 |
-|---------|------|--------------------|------|
-| 0 | — | — | 確定直後はウィンドウを出さず Successor モードのみ |
-| 1 | `g` | `g` | `romajiToInitialKana["g"]` で noun-bigram 再照会＋ pending merge → 候補を「が」に絞り込み |
-| 2a | Space | — | 絞り込み中の先頭候補「が」を確定 → noun-bigram があれば Successor 継続、なければ待機 |
-| 2b | `z` | — | `g` を通常入力として流す（`g` → pendingRomaji）、モード解除 |
+| ステップ | キー | 動作 |
+|---------|------|------|
+| 0 | — | 確定直後は候補ウィンドウを出さない |
+| 1 | `g` | `trySuccessorCandidates("g")` → 候補「が」を `.show` |
+| 2a | Space | 先頭候補「が」を確定 |
+| 2b | `z` | `g` を通常組成に流す → `gz` の pending から通常組成 |
 
-2b のケースでは、1 打目 `g` が組成バッファに入り直し、`gz` の途中状態から通常の組成処理が続く。  
-**注意**: `g` の後に `a` を打つと 2b 同様にモード解除→通常組成になり `が` が markedText に入る（自動確定はしない）。
-**注意**: 1打目のマージは `pendingSuccessorCandidates` がある場合の経路。ひらがな末尾の語の後は noun-bigram があっても Successor には入らない（通常組成へ）。
-
-*Tests: `Tests/InputHandlerSuccessorTests.swift`*
+*Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`*
 
 ---
 

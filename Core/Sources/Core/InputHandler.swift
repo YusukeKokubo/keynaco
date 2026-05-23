@@ -90,9 +90,10 @@ public struct InputHandler {
 
     public var state = CompositionState()
     public var ignoreNextModeSwitch = false
-    public var isSuccessorMode = false
-    public var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
-    public var pendingSuccessorCandidates: [String] = []
+    /// Successor 候補表示中の 1 打目ローマ字（2 打目不一致時に通常入力へ流す）
+    var successorBufferedRomaji: String? = nil
+    /// 直前の確定後、次の 1 打目だけ Successor 候補を試す（`leftSideContext` なし時のフォールバック）
+    var successorEligible = false
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }
     public var lastConfirmedContext: LastConfirmedContext? = nil
@@ -150,8 +151,8 @@ public struct InputHandler {
         let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
         clearLastConfirmedContextUnlessBackspace(isBackspace: isBackspace)
 
-        if isSuccessorMode {
-            return handleSuccessorModeKey(
+        if isSuccessorCandidateSession(candidate) {
+            return handleSuccessorCandidateKey(
                 keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
                 modifiers: modifiers, candidate: candidate, client: client)
         }
@@ -242,6 +243,9 @@ public struct InputHandler {
             fullReading: fullReading
         )
         pushCommitted(text)
+        if !isPunctuation && !skipHistory {
+            successorEligible = true
+        }
         client.insertText(text)
         state = CompositionState()
     }
@@ -297,6 +301,7 @@ public struct InputHandler {
     }
 
     public mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
+        successorEligible = false
         guard state.reset() else { return (false, .none) }
         applyMarkedText(candidateText: nil, client: client)
         return (true, .dismiss)
@@ -310,17 +315,8 @@ extension InputHandler {
         if !isBackspace { lastConfirmedContext = nil }
     }
 
-    private mutating func handleSuccessorModeKey(
-        keyCode: UInt16,
-        characters: String?,
-        baseCharacters: String?,
-        modifiers: NSEvent.ModifierFlags,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        handleSuccessorMode(
-            keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-            modifiers: modifiers, candidate: candidate, client: client)
+    private func isSuccessorCandidateSession(_ candidate: CandidateContext) -> Bool {
+        candidate.isVisible && state.composedHiragana.isEmpty && !isBracketMode && !state.isSegmentMode
     }
 
     private mutating func handleFunctionKeyIfNeeded(
@@ -329,7 +325,7 @@ extension InputHandler {
         guard !InputHandler.isAsciiMode,
               [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) else { return nil }
         let consumed = handleFunctionKey(keyCode: keyCode, client: client)
-        return (consumed, consumed ? suggestSuccessors() : .none)
+        return (consumed, consumed ? .dismiss : .none)
     }
 
     private mutating func handleModeSwitchKey(
@@ -391,7 +387,7 @@ extension InputHandler {
                 return (false, .none)
             }
             commitComposition(client: client)
-            return (true, suggestSuccessors())
+            return (true, .dismiss)
         case KeyCode.escape:
             return doEscape(client: client)
         default:

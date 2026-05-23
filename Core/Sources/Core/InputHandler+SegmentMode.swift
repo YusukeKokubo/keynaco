@@ -291,7 +291,7 @@ public extension InputHandler {
             db.recordPrefixes(reading: fullReading, output: confirmed)
         }
         commitText(text: confirmed, fullReading: fullReading, client: client)
-        return suggestSuccessors()
+        return .dismiss
     }
 
     func applySegmentMarkedText(client: TextInputClient) {

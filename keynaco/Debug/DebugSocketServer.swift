@@ -165,7 +165,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "pendingRomaji": "string",
         "composingText": "string",
         "isAsciiMode": "bool",
-        "isSuccessorMode": "bool",
+        "isSuccessorCandidateActive": "bool",
         "isSegmentMode": "bool",
         "isBracketMode": "bool",
         "isExplicitlySelected": "bool",
@@ -583,7 +583,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
         let modeFlags: [(String, String)] = [
             ("isAsciiMode", "ascii"),
-            ("isSuccessorMode", "successor"),
+            ("isSuccessorCandidateActive", "successor"),
             ("isSegmentMode", "segment"),
             ("isBracketMode", "bracket"),
         ]
@@ -754,7 +754,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let knownAssertionFields: Set<String> = [
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
-        "isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode",
+        "isAsciiMode", "isSuccessorCandidateActive", "isSegmentMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
         "segmentTexts", "focusedSegmentIndex",
@@ -1048,7 +1048,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "pendingRomaji":      snap.pendingRomaji,
             "composingText":      snap.composingText,
             "isAsciiMode":        snap.isAsciiMode,
-            "isSuccessorMode":    snap.isSuccessorMode,
+            "isSuccessorCandidateActive": snap.successorCandidateActive,
             "isSegmentMode":      snap.isSegmentMode,
             "isBracketMode":      snap.isBracketMode,
             "isExplicitlySelected": snap.isExplicitlySelected,
@@ -1115,7 +1115,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let changedFieldTargets: [String] = [
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
-        "isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode",
+        "isAsciiMode", "isSuccessorCandidateActive", "isSegmentMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
         "segmentTexts", "focusedSegmentIndex",

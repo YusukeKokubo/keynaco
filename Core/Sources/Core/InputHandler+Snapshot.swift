@@ -20,7 +20,6 @@ public extension InputHandler {
             composingText: state.composingText,
             markedText: markedText,
             isAsciiMode: Self.isAsciiMode,
-            isSuccessorMode: isSuccessorMode,
             isSegmentMode: state.isSegmentMode,
             isBracketMode: isBracketMode,
             isExplicitlySelected: false,

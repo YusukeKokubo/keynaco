@@ -158,7 +158,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
     func testBareConversionWithZenzaiPutsZenzaiFirstThenHiragana() {
         // Zenzai あり・履歴なし・autoShow: Zenzai が先頭、ひらがなは直後
         setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: true))
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         handler.state.composedHiragana = "よいのでは"
         handler.state.pendingRomaji = ""
         let action = handler.buildCandidateList(autoShow: true)
@@ -779,7 +779,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     func testSnap_F1_ZenzaiPromotedWithContext() {
         // Zenzai enabled + leftContext あり: top-1 が fixedEnd-1 に昇格
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
@@ -799,7 +799,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     func testSnap_F3_ZenzaiDisabled() {
         // Zenzai off: top-1 プロモートなし・全境界=0
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: false))
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
@@ -809,7 +809,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     func testSnap_F4_ZenzaiTop1AlreadyInHistory() {
         // top-1 が高スコア履歴と重複: fixedEnd に入らず dedup
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         handler.db.record(input: "あい", output: "Zen先頭")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
@@ -820,7 +820,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     func testSnap_F5_ZenzaiWithUserDict() {
         // userDict + Zenzai: fixedEnd = userDict(1) + zenzai(1) = 2
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
@@ -832,7 +832,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // autoShow + Zenzai + 履歴なし: Zenzai が先頭、ひらがな固定は直後
         // fixedEnd = zenzai(1) + fixedHiragana(1) = 2, initialRow = 0
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(autoShow: true),
                      candidates: ["Zen先頭", "あい", "辞書B", "アイ"],
@@ -909,7 +909,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "哀")   // low history (excluded)
         handler.db.clock = { t + 40 * 86400 }
         handler.db.record(input: "あい", output: "愛")   // high history (now)
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         handler.db.addUserDict(input: "あい", output: "UD合い")
         seedNounBigramPrediction(prev: "東京", input: "あい", output: "予測A")
         handler.committedHistory = ["東京"]
@@ -923,7 +923,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     func testSnap_I2_HiraganaPreferredWithZenzai() {
         // hiraganaPreferred「の」+ Zenzai top-1: fixedEnd = ひらがな(1) + zenzai(1) = 2
         useStub(SnapStub(["Zen先頭"], zenzai: true))
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "Zen先頭", "ノ"],
@@ -992,7 +992,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
     func testZenzaiPromotedTop1ExcludedFromPredictionBlockWhenBigramMatches() {
         let top1 = "予測と同じ"
         zenzaiMock.candidateLines = [top1, "辞書だけ"]
-        handler.leftSideContext = "前文"
+        handler.leftSideContext = "prefix"
         handler.committedHistory = ["東京"]
         handler.db.recordNounBigram(prev: "東京", input: "てすと", output: top1)
         handler.db.recordNounBigram(prev: "東京", input: "てすと", output: "予測だけ別語")

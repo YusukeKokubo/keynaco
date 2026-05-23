@@ -2,61 +2,68 @@ import AppKit
 
 // MARK: - Successor モード
 //
-// 確定直後に「次に来そうな語」を自動表示するモード。
-// noun-bigram の上位 + 履歴前方一致を候補にする。
+// 組成なし・ASCII モードでない状態で通常キーを入力した瞬間、
+// leftSideContext / lastCommittedOutput から prev を取り後続語候補を表示する。
 
 public extension InputHandler {
 
-    /// DB で得た候補の並びを保ち、`pending` からローマ字1文字に対応する読み前方一致の語を末尾に追加する（単体テスト可）。
-    static func mergePendingSuccessorMatches(dbOrdered: [String], pending: [String], romajiKey: String) -> [String] {
-        let key = romajiKey.lowercased()
+    /// `leftSideContext` 末尾から漢字・カタカナのみの連続スパンを返す（例: `"今日は東京に"` → `"東京"`）。
+    static func extractNounFromContext(_ context: String) -> String? {
+        guard !context.isEmpty else { return nil }
+        let chars = Array(context)
+        var end = chars.count
+        while end > 0 {
+            let tail = String(chars[end - 1])
+            if tail.unicodeScalars.last.map(isContentWordScalar) == true { break }
+            end -= 1
+        }
+        guard end > 0 else { return nil }
+        var start = end
+        while start > 0 {
+            let ch = String(chars[start - 1])
+            guard ch.unicodeScalars.last.map(isContentWordScalar) == true else { break }
+            start -= 1
+        }
+        return String(chars[start..<end])
+    }
+
+    private static func isContentWordScalar(_ scalar: Unicode.Scalar) -> Bool {
+        let v = scalar.value
+        let isKanji = (v >= 0x4E00 && v <= 0x9FFF)
+            || (v >= 0x3400 && v <= 0x4DBF)
+            || (v >= 0xF900 && v <= 0xFAFF)
+        let isKatakana = v >= 0x30A0 && v <= 0x30FF
+        return isKanji || isKatakana
+    }
+
+    /// ローマ字1文字に対応する Successor 候補。候補なしなら nil（通常入力へ）。
+    func trySuccessorCandidates(romajiChar: String) -> [String]? {
+        let key = romajiChar.lowercased()
         guard key.count == 1, let c = key.first, c.isLetter, c.isASCII,
-              let kanas = romajiToInitialKana[String(c)], !kanas.isEmpty else {
-            return dbOrdered
+              let kanas = Self.romajiToInitialKana[key], !kanas.isEmpty else { return nil }
+        let contextNoun = Self.extractNounFromContext(leftSideContext)
+        let noun: String?
+        if let contextNoun {
+            noun = contextNoun
+        } else if successorEligible {
+            noun = lastCommittedOutput
+        } else {
+            return nil
         }
-        var seen = Set(dbOrdered)
-        var out = dbOrdered
-        for word in pending {
-            guard kanas.contains(where: { word.hasPrefix($0) }) else { continue }
-            if seen.insert(word).inserted { out.append(word) }
+        guard let noun else { return nil }
+        var seen = Set<String>()
+        var result: [String] = []
+        for kana in kanas {
+            for s in db.fetchNounBigram(prev: noun, reading: kana)
+                where seen.insert(s).inserted { result.append(s) }
+            for s in db.fetchHistoryPrefix(reading: kana)
+                where seen.insert(s).inserted { result.append(s) }
         }
-        return out
+        return result.isEmpty ? nil : Array(result.prefix(LearningThresholds.successorMaxCandidates))
     }
 
-    /// 後続語候補を組み立ててモードに入る／出る判定をする。
-    /// 候補がある場合は `pendingSuccessorCandidates` に保存して `.dismiss` を返す（1打目まで表示を遅延）。
-    mutating func suggestSuccessors() -> CandidateAction {
-        guard let last = lastCommittedOutput else {
-            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
-            return .dismiss
-        }
-        guard isNounLike(last) else {
-            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
-            return .dismiss
-        }
-        let nounBigrams = db.fetchNounBigramTop(prev: lastConfirmedNounOutput ?? last)
-
-        isSuccessorMode = true
-        successorFirstChar = nil
-        pendingSuccessorCandidates = nounBigrams
-        return .dismiss
-    }
-
-    mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
-        isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
-        state.pendingRomaji = ""
-        db.recordPrefixes(reading: particle, output: particle)
-        lastConfirmedContext = LastConfirmedContext(
-            input: particle,
-            output: particle,
-            fullReading: nil
-        )
-        pushCommitted(particle)
-        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
-        client.insertText(particle)
-    }
-
-    mutating func handleSuccessorMode(
+    /// Successor 候補ウィンドウ表示中のキー処理（`candidate.isVisible` && 組成空）。
+    mutating func handleSuccessorCandidateKey(
         keyCode: UInt16,
         characters: String?,
         baseCharacters: String?,
@@ -67,12 +74,14 @@ public extension InputHandler {
         switch keyCode {
         case KeyCode.space, KeyCode.enter:
             guard let selected = candidate.selectedText else {
-                isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+                successorBufferedRomaji = nil
+                successorEligible = false
+                state.pendingRomaji = ""
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, .dismiss)
             }
             confirmSuccessor(selected, client: client)
-            return (true, suggestSuccessors())
+            return (true, .dismiss)
         case KeyCode.downArrow, KeyCode.tab:
             return (true, .selectNext)
         case KeyCode.upArrow:
@@ -86,45 +95,44 @@ public extension InputHandler {
                 )
                 lastConfirmedContext = nil
             }
-            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
+            successorBufferedRomaji = nil
+            successorEligible = false
+            state.pendingRomaji = ""
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         default:
-            let first = successorFirstChar
-            if first == nil {
-                let char = (baseCharacters ?? characters ?? "").lowercased()
-                if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
-                   let last = lastCommittedOutput {
-                    let kanas = InputHandler.romajiToInitialKana[char] ?? []
-                    var filteredSeen = Set<String>()
-                    var filtered: [String] = []
-                    let nounPrev = lastConfirmedNounOutput ?? last
-                    for kana in kanas {
-                        let fromNoun = db.fetchNounBigram(prev: nounPrev, reading: kana)
-                        for s in fromNoun where filteredSeen.insert(s).inserted { filtered.append(s) }
-                        let fromHistory = db.fetchHistoryPrefix(reading: kana)
-                        for s in fromHistory where filteredSeen.insert(s).inserted { filtered.append(s) }
-                    }
-                    filtered = InputHandler.mergePendingSuccessorMatches(
-                        dbOrdered: filtered, pending: pendingSuccessorCandidates, romajiKey: char
-                    )
-                    if !filtered.isEmpty {
-                        pendingSuccessorCandidates = []
-                        successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                        let limited = Array(filtered.prefix(LearningThresholds.successorMaxCandidates))
-                        return (true, .show(candidates: limited, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
-                    }
-                }
+            let buffered = successorBufferedRomaji
+            successorBufferedRomaji = nil
+            if let buffered {
+                _ = state.addRomaji(buffered)
             }
-            // モード解除、バッファがあれば先に通常入力に流す
-            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
-            if let first {
-                _ = handle(keyCode: first.keyCode, characters: first.characters, baseCharacters: first.baseCharacters,
-                           modifiers: modifiers, candidate: .hidden, client: client)
-            }
-            return handle(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-                          modifiers: modifiers, candidate: .hidden, client: client)
+            applyMarkedText(candidateText: nil, client: client)
+            return handleNormalInput(
+                keyCode: keyCode,
+                characters: characters,
+                baseCharacters: baseCharacters,
+                modifiers: modifiers,
+                wasExplicitlySelected: false,
+                candidate: .hidden,
+                client: client
+            )
         }
+    }
+
+    mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
+        successorBufferedRomaji = nil
+        successorEligible = false
+        state.pendingRomaji = ""
+        db.recordPrefixes(reading: particle, output: particle)
+        lastConfirmedContext = LastConfirmedContext(
+            input: particle,
+            output: particle,
+            fullReading: nil
+        )
+        pushCommitted(particle)
+        successorEligible = true
+        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
+        client.insertText(particle)
     }
 
     // MARK: - Successor 用の static データ

@@ -26,28 +26,32 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 変換エンジンは `AzooKeyKanaKanjiConverter`（`Core/Package.swift` の依存）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 `KanaUtils` = ひらがな↔カタカナ変換ユーティリティ（`hiraganaToKatakana` / `hiraganaToHankakuKatakana` / `toZenkakuAscii`）。F7–F9 変換確定とカタカナ候補生成で使用。
-`NotificationNames` = `KeynacoCore` 公開の通知名定義（`Core/Sources/Core/NotificationNames.swift`）。`keynacoSuccessorPendingChanged`（N-gram 保留状態変化）。`AppDelegate` がステータスバー表示更新（`⌨…`）に購読し、`InputController` が送信する。
+`NotificationNames` = `KeynacoCore` 公開の通知名定義（`Core/Sources/Core/NotificationNames.swift`）。
 
 ## Successor モード
 
-関連変数: `isSuccessorMode` / `successorFirstChar` / `pendingSuccessorCandidates`
-
-語を確定したあと、続けて1打鍵するだけで次の語の候補を選べるモード。通常の変換フローを経ずに連続確定できる。
-
-確定時は候補を先読みしてスタンバイ状態に入る（ウィンドウは出ない）。**1打目がトリガー**で、そのキーの読みと一致する候補だけを絞って表示する（最大 5 件）。1打目がどの候補にも一致しなければモードを解除して通常入力に流す。
+組成なし・ASCII モードでない状態で ASCII 英字キーを入力した瞬間、`leftSideContext` 末尾の名詞らしい語（漢字・カタカナ連続スパン）または `lastCommittedOutput` を prev として後続語候補を表示する。`isSuccessorMode` 等の事前フラグは持たず、`candidate.isVisible && composedHiragana.isEmpty` で候補選択中のキー処理を分岐する。
 
 **候補の優先順位**（読み前方一致で絞ったうえで）：
 
-1. noun-bigram（直前確定語との共起実績が高い名詞）
-2. 変換履歴（読み前方一致）
-3. 確定直後に先読みした noun-bigram（1打目入力時に再クエリできなかった分を補完）
+1. noun-bigram（prev 語との共起実績）
+2. 変換履歴（`fetchHistoryPrefix` 読み前方一致）
 
-**起動条件**: 直前確定語が名詞系（`isNounLike`）でない場合はモードに入らない。名詞系でも候補がまったく得られない場合、またはカーソルが文末でない（文中挿入）場合も起動しない。
+**トリガー条件**:
 
-- 候補を選んで確定すると、その語が名詞系であれば連鎖してモードを継続する。名詞以外（格助詞等）の確定後は連鎖しない。
-- 右矢印（→）でモードをキャンセルし通常の組成に戻る。
-- 候補選択中は marked text に実テキストを設定する（空文字だと Electron 系アプリが Enter を IME に転送しないため）。
-- 最大候補数: `successorMaxCandidates = 5`（`LearningThresholds`）。
+- 組成が空（`composedHiragana` および `pendingRomaji` が空）
+- ASCII モードでない
+- 入力キーが `romajiToInitialKana` に含まれる ASCII 英字 1 文字
+- DB クエリで候補が 1 件以上
+
+**キー処理**:
+
+- 候補表示中（組成空）は Space/Enter で確定、`↑↓` で選択、Escape/Backspace/→ でキャンセル
+- 2 打目が不一致のとき 1 打目を通常入力に流してから 2 打目を処理（`pendingRomaji` バッファ）
+- 確定後は連鎖しない（次打鍵で再度 `trySuccessorCandidates` を評価）
+- カーソルが文末でない（文中挿入）場合は候補を表示しない（`InputController.applyPostKeyDownEffects`）
+- 候補選択中は marked text に実テキストを設定する（Electron 対策）
+- 最大候補数: `successorMaxCandidates = 5`（`LearningThresholds`）
 
 ## 候補表示の優先順位
 

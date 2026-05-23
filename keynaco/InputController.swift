@@ -104,14 +104,10 @@ class InputController: IMKInputController, @unchecked Sendable {
         MainActor.assumeIsolated {
             ic.handler.state = CompositionState()
             ic.handler.committedHistory = []
-            ic.handler.isSuccessorMode = false
-            ic.handler.successorFirstChar = nil
-            ic.handler.pendingSuccessorCandidates = []
             ic.cachedSurroundingContext = nil
             ic.handler.leftSideContext = ""
             ic.handler.ignoreNextModeSwitch = true
             ic.candidateWindow.dismiss()
-            Self.postSuccessorPendingNotification(pending: false)
         }
     }
 
@@ -120,7 +116,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         super.deactivateServer(sender)
     }
 
-    /// `handle` 内の `handler.handle` 成功後、候補ウィンドウ更新・周辺文脈・LLM 補助・誤変換のスケジュールまでを一括で行う。戻り値はメニューバー用 Successor 保留フラグ。
+    /// `handle` 内の `handler.handle` 成功後、候補ウィンドウ更新・周辺文脈・LLM 補助・誤変換のスケジュールまでを一括で行う。
     @MainActor
     private func applyPostKeyDownEffects(
         action: CandidateAction,
@@ -128,7 +124,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         composedHiraganaWasEmpty: Bool,
         composingWasEmpty: Bool,
         imkSenderForSurrounding: Any?
-    ) -> Bool {
+    ) {
         switch action {
         case .none:
             break
@@ -137,17 +133,15 @@ class InputController: IMKInputController, @unchecked Sendable {
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
             #endif
             // 文中挿入時（カーソルが末尾でない）は Successor 候補を表示しない
-            if handler.isSuccessorMode,
+            let isSuccessorShow = composingWasEmpty && !handler.isBracketMode && handler.state.composedHiragana.isEmpty
+            if isSuccessorShow,
                let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding),
                !ctx.after.isEmpty {
-                handler.isSuccessorMode = false
-                handler.successorFirstChar = nil
-                handler.pendingSuccessorCandidates = []
                 candidateWindow.dismiss()
                 break
             }
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
-            if handler.isSuccessorMode {
+            if isSuccessorShow {
                 // Successor 候補表示時は選択候補を marked text に設定する。
                 // 空文字ではなく実際のテキストを持つことで Electron 系アプリが Enter を IME に転送するようになる。
                 let markedText = candidates.isEmpty ? "" : candidates[min(initialRow, candidates.count - 1)]
@@ -157,7 +151,10 @@ class InputController: IMKInputController, @unchecked Sendable {
             candidateWindow.dismiss()
         case .selectNext:
             candidateWindow.selectNext()
-            if handler.isSuccessorMode || handler.isBracketMode {
+            if handler.isBracketMode {
+                let text = candidateWindow.selectedText() ?? ""
+                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            } else if candidateWindow.isVisible && handler.state.composedHiragana.isEmpty && !handler.state.isSegmentMode && !handler.isBracketMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
             } else {
@@ -165,7 +162,10 @@ class InputController: IMKInputController, @unchecked Sendable {
             }
         case .selectPrev:
             candidateWindow.selectPrev()
-            if handler.isSuccessorMode || handler.isBracketMode {
+            if handler.isBracketMode {
+                let text = candidateWindow.selectedText() ?? ""
+                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            } else if candidateWindow.isVisible && handler.state.composedHiragana.isEmpty && !handler.state.isSegmentMode && !handler.isBracketMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
             } else {
@@ -177,15 +177,6 @@ class InputController: IMKInputController, @unchecked Sendable {
                 handler.db.deleteHistory(output: text)
                 candidateWindow.removeCandidate(at: row)
             }
-        }
-
-        // Successor モード pending: カーソルが末尾でない場合は次打鍵での表示も抑制
-        if handler.isSuccessorMode, !handler.pendingSuccessorCandidates.isEmpty,
-           let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding),
-           !ctx.after.isEmpty {
-            handler.isSuccessorMode = false
-            handler.successorFirstChar = nil
-            handler.pendingSuccessorCandidates = []
         }
 
         if handler.documentSurroundingContextInvalidated {
@@ -211,7 +202,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             )
         }
 
-        return !handler.pendingSuccessorCandidates.isEmpty
     }
 
     // MARK: - イベントハンドリング
@@ -241,7 +231,7 @@ class InputController: IMKInputController, @unchecked Sendable {
 
         // @MainActor アクセス（candidateWindow・handler）を assumeIsolated に集約。ステータス通知は島から値を返し DispatchQueue.main.async で投稿する。
         #if DEBUG
-        let (successorPendingForMenuBar, consumed, imeStateSnapshot) = MainActor.assumeIsolated {
+        let (consumed, imeStateSnapshot) = MainActor.assumeIsolated {
             EventViewerWindow.shared.addEvent(
                 keyCode: keyCode, chars: characters ?? "",
                 baseChars: baseCharacters ?? "",
@@ -269,7 +259,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             )
             let actionName = "\(action)".split(separator: "(").first.map(String.init) ?? "\(action)"
             EventViewerWindow.shared.updateResult(consumed: consumed, action: actionName)
-            let pending = ic.applyPostKeyDownEffects(
+            ic.applyPostKeyDownEffects(
                 action: action,
                 adapter: adapter,
                 composedHiraganaWasEmpty: composedHiraganaWasEmpty,
@@ -284,10 +274,10 @@ class InputController: IMKInputController, @unchecked Sendable {
             snap.historyEnd = ic.candidateWindow.historySectionEnd
             snap.fixedEnd = ic.candidateWindow.fixedRowCount
             snap.candidates = Array(ic.candidateWindow.candidates.prefix(30))
-            return (pending, consumed, snap)
+            return (consumed, snap)
         }
         #else
-        let (successorPendingForMenuBar, consumed) = MainActor.assumeIsolated {
+        let consumed = MainActor.assumeIsolated {
             let ctx = CandidateContext(
                 isVisible: ic.candidateWindow.isVisible,
                 selectedRow: ic.candidateWindow.selectedRow,
@@ -307,18 +297,17 @@ class InputController: IMKInputController, @unchecked Sendable {
                 candidate: ctx,
                 client: adapter
             )
-            let pending = ic.applyPostKeyDownEffects(
+            ic.applyPostKeyDownEffects(
                 action: action,
                 adapter: adapter,
                 composedHiraganaWasEmpty: composedHiraganaWasEmpty,
                 composingWasEmpty: composingWasEmpty,
                 imkSenderForSurrounding: imkSenderForSurrounding
             )
-            return (pending, consumed)
+            return consumed
         }
         #endif
         DispatchQueue.main.async {
-            Self.postSuccessorPendingNotification(pending: successorPendingForMenuBar)
             #if DEBUG
             NotificationCenter.default.post(
                 name: .imeStateDidUpdate,
@@ -336,9 +325,14 @@ class InputController: IMKInputController, @unchecked Sendable {
         let adapter = IMKTextInputAdapter(sender)
         let ic = self
         MainActor.assumeIsolated {
-            // Successor モード中で組成がない場合は system-triggered commit をスキップ
+            // Successor 候補表示中で組成がない場合は system-triggered commit をスキップ
             // (insertText の副作用で system が commitComposition を呼ぶことがある)
-            guard !(ic.handler.isSuccessorMode && ic.handler.state.composingText.isEmpty && !ic.handler.state.isSegmentMode) else { return }
+            guard !(
+                ic.candidateWindow.isVisible
+                    && ic.handler.state.composedHiragana.isEmpty
+                    && !ic.handler.isBracketMode
+                    && !ic.handler.state.isSegmentMode
+            ) else { return }
             let ctx = CandidateContext(
                 isVisible: ic.candidateWindow.isVisible,
                 selectedRow: ic.candidateWindow.selectedRow,
@@ -349,13 +343,9 @@ class InputController: IMKInputController, @unchecked Sendable {
             )
             ic.handler.commitComposition(client: adapter, candidate: ctx)
             ic.handler.bracketCandidates = nil
-            ic.handler.isSuccessorMode = false
-            ic.handler.successorFirstChar = nil
-            ic.handler.pendingSuccessorCandidates = []
             ic.cachedSurroundingContext = nil
             ic.handler.leftSideContext = ""
             ic.candidateWindow.dismiss()
-            Self.postSuccessorPendingNotification(pending: false)
         }
     }
 

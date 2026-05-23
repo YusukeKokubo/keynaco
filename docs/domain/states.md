@@ -10,7 +10,7 @@
 | **候補選択中** | 組成中 + `isExplicitlySelected = true`（↑↓ 操作済み）|
 | **括弧モード** | `bracketCandidates != nil`（組成空で `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを入力） |
 | **セグメントモード** | `isSegmentMode = true` |
-| **Successor モード** | `isSuccessorMode = true` |
+| **Successor 候補表示中** | `candidate.isVisible && composedHiragana.isEmpty` |
 
 ---
 
@@ -119,29 +119,25 @@ stateDiagram-v2
 
 *Tests: `Tests/InputHandlerSegmentTests.swift`*
 
-### Successor モード
+### Successor 候補表示中
 
 | キー | 動作 |
 |------|------|
-| Space / Enter | 選択候補を確定 → 次の Successor 候補があれば継続、なければ待機。`selectedText` が得られないときは Successor を解除し `composingText`（`pendingRomaji` 含む）を再表示 |
-| ↑↓ | 候補を移動 |
-| Tab | 次候補へ |
-| ローマ字 1 文字 | `romajiToInitialKana` で noun-bigram 再照会＋`fetchHistoryPrefix`＋**保留リスト**の `mergePendingSuccessorMatches` 併合→一致候補を `.show`（最大 5 件）。一致なしはモード解除 |
-| 2 打目以降 | 1 打目を通常入力に流してモード解除（絞り込みなし） |
-| 非対応キー（1 打目, `pendingSuccessorCandidates` なし） | バッファがあれば流す → モード解除 → 通常組成へ |
-| → | モードキャンセル → 待機（successorFirstChar は破棄） |
-| Escape / Backspace | モード解除 → 待機 |
+| Space / Enter | 選択候補を確定（`confirmSuccessor`）→ 待機 |
+| ↑↓ / Tab | 候補を移動 |
+| ローマ字 2 文字目 | 1 打目を通常組成に流してから 2 打目を処理 |
+| → / Escape / Backspace | 候補解除 → 待機 |
 
-*Tests: `Tests/InputHandlerSuccessorTests.swift`*
+組成空で ASCII 英字 1 文字入力時、`trySuccessorCandidates` が候補を返せばこの状態に入る（確定直後の `successorEligible`、または `leftSideContext` 末尾の名詞文脈）。
+
+*Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`*
 
 ---
 
 ## 補足
 
 - **Successor の再帰防止**: 格助詞チェックは廃止。候補が空なら自然に `.dismiss` になるため、無限ループは起きない
-- **Successor の文中挿入抑制**: カーソルが文末でない（文中挿入モード）場合、`suggestSuccessors()` は Successor モードに入らず `.dismiss` を返す
-- **候補取得**: `lastConfirmedNounOutput`（なければ `lastCommittedOutput`）で noun-bigram を引く。`committedHistory` が空のときは prev なし
-- **履歴前方一致**: 1 打目で noun-bigram に加え `fetchHistoryPrefix` も照会する。noun-bigram が空でも isNounLike なら Successor モードに入り、履歴から候補を補完できる
-- **N-gram 遅延表示**: 確定直後は常に候補ウィンドウを閉じ 1 打目待ち。1 打目でかな先頭一致で DB を再照会し、`pendingSuccessorCandidates` 内の語を併合して表示する
-- **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
+- **Successor の文中挿入抑制**: カーソルが文末でない場合、`InputController.applyPostKeyDownEffects` が Successor 候補の `.show` を抑制する
+- **候補取得**: `extractNounFromContext(leftSideContext)` または確定直後の `lastCommittedOutput`（`successorEligible`）を prev に noun-bigram + `fetchHistoryPrefix` を照会
+- **Electron 対策**: Successor 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須

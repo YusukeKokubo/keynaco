@@ -99,7 +99,7 @@ public extension InputHandler {
         } else {
             commitComposition(client: client)
         }
-        return suggestSuccessors()
+        return .dismiss
     }
 
     mutating func handleCandidateVisible(
@@ -141,7 +141,7 @@ public extension InputHandler {
             return doEscape(client: client)
         case KeyCode.rightArrow:
             commitComposition(client: client)
-            return (true, suggestSuccessors())
+            return (true, .dismiss)
         case KeyCode.backspace where modifiers.contains(.shift):
             let row = candidate.selectedRow
             if candidate.fixedEnd <= row && row < candidate.historyEnd { return (true, .deleteSelected) }

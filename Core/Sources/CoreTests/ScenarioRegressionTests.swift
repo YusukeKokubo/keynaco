@@ -83,8 +83,6 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         XCTAssertFalse(h.state.isSegmentMode)
         XCTAssertEqual(c.inserted.last, "漢字")
         _ = enterAction
-        // 「漢字」末尾は isNounLike → bigram なしでも Successor モードに入る
-        XCTAssertTrue(h.isSuccessorMode)
     }
 
     /// **S-04**: `t` Shift+`O` Shift+`K` `y` `o` Enter → `tOKyo`（シナリオ記載の混在大文字トレース）
@@ -99,15 +97,20 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         XCTAssertEqual(client.inserted, ["tOKyo"])
     }
 
-    /// セッション内 `committedHistory` から Successor が起動する
+    /// セッション内 `committedHistory` / `leftSideContext` から Successor が起動する
     func testCommittedHistory_successorFromSession() {
         var h = handler!
         h.committedHistory = ["東京"]
+        h.successorEligible = true
         h.db.recordNounBigram(prev: "東京", input: "に", output: "に")
-        h.lastConfirmedNounOutput = "東京"
-        _ = h.suggestSuccessors()
-        XCTAssertTrue(h.isSuccessorMode)
-        XCTAssertTrue(h.pendingSuccessorCandidates.contains("に"))
+        let result = h.handle(
+            keyCode: 0, characters: "n", baseCharacters: "n",
+            modifiers: [], candidate: .hidden, client: client!
+        )
+        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
+            XCTFail("committedHistory から prev を取って候補表示: \(result.candidateAction)"); return
+        }
+        XCTAssertTrue(candidates.contains("に"))
     }
 
     /// Successor 1 打目: 長い bi-gram を助詞境界で prefix 展開する（PLAN260520b）
@@ -124,8 +127,6 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
             selectedRow: 0,
             selectedText: "東京"
         )
-        XCTAssertTrue(handler.isSuccessorMode)
-        handler.pendingSuccessorCandidates = ["会議に出席する"]
         let showResult = type(chars: "k", base: "k")
         guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
             XCTFail("1 打目で .show: \(showResult.candidateAction)")
