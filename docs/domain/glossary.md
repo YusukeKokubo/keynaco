@@ -114,13 +114,7 @@ noun-bigram で候補を取得し、格助詞リストを fallback として末�
 
 ### pendingSuccessorCandidates
 Successor モードで候補を 1 打目まで遅延表示するためのバッファ（N-gram 予測語と格助詞 fallback）。  
-1 打目でかな先頭一致フィルタを行い一致候補を表示。一致なしはモード解除。`isSuccessorMode = false` になるすべての経路でクリアされる。
-
-### Successor prefix 展開（`expandSuccessorPrefixes`）
-1 打目の候補マージ後、長い表層形を `InputHandler.particles` の助詞境界で prefix に分割して挿入する（形態素解析は使わない）。  
-**不変条件**: 元の全体候補は各親の直後に必ず残す。助詞単独 prefix は出さない。体言で終わる prefix を助詞末尾より先に並べる。同一親からの prefix は最大 2 個。表示全体は `successorMaxCandidates`（5）を超えない。先頭が助詞の表層は分割しない。
-
-*Tests: `Tests/InputHandlerSuccessorPrefixTests.swift`*
+1 打目でかな先頭一致フィルタを行い一致候補を表示。2 打目以降の絞り込みは行わない（不一致時は 1 打目を通常入力に流してモード解除）。`isSuccessorMode = false` になるすべての経路でクリアされる。
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。2 打目がマッチしなければ 1 打目を通常入力として流してからモード解除する。
@@ -157,7 +151,7 @@ IMK `before` テキスト末尾から抽出した仮想末尾語列（最大 2 �
 Apple Intelligence 必須前提。無効時は noun-bigram は蓄積されず予測候補も出ない。
 
 #### lastConfirmedNounOutput
-LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` および Successor / pending 先読みの参照キー。セッションをまたいでリセットしない。
+LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` および Successor の参照キー。セッションをまたいでリセットしない。
 
 #### penalizeAll（訂正シグナル）
 確定直後 Backspace 時に呼ばれ、history の該当行を count -1（0以下で削除）する。

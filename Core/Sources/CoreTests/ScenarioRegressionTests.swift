@@ -135,8 +135,8 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         }
         XCTAssertEqual(
             candidates,
-            ["会議", "会議に", "会議に出席する"],
-            "長い後続語は体言切り prefix を先に、全体候補を末尾に並べる"
+            ["会議に出席する"],
+            "長い後続語は DB 再クエリ結果をそのまま表示（prefix 展開なし）"
         )
     }
 

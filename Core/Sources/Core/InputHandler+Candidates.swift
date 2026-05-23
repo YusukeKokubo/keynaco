@@ -325,25 +325,4 @@ public extension InputHandler {
             fixedEnd: layout.fixedEnd
         )
     }
-
-    /// composedHiragana が空で pendingRomaji が1文字のときに noun-bigram を先読みして候補表示する。
-    /// 候補が存在すれば isSuccessorMode = true を立てて返す。pendingRomaji は confirmSuccessor() で破棄される。
-    mutating func buildPendingCandidateList(pendingChar: String, client: TextInputClient) -> CandidateAction {
-        guard let kanas = InputHandler.romajiToInitialKana[pendingChar],
-              let nounPrev = lastConfirmedNounOutput else { return .dismiss }
-        var seen = Set<String>()
-        var candidates: [String] = []
-        for kana in kanas {
-            let fromNoun = db.fetchNounBigram(prev: nounPrev, reading: kana)
-            for s in fromNoun where seen.insert(s).inserted { candidates.append(s) }
-        }
-        guard !candidates.isEmpty else { return .dismiss }
-        isSuccessorMode = true
-        successorFirstChar = nil
-        pendingSuccessorCandidates = []
-        client.setMarkedText(candidates[0], selectionRange: NSRange(location: candidates[0].count, length: 0))
-        let fixedCandidates = kanas
-        let allCandidates = Self.merged(fixedCandidates, candidates)
-        return .show(candidates: allCandidates, historyEnd: 0, initialRow: fixedCandidates.count, predictionEnd: 0, fixedEnd: 0)
-    }
 }

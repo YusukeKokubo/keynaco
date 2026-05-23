@@ -53,19 +53,6 @@ final class InputHandlerVirtualContextTests: InputHandlerTestCase {
         XCTAssertTrue(handler.pendingSuccessorCandidates.contains("に"))
     }
 
-    func testPendingPreviewUsesVirtualNounBigram() {
-        handler.committedHistory = []
-        handler.virtualHistoryPrefix = ["東京"]
-        seedNounBigramPrediction(prev: "東京", input: "から", output: "から")
-        let action = handler.buildPendingCandidateList(pendingChar: "k", client: client)
-        XCTAssertTrue(handler.isSuccessorMode)
-        guard case .show(let candidates, _, _, _, _) = action else {
-            XCTFail("virtual 文脈で pending 先読み .show を返すはず: \(action)")
-            return
-        }
-        XCTAssertTrue(candidates.contains("から"))
-    }
-
     // MARK: - Learning isolation
 
     func testVirtualDoesNotRecordNounBigramOnCommit() {

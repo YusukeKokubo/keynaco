@@ -139,18 +139,9 @@ public extension InputHandler {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         let needsRefresh = state.addRomaji(base)
         let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
-        let pending = state.pendingRomaji
-        let hasPendingPreview = lastCommittedOutput != nil
-            && state.composedHiragana.isEmpty
-            && pending.count == 1
-            && pending != "n"
-            && InputHandler.romajiToInitialKana[pending] != nil
-
         let candidateAction: CandidateAction
         if needsRefresh || hasBigramContext {
             candidateAction = buildCandidateList(autoShow: true)
-        } else if hasPendingPreview {
-            candidateAction = buildPendingCandidateList(pendingChar: pending, client: client)
         } else {
             candidateAction = .dismiss
         }

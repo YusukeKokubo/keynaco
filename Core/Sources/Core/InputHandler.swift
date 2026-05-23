@@ -94,14 +94,6 @@ public struct InputHandler {
     public var isSuccessorMode = false
     public var successorFirstChar: (keyCode: UInt16, characters: String?, baseCharacters: String?)? = nil
     public var pendingSuccessorCandidates: [String] = []
-    /// 1打目フィルタ後の候補リスト。2打目以降で successorKanaPrefix で絞り込む。
-    public var successorActiveCandidates: [String] = []
-    /// 1打目以降に確定したかな prefix（successorActiveCandidates の絞り込みに使用）。
-    public var successorKanaPrefix: String = ""
-    /// 1打目以降の未確定ローマ字バッファ。
-    public var successorRomajiBuffer: String = ""
-    /// 1打目以降に消費したキーイベント（モード解除時に通常入力として再生するため保存）。
-    public var successorSubsequentKeys: [(keyCode: UInt16, characters: String?, baseCharacters: String?)] = []
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }
     public var lastConfirmedContext: LastConfirmedContext? = nil

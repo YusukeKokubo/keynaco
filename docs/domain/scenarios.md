@@ -72,15 +72,15 @@
 
 ---
 
-## S-03a: Successor 長い後続語の prefix 展開
+## S-03a: Successor 長い後続語（prefix 展開なし）
 
-**前提**: `東京` 確定後、保留に `会議に出席する`（noun-bigram または LLM extras）。1 打目 `k` で読みフィルタを通過。
+**前提**: `東京` 確定後、保留に `会議に出席する`（noun-bigram）。1 打目 `k` で読みフィルタを通過。
 
 | ステップ | キー | candidates（例） | 動作 |
 |---------|------|------------------|------|
-| 1 | `k` | `会議`, `会議に`, `会議に出席する` | 助詞境界で体言切り prefix を親の直前に挿入。全体候補は末尾に残す |
+| 1 | `k` | `会議に出席する` | DB 再クエリ + pending merge の結果をそのまま表示（助詞境界 prefix 展開は行わない） |
 
-*Tests: `Tests/ScenarioRegressionTests.swift`（`testSuccessorPrefixSplit_longBigramOnFirstKey`）、`Tests/InputHandlerSuccessorPrefixTests.swift`*
+*Tests: `Tests/ScenarioRegressionTests.swift`（`testSuccessorPrefixSplit_longBigramOnFirstKey`）*
 
 ---
 
@@ -210,56 +210,19 @@
 
 ---
 
-## S-03d: pendingRomaji 先読み予測（1打削減）
-
-**前提**: `東京` を確定。noun-bigram `(東京, について, について)` を学習済み（Successor の閾値未満で遅延表示中）。
-
-| ステップ | キー | 状態 | pendingRomaji | composedHiragana | 動作 |
-|---------|------|------|--------------|-----------------|------|
-| 0 | — | Successor モード | — | — | noun-bigram 遅延表示中（`pendingSuccessorCandidates = ["について"]`） |
-| 1 | Escape | 待機 | — | — | Successor モードキャンセル（`lastCommittedOutput = "東京"` は保持） |
-| 2 | `n` | 組成中 | `n` | `` | **先読み除外**（`n` は `ん` との曖昧さあり） → `.dismiss` |
-| — | `i` | 組成中 | `` | `に` | 「に」が組成 → noun-bigram フィルタで候補表示 |
-
-**先読みが効くケース**: `t` を入力すると `romajiToInitialKana["t"]` → 「た行」全体で先読み → 「て」「と」「た」始まりの noun-bigram があれば即座に候補表示 → Space で確定（`i` 打鍵を省略）。
-
-| ステップ | キー | 状態 | 動作 |
-|---------|------|------|------|
-| 0 | — | 待機 | `lastCommittedOutput = "て"`、noun-bigram `(て, から)` 学習済み |
-| 1 | `k` | Successor モード | `buildPendingCandidateList("k")` → `["か", "き", ..., "から"]` → `.show`（`pendingRomaji = "k"` は保持） |
-| 2 | Space | 待機 | `confirmSuccessor("から")` → 「から」確定（`i` を打たず1打削減） |
-
-**制約**: `composedHiragana` が空のとき限定。2文字目（`sh` 等）は対象外（`pending.count == 1` ガード）。
-
-**補足（誤操作）**: 直前に確定した語がなく `isSuccessorMode` も立っていない状態で、子音 1 文字だけ（例: `k`）のときに Space を押すと、キーはホストへ渡さず `pendingRomaji` を表示したまま維持する（本文にスペース文字は入れない）。**先読み**で `isSuccessorMode` 中に候補文脈と不整合で `selectedText` が得られない Space / Enter は、確定に失敗しても同じ `pendingRomaji` を `composingText` で再表示する。
-
-*Tests: `Tests/InputHandlerPendingPreviewTests.swift`, `Tests/InputHandlerCompositionTests.swift`*
-
----
-
-## S-11: 境界学習の保存と再現
-
-**前提**: 初回入力。`boundary_pref` テーブルは空。
+## S-11: セグメント手動境界調整
 
 **1回目の入力**: `kyouha` Space
 
 | ステップ | キー | 状態 | セグメント | 動作 |
 |---------|------|------|-----------|------|
-| 1 | Space | セグメントモード | AzooKey 初期分割（例: `きょうは` / 1セグメント or `きょう`+`は`） | `fetchBoundaryPref` ミス → AzooKey へフォールバック |
+| 1 | Space | セグメントモード | AzooKey 初期分割（例: `きょう`+`は`） | `segmentize` + 必要なら `tryManualBisection` |
 | 2 | Shift+← | セグメントモード | 境界縮小 → `isManuallyAdjusted = true` | フォーカス文節を1文字縮小 |
-| 3 | Enter | 待機 | — | `isManuallyAdjusted` あり → `saveBoundaryPref(fullReading: "きょうは", segments: [...])` |
+| 3 | Enter | 待機 | — | 手動調整あり → `recordPrefixes` 二重記録（history ブースト） |
 
-**2回目の入力**: `kyouha` Space
+**2回目の入力**: `kyouha` Space → AzooKey 初期分割に戻る（境界は DB に保存しない）。
 
-| ステップ | キー | 状態 | セグメント | 動作 |
-|---------|------|------|-----------|------|
-| 1 | Space | セグメントモード | 保存済み境界 | `fetchBoundaryPref("きょうは")` ヒット → 手動調整後の境界で直接セグメントを構築 |
-
-**制約**:
-- 完全一致のみ。`きょうはよいてんきです` の保存は `きょうはてんきです` 入力には適用されない
-- AzooKey 初期分割のまま（LLM の多文節再構築もない）で手動調整もなく確定した場合は `boundary_pref` に保存されない
-
-*Tests: `Tests/InputHandlerSegmentTests.swift` — `testBoundaryPrefSavedOnManualAdjust`, `testBoundaryPrefReproducedOnReenter`*
+*Tests: `Tests/InputHandlerSegmentTests.swift`*
 
 ---
 

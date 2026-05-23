@@ -39,14 +39,13 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 **起動条件**: `isNounLike(last)` が偽（ひらがな末尾の動詞・助詞・副詞等）のときは noun-bigram があっても即 `.dismiss` を返しモードには入らない。名詞末尾でも noun-bigram・格助詞 fallback がともに空なら `.dismiss`。**カーソルが文末でない（文中挿入）場合も `.dismiss`。**
 
-**N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加してから **`expandSuccessorPrefixes`** で長い表層を助詞境界の部分候補に展開してから `.show` する（いずれにも一致しなければモード解除）。
+**N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加して `.show` する（最大 5 件。いずれにも一致しなければモード解除）。
 
-- `successorFirstChar`: 頭文字 1 打目のバッファリング。1打目で `pendingSuccessorCandidates` を表示したあと、2 打目でモード解除する際にも使用する。
+- `successorFirstChar`: 頭文字 1 打目のバッファリング。1打目不一致時に通常入力へ流すために使用する。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
 - 候補確定後は `suggestSuccessors()` を再呼び出しし、確定語が `isNounLike` かつ次の noun-bigram 候補があれば連鎖表示を継続する。格助詞（ひらがな末尾）確定後はチェーンしない。
 - Successor モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。
 - 最大候補数: `successorMaxCandidates = 5`（`LearningThresholds`）。
-- **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき `buildPendingCandidateList` が noun-bigram を先読みし、候補があれば `isSuccessorMode = true` へ移行。`lastConfirmedNounOutput` が nil のときは先読みしない。`n` は `ん` との曖昧さがあるため除外。候補ゼロなら `pendingRomaji` はそのまま通常組成を続ける。確定時（Space/Enter）に `confirmSuccessor()` が `pendingRomaji` をクリアする（`buildPendingCandidateList` 内ではクリアしない。Escape 後に続きのローマ字を入力できるようにするため）。
 
 ## 候補表示の優先順位
 
@@ -71,9 +70,9 @@ Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（`fixedCount <= ro
 
 | タイミング | 例 | 理由 |
 |------|----|----|
-| **handle の前** | `leftSideContext` / `virtualHistoryPrefix` | `handle` 内（`buildCandidateList` / `buildPendingCandidateList` 等）から読まれる |
+| **handle の前** | `leftSideContext` / `virtualHistoryPrefix` | `handle` 内（`buildCandidateList` 等）から読まれる |
 | **handle の後**（`applyPostKeyDownEffects`） | `cachedSurroundingContext` 更新・候補ウィンドウ更新 | 次キー以降のための準備 |
 
 **判定基準**: そのフィールドが現在のキー処理中に参照されるなら pre、次以降のキー処理 or 非同期コールバックでのみ参照されるなら post。post に置くと「1 キーストローク遅延」バグになる。
 
-**組成判定の軸**: 「組成中かどうか」を扱う条件は `composedHiragana` ではなく `composingText`（= `composedHiragana + pendingRomaji`）を見る。前者だと pendingRomaji 1 文字の先読み経路（`buildPendingCandidateList`）が判定漏れになる。
+**組成判定の軸**: 「組成中かどうか」を扱う条件は `composedHiragana` ではなく `composingText`（= `composedHiragana + pendingRomaji`）を見る。
