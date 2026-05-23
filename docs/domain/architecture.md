@@ -4,7 +4,7 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 ## コンポーネント一覧
 
-- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` と `LLMMisconversionChecker`（確定後の誤変換検出。`committedHistory.suffix(5)` をユーザー語彙ヒントとして注入）もここで管理
+- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` もここで管理
 - `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+NormalInput.swift`（通常キー処理・ASCII/かなモード切替）、`InputHandler+Candidates.swift`（候補リスト構築）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+Numbers.swift`（数字入力時の全角・桁区切り候補生成）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII 記号 → 全角候補列に変換。`"?": ["？", "?"]`・`"!": ["！", "!"]`・`"/": ["・", "／", "/"]`・`".": ["。", "．", "…"]`・`",": ["、", "，"]` 等、記号全般に対応）。`sentenceTerminators`（`["。", "！", "？"]`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する（Enter キー空確定時は別途 `removeAll()`）。**句読点（`readingPunctuations`）確定時は `recordPrefixes` をスキップし** `pushCommitted` でも `committedHistory` に追加しない（句読点が next-word 予測を汚すのを防ぐ）
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包。`hiddenPendingN` フラグで "nn" → "ん" 後の pending "n" を不可視化（標準 IME 準拠）。Backspace 時は "ん" + hidden n をまとめて1操作で削除する
@@ -17,7 +17,7 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
 - `CandidateWindow` = `keynaco/CandidateWindow.swift`。`NSPanel(.borderless, level: .popUpMenu)` + `NSTableView` の自作候補ウィンドウ。`IMKCandidates` は macOS 26 で動作しないため自作（詳細は CLAUDE.md「macOS 26 IME の罠」参照）。`InputController` が所有・制御する。候補が 8 件以下のときはウィンドウ高さを全件分取り、スクロール位置は先頭（`initialRow` より前の行も見える）。9 件以上のときだけ `initialRow` を上端に合わせる
 - `AppDelegate` = `IMKServer` 起動 + `setupMainMenu()`（Edit メニュー登録。アクセサリアプリは既定でメインメニューを持たず Cmd+V/A/Z が届かないため）
-- `SurroundingIMKContext` = カーソル前後テキストの取得ユーティリティ（enum + static func）。`IMKTextInput` の `attributedSubstring(from:)` / `length` / `selectedRange` をラップし、LLM 系コンポーネント（`LLMMisconversionChecker` 等）が文脈テキストを取得するために使用
+- `SurroundingIMKContext` = カーソル前後テキストの取得ユーティリティ（enum + static func）。`IMKTextInput` の `attributedSubstring(from:)` / `length` / `selectedRange` をラップし、LLM 系コンポーネント（`LLMPOSClassifier` 等）が文脈テキストを取得するために使用
 - `InputHandlerSnapshot`（`#if DEBUG`）= `InputController` が `InputHandler` と候補ウィンドウから組み立てるデバッグ用スナップショット（`InputHandlerSnapshot.swift` + `InputHandler+Snapshot.swift`）。`DebugSocketServer` が JSON レスポンスのペイロードとして送信
 - `EventViewerWindow` = `keynaco/Debug/EventViewerWindow.swift`。`AppDelegate` が NSStatusItem（⌨アイコン）として常駐し、メニューから起動。keyCode・chars・mods・consumed・action・app をリアルタイム表示。確定テキストと候補リストをキャプチャしてクリップボードにコピー可能。JSONL エクスポートで `~/Library/Application Support/keynaco/sessions/` に保存。デバッグ用途
 - `IMESandboxWindow` = `keynaco/Debug/IMESandboxWindow.swift`。GUI 上でキーシーケンスを手動送信し `DebugSocketServer` の状態スナップショットを表示するサンドボックス画面。`AppDelegate` からメニュー経由で起動
@@ -26,7 +26,7 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 変換エンジンは `AzooKeyKanaKanjiConverter`（`Core/Package.swift` の依存）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 `KanaUtils` = ひらがな↔カタカナ変換ユーティリティ（`hiraganaToKatakana` / `hiraganaToHankakuKatakana` / `toZenkakuAscii`）。F7–F9 変換確定とカタカナ候補生成で使用。
-`NotificationNames` = `KeynacoCore` 公開の通知名定義（`Core/Sources/Core/NotificationNames.swift`）。`keynacoSuccessorPendingChanged`（N-gram 保留状態変化）、`keynacoMisconversionIssueFound`（LLM 誤変換指摘。`userInfo["detail"]` に全文）、`keynacoMisconversionCleared`（誤変換状態クリア）の3通知。`AppDelegate` がステータスバー表示更新（`⌨!` + オレンジ tint）・macOS バナー通知・Popover に購読し、`InputController` が送信する。
+`NotificationNames` = `KeynacoCore` 公開の通知名定義（`Core/Sources/Core/NotificationNames.swift`）。`keynacoSuccessorPendingChanged`（N-gram 保留状態変化）。`AppDelegate` がステータスバー表示更新（`⌨…`）に購読し、`InputController` が送信する。
 
 ## Successor モード
 

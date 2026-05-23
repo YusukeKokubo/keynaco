@@ -58,13 +58,6 @@ extension InputController {
         }
     }
 
-    /// 確定 `insertText` 後にカーソル前文を誤変換検出で検査（0.5 秒デバウンス）。
-    func scheduleMisconversionCheck(adapter: IMKTextInputAdapter) {
-        let prefix = adapter.surroundingText(maxLength: 200).prefix
-        let recentWords = Array(handler.committedHistory.suffix(5))
-        Self.misconversionChecker.check(surroundingPrefix: prefix, recentWords: recentWords)
-    }
-
     /// IMK の `handle` / `activateServer` は nonisolated のため、通知だけ static で送る（MainActor の `self` を捕らない）。
     nonisolated static func postSuccessorPendingNotification(pending: Bool) {
         NotificationCenter.default.post(

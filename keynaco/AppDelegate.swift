@@ -2,27 +2,16 @@ import Cocoa
 import KeynacoCore
 import InputMethodKit
 import Carbon
-import UserNotifications
 
 nonisolated(unsafe) var gServer: IMKServer?
-
-private enum MisconversionNotification {
-    static let id = "keynaco.misconversion"
-}
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
     private var successorPendingObserver: NSObjectProtocol?
-    private var misconversionIssueObserver: NSObjectProtocol?
-    private var misconversionClearObserver: NSObjectProtocol?
 
     private var successorPending = false
-    private var misconversionDetail: String?
-
-    private var misconversionPopover: NSPopover?
-    private var misconversionTextView: NSTextView?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
@@ -41,7 +30,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         #endif
         setupMainMenu()
         setupStatusItem()
-        setupMisconversionNotifications()
         Task.detached(priority: .background) {
             DatabaseManager.shared.performGCIfNeeded()
         }
@@ -88,24 +76,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             MainActor.assumeIsolated { self?.applySuccessorPending(pending: pending) }
         }
 
-        misconversionIssueObserver = NotificationCenter.default.addObserver(
-            forName: .keynacoMisconversionIssueFound,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            if let s = note.userInfo?["detail"] as? String, !s.isEmpty {
-                MainActor.assumeIsolated { self?.applyMisconversionIssue(detail: s) }
-            }
-        }
-
-        misconversionClearObserver = NotificationCenter.default.addObserver(
-            forName: .keynacoMisconversionCleared,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.applyMisconversionCleared() }
-        }
-
         let menu = NSMenu()
         menu.autoenablesItems = false
 
@@ -128,82 +98,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         statusItem?.button?.target = self
         statusItem?.button?.action = #selector(statusBarButtonClicked(_:))
         statusItem?.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
-
-        setupMisconversionPopover()
-    }
-
-    private func setupMisconversionPopover() {
-        let pop = NSPopover()
-        pop.behavior = .transient
-
-        let sv = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
-        sv.hasVerticalScroller = true
-        sv.borderType = .noBorder
-        sv.drawsBackground = true
-        sv.autoresizingMask = [.width, .height]
-
-        let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
-        tv.isEditable = false
-        tv.isSelectable = true
-        tv.isVerticallyResizable = true
-        tv.isHorizontallyResizable = false
-        tv.autoresizingMask = [.width]
-        tv.drawsBackground = true
-        tv.font = .systemFont(ofSize: NSFont.systemFontSize)
-        tv.textContainerInset = NSSize(width: 8, height: 8)
-        tv.minSize = NSSize(width: 300, height: 0)
-        tv.maxSize = NSSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        tv.textContainer?.containerSize = NSSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-        tv.textContainer?.widthTracksTextView = true
-
-        sv.documentView = tv
-
-        let vc = NSViewController()
-        vc.view = sv
-        pop.contentViewController = vc
-        pop.contentSize = NSSize(width: 320, height: 200)
-
-        misconversionPopover = pop
-        misconversionTextView = tv
-    }
-
-    private func setupMisconversionNotifications() {
-        UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-    }
-
-    private func postMisconversionNotification(detail: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "keynaco: 誤変換の可能性"
-        let body = detail.trimmingCharacters(in: .whitespacesAndNewlines)
-        content.body = body.count > 200 ? String(body.prefix(200)) + "…" : body
-        content.sound = .default
-        let request = UNNotificationRequest(
-            identifier: MisconversionNotification.id,
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
-    }
-
-    private func clearMisconversionNotifications() {
-        UNUserNotificationCenter.current().removeDeliveredNotifications(
-            withIdentifiers: [MisconversionNotification.id]
-        )
-        UNUserNotificationCenter.current().removePendingNotificationRequests(
-            withIdentifiers: [MisconversionNotification.id]
-        )
-    }
-
-    private func showMisconversionPopoverIfNeeded() {
-        guard misconversionDetail != nil,
-              let button = statusItem?.button,
-              let popover = misconversionPopover,
-              !popover.isShown else { return }
-        if let detail = misconversionDetail {
-            misconversionTextView?.string = detail
-        }
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
     private func applySuccessorPending(pending: Bool) {
@@ -211,26 +105,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         updateStatusItemTitle()
     }
 
-    private func applyMisconversionIssue(detail: String) {
-        misconversionDetail = detail
-        misconversionTextView?.string = detail
-        updateStatusItemTitle()
-        postMisconversionNotification(detail: detail)
-    }
-
-    private func applyMisconversionCleared() {
-        misconversionDetail = nil
-        misconversionPopover?.performClose(nil)
-        clearMisconversionNotifications()
-        updateStatusItemTitle()
-    }
-
     private func updateStatusItemTitle() {
         guard let button = statusItem?.button else { return }
-        if misconversionDetail != nil {
-            button.title = "⌨!"
-            button.contentTintColor = .systemOrange
-        } else if successorPending {
+        if successorPending {
             button.title = "⌨…"
             button.contentTintColor = nil
         } else {
@@ -244,28 +121,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
               let button = statusItem?.button,
               let menu = statusMenu else { return }
 
-        if event.type == .rightMouseDown {
-            NSMenu.popUpContextMenu(menu, with: event, for: button)
-            return
-        }
-
-        if misconversionDetail != nil {
-            toggleMisconversionPopover(relativeTo: button)
-        } else {
-            NSMenu.popUpContextMenu(menu, with: event, for: button)
-        }
-    }
-
-    private func toggleMisconversionPopover(relativeTo button: NSStatusBarButton) {
-        guard let popover = misconversionPopover else { return }
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            if let detail = misconversionDetail {
-                misconversionTextView?.string = detail
-            }
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        }
+        NSMenu.popUpContextMenu(menu, with: event, for: button)
     }
 
     @objc private func openEventViewer() {
@@ -280,35 +136,5 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     @objc private func openUserDict() {
         SettingsWindowController.shared.showSettings(selectingTab: 0)
-    }
-}
-
-extension AppDelegate: UNUserNotificationCenterDelegate {
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping @Sendable (Int) -> Void
-    ) {
-        guard notification.request.identifier == MisconversionNotification.id else {
-            completionHandler(0)
-            return
-        }
-        let options = UNNotificationPresentationOptions.banner.union(.sound)
-        completionHandler(Int(options.rawValue))
-    }
-
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping @Sendable () -> Void
-    ) {
-        guard response.notification.request.identifier == MisconversionNotification.id else {
-            completionHandler()
-            return
-        }
-        DispatchQueue.main.async { [weak self] in
-            self?.showMisconversionPopoverIfNeeded()
-            completionHandler()
-        }
     }
 }

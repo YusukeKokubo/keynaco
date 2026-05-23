@@ -12,7 +12,6 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
     nonisolated(unsafe) private var zenzaiSettingsObserver: NSObjectProtocol?
     nonisolated(unsafe) private var hiraganaPreferredObserver: NSObjectProtocol?
-    static let misconversionChecker = LLMMisconversionChecker()
     static let posClassifier = LLMPOSClassifier()
 
     static let candidateWindow: CandidateWindow = {
@@ -111,7 +110,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.cachedSurroundingContext = nil
             ic.handler.virtualHistoryPrefix = []
             ic.handler.leftSideContext = ""
-            Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: true)
             ic.handler.ignoreNextModeSwitch = true
             ic.candidateWindow.dismiss()
             Self.postSuccessorPendingNotification(pending: false)
@@ -214,15 +212,10 @@ class InputController: IMKInputController, @unchecked Sendable {
         }
 
         if adapter.didInsertText {
-            scheduleMisconversionCheck(adapter: adapter)
             schedulePOSClassification(
                 output: adapter.lastInsertedText,
                 reading: handler.lastCommittedReading ?? ""
             )
-        }
-        if !handler.isSuccessorMode, !handler.isBracketMode,
-           composingWasEmpty, !handler.state.composingText.isEmpty {
-            Self.misconversionChecker.cancel(suppressClearNotification: false)
         }
 
         return !handler.pendingSuccessorCandidates.isEmpty
@@ -379,31 +372,12 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.cachedSurroundingContext = nil
             ic.handler.virtualHistoryPrefix = []
             ic.handler.leftSideContext = ""
-            Self.cancelOnDeviceLLMTasks(includeMisconversionCancel: false)
             ic.candidateWindow.dismiss()
             Self.postSuccessorPendingNotification(pending: false)
-
-            if adapter.didInsertText {
-                ic.scheduleMisconversionCheck(adapter: adapter)
-            }
         }
     }
 
     // MARK: - プライベートヘルパー
-
-    /// オンデバイス LLM（Successor / セグメント / 任意で誤変換チェック）をキャンセルする。
-    /// IMK の `activateServer` / `commitComposition` は nonisolated オーバーライドのため `self` を渡すインスタンスヘルパーは Swift 6 でコンパイルできない。static にして重複を抑える。
-    /// `commitComposition` では確定後に `scheduleMisconversionCheck` が走りうるため、`misconversionChecker.cancel()` はここでは呼ばない（`includeMisconversionCancel: false`）。
-    private static func cancelOnDeviceLLMTasks(includeMisconversionCancel: Bool) {
-        guard includeMisconversionCancel else { return }
-        if Thread.isMainThread {
-            misconversionChecker.cancel()
-        } else {
-            DispatchQueue.main.sync {
-                misconversionChecker.cancel()
-            }
-        }
-    }
 
     private func updateMarkedText(client: TextInputClient) {
         if let ss = handler.state.segmentState {
