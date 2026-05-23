@@ -66,9 +66,11 @@ private final class SandboxInputField: NSTextField {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         isBordered = false
-        drawsBackground = false
+        drawsBackground = true
+        backgroundColor = .textBackgroundColor
         focusRingType = .none
         font = .systemFont(ofSize: 13)
+        placeholderString = "ここに入力…"
         delegate = self
     }
 
@@ -91,6 +93,7 @@ extension SandboxInputField: NSTextFieldDelegate {
 
 // MARK: - SandboxFocusView
 
+/// 左ペイン最下部の入力バー。行一覧と重ならないよう配置する。
 private final class SandboxFocusView: NSView {
     let inputField = SandboxInputField(frame: .zero)
 
@@ -101,10 +104,10 @@ private final class SandboxFocusView: NSView {
         inputField.translatesAutoresizingMaskIntoConstraints = false
         addSubview(inputField)
         NSLayoutConstraint.activate([
-            inputField.leadingAnchor.constraint(equalTo: leadingAnchor),
-            inputField.trailingAnchor.constraint(equalTo: trailingAnchor),
-            inputField.topAnchor.constraint(equalTo: topAnchor),
-            inputField.bottomAnchor.constraint(equalTo: bottomAnchor),
+            inputField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            inputField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            inputField.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            inputField.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2),
         ])
     }
 
@@ -277,6 +280,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         selectLine(nextIndex)
         refreshCurrentLineHighlight()
         reloadEventTable()
+        restoreInputFocus()
     }
 
     func appendToCurrentLine(_ text: String) {
@@ -325,12 +329,19 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         refreshCurrentLineHighlight()
         reloadEventTable()
         detailTextView.string = ""
+        restoreInputFocus()
     }
 
     private func selectLine(_ index: Int) {
         guard index >= 0, index < lines.count else { return }
         lineTableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
         lineTableView.scrollRowToVisible(index)
+    }
+
+    /// 行一覧クリック等でフォーカスが外れたあと、IME 入力用フィールドへ戻す。
+    private func restoreInputFocus() {
+        guard isKeyWindow else { return }
+        makeFirstResponder(focusView.inputField)
     }
 
     private func reloadEventTable() {
@@ -372,11 +383,12 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             lineScroll.leadingAnchor.constraint(equalTo: leftContainer.leadingAnchor),
             lineScroll.trailingAnchor.constraint(equalTo: leftContainer.trailingAnchor),
             lineScroll.topAnchor.constraint(equalTo: leftContainer.topAnchor),
-            lineScroll.bottomAnchor.constraint(equalTo: leftContainer.bottomAnchor),
+            lineScroll.bottomAnchor.constraint(equalTo: focusView.topAnchor),
+
             focusView.leadingAnchor.constraint(equalTo: leftContainer.leadingAnchor),
             focusView.trailingAnchor.constraint(equalTo: leftContainer.trailingAnchor),
-            focusView.topAnchor.constraint(equalTo: leftContainer.topAnchor),
-            focusView.heightAnchor.constraint(equalToConstant: 24),
+            focusView.bottomAnchor.constraint(equalTo: leftContainer.bottomAnchor),
+            focusView.heightAnchor.constraint(equalToConstant: 28),
         ])
 
         let rightContainer = NSView()
@@ -610,6 +622,10 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         if tv === lineTableView {
             reloadEventTable()
             detailTextView.string = ""
+            // 行クリックで NSTableView が first responder になるため、次 runloop で入力欄へ戻す
+            DispatchQueue.main.async { [weak self] in
+                self?.restoreInputFocus()
+            }
             return
         }
         if tv === eventTableView {
@@ -624,7 +640,8 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         level = .floating
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        makeFirstResponder(focusView.inputField)
+        selectLine(currentLineIndex)
+        restoreInputFocus()
         if !didSetInitialDivider {
             didSetInitialDivider = true
             DispatchQueue.main.async { [weak self] in
@@ -632,7 +649,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                 self.mainSplit.setPosition(self.mainSplit.bounds.width * 0.38, ofDividerAt: 0)
             }
         }
-        selectLine(currentLineIndex)
     }
 
     // MARK: - エクスポートヘルパ
