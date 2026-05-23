@@ -21,9 +21,9 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | パス | 内容 |
 |------|------|
 | `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
-| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 8 ファイル。Zenzai タブ含む） |
+| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 7 ファイル。Zenzai タブ含む） |
 | `keynaco/Resources/` | バンドルリソース（`zenz-v3.1-small-gguf/` = Zenzai モデル git submodule） |
-| `keynaco/Debug/` | デバッグ用ツール（`EventViewerWindow` 等、本番動作には影響しない） |
+| `keynaco/Debug/` | デバッグ用ツール（`DebugSocketServer`・`EventViewerWindow`・`IMESandboxWindow`・`SocketMockClient` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
 | `Core/Sources/CoreTests/` | `KeynacoCore` のユニットテスト（XCTest） |
 | `keynacoTests/` | アプリ専用テスト（`SurroundingIMKContext` 等） |
@@ -51,7 +51,11 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 ## ビルド・インストール
 
-`/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。
+`/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。手動でビルドのみ行う場合:
+
+```bash
+xcodebuild build -scheme keynaco -destination "platform=macOS"
+```
 
 AzooKey（`AzooKeyKanaKanjiConverter`）が仮名漢字変換の中核エンジン。`Core/Package.swift` で SPM 依存として管理。
 
