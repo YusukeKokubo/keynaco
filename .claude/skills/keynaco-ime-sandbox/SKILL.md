@@ -53,8 +53,11 @@ if running_commit != head:
 
 **バッチ（コマンドから）:**
 ```bash
-python3 scripts/debug_ime.py kanzi
+python3 scripts/debug_ime.py kanzi              # 文字列送信 → 最終状態のみ表示（デフォルト）
+python3 scripts/debug_ime.py -v kanzi           # 各キー入力後の状態も表示（verbose）
+python3 scripts/debug_ime.py '{"reset":true}'   # 引数が `{` で始まれば JSON コマンドとして 1 回送信
 ```
+※ 引数が JSON 文字列の場合は `type_string` ではなく単一コマンドとして送られる。`type_string` として送りたい場合は明示的に `{"type_string":"..."}` で渡すこと。
 
 **Python スクリプトで直接操作する（推奨）:**
 ```python

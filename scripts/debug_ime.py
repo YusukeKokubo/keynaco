@@ -4,8 +4,10 @@ from __future__ import annotations
 """keynaco IME デバッグソケットクライアント。
 
 使い方:
-    python3 scripts/debug_ime.py              # 対話モード
-    python3 scripts/debug_ime.py kanzi        # 文字列を一括送信
+    python3 scripts/debug_ime.py                       # 対話モード
+    python3 scripts/debug_ime.py kanzi                 # 文字列を送信し最終状態のみ表示
+    python3 scripts/debug_ime.py -v kanzi              # 各キー入力後の状態も表示（verbose）
+    python3 scripts/debug_ime.py '{"reset":true}'      # 引数が JSON ならそのまま 1 コマンド送信
 
 プロトコル:
     - Unix ドメインソケット: $TMPDIR/keynaco-debug.sock
@@ -428,16 +430,42 @@ def interactive_mode(client: IMEClient) -> None:
             print(f"  error: {exc}")
 
 
-def batch_mode(client: IMEClient, text: str) -> None:
-    r = client.type_string(text, return_steps=True)
-    for i, step in enumerate(r.get("steps", [r])):
-        ch = text[i] if i < len(text) else "?"
-        print(f"key={ch!r}:")
-        print(client.pretty(step))
-        print()
+def batch_mode(client: IMEClient, text: str, verbose: bool = False) -> None:
+    if verbose:
+        r = client.type_string(text, return_steps=True)
+        for i, step in enumerate(r.get("steps", [r])):
+            ch = text[i] if i < len(text) else "?"
+            print(f"key={ch!r}:")
+            print(client.pretty(step))
+            print()
+    else:
+        r = client.type_string(text)
+        print(client.pretty(r))
+
+
+def json_mode(client: IMEClient, raw: str) -> None:
+    try:
+        cmd = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        print(f"ERROR: JSON parse failed: {exc}")
+        sys.exit(1)
+    if not isinstance(cmd, dict):
+        print("ERROR: JSON command must be an object")
+        sys.exit(1)
+    r = client._send_recv(cmd)
+    if "log" in r and isinstance(r["log"], list):
+        print(client.format_log(r))
+    else:
+        print(client.pretty(r))
 
 
 if __name__ == "__main__":
+    args = sys.argv[1:]
+    verbose = False
+    if args and args[0] in ("-v", "--verbose"):
+        verbose = True
+        args = args[1:]
+
     try:
         c = IMEClient()
     except FileNotFoundError:
@@ -450,9 +478,13 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        if len(sys.argv) > 1:
-            batch_mode(c, " ".join(sys.argv[1:]))
-        else:
+        if not args:
             interactive_mode(c)
+        else:
+            joined = " ".join(args)
+            if joined.lstrip().startswith("{"):
+                json_mode(c, joined)
+            else:
+                batch_mode(c, joined, verbose=verbose)
     finally:
         c.close()
