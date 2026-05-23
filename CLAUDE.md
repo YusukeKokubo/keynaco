@@ -56,6 +56,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 AzooKey（`AzooKeyKanaKanjiConverter`）が仮名漢字変換の中核エンジン。`Core/Package.swift` で SPM 依存として管理。
 
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
+- **`@unchecked Sendable` + `Task.detached` の注意**: `@unchecked Sendable` はコンパイラの並行性チェックをバイパスするため、内部の非スレッドセーフな状態を `Task.detached` から触ると無音でデータ競合になる。`AzooKeyConverter.converter`（`KanaKanjiConverter` / Zenzai の `llama_context`）は非スレッドセーフ。`converter.*` を呼ぶメソッドはすべて `converterLock.withLock` を通すこと（過去に SIGABRT クラッシュを引き起こした実績あり）。
 - **Zenzai モデルのセットアップ**: `keynaco/Resources/zenz-v3.1-small-gguf/` は HuggingFace の git submodule（LFS 管理）。初回 clone 後に以下が必要:
   ```bash
   brew install git-lfs && git lfs install
