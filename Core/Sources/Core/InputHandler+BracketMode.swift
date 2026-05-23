@@ -13,8 +13,6 @@ public extension InputHandler {
 
     // MARK: - 括弧候補マップ
 
-    static let punctuationMap: [String: String] = [:]
-
     static let bracketOptions: [String: [String]] = [
         "[": ["「", "【", "〔", "［", "〈", "《", "『"],
         "]": ["」", "】", "〕", "］", "〉", "》", "』"],

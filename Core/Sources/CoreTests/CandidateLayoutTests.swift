@@ -95,17 +95,6 @@ final class CandidateLayoutTests: XCTestCase {
         XCTAssertEqual(l.historyEnd, 0)  // highHistory なし
     }
 
-    func testLowHistoryAppendedAtEnd() {
-        let l = layout(
-            (.highHistory, ["高スコア"]),
-            (.azooKeyDict, ["辞書A"]),
-            (.lowHistory, ["低スコア"])
-        )
-        XCTAssertEqual(l.candidates, ["高スコア", "辞書A", "低スコア"])
-        XCTAssertEqual(l.historyEnd, 1)
-        XCTAssertEqual(l.candidates.last, "低スコア")
-    }
-
     // MARK: - 重複排除
 
     func testDedupAcrossSections() {
@@ -221,7 +210,7 @@ final class CandidateLayoutTests: XCTestCase {
     }
 
     func testInvariantHistoryEndLeqCandidatesCount() {
-        let l = layout((.highHistory, ["H"]), (.azooKeyDict, ["A"]), (.lowHistory, ["L"]))
+        let l = layout((.highHistory, ["H"]), (.azooKeyDict, ["A"]))
         XCTAssertLessThanOrEqual(l.historyEnd, l.candidates.count)
     }
 }

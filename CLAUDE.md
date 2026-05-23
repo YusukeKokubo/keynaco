@@ -64,7 +64,7 @@ AzooKey（`AzooKeyKanaKanjiConverter`）が仮名漢字変換の中核エンジ�
   git -C keynaco/Resources/zenz-v3.1-small-gguf lfs pull
   ```
   モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る
-- LLM 機能（`LLMSuccessorFetcher` / `LLMMisconversionChecker` / `LLMPOSClassifier`）は `FoundationModels` フレームワーク（Apple Intelligence）を使用。macOS 26 で Apple Intelligence が有効なデバイスでないと `SystemLanguageModel.default.availability` が `.unavailable` を返しスキップされる（IME 基本動作は継続）。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
+- LLM 機能（`LLMMisconversionChecker` / `LLMPOSClassifier`）は `FoundationModels` フレームワーク（Apple Intelligence）を使用。macOS 26 で Apple Intelligence が有効なデバイスでないと `SystemLanguageModel.default.availability` が `.unavailable` を返しスキップされる（IME 基本動作は継続）。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
 - **Apple Intelligence は必須前提**：noun_bigram の蓄積・POS 分類など学習機能のコアは Apple Intelligence に依存する設計。Apple Intelligence なし環境でのフォールバックは論点にしない。
 
 ## テスト実行
@@ -99,9 +99,9 @@ cd Core && swift test
 
 - **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始（`GitHub` 等の混在ケース用）。`InputHandlerAsciiTests.swift` 参照。
 - **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
-- **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。`punctuationMap`は`baseCharacters`で照合するため Shift+`,`/`.` が `<`/`>` になる
+- **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。Shift+`,`/`.` は `characters` が `<`/`>` となり Bracket モード（`＜`/`＞` 候補）に入る
 - **z シーケンス**: `z` + 記号/矢印キーで特殊文字を挿入（`zCharMap` / `zArrowMap` 定義）。`InputHandlerZSequenceTests.swift` 参照。
-- **Bracket モード（`?` / `(` / `[` / `{` / `「`）**: 組成なし・ASCII モードでない状態でトリガー。`bracketOptions` マップで対応文字ペアを定義。US キーボードの `?` は `Shift+/`（`baseCharacters="/"`）なのでキーボード判定が必要（`InputHandler+Candidates.swift` 参照）。
+- **Bracket モード（`?` / `(` / `[` / `{` / `「` / `,` / `.` 等）**: 組成なし・ASCII モードでない状態でトリガー。`bracketOptions` マップで対応文字ペアを定義。US キーボードの `?` は `Shift+/`（`baseCharacters="/"`）なのでキーボード判定が必要（`InputHandler+Candidates.swift` 参照）。
 
 ## macOS 26 IME の罠
 

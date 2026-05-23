@@ -43,7 +43,6 @@ public extension InputHandler {
         let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
 
         if let r = handleZSequence(base: base, client: client) { return r }
-        if let r = handlePunctuation(base: base, modifiers: modifiers, client: client) { return r }
         if let r = handleBracketChar(chars: chars, base: base, modifiers: modifiers, client: client) { return r }
         if let r = handleShiftChar(chars: chars, isNonAscii: isNonAscii, modifiers: modifiers,
                                     wasExplicitlySelected: wasExplicitlySelected,
@@ -76,22 +75,6 @@ public extension InputHandler {
     private mutating func handleZSequence(base: String, client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard state.pendingRomaji == "z", let special = Self.zCharMap[base] else { return nil }
         return commitZSequence(special: special, client: client)
-    }
-
-    private mutating func handlePunctuation(
-        base: String, modifiers: NSEvent.ModifierFlags, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard let mappedPunct = Self.punctuationMap[base], !modifiers.contains(.shift) else { return nil }
-        if state.composingText.isEmpty {
-            pushCommitted(mappedPunct)
-            client.insertText(mappedPunct)
-            return (true, .dismiss)
-        }
-        flushPendingRomaji()
-        state.composedHiragana += mappedPunct
-        let action = buildCandidateList()
-        applyMarkedText(candidateText: nil, client: client)
-        return (true, action)
     }
 
     private mutating func handleBracketChar(

@@ -65,38 +65,6 @@ extension InputController {
         Self.misconversionChecker.check(surroundingPrefix: prefix, recentWords: recentWords)
     }
 
-    /// `suggestSuccessors()` が立てた `successorLLMContext` に応じてオンデバイス LLM で後続語を補完する。
-    func applySuccessorLLMScheduling(adapter: IMKTextInputAdapter) {
-        guard let triggerContext = handler.successorLLMContext else { return }
-        handler.successorLLMContext = nil
-
-        let examples: [(prev: String, next: String)] = triggerContext.last.map { lw in
-            let fromNoun = handler.lastConfirmedNounOutput.map {
-                handler.db.fetchNounBigramTop(prev: $0, limit: 5)
-            } ?? handler.db.fetchNounBigramTop(prev: lw, limit: 5)
-            return fromNoun
-                .filter { !InputHandler.particles.contains($0) }
-                .map { (prev: lw, next: $0) }
-        } ?? []
-
-        let docPrefix = resolvedLLMDocumentContextPrefix(adapter: adapter)
-        Self.successorLLM.fetch(
-            context: triggerContext, documentContextPrefix: docPrefix, examples: examples
-        ) { [weak self] words in
-            guard let self else { return }
-            guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
-            guard self.handler.isSuccessorMode else { return }
-            var seen = Set(self.handler.pendingSuccessorCandidates)
-            seen.formUnion(self.handler.successorLLMSurfaceExtras)
-            let extra = words.filter { !seen.contains($0) }
-            guard !extra.isEmpty else { return }
-            self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
-            if !self.handler.pendingSuccessorCandidates.isEmpty {
-                Self.postSuccessorPendingNotification(pending: true)
-            }
-        }
-    }
-
     /// IMK の `handle` / `activateServer` は nonisolated のため、通知だけ static で送る（MainActor の `self` を捕らない）。
     nonisolated static func postSuccessorPendingNotification(pending: Bool) {
         NotificationCenter.default.post(

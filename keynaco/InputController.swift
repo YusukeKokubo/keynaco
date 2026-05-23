@@ -12,8 +12,6 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
     nonisolated(unsafe) private var zenzaiSettingsObserver: NSObjectProtocol?
     nonisolated(unsafe) private var hiraganaPreferredObserver: NSObjectProtocol?
-    /// IME はプロセス内で共有されるため `LLMSuccessorFetcher` も1つにまとめ、`activateServer` 等の nonisolated オーバーライドからのデータ競合を避ける。
-    static let successorLLM = LLMSuccessorFetcher()
     static let misconversionChecker = LLMMisconversionChecker()
     static let posClassifier = LLMPOSClassifier()
 
@@ -110,8 +108,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.isSuccessorMode = false
             ic.handler.successorFirstChar = nil
             ic.handler.pendingSuccessorCandidates = []
-            ic.handler.successorLLMSurfaceExtras = []
-            ic.handler.successorLLMContext = nil
             ic.cachedSurroundingContext = nil
             ic.handler.virtualHistoryPrefix = []
             ic.handler.leftSideContext = ""
@@ -150,7 +146,6 @@ class InputController: IMKInputController, @unchecked Sendable {
                 handler.isSuccessorMode = false
                 handler.successorFirstChar = nil
                 handler.pendingSuccessorCandidates = []
-                handler.clearSuccessorLLMAuxiliaryState()
                 candidateWindow.dismiss()
                 break
             }
@@ -194,7 +189,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             handler.isSuccessorMode = false
             handler.successorFirstChar = nil
             handler.pendingSuccessorCandidates = []
-            handler.clearSuccessorLLMAuxiliaryState()
         }
 
         if handler.documentSurroundingContextInvalidated {
@@ -218,8 +212,6 @@ class InputController: IMKInputController, @unchecked Sendable {
         if handler.state.composingText.isEmpty {
             handler.virtualHistoryPrefix = []
         }
-
-        applySuccessorLLMScheduling(adapter: adapter)
 
         if adapter.didInsertText {
             scheduleMisconversionCheck(adapter: adapter)
@@ -384,8 +376,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.isSuccessorMode = false
             ic.handler.successorFirstChar = nil
             ic.handler.pendingSuccessorCandidates = []
-            ic.handler.successorLLMSurfaceExtras = []
-            ic.handler.successorLLMContext = nil
             ic.cachedSurroundingContext = nil
             ic.handler.virtualHistoryPrefix = []
             ic.handler.leftSideContext = ""
@@ -405,17 +395,12 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// IMK の `activateServer` / `commitComposition` は nonisolated オーバーライドのため `self` を渡すインスタンスヘルパーは Swift 6 でコンパイルできない。static にして重複を抑える。
     /// `commitComposition` では確定後に `scheduleMisconversionCheck` が走りうるため、`misconversionChecker.cancel()` はここでは呼ばない（`includeMisconversionCancel: false`）。
     private static func cancelOnDeviceLLMTasks(includeMisconversionCancel: Bool) {
+        guard includeMisconversionCancel else { return }
         if Thread.isMainThread {
-            successorLLM.cancel()
-            if includeMisconversionCancel {
-                misconversionChecker.cancel()
-            }
+            misconversionChecker.cancel()
         } else {
             DispatchQueue.main.sync {
-                successorLLM.cancel()
-                if includeMisconversionCancel {
-                    misconversionChecker.cancel()
-                }
+                misconversionChecker.cancel()
             }
         }
     }

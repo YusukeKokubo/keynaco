@@ -26,11 +26,6 @@ final class DebugSocketServer: @unchecked Sendable {
     let mockClient = SocketMockClient()
     var candidateWindow = DebugCandidateWindow()
 
-    let successorLLM = LLMSuccessorFetcher()
-
-    /// `reset` のたびに増やし、直前のキー処理で飛ばした LLM 完了コールバックを無効化する。
-    var llmEpoch: UInt64 = 0
-
     /// `set_left_context` で明示指定した左コンテキスト。nil なら committedHistory から自動計算。
     var debugLeftContextOverride: String? = nil
 
@@ -184,7 +179,6 @@ final class DebugSocketServer: @unchecked Sendable {
         "committedHistory": "array<string>",
         "segmentTexts": "array<string>",
         "focusedSegmentIndex": "int",
-        "successorLLMSurfaceExtras": "array<string>",
         "isZenzaiEnabled": "bool",
         "leftSideContext": "string",
         "candidateEntries": "array<object>",
@@ -648,10 +642,10 @@ final class DebugSocketServer: @unchecked Sendable {
                 Self.errorPayload(
                     code: "WAIT_UNTIL_MISSING_FIELD",
                     message: "wait_until requires field",
-                    hint: #"Use {"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1}}."#,
+                    hint: #"Use {"wait_until":{"field":"candidates","minCount":1}}."#,
                     suggestedFixes: [
                         ["schema": true],
-                        ["wait_until": ["field": "successorLLMSurfaceExtras", "minCount": 1, "timeoutMs": 1500]]
+                        ["wait_until": ["field": "candidates", "minCount": 1, "timeoutMs": 1500]]
                     ]
                 ),
                 cmd: cmd
@@ -763,7 +757,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
-        "segmentTexts", "focusedSegmentIndex", "successorLLMSurfaceExtras",
+        "segmentTexts", "focusedSegmentIndex",
         "candidateEntries", "changed", "explain",
         "ok", "matched", "timedOut", "waitField", "state", "steps", "last",
     ]
@@ -801,17 +795,6 @@ final class DebugSocketServer: @unchecked Sendable {
                         ["key": "enter", "assert_contains": ["inserted": "{{picked}}"]]
                     ],
                     "vars": [:]
-                ]
-            ],
-            [
-                "name": "eventual_llm_assert",
-                "command": [
-                    "assert_eventually": [
-                        "field": "successorLLMSurfaceExtras",
-                        "minCount": 1,
-                        "timeoutMs": 1500,
-                        "intervalMs": 50
-                    ]
                 ]
             ],
             [
@@ -1079,7 +1062,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "virtualHistoryPrefix": snap.virtualHistoryPrefix,
             "segmentTexts":       snap.segmentTexts,
             "focusedSegmentIndex": snap.focusedSegmentIndex,
-            "successorLLMSurfaceExtras": handler.successorLLMSurfaceExtras,
             "isZenzaiEnabled":    handler.azooKeyConverter.isZenzaiEnabled,
             "leftSideContext":    handler.leftSideContext,
             "surroundingAfter":   mockClient.documentAfter,
@@ -1137,7 +1119,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
-        "segmentTexts", "focusedSegmentIndex", "successorLLMSurfaceExtras",
+        "segmentTexts", "focusedSegmentIndex",
         "candidateEntries"
     ]
 
@@ -1150,45 +1132,9 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    // MARK: - LLM スケジューリング（InputController と同順・文脈は committedHistory のみ）
-
-    func llmDocumentContextPrefix() -> String {
+    func debugLeftContextPrefix() -> String {
         if let override = debugLeftContextOverride { return override }
         return handler.committedHistory.suffix(5).joined()
-    }
-
-    func applyLLMScheduling() {
-        applySuccessorLLMScheduling()
-    }
-
-    func applySuccessorLLMScheduling() {
-        guard let triggerContext = handler.successorLLMContext else { return }
-        handler.successorLLMContext = nil
-        let schedulingEpoch = llmEpoch
-
-        let examples: [(prev: String, next: String)] = triggerContext.last.map { lw in
-            let fromNoun = handler.lastConfirmedNounOutput.map {
-                handler.db.fetchNounBigramTop(prev: $0, limit: 5)
-            } ?? handler.db.fetchNounBigramTop(prev: lw, limit: 5)
-            return fromNoun
-                .filter { !InputHandler.particles.contains($0) }
-                .map { (prev: lw, next: $0) }
-        } ?? []
-
-        let docPrefix = llmDocumentContextPrefix()
-        successorLLM.fetch(
-            context: triggerContext, documentContextPrefix: docPrefix, examples: examples
-        ) { [weak self] words in
-            guard let self else { return }
-            guard schedulingEpoch == self.llmEpoch else { return }
-            guard Array(self.handler.committedHistory.suffix(3)) == triggerContext else { return }
-            guard self.handler.isSuccessorMode else { return }
-            var seen = Set(self.handler.pendingSuccessorCandidates)
-            seen.formUnion(self.handler.successorLLMSurfaceExtras)
-            let extra = words.filter { !seen.contains($0) }
-            guard !extra.isEmpty else { return }
-            self.handler.successorLLMSurfaceExtras.append(contentsOf: extra)
-        }
     }
 
     private func updateMockMarkedText() {

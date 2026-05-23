@@ -12,7 +12,6 @@ public struct CandidateSection: Sendable {
         case dateTime       // 日時変換
         case azooKeyDict    // AzooKey 辞書候補
         case katakana       // カタカナ変換（末尾固定）
-        case lowHistory     // 低スコア履歴（末尾）
     }
 
     public let kind: Kind
@@ -84,7 +83,6 @@ public struct CandidateLayout: Sendable {
         .number, .dateTime,
         .azooKeyDict,
         .katakana,
-        .lowHistory,
     ]
 
     /// Zenzai top-1 をひらがな固定より前に置く順序（履歴・予測なしでZenzai提案ありの場合に使用）
@@ -98,7 +96,6 @@ public struct CandidateLayout: Sendable {
         .number, .dateTime,
         .azooKeyDict,
         .katakana,
-        .lowHistory,
     ]
 
     private static let fixedSectionKinds: Set<CandidateSection.Kind> = [

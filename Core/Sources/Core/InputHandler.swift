@@ -102,10 +102,6 @@ public struct InputHandler {
     public var successorRomajiBuffer: String = ""
     /// 1打目以降に消費したキーイベント（モード解除時に通常入力として再生するため保存）。
     public var successorSubsequentKeys: [(keyCode: UInt16, characters: String?, baseCharacters: String?)] = []
-    /// LLM が返した表層形のみ。`mergePendingSuccessorMatches` の `pending` には渡さない。
-    public var successorLLMSurfaceExtras: [String] = []
-    /// `suggestSuccessors()` が候補を積んだ直後にセットされる LLM コンテキスト（`committedHistory.suffix(3)` のスナップショット）。nil = トリガーなし。
-    public var successorLLMContext: [String]? = nil
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }
     public var lastConfirmedContext: LastConfirmedContext? = nil

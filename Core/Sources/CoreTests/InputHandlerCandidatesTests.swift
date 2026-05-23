@@ -500,12 +500,12 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(count, 1, "履歴と noun-bigram に同じ候補があっても重複なし: \(candidates)")
     }
 
-    // MARK: - 低スコア履歴の AzooKey 後ろ回し（P4）
+    // MARK: - 低スコア履歴は候補に載せない
 
-    func testLowScoreHistoryAppendedAfterAzooKey() {
+    func testLowScoreHistoryExcludedFromCandidates() {
         let t0: Int64 = 2_000_000_000
         handler.db.clock = { t0 }
-        let marker = "⌘愛媛ア"  // 末尾カタカナ → isNounLike = true
+        let marker = "⌘愛媛ア"
         handler.db.record(input: "あい", output: marker)
         // count=1 かつ age > τ(30日) なら recencyExpr < 0.5
         handler.db.clock = { t0 + 40 * 86400 }
@@ -514,8 +514,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail(".show を返すはず: \(action)"); return
         }
-        XCTAssertTrue(candidates.contains(marker), "低スコアも候補に含まれるはず")
-        XCTAssertEqual(candidates.last, marker, "低スコア履歴はリスト末尾（AzooKey・数値・日時の後）")
+        XCTAssertFalse(candidates.contains(marker), "低スコア履歴は候補に載せない")
     }
 
     func testAutoShowShowsWhenOnlyLowScoreHistoryAndAzooKeyExists() {
@@ -526,7 +525,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let (_, action) = type(chars: "i", base: "i")
         guard case .show = action else {
-            XCTFail("高スコア 0 でも履歴行が残り AzooKey があれば autoShow は .show のはず: \(action)"); return
+            XCTFail("低スコア履歴のみでも AzooKey があれば autoShow は .show のはず: \(action)"); return
         }
     }
 
@@ -610,7 +609,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     }
 
     func testSnap_A4_LowHistoryOnly() {
-        // 低スコア履歴のみ: AzooKey の後ろ、lowHistory の前に追加される
+        // 低スコア履歴のみ: 候補に載せず AzooKey のみ
         useStub(SnapStub(["辞書A", "辞書B"]))
         let t = Int64(1_000_000_000)
         handler.db.clock = { t }
@@ -618,12 +617,12 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.clock = { t + 40 * 86400 }  // 40日後 = low score
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["辞書A", "辞書B", "アイ", "哀"],
+                     candidates: ["辞書A", "辞書B", "アイ"],
                      historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_A5_HighAndLowHistory() {
-        // 高スコア+低スコア: 高スコアは先頭、低スコアは katakana 末尾
+        // 高スコア+低スコア: 高スコアのみ表示、低スコアは除外
         useStub(SnapStub(["辞書A", "辞書B"]))
         let t = Int64(1_000_000_000)
         handler.db.clock = { t }
@@ -632,7 +631,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")  // high (now)
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛", "辞書A", "辞書B", "アイ", "哀"],
+                     candidates: ["愛", "辞書A", "辞書B", "アイ"],
                      historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
@@ -903,11 +902,11 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     // MARK: - I: 全セクション組み合わせ
 
     func testSnap_I1_AllSectionsCombined() {
-        // userDict + Zenzai(fixed) + prediction + highHistory + lowHistory
+        // userDict + Zenzai(fixed) + prediction + highHistory
         let t = Int64(1_000_000_000)
         useStub(SnapStub(["辞書A"], zenzai: true))
         handler.db.clock = { t }
-        handler.db.record(input: "あい", output: "哀")   // low history
+        handler.db.record(input: "あい", output: "哀")   // low history (excluded)
         handler.db.clock = { t + 40 * 86400 }
         handler.db.record(input: "あい", output: "愛")   // high history (now)
         handler.leftSideContext = "前文"
@@ -917,7 +916,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         // fixedEnd=2(userDict+zenzai), predictionEnd=3, historyEnd=4
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["UD合い", "辞書A", "予測A", "愛", "アイ", "哀"],
+                     candidates: ["UD合い", "辞書A", "予測A", "愛", "アイ"],
                      historyEnd: 4, predictionEnd: 3, fixedEnd: 2, initialRow: 0)
     }
 

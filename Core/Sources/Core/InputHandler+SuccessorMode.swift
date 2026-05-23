@@ -7,11 +7,6 @@ import AppKit
 
 public extension InputHandler {
 
-    mutating func clearSuccessorLLMAuxiliaryState() {
-        successorLLMContext = nil
-        successorLLMSurfaceExtras.removeAll()
-    }
-
     /// DB で得た候補の並びを保ち、`pending` からローマ字1文字に対応する読み前方一致の語を末尾に追加する（単体テスト可）。
     static func mergePendingSuccessorMatches(dbOrdered: [String], pending: [String], romajiKey: String) -> [String] {
         let key = romajiKey.lowercased()
@@ -97,13 +92,11 @@ public extension InputHandler {
         guard let last = lastCommittedOutput else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
-            clearSuccessorLLMAuxiliaryState()
             return .dismiss
         }
         guard isNounLike(last) else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
-            clearSuccessorLLMAuxiliaryState()
             return .dismiss
         }
         let predictTop = db.fetchNounBigramTop(prev: lastConfirmedNounOutput ?? last)
@@ -116,25 +109,19 @@ public extension InputHandler {
         guard !candidates.isEmpty else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
-            clearSuccessorLLMAuxiliaryState()
             return .dismiss
         }
 
-        successorLLMSurfaceExtras = []
         isSuccessorMode = true
         successorFirstChar = nil
         successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
-        let llmContext = Array(committedHistory.suffix(3))
-
         pendingSuccessorCandidates = candidates
-        successorLLMContext = llmContext
         return .dismiss
     }
 
     mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {
         isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
         successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
-        clearSuccessorLLMAuxiliaryState()
         state.pendingRomaji = ""
         db.recordPrefixes(reading: particle, output: particle)
         lastConfirmedContext = LastConfirmedContext(
@@ -160,7 +147,6 @@ public extension InputHandler {
             guard let selected = candidate.selectedText else {
                 isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
                 successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
-                clearSuccessorLLMAuxiliaryState()
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, .dismiss)
             }
@@ -181,7 +167,6 @@ public extension InputHandler {
             }
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
-            clearSuccessorLLMAuxiliaryState()
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         default:
@@ -209,16 +194,9 @@ public extension InputHandler {
                         filtered.append(p)
                     }
                     if !filtered.isEmpty {
-                        var merged = filtered
-                        var mergeSeen = Set(filtered)
-                        for w in successorLLMSurfaceExtras where mergeSeen.insert(w).inserted {
-                            merged.append(w)
-                        }
                         pendingSuccessorCandidates = []
-                        successorLLMSurfaceExtras = []
-                        clearSuccessorLLMAuxiliaryState()
                         successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
-                        let expanded = InputHandler.expandSuccessorPrefixes(candidates: merged)
+                        let expanded = InputHandler.expandSuccessorPrefixes(candidates: filtered)
                         // 2打目以降の絞り込み用に active candidates とローマ字バッファを初期化
                         successorActiveCandidates = expanded
                         successorKanaPrefix = ""
@@ -268,7 +246,6 @@ public extension InputHandler {
             // モード解除、バッファがあれば先に通常入力に流す
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             successorActiveCandidates = []; successorKanaPrefix = ""; successorRomajiBuffer = ""; successorSubsequentKeys = []
-            clearSuccessorLLMAuxiliaryState()
             if let first {
                 _ = handle(keyCode: first.keyCode, characters: first.characters, baseCharacters: first.baseCharacters,
                            modifiers: modifiers, candidate: .hidden, client: client)

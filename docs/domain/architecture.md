@@ -4,8 +4,8 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 ## コンポーネント一覧
 
-- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` と `LLMSuccessorFetcher`（Successor のオンデバイス後続語補完。`lastConfirmedNounOutput` の noun-bigram 上位を few-shot 注入）、`LLMSegmentConverter`（セグメントモードで読み全体をオンデバイス LLM で一括変換。`inferSegmentBoundaries`（nonisolated static）でアライメント成功時はセグメント再構築し、Zenzai 有効なら各文節で辞書先頭表層を LLM トークンより前に並べる。アライメント失敗時は Zenzai 無効のみ先頭文節へ LLM 全文挿入、Zenzai 有効時は候補列を維持）、`LLMMisconversionChecker`（確定後の誤変換検出。`committedHistory.suffix(5)` をユーザー語彙ヒントとして注入）もここで管理
-- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+NormalInput.swift`（通常キー処理・ASCII/かなモード切替）、`InputHandler+Candidates.swift`（候補リスト構築）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+Numbers.swift`（数字入力時の全角・桁区切り候補生成）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII 記号 → 全角候補列に変換。`"?": ["？", "?"]`・`"!": ["！", "!"]`・`"/": ["・", "÷", "…"]`・`".": ["。", "．", "…"]`・`",": ["、", "，"]` 等、記号全般に対応）。`sentenceTerminators`（`["。", "！", "？"]`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する（Enter キー空確定時は別途 `removeAll()`）。**句読点（`readingPunctuations`）確定時は `recordPrefixes` をスキップし** `pushCommitted` でも `committedHistory` に追加しない（句読点が next-word 予測を汚すのを防ぐ）
+- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` と `LLMMisconversionChecker`（確定後の誤変換検出。`committedHistory.suffix(5)` をユーザー語彙ヒントとして注入）もここで管理
+- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+NormalInput.swift`（通常キー処理・ASCII/かなモード切替）、`InputHandler+Candidates.swift`（候補リスト構築）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+Numbers.swift`（数字入力時の全角・桁区切り候補生成）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII 記号 → 全角候補列に変換。`"?": ["？", "?"]`・`"!": ["！", "!"]`・`"/": ["・", "／", "/"]`・`".": ["。", "．", "…"]`・`",": ["、", "，"]` 等、記号全般に対応）。`sentenceTerminators`（`["。", "！", "？"]`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する（Enter キー空確定時は別途 `removeAll()`）。**句読点（`readingPunctuations`）確定時は `recordPrefixes` をスキップし** `pushCommitted` でも `committedHistory` に追加しない（句読点が next-word 予測を汚すのを防ぐ）
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包。`hiddenPendingN` フラグで "nn" → "ん" 後の pending "n" を不可視化（標準 IME 準拠）。Backspace 時は "ん" + hidden n をまとめて1操作で削除する
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
@@ -30,7 +30,7 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 ## Successor モード
 
-関連変数: `isSuccessorMode` / `successorFirstChar` / `pendingSuccessorCandidates` / `successorLLMSurfaceExtras`
+関連変数: `isSuccessorMode` / `successorFirstChar` / `pendingSuccessorCandidates`
 
 確定直後に `suggestSuccessors()` が後続語候補を準備する。候補は以下の順：
 
@@ -39,7 +39,7 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 **起動条件**: `isNounLike(last)` が偽（ひらがな末尾の動詞・助詞・副詞等）のときは noun-bigram があっても即 `.dismiss` を返しモードには入らない。名詞末尾でも noun-bigram・格助詞 fallback がともに空なら `.dismiss`。**カーソルが文末でない（文中挿入）場合も `.dismiss`。**
 
-**N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加してから **`successorLLMSurfaceExtras` を末尾に連結**し、**`expandSuccessorPrefixes`** で長い表層を助詞境界の部分候補に展開してから `.show` する（いずれにも一致しなければモード解除）。利用可能なら `LLMSuccessorFetcher` が `committedHistory.suffix(3)` を文脈にオンデバイス LLM で表層形の後続語を非同期取得し、`successorLLMSurfaceExtras` に蓄える（コールバックは `suffix(3)` がトリガ時スナップショットと一致するときのみ反映。遅延到着で画面は更新しない場合あり）。
+**N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加してから **`expandSuccessorPrefixes`** で長い表層を助詞境界の部分候補に展開してから `.show` する（いずれにも一致しなければモード解除）。
 
 - `successorFirstChar`: 頭文字 1 打目のバッファリング。1打目で `pendingSuccessorCandidates` を表示したあと、2 打目でモード解除する際にも使用する。
 - Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
@@ -60,9 +60,8 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 6. 数字候補（`generateNumberCandidates`：全角数字 + 桁区切り。数字のみ入力時に生成、`historyEnd` の直後に挿入。変換履歴には記録しない）
 7. 日時候補（`generateDateTimeCandidates`：きょう/いま/ことし等、数字候補の直後に挿入。変換履歴には記録しない）
 8. AzooKey 辞書候補（プロモート済み top-1 は除外済み）
-9. 低スコア履歴（閾値 **未満**の履歴行を AzooKey の後ろに追記。`historyEnd` には含めない）
 
-`autoShow=true`（文字入力中の自動表示）のとき、履歴（高+低のいずれか）・辞書・noun-bigram・ユーザー辞書がすべて 0 件なら表示しない。
+`autoShow=true`（文字入力中の自動表示）のとき、高スコア履歴・辞書・noun-bigram・ユーザー辞書がすべて 0 件なら表示しない。
 
 Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（`fixedCount <= row < fixedEnd` のユーザー辞書行・Zenzai プロモート行は削除不可。`CandidateAction.fixedEnd` は Zenzai 行を含む）。
 
@@ -73,7 +72,7 @@ Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（`fixedCount <= ro
 | タイミング | 例 | 理由 |
 |------|----|----|
 | **handle の前** | `leftSideContext` / `virtualHistoryPrefix` | `handle` 内（`buildCandidateList` / `buildPendingCandidateList` 等）から読まれる |
-| **handle の後**（`applyPostKeyDownEffects`） | `cachedSurroundingContext` 更新・`successorLLMContext` 発火・候補ウィンドウ更新 | 次キー以降のための準備・非同期スケジュール |
+| **handle の後**（`applyPostKeyDownEffects`） | `cachedSurroundingContext` 更新・候補ウィンドウ更新 | 次キー以降のための準備 |
 
 **判定基準**: そのフィールドが現在のキー処理中に参照されるなら pre、次以降のキー処理 or 非同期コールバックでのみ参照されるなら post。post に置くと「1 キーストローク遅延」バグになる。
 

@@ -47,8 +47,7 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 
 ### historyEnd
 「カナ固定〜高スコア履歴候補」セクションの末尾インデックス。  
-`fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。  
-閾値未満の低スコア履歴は数値・日時・AzooKey の後に続くためこの範囲外になる。
+`fixedEnd <= index < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能。
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
@@ -62,7 +61,7 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
 ### particles
-格助詞の固定リスト（`InputHandler.particles`）。Successor モードの名詞末尾 fallback、LLM 例示のフィルタ（`applySuccessorLLMScheduling`）等に使用する。
+格助詞の固定リスト（`InputHandler.particles`）。Successor モードの名詞末尾 fallback 等に使用する。
 
 ### hiraganaPreferred
 ひらがな表記が自然な語彙の集合。`particles` の上位集合。  
@@ -84,10 +83,9 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 6. 数字候補（数字のみ読みのとき）
 7. 日時候補（`きょう` / `いま` 等のとき）
 8. AzooKey 辞書候補（Zenzai プロモート済みは除外）
-9. 低スコア履歴（閾値未満の履歴を末尾に）
 
 ### 括弧モード（isBracketMode）
-`[` / `(` / `!` / `?` / `/` / `.` / `,` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補リストを候補ウィンドウで表示するモード（`bracketCandidates != nil`）。  
+`[` / `(` / `!` / `?` / `/` / `.` / `,` / `@` / `#` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補リストを候補ウィンドウで表示するモード（`bracketCandidates != nil`）。  
 US キーボードの `Shift+/`（`?`）と `Shift+1`（`!`）は `baseCharacters` で判定し bracketOptions を発動する。  
 **組成中**に記号キーを入力した場合は候補ウィンドウは表示せず、全角1文字目を `composedHiragana` に追加して通常の組成継続。
 
@@ -126,14 +124,11 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 noun-bigram で候補を取得し、格助詞リストを fallback として末尾に並べる。  
 確定後は次の候補があれば連鎖表示を継続する（ただし確定語が名詞末尾の場合のみ）。
 
-*Tests: `Tests/InputHandlerSuccessorTests.swift`、`Tests/LLMSuccessorFetcherTests.swift`*
+*Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
 ### pendingSuccessorCandidates
 Successor モードで候補を 1 打目まで遅延表示するためのバッファ（N-gram 予測語と格助詞 fallback）。  
 1 打目でかな先頭一致フィルタを行い一致候補を表示。一致なしはモード解除。`isSuccessorMode = false` になるすべての経路でクリアされる。
-
-### successorLLMSurfaceExtras
-オンデバイス LLM が返した表層形の後続語候補。1 打目表示時に `pendingSuccessorCandidates` 由来の候補末尾に連結する。
 
 ### Successor prefix 展開（`expandSuccessorPrefixes`）
 1 打目の候補マージ後、長い表層形を `InputHandler.particles` の助詞境界で prefix に分割して挿入する（形態素解析は使わない）。  
@@ -154,7 +149,7 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 
 ### virtualHistoryPrefix
 IMK `before` テキスト末尾から抽出した仮想末尾語列（最大 2 語、古→新）。組成開始時に `InputController` がセットする。  
-**不変条件**: `pushCommitted` / `successorLLMContext` には流さない。`UserDefaults` の `virtualHistoryEnabled`（デフォルト true）で無効化可能。
+**不変条件**: `pushCommitted` には流さない。`UserDefaults` の `virtualHistoryEnabled`（デフォルト true）で無効化可能。
 
 ### lastConfirmedContext
 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。  

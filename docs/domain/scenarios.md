@@ -163,19 +163,19 @@
 
 **長音符（ハイフン）**: 日本語モードの組成中に `-` を入力すると `ー`（長音符）として composedHiragana に追加される。
 
-**Shift+句読点**: `。`/`、` に変換される通常の句読点とは異なり、Shift を押しながら `,`/`.` を入力すると `<`/`>` がそのまま composedHiragana に追加される。
+**句読点（`,`/`.`）**: 組成なし・非 ASCII モードで `,`/`.` を入力すると Bracket モードに入り、`、`/`。` 等の候補が表示される（`bracketOptions`）。
+
+**Shift+句読点**: Shift を押しながら `,`/`.` を入力すると `characters` が `<`/`>` となり Bracket モードに入り、`＜`/`＞` 等の候補が表示される。
 
 | 入力 | Shift | 出力 |
 |------|-------|------|
-| `,` | なし | `、` |
-| `.` | なし | `。` |
-| `,` | あり | `<` |
-| `.` | あり | `>` |
+| `,` | なし | Bracket モード → `、` 等 |
+| `.` | なし | Bracket モード → `。` 等 |
+| `,` | あり | Bracket モード → `＜` 等 |
+| `.` | あり | Bracket モード → `＞` 等 |
 | `-` | なし | `ー` |
 
-`punctuationMap` は `baseCharacters`（素文字）で照合するため、Shift あり時は変換されず素文字がそのまま組成に入る。
-
-*Tests: `Tests/InputHandlerCompositionTests.swift`*
+*Tests: `Tests/InputHandlerPunctuationTests.swift`*
 
 ---
 

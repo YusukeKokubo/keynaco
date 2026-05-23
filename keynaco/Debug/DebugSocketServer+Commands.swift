@@ -8,8 +8,6 @@ import InputMethodKit
 extension DebugSocketServer {
     func handleReset(cmd: [String: Any]) -> [String: Any] {
     cleanupSnapshot()
-    successorLLM.cancel()
-    llmEpoch &+= 1
     let useRealDB = cmd["useRealDB"] as? Bool ?? false
     let converter = ZenzaiSettings.makeConverter()
     if useRealDB, let db = makeRealDBSnapshot() {
@@ -470,7 +468,7 @@ extension DebugSocketServer {
     let mods  = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
 
     let composingTextWasEmpty = handler.state.composingText.isEmpty
-    handler.leftSideContext = llmDocumentContextPrefix()
+    handler.leftSideContext = debugLeftContextPrefix()
     // virtualHistoryPrefix は handler.handle 前にセット（buildPendingCandidateList が参照するため）。
     if composingTextWasEmpty {
     handler.virtualHistoryPrefix = VirtualHistoryExtractor.extract(from: mockClient.documentBefore)
@@ -496,11 +494,9 @@ extension DebugSocketServer {
     handler.isSuccessorMode = false
     handler.successorFirstChar = nil
     handler.pendingSuccessorCandidates = []
-    handler.clearSuccessorLLMAuxiliaryState()
     candidateWindow.apply(action: .dismiss)
     }
     let insertedTexts = mockClient.consume()
-    applyLLMScheduling()
     for text in insertedTexts {
     let db = handler.db
     InputController.posClassifier.classify(output: text) { classifiedOutput, pos in

@@ -127,7 +127,7 @@ stateDiagram-v2
 | Space / Enter | 選択候補を確定 → 次の Successor 候補があれば継続、なければ待機。`selectedText` が得られないときは Successor を解除し `composingText`（`pendingRomaji` 含む）を再表示 |
 | ↑↓ | 候補を移動 |
 | Tab | 次候補へ |
-| ローマ字 1 文字（`pendingSuccessorCandidates` あり） | `romajiToInitialKana` で DB 再照会＋**保留リスト**の `mergePendingSuccessorMatches` 併合＋`particleRomajiMap` で当たる格助詞を追加→一致候補を表示し、末尾に `successorLLMSurfaceExtras` を連結→**`expandSuccessorPrefixes`** で長い表層を助詞境界 prefix に展開して `.show`（最大 5 件）。一致なしはモード解除 |
+| ローマ字 1 文字（`pendingSuccessorCandidates` あり） | `romajiToInitialKana` で DB 再照会＋**保留リスト**の `mergePendingSuccessorMatches` 併合＋`particleRomajiMap` で当たる格助詞を追加→一致候補を表示し、**`expandSuccessorPrefixes`** で長い表層を助詞境界 prefix に展開して `.show`（最大 5 件）。一致なしはモード解除 |
 | 非対応キー（1 打目, `pendingSuccessorCandidates` なし） | バッファがあれば流す → モード解除 → 通常組成へ |
 | → | モードキャンセル → 待機（successorFirstChar は破棄） |
 | Escape / Backspace | モード解除 → 待機 |
@@ -142,7 +142,7 @@ stateDiagram-v2
 - **Successor の文中挿入抑制**: カーソルが文末でない（文中挿入モード）場合、`suggestSuccessors()` は Successor モードに入らず `.dismiss` を返す
 - **候補取得**: `lastConfirmedNounOutput`（なければ `lastCommittedOutput`）で noun-bigram を引く。`committedHistory` が空のときは IMK `before` 由来の `virtualHistoryPrefix` で `lastCommittedOutput` を補完する（学習経路は対象外）
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補の後ろに格助詞固定リストを並べる
-- **N-gram 遅延表示**: 確定直後は常に候補ウィンドウを閉じ 1 打目待ち。1 打目でかな先頭一致で DB を再照会し、`pendingSuccessorCandidates` 内の語を併合し、`successorLLMSurfaceExtras`（LLM 表層形）を末尾に連結したあと `expandSuccessorPrefixes` で長い候補を部分表層に展開して表示する（元の全体候補は必ず残す）
+- **N-gram 遅延表示**: 確定直後は常に候補ウィンドウを閉じ 1 打目待ち。1 打目でかな先頭一致で DB を再照会し、`pendingSuccessorCandidates` 内の語を併合したあと `expandSuccessorPrefixes` で長い候補を部分表層に展開して表示する（元の全体候補は必ず残す）
 - **pendingRomaji 先読み予測**: Successor モード外で `composedHiragana` が空かつ `pendingRomaji` が1文字（`n` を除く）のとき `lastConfirmedNounOutput` で noun-bigram を先読みし、候補があれば Successor モードへ移行
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須

@@ -32,7 +32,6 @@ public extension InputHandler {
         let azooKeyCandidates: [String]
         let userDictRaw: [String]
         let highHistory: [String]
-        let lowHistory: [String]
         let totalHistoryCount: Int
         let highHistoryCount: Int
         let uniquePredictions: [String]
@@ -61,17 +60,12 @@ public extension InputHandler {
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
         let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
         var highHistory: [String] = []
-        var lowHistory: [String] = []
-        for row in historyScored {
-            if row.score >= Self.historyRecencyScoreCutoff {
-                highHistory.append(row.output)
-            } else {
-                lowHistory.append(row.output)
-            }
+        for row in historyScored where row.score >= Self.historyRecencyScoreCutoff {
+            highHistory.append(row.output)
         }
-        let totalHistoryCount = historyScored.count
         highHistory = Array(highHistory.prefix(Self.maxHighHistoryCount))
         let highHistoryCount = highHistory.count
+        let totalHistoryCount = highHistoryCount
 
         let nounBigramRaw = lastConfirmedNounOutput.map {
             db.fetchNounBigram(prev: $0, reading: state.composedHiragana)
@@ -97,7 +91,6 @@ public extension InputHandler {
             azooKeyCandidates: azooKeyCandidates,
             userDictRaw: userDictRaw,
             highHistory: highHistory,
-            lowHistory: lowHistory,
             totalHistoryCount: totalHistoryCount,
             highHistoryCount: highHistoryCount,
             uniquePredictions: uniquePredictions,
@@ -110,7 +103,7 @@ public extension InputHandler {
 
     // MARK: - Fixed slot（hiraganaPreferred / foreignMarker 排他）
 
-    /// これ未満の履歴スコアは AzooKey・数値・日時の後ろに回す（DB の `recencyExpr` と同じ尺度）。
+    /// これ未満の履歴スコアは候補に載せない（DB の `recencyExpr` と同じ尺度）。
     private static let historyRecencyScoreCutoff = 0.5
     /// 候補ヘッドの過剰膨張を抑える前方一致履歴の上限件数。
     private static let maxHighHistoryCount = 3
@@ -268,17 +261,6 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .katakana, items: [katakana]))
         }
 
-        let preLowLayout = CandidateLayout(
-            sections: sections,
-            sectionOrder: CandidateLayout.defaultSectionOrder,
-            initialRowPolicy: .afterFixed
-        )
-        var lowHistorySeen = Set(preLowLayout.candidates)
-        let uniqueLowHistory = sources.lowHistory.filter { lowHistorySeen.insert($0).inserted }
-        if !uniqueLowHistory.isEmpty {
-            sections.append(CandidateSection(kind: .lowHistory, items: uniqueLowHistory))
-        }
-
         return sections
     }
 
@@ -297,9 +279,7 @@ public extension InputHandler {
         let highHistoryCount = sources.highHistoryCount
         let basePool = sources.uniquePredictions + sources.highHistory + sources.azooKeyUniq
         let hiraganaInHistory = basePool.prefix(predictCount + highHistoryCount).contains(hiragana)
-            || sources.lowHistory.contains(hiragana)
         let katakanaInHistory = basePool.prefix(predictCount + highHistoryCount).contains(katakana)
-            || sources.lowHistory.contains(katakana)
         let fixedSlot = resolveFixedSlot(
             reading: h,
             hiragana: hiragana,
@@ -361,7 +341,6 @@ public extension InputHandler {
         isSuccessorMode = true
         successorFirstChar = nil
         pendingSuccessorCandidates = []
-        clearSuccessorLLMAuxiliaryState()
         client.setMarkedText(candidates[0], selectionRange: NSRange(location: candidates[0].count, length: 0))
         let fixedCandidates = kanas
         let allCandidates = Self.merged(fixedCandidates, candidates)

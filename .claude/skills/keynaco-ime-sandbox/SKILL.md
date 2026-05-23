@@ -110,8 +110,8 @@ send({"reset": True})
 | 否定 assert | `{"state":true,"assert_not":{"isAsciiMode":true}}` |
 | スキーマ assert | `{"state":true,"assert_schema":{"candidates":"array<string>","historyEnd":"int"}}` |
 | 正規表現 assert | `{"state":true,"assert_regex":{"markedText":"^\\\".*\\\"$"}}` |
-| 非同期待機 | `{"wait_until":{"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}` |
-| 非同期アサート（待機+検証） | `{"assert_eventually":{"field":"successorLLMSurfaceExtras","minCount":1,"timeoutMs":1500}}` |
+| 非同期待機 | `{"wait_until":{"field":"candidates","minCount":1,"timeoutMs":1500}}` |
+| 非同期アサート（待機+検証） | `{"assert_eventually":{"field":"candidates","contains":"漢字","timeoutMs":1500}}` |
 | 複数シナリオを一括実行 | `{"test_suite":[{"name":"kanzi変換","cmds":[...],"assert":{"inserted":["漢字"]}}]}` |
 | test_suite 共通前処理/後処理 | `{"before_each":[...], "after_each":[...], "test_suite":[...]}` |
 | test_suite fail-fast | `{"test_suite":[...], "fail_fast": true}`（最初の失敗で打ち切り） |
@@ -226,28 +226,17 @@ linted = send({
 })
 print(linted["ok"], linted["summary"], linted["issues"])
 
-# LLM の非同期反映を待つ（state 連打せずに待機）
+# 候補表示を待つ
 waited = send({
     "wait_until": {
-        "field": "successorLLMSurfaceExtras",
+        "field": "candidates",
         "minCount": 1,
         "timeoutMs": 1500,
         "intervalMs": 50
     },
-    "describe": "LLM extras待機"
+    "describe": "候補待機"
 })
-print(waited["matched"], waited["state"]["successorLLMSurfaceExtras"])
-
-# assert_eventually: タイムアウト前に条件が成立することをアサート
-ae = send({
-    "assert_eventually": {
-        "field": "successorLLMSurfaceExtras",
-        "minCount": 1,
-        "timeoutMs": 1500,
-        "intervalMs": 50
-    }
-})
-print("eventually_ok?", "assertion_failed" not in ae)
+print(waited["matched"], waited["state"]["candidates"])
 ```
 
 ---
@@ -315,7 +304,6 @@ eisu(英数)=102  kana(かな)=104
   "segmentTexts": [],            // セグメントモード中の文節テキスト
   "focusedSegmentIndex": 0,
   "predictionEnd": 0,            // 予測ブロック末尾（本番の CandidateWindow と同様）
-  "successorLLMSurfaceExtras": [], // 後続語 LLM が返した表層形（コールバック後に増える）
   "isZenzaiEnabled": true,        // AzooKeyConverter の zenzaiEnabled フラグ
   "leftSideContext": "申請書を",  // 現在の leftSideContext（空なら Zenzai プロモートなし）
   "candidateEntries": [          // candidates の行ごとのメタデータ
@@ -349,15 +337,6 @@ eisu(英数)=102  kana(かな)=104
 ```
 
 `test_suite` の失敗シナリオには `reproCommand` が付く。失敗ケースだけを切り出して再実行できる（`before_each` / `after_each` / `vars` / `useRealDB` を保持）。
-
-## LLM（Debug ビルド）
-
-`keynaco/Debug/DebugSocketServer.swift` は **`InputController` と同順**で `LLMSuccessorFetcher` / `LLMSegmentConverter` をスケジュールする（キー処理の直後に `applyLLMScheduling()`）。
-
-- **非同期**: 1 行の JSON 応答は、そのキー処理直後の状態。LLM の推論完了は後から届く。
-- **観察方法**: 同一ソケットで `{"state": true}` を送り **ポーリング**する。`successorLLMSurfaceExtras` の増加、セグメント全文の更新が反映されたか確認できる。
-- **Successor の extras**: `pendingLowConfidence` 経路では、オンデバイス LLM の表層形はまず `successorLLMSurfaceExtras` にだけ溜まる。`candidates` へ載るのは **次のキー処理で `mergePendingSuccessorMatches` が走ったとき**（本番と同じ）。ポーリングだけでは extras は増えても一覧が変わらない場合がある。
-- 設計メモ: `plans/PLAN260504f.md`
 
 **候補リストの構造:**
 - `[0, fixedEnd)` — ひらがな・カタカナ固定候補
