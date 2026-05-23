@@ -3,6 +3,8 @@ import KanaKanjiConverterModuleWithDefaultDictionary
 
 public final class AzooKeyConverter: @unchecked Sendable {
     private let converter = KanaKanjiConverter.withDefaultDictionary()
+    // llama_context (Zenzai) は非スレッドセーフ。全 converter.* 呼び出しをこのロックで直列化する
+    private let converterLock = NSLock()
     private var candidateCache: [String: [Candidate]] = [:]
     private var candidateCacheKeys: [String] = []
     private let candidateCacheLimit = 50
@@ -37,6 +39,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return u
     }
 
+    // converterLock 保持中に呼ぶこと
     private func insertCache(key: String, value: [Candidate]) {
         if candidateCache[key] != nil {
             candidateCacheKeys.removeAll { $0 == key }
@@ -101,8 +104,11 @@ public final class AzooKeyConverter: @unchecked Sendable {
         let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext)
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates))
-        insertCache(key: key, value: result.mainResults)
+        let result = converterLock.withLock {
+            let r = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates))
+            insertCache(key: key, value: r.mainResults)
+            return r
+        }
         let inputLength = hiragana.count
         let fullCoverage = result.mainResults.filter { composingCountValue($0) == inputLength }
         // 末尾 data エントリが1文字のひらがな/カタカナである複合変換候補を除外する
@@ -127,19 +133,23 @@ public final class AzooKeyConverter: @unchecked Sendable {
         let key = Self.cacheKey(segment: reading, leftSideContext: leftSideContext)
         var text = ComposingText()
         text.insertAtCursorPosition(reading, inputStyle: .direct)
-        let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
-        insertCache(key: key, value: result.mainResults)
-        return result.mainResults.map { $0.text }
+        return converterLock.withLock {
+            let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
+            insertCache(key: key, value: result.mainResults)
+            return result.mainResults.map { $0.text }
+        }
     }
 
     public func commit(reading: String, text: String) {
-        for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
-            if let candidate = candidates.first(where: { $0.text == text }) {
-                FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
-                converter.updateLearningData(candidate)
-                converter.commitUpdateLearningData()
-                try? FileManager.default.removeItem(at: commitLockURL)
-                return
+        converterLock.withLock {
+            for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
+                if let candidate = candidates.first(where: { $0.text == text }) {
+                    FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
+                    converter.updateLearningData(candidate)
+                    converter.commitUpdateLearningData()
+                    try? FileManager.default.removeItem(at: commitLockURL)
+                    return
+                }
             }
         }
     }
@@ -157,27 +167,30 @@ public final class AzooKeyConverter: @unchecked Sendable {
         while !remaining.isEmpty {
             var text = ComposingText()
             text.insertAtCursorPosition(remaining, inputStyle: .direct)
-            let result = converter.requestCandidates(text, options: opts)
-            let clauseCandidates = result.firstClauseResults.isEmpty
-                ? result.mainResults : result.firstClauseResults
-            let totalLen = remaining.count
-            let partialBest = clauseCandidates
-                .filter { composingCountValue($0) < totalLen }
-                .max(by: { $0.value < $1.value })
-            let count: Int
-            if let best = partialBest {
-                count = composingCountValue(best)
-            } else {
-                count = clauseCandidates.first.map { composingCountValue($0) } ?? 1
+            let (reading, segmentCandidates, consumed) = converterLock.withLock { () -> (String, [Candidate], Int) in
+                let result = converter.requestCandidates(text, options: opts)
+                let clauseCandidates = result.firstClauseResults.isEmpty
+                    ? result.mainResults : result.firstClauseResults
+                let totalLen = remaining.count
+                let partialBest = clauseCandidates
+                    .filter { composingCountValue($0) < totalLen }
+                    .max(by: { $0.value < $1.value })
+                let count: Int
+                if let best = partialBest {
+                    count = composingCountValue(best)
+                } else {
+                    count = clauseCandidates.first.map { composingCountValue($0) } ?? 1
+                }
+                let safeCount = max(1, min(count, totalLen))
+                let seg = String(remaining.prefix(safeCount))
+                let ck = Self.cacheKey(segment: seg, leftSideContext: leftSideContext)
+                let exactCoverage = clauseCandidates.filter { composingCountValue($0) == safeCount }
+                let segCandidates = exactCoverage.isEmpty ? clauseCandidates : exactCoverage
+                insertCache(key: ck, value: segCandidates)
+                return (seg, segCandidates, safeCount)
             }
-            let safeCount = max(1, min(count, totalLen))
-            let reading = String(remaining.prefix(safeCount))
-            let ck = Self.cacheKey(segment: reading, leftSideContext: leftSideContext)
-            let exactCoverage = clauseCandidates.filter { composingCountValue($0) == safeCount }
-            let segmentCandidates = exactCoverage.isEmpty ? clauseCandidates : exactCoverage
-            insertCache(key: ck, value: segmentCandidates)
             segments.append((reading: reading, candidates: segmentCandidates.map { $0.text }))
-            remaining = String(remaining.dropFirst(safeCount))
+            remaining = String(remaining.dropFirst(consumed))
         }
         return segments
     }
