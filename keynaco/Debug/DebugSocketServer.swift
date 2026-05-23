@@ -1055,9 +1055,10 @@ final class DebugSocketServer: @unchecked Sendable {
             return Self.finalize(state, cmd: cmd)
         }
 
-        // {"get_log": true} — IME Sandbox ウィンドウに蓄積されたキーイベントログを取得
+        // {"get_log": true, "line": 0?} — IME Sandbox の行単位ログ（line 省略時は全行）
         if cmd["get_log"] != nil {
-            let entries = IMESandboxWindow.shared.exportLog()
+            let lineFilter = cmd["line"] as? Int
+            let entries = IMESandboxWindow.shared.exportLog(line: lineFilter)
             return Self.finalize(["log": entries, "count": entries.count], cmd: cmd)
         }
 

@@ -259,10 +259,36 @@ class IMEClient:
         """現在の状態を取得する（キー入力なし）。"""
         return self._send_recv({"state": True})
 
-    def get_log(self) -> dict:
-        """IME Sandbox ウィンドウに蓄積されたキーイベントログを取得する。
-        result["log"] に各イベントの構造化データ（スナップショット + timestamp + summary）の配列が入る。"""
-        return self._send_recv({"get_log": True})
+    def get_log(self, line: int | None = None) -> dict:
+        """IME Sandbox の行単位ログを取得する。
+        result["log"] は [{lineIndex, displayText, events: [...]}, ...] の配列。
+        line を指定するとその行のみ返る。"""
+        cmd: dict = {"get_log": True}
+        if line is not None:
+            cmd["line"] = line
+        return self._send_recv(cmd)
+
+    @staticmethod
+    def format_log(r: dict) -> str:
+        """get_log レスポンスを人間向けに整形する。"""
+        lines_out: list[str] = []
+        log = r.get("log", [])
+        lines_out.append(f"  count: {r.get('count', len(log))}")
+        for block in log:
+            if "events" in block:
+                idx = block.get("lineIndex", "?")
+                text = block.get("displayText", "")
+                events = block.get("events", [])
+                lines_out.append(f"  --- line #{idx + 1 if isinstance(idx, int) else idx}: {text!r} ({len(events)} events) ---")
+                for j, entry in enumerate(events):
+                    src = entry.get("source", "ime")
+                    tag = {"ime": "     ", "socket": "[AI] ", "annotation": "[NOTE]"}.get(src, "     ")
+                    lines_out.append(f"    [{j}] {tag} {entry.get('timestamp', '')}  {entry.get('summary', '')}")
+            else:
+                src = block.get("source", "ime")
+                tag = {"ime": "     ", "socket": "[AI] ", "annotation": "[NOTE]"}.get(src, "     ")
+                lines_out.append(f"  {tag} {block.get('timestamp', '')}  {block.get('summary', '')}")
+        return "\n".join(lines_out)
 
     def annotate(self, text: str) -> dict:
         """AI のコメントを Sandbox ウィンドウのリストに挿入する。
@@ -341,7 +367,8 @@ def interactive_mode(client: IMEClient) -> None:
     print("  .state             : 現在状態を表示")
     print("  .schema            : サーバースキーマを表示")
     print("  .schema+           : examples 付きスキーマを表示")
-    print("  .log               : Sandbox ウィンドウのログを取得")
+    print("  .log               : Sandbox ログ（全行）")
+    print("  .log N             : Sandbox ログ（行 N のみ、0始まり）")
     print("  .annotate <text>   : AI コメントを Sandbox ウィンドウに挿入")
     print()
 
@@ -372,12 +399,15 @@ def interactive_mode(client: IMEClient) -> None:
                 print(json.dumps(r.get("schema", r), ensure_ascii=False, indent=2))
             elif line == ".log":
                 r = client.get_log()
-                entries = r.get("log", [])
-                print(f"  count: {r.get('count', len(entries))}")
-                for i, entry in enumerate(entries):
-                    src = entry.get("source", "ime")
-                    tag = {"ime": "     ", "socket": "[AI] ", "annotation": "[NOTE]"}.get(src, "     ")
-                    print(f"  [{i}] {tag} {entry.get('timestamp', '')}  {entry.get('summary', '')}")
+                print(client.format_log(r))
+            elif line.startswith(".log "):
+                try:
+                    line_no = int(line.split()[1])
+                except (IndexError, ValueError):
+                    print("  usage: .log [lineIndex]")
+                    continue
+                r = client.get_log(line=line_no)
+                print(client.format_log(r))
             elif line.startswith(".annotate "):
                 text = line[len(".annotate "):]
                 r = client.annotate(text)

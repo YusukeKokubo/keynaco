@@ -6,6 +6,18 @@ import KeynacoCore
 extension Notification.Name {
     /// `InputController` が keyDown 処理完了後に内部状態を通知するときに使う（Debug のみ）。
     static let imeStateDidUpdate = Notification.Name("com.yusuke.inputmethod.keynaco.imeStateDidUpdate")
+    /// `IMKTextInputAdapter.insertText` で確定テキストが挿入されたとき（Debug のみ）。
+    static let imeSandboxInsertText = Notification.Name("com.yusuke.inputmethod.keynaco.imeSandboxInsertText")
+}
+
+// MARK: - SandboxLine
+
+private struct SandboxLine {
+    let index: Int
+    var committedSegments: [String]
+    var events: [LogEntry]
+
+    var displayText: String { committedSegments.joined() }
 }
 
 // MARK: - LogEntry
@@ -13,44 +25,109 @@ extension Notification.Name {
 private struct LogEntry {
     enum Source { case ime, socket, annotation }
 
+    let lineIndex: Int
     let timestamp: String
-    let summary: String              // リスト行に表示する1行
-    let detail: String               // ディテールペインに表示する複数行
-    let snapshotDict: [String: Any]  // get_log ソケットコマンド向け構造化データ
+    let summary: String
+    let detail: String
+    let snapshotDict: [String: Any]
     let source: Source
 
-    /// リスト行の先頭タグ
     var tag: String {
         switch source {
-        case .ime:        return "     "   // IME は無印（最も多い）
+        case .ime:        return "     "
         case .socket:     return "[AI] "
         case .annotation: return "[NOTE]"
         }
     }
 }
 
+// MARK: - SandboxInputField
+
+/// 不可視の入力フィールド。Enter で行を区切る。
+private final class SandboxInputField: NSTextField {
+    weak var sandbox: IMESandboxWindow?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        isBordered = false
+        drawsBackground = false
+        focusRingType = .none
+        font = .systemFont(ofSize: 13)
+        delegate = self
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+extension SandboxInputField: NSTextFieldDelegate {
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
+        guard let sandbox else { return false }
+        if sandbox.isComposing {
+            sandbox.pendingLineAdvance = true
+            return false
+        }
+        sandbox.finishCurrentLine()
+        return true
+    }
+}
+
+// MARK: - SandboxFocusView
+
+private final class SandboxFocusView: NSView {
+    let inputField = SandboxInputField(frame: .zero)
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        inputField.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(inputField)
+        NSLayoutConstraint.activate([
+            inputField.leadingAnchor.constraint(equalTo: leadingAnchor),
+            inputField.trailingAnchor.constraint(equalTo: trailingAnchor),
+            inputField.topAnchor.constraint(equalTo: topAnchor),
+            inputField.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func becomeFirstResponder() -> Bool {
+        window?.makeFirstResponder(inputField) ?? false
+    }
+}
+
 // MARK: - IMESandboxWindow
 
-/// 左ペイン: テキスト入力。右ペイン上: イベントリスト。右ペイン下: 選択行の詳細。
+/// 左ペイン: 行一覧 + 入力フィールド。右ペイン上: イベントリスト。右ペイン下: 詳細。
 @MainActor
 final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                               NSTableViewDataSource, NSTableViewDelegate {
     static let shared = IMESandboxWindow()
 
     private var stateObserver: NSObjectProtocol?
+    private var insertTextObserver: NSObjectProtocol?
 
-    // 左右分割
     private let mainSplit = NSSplitView()
-    private let leftTextView = NSTextView(frame: .zero)
+    private let leftContainer = NSView()
+    private let lineTableView = NSTableView()
+    private let focusView = SandboxFocusView(frame: .zero)
     private var didSetInitialDivider = false
     private var didSetInitialRightDivider = false
 
-    // 右ペイン内の上下分割
     private let rightSplit = NSSplitView()
-    private let tableView = NSTableView()
+    private let eventTableView = NSTableView()
     private let detailTextView = NSTextView(frame: .zero)
+    private let showAllLogButton = NSButton()
 
-    private var entries: [LogEntry] = []
+    private var lines: [SandboxLine] = [SandboxLine(index: 0, committedSegments: [], events: [])]
+    var currentLineIndex: Int = 0
+    var pendingLineAdvance = false
+    private var showAllLog = false
+    private var lastSnapshot: InputHandlerSnapshot?
 
     private init() {
         super.init(
@@ -61,6 +138,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         )
         title = "IME Sandbox"
         isReleasedWhenClosed = false
+        focusView.inputField.sandbox = self
         setupUI()
 
         stateObserver = NotificationCenter.default.addObserver(
@@ -69,14 +147,39 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             queue: .main
         ) { [weak self] note in
             guard let snap = note.userInfo?["snapshot"] as? InputHandlerSnapshot else { return }
-            let entry = Self.makeIMEEntry(snap)
-            MainActor.assumeIsolated { self?.push(entry) }
+            let entry = Self.makeIMEEntry(snap, lineIndex: self?.currentLineIndex ?? 0)
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.lastSnapshot = snap
+                self.push(entry)
+                if self.pendingLineAdvance, !Self.isComposing(snap) {
+                    self.pendingLineAdvance = false
+                    self.finishCurrentLine()
+                }
+            }
+        }
+
+        insertTextObserver = NotificationCenter.default.addObserver(
+            forName: .imeSandboxInsertText,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let text = note.userInfo?["text"] as? String, !text.isEmpty else { return }
+            MainActor.assumeIsolated { self?.appendToCurrentLine(text) }
         }
     }
 
-    // MARK: - ソケット → Sandbox（逆方向書き込み）
+    var isComposing: Bool {
+        guard let s = lastSnapshot else { return false }
+        return Self.isComposing(s)
+    }
 
-    /// AI がソケット経由で送ったキー操作の結果をリストに追記する。
+    private static func isComposing(_ s: InputHandlerSnapshot) -> Bool {
+        !s.composedHiragana.isEmpty || !s.composingText.isEmpty || !s.pendingRomaji.isEmpty
+    }
+
+    // MARK: - ソケット → Sandbox
+
     func appendSocketSnapshot(_ dict: [String: Any], inserted: [String]) {
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
@@ -94,57 +197,130 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         let summary = "組=「\(hiragana)」romaji=「\(romaji)」  cand:\(candStr)\(insertStr)"
         let detail  = Self.formatDetailFromDict(dict, inserted: inserted, timestamp: ts)
 
-        push(LogEntry(timestamp: ts, summary: summary, detail: detail,
-                      snapshotDict: dict, source: .socket))
+        push(LogEntry(
+            lineIndex: currentLineIndex,
+            timestamp: ts,
+            summary: summary,
+            detail: detail,
+            snapshotDict: dict,
+            source: .socket
+        ))
+        for text in inserted where !text.isEmpty {
+            appendToCurrentLine(text)
+        }
     }
 
-    /// AI がアノテーション（コメント）をリストに挿入する。
     func appendAnnotation(_ text: String) {
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
         df.dateFormat = "HH:mm:ss"
         let ts = df.string(from: Date())
 
-        push(LogEntry(timestamp: ts, summary: text, detail: text,
-                      snapshotDict: [:], source: .annotation))
+        push(LogEntry(
+            lineIndex: currentLineIndex,
+            timestamp: ts,
+            summary: text,
+            detail: text,
+            snapshotDict: [:],
+            source: .annotation
+        ))
     }
 
-    // MARK: - ソケット向けエクスポート
-
-    func exportLog() -> [[String: Any]] {
-        entries.map { entry in
-            var dict = entry.snapshotDict
-            dict["timestamp"] = entry.timestamp
-            dict["summary"]   = entry.summary
-            dict["source"]    = { switch entry.source {
-                case .ime: return "ime"
-                case .socket: return "socket"
-                case .annotation: return "annotation"
-            }}()
-            return dict
+    func exportLog(line: Int? = nil) -> [[String: Any]] {
+        let target: [SandboxLine]
+        if let line {
+            target = lines.filter { $0.index == line }
+        } else {
+            target = lines
+        }
+        return target.map { sandboxLine in
+            [
+                "lineIndex": sandboxLine.index,
+                "displayText": sandboxLine.displayText,
+                "events": sandboxLine.events.map { Self.entryToDict($0) },
+            ]
         }
     }
 
     // MARK: - データ操作
 
+    func finishCurrentLine() {
+        let nextIndex = lines.count
+        lines.append(SandboxLine(index: nextIndex, committedSegments: [], events: []))
+        currentLineIndex = nextIndex
+        lineTableView.reloadData()
+        selectLine(nextIndex)
+        reloadEventTable()
+    }
+
+    func appendToCurrentLine(_ text: String) {
+        guard lines.indices.contains(currentLineIndex) else { return }
+        lines[currentLineIndex].committedSegments.append(text)
+        lineTableView.reloadData(forRowIndexes: IndexSet(integer: currentLineIndex), columnIndexes: IndexSet(integer: 0))
+    }
+
     private func push(_ entry: LogEntry) {
-        entries.append(entry)
-        tableView.reloadData()
-        let last = entries.count - 1
-        tableView.selectRowIndexes(IndexSet(integer: last), byExtendingSelection: false)
-        tableView.scrollRowToVisible(last)
-        showDetail(for: last)
+        guard lines.indices.contains(currentLineIndex) else { return }
+        lines[currentLineIndex].events.append(entry)
+        reloadEventTable()
+        if shouldAutoScrollEvents(for: entry.lineIndex) {
+            scrollEventTableToLast()
+            showEventDetail(at: filteredEntries.count - 1)
+        }
+    }
+
+    private func shouldAutoScrollEvents(for lineIndex: Int) -> Bool {
+        showAllLog || selectedLineIndex == lineIndex
+    }
+
+    private var selectedLineIndex: Int {
+        let row = lineTableView.selectedRow
+        if row >= 0, row < lines.count { return row }
+        return currentLineIndex
+    }
+
+    private var filteredEntries: [(lineIndex: Int, entry: LogEntry)] {
+        if showAllLog {
+            return lines.flatMap { line in
+                line.events.map { (line.index, $0) }
+            }
+        }
+        guard lines.indices.contains(selectedLineIndex) else { return [] }
+        return lines[selectedLineIndex].events.map { (selectedLineIndex, $0) }
     }
 
     private func clearLog() {
-        entries.removeAll()
-        tableView.reloadData()
+        lines = [SandboxLine(index: 0, committedSegments: [], events: [])]
+        currentLineIndex = 0
+        pendingLineAdvance = false
+        lastSnapshot = nil
+        lineTableView.reloadData()
+        selectLine(0)
+        reloadEventTable()
         detailTextView.string = ""
     }
 
-    private func showDetail(for row: Int) {
-        guard entries.indices.contains(row) else { return }
-        detailTextView.string = entries[row].detail
+    private func selectLine(_ index: Int) {
+        guard index >= 0, index < lines.count else { return }
+        lineTableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+        lineTableView.scrollRowToVisible(index)
+    }
+
+    private func reloadEventTable() {
+        eventTableView.reloadData()
+    }
+
+    private func scrollEventTableToLast() {
+        let count = filteredEntries.count
+        guard count > 0 else { return }
+        let last = count - 1
+        eventTableView.selectRowIndexes(IndexSet(integer: last), byExtendingSelection: false)
+        eventTableView.scrollRowToVisible(last)
+    }
+
+    private func showEventDetail(at filteredRow: Int) {
+        guard filteredEntries.indices.contains(filteredRow) else { return }
+        detailTextView.string = filteredEntries[filteredRow].entry.detail
         detailTextView.scrollToBeginningOfDocument(nil)
     }
 
@@ -160,7 +336,21 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         mainSplit.translatesAutoresizingMaskIntoConstraints = false
         mainSplit.delegate = self
 
-        let leftScroll = makeEditorScroll(textView: leftTextView, editable: true)
+        leftContainer.translatesAutoresizingMaskIntoConstraints = false
+        let lineScroll = makeLineTableScroll()
+        focusView.translatesAutoresizingMaskIntoConstraints = false
+        leftContainer.addSubview(lineScroll)
+        leftContainer.addSubview(focusView)
+        NSLayoutConstraint.activate([
+            lineScroll.leadingAnchor.constraint(equalTo: leftContainer.leadingAnchor),
+            lineScroll.trailingAnchor.constraint(equalTo: leftContainer.trailingAnchor),
+            lineScroll.topAnchor.constraint(equalTo: leftContainer.topAnchor),
+            lineScroll.bottomAnchor.constraint(equalTo: leftContainer.bottomAnchor),
+            focusView.leadingAnchor.constraint(equalTo: leftContainer.leadingAnchor),
+            focusView.trailingAnchor.constraint(equalTo: leftContainer.trailingAnchor),
+            focusView.topAnchor.constraint(equalTo: leftContainer.topAnchor),
+            focusView.heightAnchor.constraint(equalToConstant: 24),
+        ])
 
         let rightContainer = NSView()
         rightContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -169,22 +359,32 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         clearButton.bezelStyle = .rounded
         clearButton.translatesAutoresizingMaskIntoConstraints = false
 
+        showAllLogButton.title = "全ログ"
+        showAllLogButton.setButtonType(.switch)
+        showAllLogButton.target = self
+        showAllLogButton.action = #selector(onToggleShowAllLog)
+        showAllLogButton.translatesAutoresizingMaskIntoConstraints = false
+
         rightSplit.dividerStyle = .thin
         rightSplit.isVertical = false
         rightSplit.translatesAutoresizingMaskIntoConstraints = false
         rightSplit.delegate = self
 
-        let tableScroll = makeTableScroll()
+        let eventScroll = makeEventTableScroll()
         let detailScroll = makeEditorScroll(textView: detailTextView, editable: false)
-        rightSplit.addSubview(tableScroll)
+        rightSplit.addSubview(eventScroll)
         rightSplit.addSubview(detailScroll)
 
         rightContainer.addSubview(clearButton)
+        rightContainer.addSubview(showAllLogButton)
         rightContainer.addSubview(rightSplit)
         NSLayoutConstraint.activate([
             clearButton.topAnchor.constraint(equalTo: rightContainer.topAnchor, constant: 4),
             clearButton.trailingAnchor.constraint(equalTo: rightContainer.trailingAnchor, constant: -8),
             clearButton.heightAnchor.constraint(equalToConstant: 24),
+
+            showAllLogButton.centerYAnchor.constraint(equalTo: clearButton.centerYAnchor),
+            showAllLogButton.trailingAnchor.constraint(equalTo: clearButton.leadingAnchor, constant: -12),
 
             rightSplit.topAnchor.constraint(equalTo: clearButton.bottomAnchor, constant: 4),
             rightSplit.leadingAnchor.constraint(equalTo: rightContainer.leadingAnchor),
@@ -192,7 +392,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             rightSplit.bottomAnchor.constraint(equalTo: rightContainer.bottomAnchor),
         ])
 
-        mainSplit.addSubview(leftScroll)
+        mainSplit.addSubview(leftContainer)
         mainSplit.addSubview(rightContainer)
 
         root.addSubview(mainSplit)
@@ -225,19 +425,42 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         return scroll
     }
 
-    private func makeTableScroll() -> NSScrollView {
+    private func makeLineTableScroll() -> NSScrollView {
+        let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("line"))
+        col.title = "行"
+        col.resizingMask = .autoresizingMask
+
+        lineTableView.addTableColumn(col)
+        lineTableView.headerView = NSTableHeaderView()
+        lineTableView.rowHeight = 22
+        lineTableView.font = .systemFont(ofSize: 12)
+        lineTableView.dataSource = self
+        lineTableView.delegate = self
+        lineTableView.target = self
+        lineTableView.usesAlternatingRowBackgroundColors = true
+
+        let scroll = NSScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        scroll.documentView = lineTableView
+        return scroll
+    }
+
+    private func makeEventTableScroll() -> NSScrollView {
         let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("summary"))
         col.title = "イベントログ"
         col.resizingMask = .autoresizingMask
 
-        tableView.addTableColumn(col)
-        tableView.headerView = NSTableHeaderView()
-        tableView.rowHeight = 18
-        tableView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.target = self
-        tableView.action = #selector(onTableClick)
+        eventTableView.addTableColumn(col)
+        eventTableView.headerView = NSTableHeaderView()
+        eventTableView.rowHeight = 18
+        eventTableView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        eventTableView.dataSource = self
+        eventTableView.delegate = self
+        eventTableView.target = self
+        eventTableView.action = #selector(onEventTableClick)
 
         let scroll = NSScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
@@ -245,12 +468,21 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
-        scroll.documentView = tableView
+        scroll.documentView = eventTableView
         return scroll
     }
 
     @objc private func onClear() { clearLog() }
-    @objc private func onTableClick() { showDetail(for: tableView.selectedRow) }
+
+    @objc private func onToggleShowAllLog(_ sender: NSButton) {
+        showAllLog = sender.state == .on
+        reloadEventTable()
+        detailTextView.string = ""
+    }
+
+    @objc private func onEventTableClick() {
+        showEventDetail(at: eventTableView.selectedRow)
+    }
 
     // MARK: - NSSplitViewDelegate
 
@@ -271,11 +503,52 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
 
     // MARK: - NSTableViewDataSource / Delegate
 
-    func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        if tableView === lineTableView { return lines.count }
+        return filteredEntries.count
+    }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if tableView === lineTableView {
+            return lineCell(for: row)
+        }
+        return eventCell(for: row)
+    }
+
+    private func lineCell(for row: Int) -> NSView {
+        let id = NSUserInterfaceItemIdentifier("lineCell")
+        let cell = lineTableView.makeView(withIdentifier: id, owner: nil) as? NSTextField
+            ?? {
+                let tf = NSTextField()
+                tf.identifier = id
+                tf.isEditable = false
+                tf.isBordered = false
+                tf.drawsBackground = false
+                tf.font = .systemFont(ofSize: 12)
+                return tf
+            }()
+        guard lines.indices.contains(row) else { return cell }
+        let line = lines[row]
+        let num = "#\(line.index + 1)"
+        let text: String
+        if row == currentLineIndex, line.displayText.isEmpty {
+            text = "（入力中）"
+        } else if line.displayText.isEmpty {
+            text = "—"
+        } else {
+            text = line.displayText
+        }
+        let badge = line.events.isEmpty ? "" : "  [\(line.events.count)]"
+        cell.stringValue = "\(num)  \(text)\(badge)"
+        cell.textColor = (row == currentLineIndex && line.displayText.isEmpty)
+            ? .secondaryLabelColor
+            : .labelColor
+        return cell
+    }
+
+    private func eventCell(for row: Int) -> NSView {
         let id = NSUserInterfaceItemIdentifier("cell")
-        let cell = tableView.makeView(withIdentifier: id, owner: nil) as? NSTextField
+        let cell = eventTableView.makeView(withIdentifier: id, owner: nil) as? NSTextField
             ?? {
                 let tf = NSTextField()
                 tf.identifier = id
@@ -285,14 +558,34 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                 tf.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
                 return tf
             }()
-        let entry = entries[row]
-        cell.stringValue = "\(entry.tag) \(entry.timestamp)  \(entry.summary)"
+        guard filteredEntries.indices.contains(row) else { return cell }
+        let item = filteredEntries[row]
+        let linePrefix = showAllLog ? "[#\(item.lineIndex + 1)] " : ""
+        let entry = item.entry
+        cell.stringValue = "\(entry.tag)\(linePrefix)\(entry.timestamp)  \(entry.summary)"
         cell.textColor = entry.source == .annotation ? .systemOrange : .labelColor
         return cell
     }
 
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        guard tableView === lineTableView else { return nil }
+        let rowView = NSTableRowView()
+        if row == currentLineIndex {
+            rowView.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.15)
+        }
+        return rowView
+    }
+
     func tableViewSelectionDidChange(_ notification: Notification) {
-        showDetail(for: tableView.selectedRow)
+        guard let tv = notification.object as? NSTableView else { return }
+        if tv === lineTableView {
+            reloadEventTable()
+            detailTextView.string = ""
+            return
+        }
+        if tv === eventTableView {
+            showEventDetail(at: tv.selectedRow)
+        }
     }
 
     // MARK: - show
@@ -302,6 +595,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         level = .floating
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        makeFirstResponder(focusView.inputField)
         if !didSetInitialDivider {
             didSetInitialDivider = true
             DispatchQueue.main.async { [weak self] in
@@ -309,16 +603,33 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                 self.mainSplit.setPosition(self.mainSplit.bounds.width * 0.38, ofDividerAt: 0)
             }
         }
+        selectLine(currentLineIndex)
+    }
+
+    // MARK: - エクスポートヘルパ
+
+    private nonisolated static func entryToDict(_ entry: LogEntry) -> [String: Any] {
+        var dict = entry.snapshotDict
+        dict["lineIndex"] = entry.lineIndex
+        dict["timestamp"] = entry.timestamp
+        dict["summary"] = entry.summary
+        dict["source"] = { switch entry.source {
+            case .ime: return "ime"
+            case .socket: return "socket"
+            case .annotation: return "annotation"
+        }}()
+        return dict
     }
 
     // MARK: - フォーマット（IME イベント用）
 
-    private nonisolated static func makeIMEEntry(_ s: InputHandlerSnapshot) -> LogEntry {
+    private nonisolated static func makeIMEEntry(_ s: InputHandlerSnapshot, lineIndex: Int) -> LogEntry {
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
         df.dateFormat = "HH:mm:ss"
         let ts = df.string(from: Date())
         return LogEntry(
+            lineIndex: lineIndex,
             timestamp: ts,
             summary: formatSummaryFromSnapshot(s),
             detail: formatDetailFromSnapshot(s, timestamp: ts),
@@ -403,8 +714,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("更新: \(timestamp)  source: IME")
         return lines.joined(separator: "\n")
     }
-
-    // MARK: - フォーマット（ソケットイベント用）
 
     private nonisolated static func formatDetailFromDict(
         _ dict: [String: Any],
