@@ -41,6 +41,43 @@ private struct LogEntry {
     }
 }
 
+// MARK: - CopyableTableView
+
+private final class CopyableTableView: NSTableView {
+    var textForRow: ((Int) -> String?)?
+
+    override func keyDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "c" {
+            let texts = selectedRowIndexes.compactMap { textForRow?($0) }
+            if !texts.isEmpty {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(texts.joined(separator: "\n"), forType: .string)
+                return
+            }
+        }
+        super.keyDown(with: event)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let pt = convert(event.locationInWindow, from: nil)
+        let row = self.row(at: pt)
+        guard row >= 0 else { return nil }
+        selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        let menu = NSMenu()
+        let item = NSMenuItem(title: "コピー", action: #selector(copyClickedRow), keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+        return menu
+    }
+
+    @objc private func copyClickedRow() {
+        let row = clickedRow >= 0 ? clickedRow : selectedRow
+        guard row >= 0, let text = textForRow?(row) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
 // MARK: - SandboxLineRowView
 
 /// 現在入力中の行を背景色で示す。`backgroundColor` だけでは描画されないため `drawBackground` を使う。
@@ -132,7 +169,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
 
     private let mainSplit = NSSplitView()
     private let leftContainer = NSView()
-    private let lineTableView = NSTableView()
+    private let lineTableView = CopyableTableView()
     private let focusView = SandboxFocusView(frame: .zero)
     private var didSetInitialDivider = false
     private var didSetInitialRightDivider = false
@@ -480,6 +517,12 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lineTableView.delegate = self
         lineTableView.target = self
         lineTableView.usesAlternatingRowBackgroundColors = true
+        lineTableView.textForRow = { [weak self] row in
+            guard let self, self.lines.indices.contains(row) else { return nil }
+            let line = self.lines[row]
+            guard !line.events.isEmpty else { return nil }
+            return line.events.map { Self.formatForCopy($0) }.joined(separator: "\n")
+        }
 
         let scroll = NSScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
@@ -652,6 +695,21 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                 self.mainSplit.setPosition(self.mainSplit.bounds.width * 0.38, ofDividerAt: 0)
             }
         }
+    }
+
+    // MARK: - コピー用フォーマット
+
+    private nonisolated static func formatForCopy(_ entry: LogEntry) -> String {
+        let base = "\(entry.tag)\(entry.timestamp)  \(entry.summary)"
+        let dict = entry.snapshotDict
+        guard dict["candidateVisible"] as? Bool == true else { return base }
+
+        let hEnd = dict["historyEnd"] as? Int ?? 0
+        let fEnd = dict["fixedEnd"]   as? Int ?? 0
+        let cands = dict["candidates"] as? [String] ?? []
+        let top   = cands.prefix(5).joined(separator: " ")
+        let ellipsis = cands.count > 5 ? " …" : ""
+        return "\(base)  hEnd:\(hEnd) fEnd:\(fEnd)  [\(top)\(ellipsis)]"
     }
 
     // MARK: - エクスポートヘルパ
