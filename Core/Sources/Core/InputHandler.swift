@@ -293,6 +293,7 @@ public struct InputHandler {
                 fullReading: ctx.fullReading
             )
             lastConfirmedContext = nil
+            successorEligible = false
         }
         guard handled else { return (false, .none) }
         let action: CandidateAction = needsRefresh ? buildCandidateList() : .dismiss

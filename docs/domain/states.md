@@ -139,5 +139,6 @@ stateDiagram-v2
 - **Successor の再帰防止**: 格助詞チェックは廃止。候補が空なら自然に `.dismiss` になるため、無限ループは起きない
 - **Successor の文中挿入抑制**: カーソルが文末でない場合、`InputController.applyPostKeyDownEffects` が Successor 候補の `.show` を抑制する
 - **候補取得**: `extractNounFromContext(leftSideContext)` または確定直後の `lastCommittedOutput`（`successorEligible`）を prev に noun-bigram + `fetchHistoryPrefix` を照会
+- **確定直後 Backspace**: `penalizeAll` と同時に `successorEligible` をクリア（訂正意図の次打鍵で Successor を出さない）
 - **Electron 対策**: Successor 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須

@@ -105,12 +105,26 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         press(keyCode: 49, candidateVisible: true, selectedRow: 0, selectedText: "が")
         XCTAssertTrue(client.inserted.contains("が"))
 
-        // 「が」確定後、bigram (が, 好き) があれば次打鍵で候補表示
+        // ひらがな末尾（が）確定後は Successor チェーンしない → 通常組成
         let chainResult = type(chars: "s", base: "s")
-        guard case .show(let next, _, _, _, _) = chainResult.candidateAction else {
-            XCTFail("「が」確定後も prev=が で候補表示: \(chainResult.candidateAction)"); return
+        XCTAssertEqual(client.markedText, "s", "格助詞確定後は通常組成")
+        guard case .dismiss = chainResult.candidateAction else {
+            XCTFail("「が」確定後は Successor 候補を出さない: \(chainResult.candidateAction)"); return
         }
-        XCTAssertTrue(next.contains("好き"))
+    }
+
+    func testBackspaceAfterCommitClearsSuccessorEligible() {
+        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        XCTAssertTrue(handler.successorEligible)
+        _ = press(keyCode: KeyCode.backspace)
+        XCTAssertFalse(handler.successorEligible, "確定直後 Backspace で successorEligible をクリア")
+        let result = type(chars: "g", base: "g")
+        XCTAssertEqual(client.markedText, "g", "Backspace 後は Successor ではなく通常組成")
+        guard case .dismiss = result.candidateAction else {
+            XCTFail("Backspace 後は Successor 候補を出さない: \(result.candidateAction)"); return
+        }
     }
 
     func testSuccessorArrowNavigates() {

@@ -120,7 +120,7 @@
 |---------|------|------|------|
 | 0 | — | Successor モード | noun-bigram あり（`が` が学習済み）→ `.dismiss`（確定直後はウィンドウなし） |
 | 1 | `g` | Successor モード | `pendingSuccessorCandidates` を読みフィルタして表示（`["が", ...]`）|
-| 2 | Space | 待機 | 「が」確定 → ひらがな末尾（`isNounLike` 偽）→ Successor 終了 |
+| 2 | Space | 待機 | 「が」確定 → ひらがな末尾（`isNounLike` 偽）→ `successorEligible` を立てず Successor 終了 |
 
 **変更点（旧仕様との差異）**: 以前は「が」確定後も `suggestSuccessors()` が再呼び出しされ、`(が, 好き)` など N-gram があればチェーンが継続していた。現在はひらがな末尾確定後は Successor に入らないため、格助詞の後は通常の組成に戻る。
 

@@ -130,7 +130,9 @@ public extension InputHandler {
             fullReading: nil
         )
         pushCommitted(particle)
-        successorEligible = true
+        if isNounLike(particle) {
+            successorEligible = true
+        }
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
         client.insertText(particle)
     }

@@ -104,7 +104,7 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 `leftSideContext` 末尾の非漢字・非カタカナをスキップし、続く漢字・カタカナ連続スパンを返す（例: `"今日は東京に"` → `"東京"`）。
 
 ### successorEligible
-`commitText` / `confirmSuccessor` 確定直後に立ち、次の 1 打目だけ `leftSideContext` が空でも `lastCommittedOutput` を prev に Successor を試す。1 打目処理後または Escape でクリア。
+`commitText` 確定直後、または `confirmSuccessor` で **名詞系**（`isNounLike`）を確定した直後に立ち、次の 1 打目だけ `leftSideContext` が空でも `lastCommittedOutput` を prev に Successor を試す。1 打目処理後・Escape・確定直後 Backspace（`penalizeAll`）でクリア。格助詞等のひらがな確定後は立てない。
 
 ### successorBufferedRomaji
 Successor 候補表示中の 1 打目ローマ字。2 打目不一致時に通常組成へ流す。
