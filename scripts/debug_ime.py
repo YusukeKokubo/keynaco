@@ -259,6 +259,16 @@ class IMEClient:
         """現在の状態を取得する（キー入力なし）。"""
         return self._send_recv({"state": True})
 
+    def get_log(self) -> dict:
+        """IME Sandbox ウィンドウに蓄積されたキーイベントログを取得する。
+        result["log"] に各イベントの構造化データ（スナップショット + timestamp + summary）の配列が入る。"""
+        return self._send_recv({"get_log": True})
+
+    def annotate(self, text: str) -> dict:
+        """AI のコメントを Sandbox ウィンドウのリストに挿入する。
+        ユーザーが見ているサンドボックスに [NOTE] タグ付きでテキストが表示される。"""
+        return self._send_recv({"annotate": text})
+
     def schema(self, with_examples: bool = False) -> dict:
         """サーバーのコマンド/フィールドスキーマを取得する。"""
         cmd: dict = {"schema": True}
@@ -331,6 +341,8 @@ def interactive_mode(client: IMEClient) -> None:
     print("  .state             : 現在状態を表示")
     print("  .schema            : サーバースキーマを表示")
     print("  .schema+           : examples 付きスキーマを表示")
+    print("  .log               : Sandbox ウィンドウのログを取得")
+    print("  .annotate <text>   : AI コメントを Sandbox ウィンドウに挿入")
     print()
 
     while True:
@@ -358,6 +370,18 @@ def interactive_mode(client: IMEClient) -> None:
             elif line == ".schema+":
                 r = client.schema(with_examples=True)
                 print(json.dumps(r.get("schema", r), ensure_ascii=False, indent=2))
+            elif line == ".log":
+                r = client.get_log()
+                entries = r.get("log", [])
+                print(f"  count: {r.get('count', len(entries))}")
+                for i, entry in enumerate(entries):
+                    src = entry.get("source", "ime")
+                    tag = {"ime": "     ", "socket": "[AI] ", "annotation": "[NOTE]"}.get(src, "     ")
+                    print(f"  [{i}] {tag} {entry.get('timestamp', '')}  {entry.get('summary', '')}")
+            elif line.startswith(".annotate "):
+                text = line[len(".annotate "):]
+                r = client.annotate(text)
+                print(f"  annotate: {r.get('ok')}")
             elif line.startswith("."):
                 name = line[1:]
                 if name not in KEY_MAP:

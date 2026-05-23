@@ -211,6 +211,8 @@ final class DebugSocketServer: @unchecked Sendable {
             "supportsChangedFields": true,
             "supportsCandidateEntries": true,
             "supportsExplain": true,
+            "supportsGetLog": true,
+            "supportsAnnotate": true,
         ]
     }
 
@@ -768,7 +770,8 @@ final class DebugSocketServer: @unchecked Sendable {
     ]
 
     private static let knownCommandKeys: Set<String> = [
-        "reset", "state", "wait_until", "assert_eventually", "seed_noun_bigram", "seed_history",
+        "reset", "state", "get_log", "annotate",
+        "wait_until", "assert_eventually", "seed_noun_bigram", "seed_history",
         "set_last_noun", "set_surrounding", "set_left_context",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
         "capture", "vars", "schema", "with_examples", "explain",
@@ -1050,6 +1053,18 @@ final class DebugSocketServer: @unchecked Sendable {
             var state = makeResponse(inserted: [])
             state["changed"] = []
             return Self.finalize(state, cmd: cmd)
+        }
+
+        // {"get_log": true} — IME Sandbox ウィンドウに蓄積されたキーイベントログを取得
+        if cmd["get_log"] != nil {
+            let entries = IMESandboxWindow.shared.exportLog()
+            return Self.finalize(["log": entries, "count": entries.count], cmd: cmd)
+        }
+
+        // {"annotate": "メッセージ"} — AI のコメントを Sandbox ウィンドウのリストに挿入
+        if let text = cmd["annotate"] as? String {
+            IMESandboxWindow.shared.appendAnnotation(text)
+            return Self.finalize(["ok": true], cmd: cmd)
         }
 
         // {"lint_suite":[...], "before_each":[...], "after_each":[...]}
@@ -1520,6 +1535,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
         var result = makeResponse(inserted: insertedTexts)
         result["changed"] = Self.computeChangedFields(before: before, after: result)
+        IMESandboxWindow.shared.appendSocketSnapshot(result, inserted: insertedTexts)
         return Self.finalize(result, cmd: cmd)
     }
 
