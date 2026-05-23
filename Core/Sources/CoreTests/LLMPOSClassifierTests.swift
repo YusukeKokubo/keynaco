@@ -24,7 +24,8 @@ final class LLMPOSClassifierTests: XCTestCase {
     }
 
     func testCategoryIgnoresConfidence() {
-        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/place:high"),  "proper_noun")
+        // proper_noun は subcategory まで保持
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/place:high"),  "proper_noun/place")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("noun/suru:mid"),           "noun")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/ta:low"),             "verb")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("adjective/na:high"),       "adjective")
@@ -35,9 +36,11 @@ final class LLMPOSClassifierTests: XCTestCase {
     func testCategoryFromTagHierarchical() {
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("noun/common"),          "noun")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("noun/suru"),            "noun")
-        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/place"),    "proper_noun")
-        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/person"),   "proper_noun")
-        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/org"),      "proper_noun")
+        // proper_noun は subcategory を pos にそのまま格納する
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/place"),    "proper_noun/place")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/person"),   "proper_noun/person")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/org"),      "proper_noun/org")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun"),          "proper_noun")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/te"),              "verb")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/ta"),              "verb")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/dict"),            "verb")
@@ -55,6 +58,7 @@ final class LLMPOSClassifierTests: XCTestCase {
     }
 
     func testCategoryFromTagJapanese() {
+        // 日本語応答は subcategory なしの proper_noun にフォールバック
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("固有名詞"),             "proper_noun")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("名詞"),                 "noun")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("動詞"),                 "verb")

@@ -21,7 +21,7 @@ final class ZenzaiViewController: NSViewController {
         super.viewDidLoad()
         let d = UserDefaults.standard
         let row1 = rowStack(label: "Zenzai を有効にする", control: enabledSwitch)
-        profileField.placeholderString = "例: 田中太郎/エンジニア"
+        profileField.placeholderString = "例: ITエンジニア,技術文書"
         profileField.stringValue = d.string(forKey: ZenzaiSettings.profileKey) ?? ""
         let row2 = rowStack(label: "プロフィール", control: profileField)
         limitStepper.minValue = 1

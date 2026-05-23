@@ -132,6 +132,17 @@ public final class DatabaseManager: @unchecked Sendable {
         // pos_raw から pos_tag へデータを移行（pos_raw は互換のため残す）
         sqlite3_exec(db, "UPDATE history SET pos_tag = pos_raw WHERE pos_tag IS NULL AND pos_raw IS NOT NULL", nil, nil, nil)
         sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_retry INTEGER NOT NULL DEFAULT 0", nil, nil, nil)
+        // pos_tag の subcategory を pos 列に反映（proper_noun → proper_noun/place|person|org）
+        sqlite3_exec(db, """
+            UPDATE history SET pos =
+                CASE
+                    WHEN pos_tag LIKE 'proper_noun/place%' THEN 'proper_noun/place'
+                    WHEN pos_tag LIKE 'proper_noun/person%' THEN 'proper_noun/person'
+                    WHEN pos_tag LIKE 'proper_noun/org%'    THEN 'proper_noun/org'
+                    ELSE pos
+                END
+            WHERE pos = 'proper_noun' AND pos_tag IS NOT NULL
+            """, nil, nil, nil)
     }
 
     private func seedHiraganaPreferredIfNeeded() {

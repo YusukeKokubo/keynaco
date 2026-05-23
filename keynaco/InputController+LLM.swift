@@ -32,12 +32,12 @@ extension InputController {
     }
 
     /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。名詞なら noun_bigram を記録する。
-    func schedulePOSClassification(output: String, reading: String) {
+    func schedulePOSClassification(output: String, reading: String, context: String? = nil) {
         let db = handler.db
         let prevNoun = handler.lastConfirmedNounOutput
-        Self.posClassifier.classify(output: output) { [weak self] classifiedOutput, pos, posTag, posRetry in
+        Self.posClassifier.classify(output: output, context: context) { [weak self] classifiedOutput, pos, posTag, posRetry in
             db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
-            if pos == "noun" || pos == "proper_noun" {
+            if pos == "noun" || pos.hasPrefix("proper_noun") {
                 if let prev = prevNoun {
                     db.recordNounBigram(prev: prev, input: reading, output: classifiedOutput)
                 }

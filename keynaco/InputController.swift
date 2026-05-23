@@ -198,7 +198,8 @@ class InputController: IMKInputController, @unchecked Sendable {
         if adapter.didInsertText {
             schedulePOSClassification(
                 output: adapter.lastInsertedText,
-                reading: handler.lastCommittedReading ?? ""
+                reading: handler.lastCommittedReading ?? "",
+                context: resolvedLLMDocumentContextPrefix(adapter: adapter)
             )
         }
 

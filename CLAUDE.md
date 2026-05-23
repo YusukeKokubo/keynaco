@@ -71,6 +71,21 @@ AzooKey（`AzooKeyKanaKanjiConverter`）が仮名漢字変換の中核エンジ�
 - LLM 機能（`LLMPOSClassifier`）は `FoundationModels` フレームワーク（Apple Intelligence）を使用。macOS 26 で Apple Intelligence が有効なデバイスでないと `SystemLanguageModel.default.availability` が `.unavailable` を返しスキップされる（IME 基本動作は継続）。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
 - **Apple Intelligence は必須前提**：noun_bigram の蓄積・POS 分類など学習機能のコアは Apple Intelligence に依存する設計。Apple Intelligence なし環境でのフォールバックは論点にしない。
 
+### Zenzai 制御パラメータ（zenz-v3 の条件付き変換）
+
+zenz-v3 は制御トークンを使って変換確率分布をバイアスする「条件付き変換モデル」。各パラメータは最大 25 文字で、キーワードを `,` 区切りで書くのが効率的。
+
+| パラメータ | 制御トークン | 役割 | 効果的な入力例 |
+|-----------|------------|------|--------------|
+| `profile` | `\u{EE03}` | 執筆者の属性 | `ITエンジニア,技術文書` |
+| `topic`   | `\u{EE04}` | 執筆内容・話題 | `料理,レシピ` |
+| `style`   | `\u{EE05}` | 文体・トーン | `ですます,箇条書き` |
+| `preference` | `\u{EE06}` | ユーザー固有の癖 | `旧字体優先` |
+
+- **効果が出やすい**: 専門職（`医師`・`弁護士`）、特定分野（`競馬`・`アニメ`）、文体（`SNS`・`2ch`）。同音異義語の選択が変わる
+- **効果が出にくい**: 個人名（`田中太郎`）、挨拶文、汎用的すぎる語（`普通の人`）
+- keynaco は現在 `profile` のみ UI に露出。`topic`/`style`/`preference` も AzooKey API で同等にサポートされており、UI 追加の価値がある
+
 ## テスト実行
 
 アプリ＋ IMK 関連テスト:

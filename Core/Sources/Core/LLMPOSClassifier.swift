@@ -13,8 +13,9 @@ public final class LLMPOSClassifier {
     public init() {}
 
     /// `output` の品詞を非同期に判定し、結果を `completion` に返す。
+    /// `context` は直前の確定済みテキスト（文脈）。渡すと固有名詞の subcategory 精度が上がる。
     /// 同じ output が並行して複数回呼ばれた場合は重複実行しない。
-    public func classify(output: String, completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void) {
+    public func classify(output: String, context: String? = nil, completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void) {
         guard case .available = SystemLanguageModel.default.availability else { return }
         guard !runningOutputs.contains(output) else { return }
         runningOutputs.insert(output)
@@ -49,10 +50,17 @@ public final class LLMPOSClassifier {
             """
         }
 
+        let prompt: String
+        if let ctx = context, !ctx.isEmpty {
+            prompt = "前文脈:「\(ctx)」\n「\(output)」の品詞タグを答えてください。"
+        } else {
+            prompt = "「\(output)」の品詞タグを答えてください。"
+        }
+
         Task { @MainActor [weak self, session] in
             defer { self?.runningOutputs.remove(output) }
             do {
-                let response = try await session.respond(to: "「\(output)」の品詞タグを答えてください。")
+                let response = try await session.respond(to: prompt)
                 let posTag = Self.normalizeTag(response.content)
                 let pos = Self.categoryFromTag(posTag)
                 let retry = Self.needsRetry(posTag: posTag)
@@ -96,13 +104,22 @@ public final class LLMPOSClassifier {
         return text
     }
 
-    /// `tag:confidence` または `tag` から category 部分を抽出し pos 値にマッピングする。
+    /// `tag:confidence` または `tag` から pos 値を返す。
+    /// proper_noun は subcategory（/place・/person・/org）まで保持して返す。
+    /// subcategory のない proper_noun は "proper_noun" のまま。
     static nonisolated func categoryFromTag(_ tag: String) -> String {
-        // :confidence を除いてカテゴリ判定
+        // :confidence を除く
         let tagOnly = tag.components(separatedBy: ":").first ?? tag
-        let category = tagOnly.components(separatedBy: "/").first ?? tagOnly
+        let parts = tagOnly.components(separatedBy: "/")
+        let category = parts.first ?? tagOnly
         switch category {
-        case "proper_noun":                          return "proper_noun"
+        case "proper_noun":
+            // proper_noun/place, proper_noun/person, proper_noun/org はそのまま保持
+            let known = ["place", "person", "org"]
+            if parts.count >= 2, known.contains(parts[1]) {
+                return "proper_noun/" + parts[1]
+            }
+            return "proper_noun"
         case "noun":                                 return "noun"
         case "verb":                                 return "verb"
         case "adjective":                            return "adjective"
