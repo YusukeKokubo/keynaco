@@ -81,7 +81,6 @@ public struct InputHandler {
     // 全InputControllerインスタンスで共有するモード（アプリ切替後も保持）
     public nonisolated(unsafe) static var isAsciiMode = false
 
-    public static let particles = ["が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も"]
     /// ひらがな優先語彙セット。DB から読み込み、設定変更時に再取得する。
     public var hiraganaPreferredSet: Set<String> = []
     public static let sentenceTerminators: Set<String> = ["。", "！", "？"]

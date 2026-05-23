@@ -83,7 +83,8 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         XCTAssertFalse(h.state.isSegmentMode)
         XCTAssertEqual(c.inserted.last, "漢字")
         _ = enterAction
-        XCTAssertTrue(h.isSuccessorMode, "「漢字」末尾は名詞扱いで格助詞フォールバック等で Successor に入るはず")
+        // bigram 学習なしのため Successor モードには入らない（noun-bigram あり時のみ起動する）
+        XCTAssertFalse(h.isSuccessorMode)
     }
 
     /// **S-04**: `t` Shift+`O` Shift+`K` `y` `o` Enter → `tOKyo`（シナリオ記載の混在大文字トレース）

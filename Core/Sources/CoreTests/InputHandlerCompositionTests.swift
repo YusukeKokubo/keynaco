@@ -67,10 +67,10 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         XCTAssertEqual(client.inserted, ["阿"])
         guard case .dismiss = result.candidateAction else {
-            XCTFail("確定直後は Successor も .dismiss（1打目まで遅延）: \(result.candidateAction)"); return
+            XCTFail("確定後は .dismiss を返すはず: \(result.candidateAction)"); return
         }
-        XCTAssertTrue(handler.isSuccessorMode)
-        XCTAssertFalse(handler.pendingSuccessorCandidates.isEmpty)
+        // bigram 学習なしのため Successor モードには入らない
+        XCTAssertFalse(handler.isSuccessorMode)
     }
 
     // MARK: - Escape でリセット

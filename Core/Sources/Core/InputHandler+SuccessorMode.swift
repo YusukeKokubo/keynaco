@@ -3,7 +3,7 @@ import AppKit
 // MARK: - Successor モード
 //
 // 確定直後に「次に来そうな語」を自動表示するモード。
-// noun-bigram の上位、必要なら格助詞 fallback を候補にする。
+// noun-bigram の上位を候補にする。
 
 public extension InputHandler {
 
@@ -34,12 +34,7 @@ public extension InputHandler {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             return .dismiss
         }
-        let predictTop = db.fetchNounBigramTop(prev: lastConfirmedNounOutput ?? last)
-        // 名詞末尾のとき限定で格助詞 fallback を tail に追加
-        let particlesFallback = isNounLike(last)
-            ? InputHandler.particles.filter { !Set(predictTop).contains($0) }
-            : []
-        let candidates = predictTop + particlesFallback
+        let candidates = db.fetchNounBigramTop(prev: lastConfirmedNounOutput ?? last)
 
         guard !candidates.isEmpty else {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
@@ -116,12 +111,6 @@ public extension InputHandler {
                     filtered = InputHandler.mergePendingSuccessorMatches(
                         dbOrdered: filtered, pending: pendingSuccessorCandidates, romajiKey: char
                     )
-                    let particleMatches = (InputHandler.particleRomajiMap[char] ?? [])
-                        .filter { pendingSuccessorCandidates.contains($0) }
-                    var particleSeen = Set(filtered)
-                    for p in particleMatches where particleSeen.insert(p).inserted {
-                        filtered.append(p)
-                    }
                     if !filtered.isEmpty {
                         pendingSuccessorCandidates = []
                         successorFirstChar = (keyCode: keyCode, characters: characters, baseCharacters: baseCharacters)
@@ -168,19 +157,6 @@ public extension InputHandler {
         "j": ["じ"],
         "c": ["か", "き", "く", "け", "こ", "ち"],
         "v": ["ヴ", "ゔ"],
-    ]
-
-    /// 頭文字（ローマ字1文字）→ 格助詞リスト（複数ある場合は使用頻度の高い順）
-    static let particleRomajiMap: [String: [String]] = [
-        "g": ["が"],
-        "w": ["を"],
-        "n": ["に", "の"],
-        "d": ["で"],
-        "h": ["は", "へ"],
-        "t": ["と"],
-        "k": ["から"],
-        "m": ["も", "まで"],
-        "y": ["より"],
     ]
 
     /// 漢字またはカタカナで終わる語（名詞らしい）かどうか
