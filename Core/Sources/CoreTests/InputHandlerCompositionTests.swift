@@ -69,8 +69,8 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         guard case .dismiss = result.candidateAction else {
             XCTFail("確定後は .dismiss を返すはず: \(result.candidateAction)"); return
         }
-        // bigram 学習なしのため Successor モードには入らない
-        XCTAssertFalse(handler.isSuccessorMode)
+        // isNounLike（阿 = 漢字）なので bigram なしでも Successor モードに入る
+        XCTAssertTrue(handler.isSuccessorMode)
     }
 
     // MARK: - Escape でリセット

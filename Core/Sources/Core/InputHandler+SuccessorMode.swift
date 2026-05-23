@@ -3,7 +3,7 @@ import AppKit
 // MARK: - Successor モード
 //
 // 確定直後に「次に来そうな語」を自動表示するモード。
-// noun-bigram の上位を候補にする。
+// noun-bigram の上位 + 履歴前方一致を候補にする。
 
 public extension InputHandler {
 
@@ -34,16 +34,11 @@ public extension InputHandler {
             isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
             return .dismiss
         }
-        let candidates = db.fetchNounBigramTop(prev: lastConfirmedNounOutput ?? last)
-
-        guard !candidates.isEmpty else {
-            isSuccessorMode = false; successorFirstChar = nil; pendingSuccessorCandidates = []
-            return .dismiss
-        }
+        let nounBigrams = db.fetchNounBigramTop(prev: lastConfirmedNounOutput ?? last)
 
         isSuccessorMode = true
         successorFirstChar = nil
-        pendingSuccessorCandidates = candidates
+        pendingSuccessorCandidates = nounBigrams
         return .dismiss
     }
 
@@ -96,7 +91,7 @@ public extension InputHandler {
             return (true, .dismiss)
         default:
             let first = successorFirstChar
-            if !pendingSuccessorCandidates.isEmpty, first == nil {
+            if first == nil {
                 let char = (baseCharacters ?? characters ?? "").lowercased()
                 if char.count == 1, let c = char.first, c.isLetter, c.isASCII,
                    let last = lastCommittedOutput {
@@ -107,6 +102,8 @@ public extension InputHandler {
                     for kana in kanas {
                         let fromNoun = db.fetchNounBigram(prev: nounPrev, reading: kana)
                         for s in fromNoun where filteredSeen.insert(s).inserted { filtered.append(s) }
+                        let fromHistory = db.fetchHistoryPrefix(reading: kana)
+                        for s in fromHistory where filteredSeen.insert(s).inserted { filtered.append(s) }
                     }
                     filtered = InputHandler.mergePendingSuccessorMatches(
                         dbOrdered: filtered, pending: pendingSuccessorCandidates, romajiKey: char

@@ -64,11 +64,11 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "q", "通常の組成が始まるはず")
     }
 
-    func testSuccessorModeNotActivatedWithoutBigramData() {
+    func testSuccessorModeActivatesEvenWithoutBigramData() {
         typeRomaji("tokyo")
         let result = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
-        // bigram 学習ゼロ → Successor モードにならない
-        XCTAssertFalse(handler.isSuccessorMode, "bigram なし → Successor モードにならないはず")
+        // noun-bigram ゼロでも isNounLike なら Successor モードに入る（履歴で補完するため）
+        XCTAssertTrue(handler.isSuccessorMode, "isNounLike → bigram なしでも Successor モードになるはず")
         guard case .dismiss = result.candidateAction else {
             XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
         }
@@ -300,11 +300,11 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         }
     }
 
-    func testSuccessorModeNotActivatedWhenNounEndButNoBigram() {
-        // 漢字末尾でも noun-bigram ゼロなら Successor モードは起動しない
+    func testSuccessorModeNotActivatedAfterHiraganaEndNoBigram() {
+        // ひらがな末尾（た）は isNounLike 偽 → bigram なしなら Successor モードに入らない
         typeRomaji("ta")
         let result = press(keyCode: 36)
-        XCTAssertFalse(handler.isSuccessorMode, "noun-bigram なし → Successor モードは起動しない")
+        XCTAssertFalse(handler.isSuccessorMode, "ひらがな末尾 → Successor モードにならないはず")
         guard case .dismiss = result.candidateAction else {
             XCTFail(".dismiss を返すはず: \(result.candidateAction)"); return
         }
