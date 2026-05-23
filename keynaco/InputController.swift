@@ -148,7 +148,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             }
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
             if handler.isSuccessorMode {
-                // 格助詞を選択候補としてマークドテキストに設定する。
+                // Successor 候補表示時は選択候補を marked text に設定する。
                 // 空文字ではなく実際のテキストを持つことで Electron 系アプリが Enter を IME に転送するようになる。
                 let markedText = candidates.isEmpty ? "" : candidates[min(initialRow, candidates.count - 1)]
                 adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))

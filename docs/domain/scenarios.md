@@ -53,14 +53,14 @@
 
 ---
 
-## S-03: Successor モードの 1 打目（保留 + 読み／格助詞マージ）
+## S-03: Successor モードの 1 打目（保留 + 読みマージ）
 
-**前提**: `東京` を確定した直後（末尾カタカナ → `isNounLike` 真 → noun-bigram 候補 + 格助詞 fallback を **`pendingSuccessorCandidates` に保存し `.dismiss`**）
+**前提**: `東京` を確定した直後（末尾カタカナ → `isNounLike` 真）。noun-bigram `(東京, が)` を学習済み。`pendingSuccessorCandidates` に noun-bigram を保存し `.dismiss`。
 
 | ステップ | キー | successorFirstChar | 動作 |
 |---------|------|--------------------|------|
 | 0 | — | — | 確定直後はウィンドウを出さず Successor モードのみ |
-| 1 | `g` | `g` | `particleRomajiMap["g"]` と DB 併合で候補を「が」に絞り込み |
+| 1 | `g` | `g` | `romajiToInitialKana["g"]` で noun-bigram 再照会＋ pending merge → 候補を「が」に絞り込み |
 | 2a | Space | — | 絞り込み中の先頭候補「が」を確定 → noun-bigram があれば Successor 継続、なければ待機 |
 | 2b | `z` | — | `g` を通常入力として流す（`g` → pendingRomaji）、モード解除 |
 
@@ -96,9 +96,23 @@
 | 1c | マッチしないキー | 待機 | — | 一致候補なし → モード解除→通常入力 |
 
 `isNounLike` が偽（ひらがな末尾）なら noun-bigram があっても Successor モードには入らない。  
-名詞末尾で noun-bigram が空でも、格助詞 fallback は **`pendingSuccessorCandidates` に積まれ**、1打目で表示する。
+名詞末尾で noun-bigram が空でも isNounLike なら Successor モードに入る。1 打目で `fetchHistoryPrefix` が履歴から候補を補完する。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
+
+---
+
+## S-03d: Successor 履歴前方一致（noun-bigram 空）
+
+**前提**: 「東京タワー」を複数回確定すると `recordPrefixes` により `たわー` → `タワー` 等の前方一致エントリが履歴に蓄積される。noun-bigram `(東京, タワー)` は未学習。
+
+| ステップ | キー | 状態 | candidates | 動作 |
+|---------|------|------|-----------|------|
+| 0 | — | Successor モード | 保存（空） | noun-bigram なし → 確定直後は `.dismiss` |
+| 1 | `t` | Successor モード | `["タワー", ...]` | 1打目 `fetchHistoryPrefix("た")` で履歴から「タワー」を表示 |
+| 2 | Enter | 待機 | — | 「タワー」確定 |
+
+*Tests: sandbox 回帰（`seed_history input=たわー output=タワー` + `toukyou` Space Enter → `t`）*
 
 ---
 

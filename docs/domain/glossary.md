@@ -60,11 +60,8 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 
 *Tests: `Tests/InputHandlerCandidatesTests.swift`*
 
-### particles
-格助詞の固定リスト（`InputHandler.particles`）。Successor モードの名詞末尾 fallback 等に使用する。
-
 ### hiraganaPreferred
-ひらがな表記が自然な語彙の集合。`particles` の上位集合。  
+ひらがな表記が自然な語彙の集合（DB `hiragana_preferred` テーブルから読み込み）。  
 **役割**: この集合に含まれる読みのとき、履歴スコア・予測候補の有無に関わらず `initialRow` をひらがな行にする（`assembleCandidateList`）。
 
 *Tests: `Core/Sources/CoreTests/InputHandlerCandidatesTests.swift`*
@@ -101,14 +98,14 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 ### isSuccessorMode
 確定直後に学習済みの後続語候補を `pendingSuccessorCandidates` に保持し、ユーザーの 1 打目で候補ウィンドウを開く状態。  
 **起動条件**: 漢字・カタカナ末尾（`isNounLike` 真）のときのみ起動。ひらがな末尾（動詞・助詞・副詞等）の後は bi-gram があっても起動しない。  
-noun-bigram で候補を取得し、格助詞リストを fallback として末尾に並べる。  
+noun-bigram で候補を取得する。1 打目では noun-bigram 再照会に加え `fetchHistoryPrefix` も参照する。  
 確定後は次の候補があれば連鎖表示を継続する（ただし確定語が名詞末尾の場合のみ）。
 
 *Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
 ### pendingSuccessorCandidates
-Successor モードで候補を 1 打目まで遅延表示するためのバッファ（N-gram 予測語と格助詞 fallback）。  
-1 打目でかな先頭一致フィルタを行い一致候補を表示。2 打目以降の絞り込みは行わない（不一致時は 1 打目を通常入力に流してモード解除）。`isSuccessorMode = false` になるすべての経路でクリアされる。
+Successor モードで候補を 1 打目まで遅延表示するためのバッファ（noun-bigram 予測語）。  
+1 打目でかな先頭一致フィルタを行い一致候補を表示（noun-bigram 再照会 + `fetchHistoryPrefix` + pending merge）。2 打目以降の絞り込みは行わない（不一致時は 1 打目を通常入力に流してモード解除）。`isSuccessorMode = false` になるすべての経路でクリアされる。
 
 ### successorFirstChar
 Successor モード中の 1 打目をバッファリングするフィールド。2 打目がマッチしなければ 1 打目を通常入力として流してからモード解除する。
@@ -118,7 +115,7 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 ## 学習・履歴
 
 ### lastCommittedOutput
-直前に確定した変換結果（`committedHistory.last`）。Successor の格助詞 fallback 判定等に使う。
+直前に確定した変換結果（`committedHistory.last`）。Successor の 1 打目 DB 照会等に使う。
 
 ### lastConfirmedContext
 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。  
