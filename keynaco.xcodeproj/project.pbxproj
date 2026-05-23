@@ -39,6 +39,7 @@
 		E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A755C9097E561BF05FF3D11 /* InputController.swift */; };
 		7C3D2E1F4051627384A5B6C7 /* InputController+LLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* InputController+VirtualContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* InputController+VirtualContext.swift */; };
+		E5F60718293A4B5C6D7E8F09 /* InputController+IMKAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */; };
 		B2C3D4E5F60718293A4B5C6D /* VirtualHistorySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C6E /* VirtualHistorySettings.swift */; };
 		F7C6F412438DD4540CD3E396 /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */; };
 /* End PBXBuildFile section */
@@ -62,6 +63,7 @@
 		3A755C9097E561BF05FF3D11 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+LLM.swift"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* InputController+VirtualContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+VirtualContext.swift"; sourceTree = "<group>"; };
+		E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+IMKAdapter.swift"; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6E /* VirtualHistorySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtualHistorySettings.swift; sourceTree = "<group>"; };
 		4318ADEBBCDD0DFDD3DA6056 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		443A77590841CE5845242FCF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -129,6 +131,7 @@
 				AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */,
 				022B67AD4C0C026C0F7A0564 /* Info.plist */,
 				3A755C9097E561BF05FF3D11 /* InputController.swift */,
+				E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */,
 				8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */,
 				A1B2C3D4E5F60718293A4B5D /* InputController+VirtualContext.swift */,
 				7D792FEB7E1E5625244BE8C4 /* InputSource.tiff */,
@@ -350,6 +353,7 @@
 				26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */,
 				9D8C79D665B585F63D5695FF /* IMESandboxWindow.swift in Sources */,
 				E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */,
+				E5F60718293A4B5C6D7E8F09 /* InputController+IMKAdapter.swift in Sources */,
 				7C3D2E1F4051627384A5B6C7 /* InputController+LLM.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* InputController+VirtualContext.swift in Sources */,
 				9F5BA854FBF7AFBCE8215977 /* NSManualApplication.swift in Sources */,
