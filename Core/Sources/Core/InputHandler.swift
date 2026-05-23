@@ -129,33 +129,6 @@ public struct InputHandler {
         if committedHistory.count > 5 { committedHistory.removeFirst() }
     }
 
-    public func mostRecentContentWord() -> String? {
-        mostRecentContentWords(n: 1).first
-    }
-
-    public func mostRecentContentWords(n: Int) -> [String] {
-        var result: [String] = []
-        for i in stride(from: committedHistory.count - 1, through: 0, by: -1) {
-            if !InputHandler.particles.contains(committedHistory[i]) {
-                result.append(committedHistory[i])
-                if result.count >= n { break }
-            }
-        }
-        return result
-    }
-
-    /// 学習用: `committedHistory` のみから content word を収集。
-    func committedContentWords(n: Int) -> [String] {
-        guard committedHistory.count >= 2 else { return [] }
-        var result: [String] = []
-        for i in stride(from: committedHistory.count - 2, through: 0, by: -1) {
-            if !InputHandler.particles.contains(committedHistory[i]) {
-                result.append(committedHistory[i])
-                if result.count >= n { break }
-            }
-        }
-        return result
-    }
     public let db: DatabaseManager
     public var azooKeyConverter: any AzooKeyConverting
 

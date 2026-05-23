@@ -245,7 +245,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(handler.committedHistory.isEmpty, "ASCII モード中の Enter で committedHistory がクリアされるはず")
     }
 
-    // MARK: - committedHistory / content word（旧 SkipBigramTests より移設）
+    // MARK: - committedHistory（旧 SkipBigramTests より移設）
 
     func testCommittedHistoryCapAt5() {
         for i in 0..<6 {
@@ -256,60 +256,10 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertEqual(handler.committedHistory.count, 5)
     }
 
-    func testMostRecentContentWordSkipsParticle() {
-        handler.commitText(text: "今日", client: client)
-        handler.commitText(text: "を", client: client)
-        XCTAssertEqual(handler.mostRecentContentWord(), "今日")
-    }
-
-    func testMostRecentContentWordNilWhenAllParticles() {
-        handler.commitText(text: "を", client: client)
-        handler.commitText(text: "に", client: client)
-        XCTAssertNil(handler.mostRecentContentWord())
-    }
-
-    func testMostRecentContentWordReturnsWordWhenHistoryTooShort() {
-        handler.commitText(text: "今日", client: client)
-        XCTAssertEqual(handler.mostRecentContentWord(), "今日")
-    }
-
-    func testMostRecentContentWordsReturnsOneWhenHistoryTooShort() {
-        handler.commitText(text: "今日", client: client)
-        XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["今日"])
-    }
-
-    func testMostRecentContentWordsN1MatchesMostRecentContentWord() {
-        handler.commitText(text: "今日", client: client)
-        handler.commitText(text: "を", client: client)
-        XCTAssertEqual(handler.mostRecentContentWords(n: 1).first, handler.mostRecentContentWord())
-    }
-
-    func testMostRecentContentWordsN2SkipsConsecutiveParticles() {
-        handler.commitText(text: "今日", client: client)
-        handler.commitText(text: "を", client: client)
-        handler.commitText(text: "駅", client: client)
-        handler.commitText(text: "へ", client: client)
-        XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["駅", "今日"])
-    }
-
-    func testMostRecentContentWordsN2ReturnsOneWhenOnlyOneContentWord() {
-        handler.commitText(text: "今日", client: client)
-        handler.commitText(text: "を", client: client)
-        XCTAssertEqual(handler.mostRecentContentWords(n: 2), ["今日"])
-    }
-
     func testSentenceTerminatorClearsHistory() {
         handler.commitText(text: "日本語", client: client)
         handler.commitText(text: "。", client: client)
         XCTAssertTrue(handler.committedHistory.isEmpty)
-    }
-
-    func testMostRecentContentWordNilAfterSentenceBreak() {
-        handler.commitText(text: "今日", client: client)
-        handler.commitText(text: "を", client: client)
-        handler.commitText(text: "。", client: client)
-        XCTAssertTrue(handler.committedHistory.isEmpty)
-        XCTAssertNil(handler.mostRecentContentWord())
     }
 
     func testSentenceTerminatorClearsCommittedOutputs() {
