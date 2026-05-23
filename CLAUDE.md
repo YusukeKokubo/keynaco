@@ -42,6 +42,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
 | `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
+| `generate_preset_bigram_csv.py` | プリセット bigram データを CSV 生成するスクリプト |
 
 ### 起動チェーン（IMK ブートストラップ）
 
@@ -93,6 +94,7 @@ cd Core && swift test
 - XCUITest / CGEvent は不採用（`typeText()` は IME をバイパス。CGEvent は Accessibility 権限依存で CI 不安定）
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
 - `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト。`docs/domain/scenarios.md` と対応
+- **E2E 動作確認**: 状態（Successor・Segment・Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）
 
 ## キー入力の挙動（特殊ケース）
 
