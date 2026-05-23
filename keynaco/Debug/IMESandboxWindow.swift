@@ -41,6 +41,22 @@ private struct LogEntry {
     }
 }
 
+// MARK: - SandboxLineRowView
+
+/// 現在入力中の行を背景色で示す。`backgroundColor` だけでは描画されないため `drawBackground` を使う。
+private final class SandboxLineRowView: NSTableRowView {
+    var isCurrentLine = false {
+        didSet { needsDisplay = true }
+    }
+
+    override func drawBackground(in dirtyRect: NSRect) {
+        super.drawBackground(in: dirtyRect)
+        guard isCurrentLine, !isSelected else { return }
+        NSColor.selectedContentBackgroundColor.withAlphaComponent(0.15).setFill()
+        bounds.fill()
+    }
+}
+
 // MARK: - SandboxInputField
 
 /// 不可視の入力フィールド。Enter で行を区切る。
@@ -244,12 +260,22 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
 
     // MARK: - データ操作
 
+    private func refreshCurrentLineHighlight() {
+        for row in 0..<lineTableView.numberOfRows {
+            guard let rowView = lineTableView.rowView(atRow: row, makeIfNecessary: false) as? SandboxLineRowView else {
+                continue
+            }
+            rowView.isCurrentLine = (row == currentLineIndex)
+        }
+    }
+
     func finishCurrentLine() {
         let nextIndex = lines.count
         lines.append(SandboxLine(index: nextIndex, committedSegments: [], events: []))
         currentLineIndex = nextIndex
         lineTableView.reloadData()
         selectLine(nextIndex)
+        refreshCurrentLineHighlight()
         reloadEventTable()
     }
 
@@ -296,6 +322,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lastSnapshot = nil
         lineTableView.reloadData()
         selectLine(0)
+        refreshCurrentLineHighlight()
         reloadEventTable()
         detailTextView.string = ""
     }
@@ -569,11 +596,13 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
 
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
         guard tableView === lineTableView else { return nil }
-        let rowView = NSTableRowView()
-        if row == currentLineIndex {
-            rowView.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.15)
-        }
-        return rowView
+        return SandboxLineRowView()
+    }
+
+    func tableView(_ tableView: NSTableView, didAdd rowView: NSTableRowView, forRow row: Int) {
+        guard tableView === lineTableView,
+              let rowView = rowView as? SandboxLineRowView else { return }
+        rowView.isCurrentLine = (row == currentLineIndex)
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
