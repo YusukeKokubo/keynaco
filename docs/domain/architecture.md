@@ -32,19 +32,19 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 関連変数: `isSuccessorMode` / `successorFirstChar` / `pendingSuccessorCandidates`
 
-確定直後に `suggestSuccessors()` が後続語候補を準備する。候補は以下の順：
+語を確定した直後、次に来そうな語を予測して候補ウィンドウを出す。確定直後はウィンドウを出さず、1打目が入力された時点で読みが一致する候補だけを絞って表示する（最大 5 件）。1打目がどの候補にも一致しなければモードを解除して通常入力に流す。
 
-1. `db.fetchNounBigramTop(prev: lastConfirmedNounOutput ?? last)` の上位（名詞→名詞ペア）
-2. `isNounLike(last)` が真のときのみ、格助詞固定リスト（`InputHandler.particles`）を tail に fallback として並べる
+**候補の優先順位**（読み前方一致で絞ったうえで）：
 
-**起動条件**: `isNounLike(last)` が偽（ひらがな末尾の動詞・助詞・副詞等）のときは noun-bigram があっても即 `.dismiss` を返しモードには入らない。名詞末尾でも noun-bigram・格助詞 fallback がともに空なら `.dismiss`。**カーソルが文末でない（文中挿入）場合も `.dismiss`。**
+1. noun-bigram（直前確定語との共起実績が高い名詞）
+2. 変換履歴（読み前方一致）
+3. 確定直後に先読みした noun-bigram（1打目入力時に再クエリできなかった分を補完）
 
-**N-gram 候補の遅延表示と読みフィルタ**: 後続候補がある場合、`suggestSuccessors()` は常に `pendingSuccessorCandidates` に保存して `.dismiss` を返す（確定直後はウィンドウを出さない。1打目待ち）。1打目が入力されたとき、`romajiToInitialKana` でそのキーの読み先頭候補かなを取得し、DB を再クエリした候補に、同じ読み条件で `pendingSuccessorCandidates` を `mergePendingSuccessorMatches` し、さらに **`particleRomajiMap`** で当たる保留内の格助詞を追加して `.show` する（最大 5 件。いずれにも一致しなければモード解除）。
+**起動条件**: 直前確定語が名詞系（`isNounLike`）でない場合はモードに入らない。名詞系でも候補がまったく得られない場合、またはカーソルが文末でない（文中挿入）場合も起動しない。
 
-- `successorFirstChar`: 頭文字 1 打目のバッファリング。1打目不一致時に通常入力へ流すために使用する。
-- Successor モード中は `setMarkedText` に実テキストを渡す。空文字だと Electron 系アプリが Enter を IME に転送せずアプリ側で処理してしまうため。
-- 候補確定後は `suggestSuccessors()` を再呼び出しし、確定語が `isNounLike` かつ次の noun-bigram 候補があれば連鎖表示を継続する。格助詞（ひらがな末尾）確定後はチェーンしない。
-- Successor モード中に右矢印（→）を押すとモードをキャンセルし、通常の組成に戻る。
+- 候補を選んで確定すると、その語が名詞系であれば連鎖してモードを継続する。名詞以外（格助詞等）の確定後は連鎖しない。
+- 右矢印（→）でモードをキャンセルし通常の組成に戻る。
+- 候補選択中は marked text に実テキストを設定する（空文字だと Electron 系アプリが Enter を IME に転送しないため）。
 - 最大候補数: `successorMaxCandidates = 5`（`LearningThresholds`）。
 
 ## 候補表示の優先順位
