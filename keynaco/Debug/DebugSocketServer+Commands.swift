@@ -469,10 +469,6 @@ extension DebugSocketServer {
 
     let composingTextWasEmpty = handler.state.composingText.isEmpty
     handler.leftSideContext = debugLeftContextPrefix()
-    // virtualHistoryPrefix は handler.handle 前にセット（buildPendingCandidateList が参照するため）。
-    if composingTextWasEmpty {
-    handler.virtualHistoryPrefix = VirtualHistoryExtractor.extract(from: mockClient.documentBefore)
-    }
     let before = makeResponse(inserted: [])
     let (_, action) = handler.handle(
     keyCode: keyCode,
@@ -483,10 +479,6 @@ extension DebugSocketServer {
     client: mockClient
     )
     candidateWindow.apply(action: action)
-    // composingText が空に戻ったらクリア
-    if handler.state.composingText.isEmpty {
-    handler.virtualHistoryPrefix = []
-    }
     // Successor 抑制: documentAfter が非空（文中挿入）のとき候補を出さない
     if handler.isSuccessorMode,
        let ctx = SurroundingIMKContext.fetch(from: mockClient),

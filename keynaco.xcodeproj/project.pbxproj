@@ -39,7 +39,6 @@
 		E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A755C9097E561BF05FF3D11 /* InputController.swift */; };
 		7C3D2E1F4051627384A5B6C7 /* InputController+LLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */; };
 		E5F60718293A4B5C6D7E8F09 /* InputController+IMKAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */; };
-		B2C3D4E5F60718293A4B5C6D /* VirtualHistorySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C6E /* VirtualHistorySettings.swift */; };
 		F7C6F412438DD4540CD3E396 /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */; };
 /* End PBXBuildFile section */
 
@@ -62,7 +61,6 @@
 		3A755C9097E561BF05FF3D11 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+LLM.swift"; sourceTree = "<group>"; };
 		E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+IMKAdapter.swift"; sourceTree = "<group>"; };
-		B2C3D4E5F60718293A4B5C6E /* VirtualHistorySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtualHistorySettings.swift; sourceTree = "<group>"; };
 		4318ADEBBCDD0DFDD3DA6056 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		443A77590841CE5845242FCF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		65C24D0073941540F51238C4 /* DebugSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSocketServer.swift; sourceTree = "<group>"; };
@@ -162,7 +160,6 @@
 			FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */,
 				184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */,
 				EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */,
-				B2C3D4E5F60718293A4B5C6E /* VirtualHistorySettings.swift */,
 				7C150B0401BC4C609E82079A /* ZenzaiSettings.swift */,
 				9CD4B32B2C294E56820A1632 /* ZenzaiViewController.swift */,
 			);
@@ -356,7 +353,6 @@
 				6341605E1C0AA49D7B745FD7 /* SettingsWindowController.swift in Sources */,
 				6827E18A7E43145D7F763817 /* SurroundingIMKContext.swift in Sources */,
 				CC81B691B4422E5779491EE0 /* UserDictViewController.swift in Sources */,
-				B2C3D4E5F60718293A4B5C6D /* VirtualHistorySettings.swift in Sources */,
 				8A9990EB76F54E21875AA952 /* ZenzaiSettings.swift in Sources */,
 				67352544F047475D84590AFE /* ZenzaiViewController.swift in Sources */,
 				CF5D2357CC1B6C7209F9918F /* main.swift in Sources */,

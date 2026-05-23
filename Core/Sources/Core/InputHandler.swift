@@ -112,12 +112,10 @@ public struct InputHandler {
     /// Zenzai がプロモートした候補の行インデックス。文脈なし・Zenzai 無効時は `nil`。
     public var lastZenzaiRow: Int? = nil
     public var committedHistory: [String] = []
-    /// IMK before 末尾から抽出した仮想末尾語列（最大2語、古→新）。学習経路には流さない。
-    public var virtualHistoryPrefix: [String] = []
     /// `pushCommitted` で文末記号により `committedHistory` を消した直後に立て、`InputController` が IMK 文脈キャッシュを捨てる。
     public var documentSurroundingContextInvalidated = false
     public var lastCommittedOutput: String? {
-        committedHistory.last ?? virtualHistoryPrefix.last
+        committedHistory.last
     }
     public var segmentCandidateCache: [String: Segment] = [:]
     public mutating func pushCommitted(_ text: String) {
@@ -136,20 +134,17 @@ public struct InputHandler {
     }
 
     public func mostRecentContentWords(n: Int) -> [String] {
-        let combined = committedHistory.count >= 2
-            ? committedHistory
-            : virtualHistoryPrefix + committedHistory
         var result: [String] = []
-        for i in stride(from: combined.count - 1, through: 0, by: -1) {
-            if !InputHandler.particles.contains(combined[i]) {
-                result.append(combined[i])
+        for i in stride(from: committedHistory.count - 1, through: 0, by: -1) {
+            if !InputHandler.particles.contains(committedHistory[i]) {
+                result.append(committedHistory[i])
                 if result.count >= n { break }
             }
         }
         return result
     }
 
-    /// 学習用: `committedHistory` のみから content word を収集（virtual は含めない）。
+    /// 学習用: `committedHistory` のみから content word を収集。
     func committedContentWords(n: Int) -> [String] {
         guard committedHistory.count >= 2 else { return [] }
         var result: [String] = []

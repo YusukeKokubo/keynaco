@@ -70,7 +70,7 @@ Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（`fixedCount <= ro
 
 | タイミング | 例 | 理由 |
 |------|----|----|
-| **handle の前** | `leftSideContext` / `virtualHistoryPrefix` | `handle` 内（`buildCandidateList` 等）から読まれる |
+| **handle の前** | `leftSideContext` | `handle` 内（`buildCandidateList` 等）から読まれる |
 | **handle の後**（`applyPostKeyDownEffects`） | `cachedSurroundingContext` 更新・候補ウィンドウ更新 | 次キー以降のための準備 |
 
 **判定基準**: そのフィールドが現在のキー処理中に参照されるなら pre、次以降のキー処理 or 非同期コールバックでのみ参照されるなら post。post に置くと「1 キーストローク遅延」バグになる。

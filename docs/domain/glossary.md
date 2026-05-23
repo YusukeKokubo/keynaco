@@ -124,12 +124,7 @@ Successor モード中の 1 打目をバッファリングするフィールド�
 ## 学習・履歴
 
 ### lastCommittedOutput
-直前に確定した変換結果（`committedHistory.last`）。Successor の格助詞 fallback 判定等に使う。  
-`committedHistory` が空のときは `virtualHistoryPrefix.last` でフォールバックする（**予測のみ**。学習は `committedHistory` 直参照）。
-
-### virtualHistoryPrefix
-IMK `before` テキスト末尾から抽出した仮想末尾語列（最大 2 語、古→新）。組成開始時に `InputController` がセットする。  
-**不変条件**: `pushCommitted` には流さない。`UserDefaults` の `virtualHistoryEnabled`（デフォルト true）で無効化可能。
+直前に確定した変換結果（`committedHistory.last`）。Successor の格助詞 fallback 判定等に使う。
 
 ### lastConfirmedContext
 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。  

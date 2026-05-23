@@ -703,7 +703,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             "fixedEnd":            s.fixedEnd,
             "candidates":          s.candidates,
             "committedHistory":    s.committedHistory,
-            "virtualHistoryPrefix": s.virtualHistoryPrefix,
             "segmentTexts":        s.segmentTexts,
             "focusedSegmentIndex": s.focusedSegmentIndex,
         ]
@@ -751,7 +750,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("")
         lines.append("【確定履歴】")
         lines.append("committedHistory     : \(s.committedHistory)")
-        lines.append("virtualHistoryPrefix : \(s.virtualHistoryPrefix)")
         if s.isSegmentMode {
             lines.append("")
             lines.append("【セグメント】")

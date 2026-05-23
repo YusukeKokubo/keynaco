@@ -1059,7 +1059,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "fixedEnd":           snap.fixedEnd,
             "candidates":         snap.candidates,
             "committedHistory":   snap.committedHistory,
-            "virtualHistoryPrefix": snap.virtualHistoryPrefix,
             "segmentTexts":       snap.segmentTexts,
             "focusedSegmentIndex": snap.focusedSegmentIndex,
             "isZenzaiEnabled":    handler.azooKeyConverter.isZenzaiEnabled,

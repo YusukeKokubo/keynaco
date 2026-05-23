@@ -140,7 +140,7 @@ stateDiagram-v2
 
 - **Successor の再帰防止**: 格助詞チェックは廃止。候補が空なら自然に `.dismiss` になるため、無限ループは起きない
 - **Successor の文中挿入抑制**: カーソルが文末でない（文中挿入モード）場合、`suggestSuccessors()` は Successor モードに入らず `.dismiss` を返す
-- **候補取得**: `lastConfirmedNounOutput`（なければ `lastCommittedOutput`）で noun-bigram を引く。`committedHistory` が空のときは IMK `before` 由来の `virtualHistoryPrefix` で `lastCommittedOutput` を補完する（学習経路は対象外）
+- **候補取得**: `lastConfirmedNounOutput`（なければ `lastCommittedOutput`）で noun-bigram を引く。`committedHistory` が空のときは prev なし
 - **fallback の条件**: `isNounLike(last)` が真のとき限定で、予測候補の後ろに格助詞固定リストを並べる
 - **N-gram 遅延表示**: 確定直後は常に候補ウィンドウを閉じ 1 打目待ち。1 打目でかな先頭一致で DB を再照会し、`pendingSuccessorCandidates` 内の語を併合して表示する
 - **Electron 対策**: 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）

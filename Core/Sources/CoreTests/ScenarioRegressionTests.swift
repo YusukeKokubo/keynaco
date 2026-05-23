@@ -98,13 +98,10 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         XCTAssertEqual(client.inserted, ["tOKyo"])
     }
 
-    /// **S-02**（参照）: `ka` の候補が開いている状態で ↓↓→ はひらがな「か」を確定。
-    /// 詳細は `InputHandlerCandidatesTests.testRightArrowDuringCandidateCommitsHiragana` と同等。
-    /// アプリ切替相当: `committedHistory` 空 + IMK before 由来の virtual で N-gram 予測が立つ
-    func testVirtualContext_successorFromDocumentPrefix() {
+    /// セッション内 `committedHistory` から Successor が起動する
+    func testCommittedHistory_successorFromSession() {
         var h = handler!
-        h.committedHistory = []
-        h.virtualHistoryPrefix = ["東京"]
+        h.committedHistory = ["東京"]
         h.db.recordNounBigram(prev: "東京", input: "に", output: "に")
         h.lastConfirmedNounOutput = "東京"
         _ = h.suggestSuccessors()
