@@ -39,9 +39,9 @@ public final class LLMPOSClassifier {
 
     static func parsePOS(from response: LanguageModelSession.Response<String>) -> String {
         let text = response.content.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if text.hasPrefix("noun") { return "noun" }
-        if text.hasPrefix("verb") { return "verb" }
-        if text.hasPrefix("adjective") { return "adjective" }
+        if text.hasPrefix("noun") || text.hasPrefix("名詞") { return "noun" }
+        if text.hasPrefix("verb") || text.hasPrefix("動詞") { return "verb" }
+        if text.hasPrefix("adjective") || text.hasPrefix("形容詞") || text.hasPrefix("副詞") { return "adjective" }
         return "other"
     }
 }
