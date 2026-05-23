@@ -101,11 +101,6 @@ public final class DatabaseManager: @unchecked Sendable {
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_user_dict ON user_dict(input);
-        CREATE TABLE IF NOT EXISTS boundary_pref (
-            full_reading  TEXT NOT NULL PRIMARY KEY,
-            boundaries    TEXT NOT NULL,
-            used_at       INTEGER NOT NULL
-        );
         CREATE TABLE IF NOT EXISTS hiragana_preferred (
             word TEXT NOT NULL PRIMARY KEY
         );
@@ -119,7 +114,7 @@ public final class DatabaseManager: @unchecked Sendable {
 
     /// 廃止した bigram / trigram / skip_bigram テーブルを既存 DB から削除する。
     private func dropDeprecatedNgramTables() {
-        for table in ["skip_bigram", "trigram", "bigram"] {
+        for table in ["skip_bigram", "trigram", "bigram", "boundary_pref"] {
             sqlite3_exec(db, "DROP TABLE IF EXISTS \(table)", nil, nil, nil)
         }
     }
@@ -228,7 +223,7 @@ public final class DatabaseManager: @unchecked Sendable {
         public let output: String
     }
 
-    /// 確定直後 Backspace（誤変換訂正）で history / boundary_pref を一括ペナルティする。
+    /// 確定直後 Backspace（誤変換訂正）で history をペナルティする。
     func penalizeAll(
         input: String,
         output: String,
@@ -241,11 +236,6 @@ public final class DatabaseManager: @unchecked Sendable {
             }
             self.executeOnQueue("DELETE FROM history WHERE input = ? AND output = ? AND count <= 0") {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
-            }
-            if let fr = fullReading {
-                self.executeOnQueue("DELETE FROM boundary_pref WHERE full_reading = ?") {
-                    self.bindText($0, 1, fr)
-                }
             }
             self.executeOnQueue("COMMIT")
         }
@@ -267,7 +257,6 @@ public final class DatabaseManager: @unchecked Sendable {
                     sqlite3_bind_int64(stmt, 1, cutoff)
                 }
             }
-            self.executeOnQueue("DELETE FROM boundary_pref WHERE used_at < ?") { sqlite3_bind_int64($0, 1, cutoff) }
             sqlite3_exec(self.db, "VACUUM;", nil, nil, nil)
             defaults.set(self.nowEpoch(), forKey: key)
             #if DEBUG

@@ -18,53 +18,37 @@ public extension InputHandler {
             return buildCandidateList()
         }
 
-        let segments: [Segment]
-        if let stored = db.fetchBoundaryPref(fullReading: fullReading), stored.count >= 2 {
-            var built: [Segment] = []
-            var prevText: String? = lastCommittedOutput
-            for reading in stored {
-                let seg = buildSegmentCandidates(
-                    reading: reading,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: reading, leftSideContext: azooKeyLeftContext),
-                    prev: prevText
-                )
-                built.append(seg)
-                prevText = seg.selectedText
-            }
-            segments = built
-        } else {
-            let rawSegments = azooKeyConverter.segmentize(fullReading, leftSideContext: azooKeyLeftContext)
-            guard rawSegments.count >= 2 else {
-                let listAction = buildCandidateList()
-                // 辞書候補がある場合はそのまま返す（「楽しい」等の既知単語）
-                if case .show(let candidates, let historyEnd, _, _, _) = listAction,
-                   candidates.count > historyEnd {
-                    return listAction
-                }
-                // 辞書候補なし（未知複合語等）のみ手動2分割を試みる
-                if let manualSegs = tryManualBisection(fullReading: fullReading) {
-                    state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
-                    return makeCandidateActionForFocusedSegment()
-                }
+        let rawSegments = azooKeyConverter.segmentize(fullReading, leftSideContext: azooKeyLeftContext)
+        guard rawSegments.count >= 2 else {
+            let listAction = buildCandidateList()
+            // 辞書候補がある場合はそのまま返す（「楽しい」等の既知単語）
+            if case .show(let candidates, let historyEnd, _, _, _) = listAction,
+               candidates.count > historyEnd {
                 return listAction
             }
-            var built: [Segment] = []
-            var prevText: String? = lastCommittedOutput
-            for raw in rawSegments {
-                let seg = buildSegmentCandidates(reading: raw.reading, dictCandidates: raw.candidates, prev: prevText)
-                built.append(seg)
-                prevText = seg.selectedText
-            }
-            // 先頭セグメントが促音(っ)終わりの2分割は誤分割の可能性が高い（例:「せっ」+「ていがめんの」）。
-            // 手動2分割でより長い前半が得られれば優先する。
-            if rawSegments.count == 2, rawSegments[0].reading.last == "っ",
-               let manualSegs = tryManualBisection(fullReading: fullReading),
-               manualSegs[0].reading.count > rawSegments[0].reading.count {
+            // 辞書候補なし（未知複合語等）のみ手動2分割を試みる
+            if let manualSegs = tryManualBisection(fullReading: fullReading) {
                 state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
                 return makeCandidateActionForFocusedSegment()
             }
-            segments = built
+            return listAction
         }
+        var built: [Segment] = []
+        var prevText: String? = lastCommittedOutput
+        for raw in rawSegments {
+            let seg = buildSegmentCandidates(reading: raw.reading, dictCandidates: raw.candidates, prev: prevText)
+            built.append(seg)
+            prevText = seg.selectedText
+        }
+        // 先頭セグメントが促音(っ)終わりの2分割は誤分割の可能性が高い（例:「せっ」+「ていがめんの」）。
+        // 手動2分割でより長い前半が得られれば優先する。
+        if rawSegments.count == 2, rawSegments[0].reading.last == "っ",
+           let manualSegs = tryManualBisection(fullReading: fullReading),
+           manualSegs[0].reading.count > rawSegments[0].reading.count {
+            state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
+            return makeCandidateActionForFocusedSegment()
+        }
+        let segments = built
 
         state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
         return makeCandidateActionForFocusedSegment()
@@ -305,10 +289,6 @@ public extension InputHandler {
         }
         if segmentState.segments.count >= 2 {
             db.recordPrefixes(reading: fullReading, output: confirmed)
-        }
-        let segs = segmentState.segments
-        if segs.contains(where: { $0.isManuallyAdjusted }) {
-            db.saveBoundaryPref(fullReading: fullReading, segments: segs.map { $0.reading })
         }
         commitText(text: confirmed, fullReading: fullReading, client: client)
         return suggestSuccessors()

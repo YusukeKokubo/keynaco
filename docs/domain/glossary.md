@@ -96,18 +96,9 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 
 ### SegmentState.llmWholeText（セグメント LLM 全文候補）
 読み全体をオンデバイス LLM で一括変換した全文テキスト。`inferSegmentBoundaries` が成功した場合は各文節の候補先頭にその文節の LLM トークンが入り、連結がこの文字列になる。失敗時のフォールバックでは先頭文節のみに全文を挿入する。  
-**短絡確定**: `focusedIndex == 0` かつ確定条件を満たすとき Enter で全文節を破棄し `llmWholeText` だけを確定する（詳細: `isLlmWholeTextShortcut`）。`inferSegmentBoundaries` が 2 ペア以上で成功した確定では境界を `boundary_pref` にも保存する。
-
-### LLMSegmentConverter
-セグメントモード用の FoundationModels ラッパー。`SystemLanguageModel.default` が利用可能なときのみ推論を走らせる。失敗時は空文字でコールバックし既存 UX を壊さない。
+**短絡確定**: `focusedIndex == 0` かつ確定条件を満たすとき Enter で全文節を破棄し `llmWholeText` だけを確定する（詳細: `isLlmWholeTextShortcut`）。
 
 *Tests: `Tests/InputHandlerSegmentLLMTests.swift`、`Tests/SegmentBoundaryTests.swift`*
-
-### boundary_pref（境界学習）
-手動調整した境界、または LLM 多文節境界推定が成功した確定の読み分割を保存するテーブルエントリ。  
-次回同じ読みで Space を押すと AzooKey の初期分割より保存済み境界が優先される（前方一致で最長キーを採用）。  
-**保存条件**: 手動境界調整ありの確定、または `isLlmBoundaryInferred`（2ペア以上再構築）のとき。AzooKey 初期分割のままかつ LLM 条件も満たさない確定では保存しない。  
-**上書きポリシー**: 同じ読みに対して再調整・確定すると前回エントリが上書きされる。GC: 180日未使用で削除。
 
 ---
 
@@ -151,7 +142,7 @@ IMK `before` テキスト末尾から抽出した仮想末尾語列（最大 2 �
 **不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。
 
 ### DatabaseManager
-変換履歴（`history`）・noun-bigram（`noun_bigram`）・ユーザー辞書（`user_dict`）・境界学習（`boundary_pref`）・ひらがな優先語彙（`hiragana_preferred`）の **5 テーブル**を持つ SQLite ストア。  
+変換履歴（`history`）・noun-bigram（`noun_bigram`）・ユーザー辞書（`user_dict`）・ひらがな優先語彙（`hiragana_preferred`）の **4 テーブル**を持つ SQLite ストア。  
 `InputHandler` のイニシャライザで DI。テストは `inMemory: true`。起動時に廃止した `bigram` / `trigram` / `skip_bigram` を DROP する。  
 全 fetch/record で時間減衰スコア `count / (1 + age_days / τ)`（τ=30日）を使用。`user_dict` のみ time-decay なし。
 
@@ -169,7 +160,7 @@ Apple Intelligence 必須前提。無効時は noun-bigram は蓄積されず予
 LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` および Successor / pending 先読みの参照キー。セッションをまたいでリセットしない。
 
 #### penalizeAll（訂正シグナル）
-確定直後 Backspace 時に呼ばれ、history の該当行を count -1（0以下で削除）、`boundary_pref` 行を DELETE する。
+確定直後 Backspace 時に呼ばれ、history の該当行を count -1（0以下で削除）する。
 
 *Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/NounBigramTests.swift`*
 
