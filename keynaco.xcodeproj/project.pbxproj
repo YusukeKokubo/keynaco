@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C24D0073941540F51238C4 /* DebugSocketServer.swift */; };
+		D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */; };
+		D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */; };
+		D0A1B2C3D4E5F60718293A05 /* SocketMockClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */; };
+		D0A1B2C3D4E5F60718293A07 /* DebugCandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */; };
 		1FEE62AC67AF46B79608E006 /* HiraganaPreferredViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BB50D896044E0EB5C1CC28 /* HiraganaPreferredViewController.swift */; };
 		26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */; };
 		2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */; };
@@ -62,6 +66,10 @@
 		4318ADEBBCDD0DFDD3DA6056 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		443A77590841CE5845242FCF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		65C24D0073941540F51238C4 /* DebugSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSocketServer.swift; sourceTree = "<group>"; };
+		D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+Commands.swift"; sourceTree = "<group>"; };
+		D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+Snapshot.swift"; sourceTree = "<group>"; };
+		D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketMockClient.swift; sourceTree = "<group>"; };
+		D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugCandidateWindow.swift; sourceTree = "<group>"; };
 		7C150B0401BC4C609E82079A /* ZenzaiSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenzaiSettings.swift; sourceTree = "<group>"; };
 		6F986E1AF5358DEC6AF3E7A9 /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = System/Library/Frameworks/InputMethodKit.framework; sourceTree = SDKROOT; };
 		7113D7BD62C41DB9C1C602EE /* keynaco.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = keynaco.entitlements; sourceTree = "<group>"; };
@@ -202,9 +210,13 @@
 		96DC1F9B346A9426962FF324 /* Debug */ = {
 			isa = PBXGroup;
 			children = (
+				D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */,
+				D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */,
+				D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */,
 				65C24D0073941540F51238C4 /* DebugSocketServer.swift */,
 				A96925E03EBB4612285CA9FF /* EventViewerWindow.swift */,
 				C9289632F6594D9EE9A07926 /* IMESandboxWindow.swift */,
+				D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */,
 			);
 			path = Debug;
 			sourceTree = "<group>";
@@ -329,6 +341,10 @@
 				A8C9D0E12F3A4B5C6D7E8F04 /* CleanserSheetViewController.swift in Sources */,
 				8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
 				1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */,
+				D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */,
+				D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */,
+				D0A1B2C3D4E5F60718293A07 /* DebugCandidateWindow.swift in Sources */,
+				D0A1B2C3D4E5F60718293A05 /* SocketMockClient.swift in Sources */,
 				BECB3D246AF08901817AFD4E /* EventViewerWindow.swift in Sources */,
 				1FEE62AC67AF46B79608E006 /* HiraganaPreferredViewController.swift in Sources */,
 				26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */,

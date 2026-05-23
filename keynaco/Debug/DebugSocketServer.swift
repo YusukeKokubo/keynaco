@@ -22,21 +22,21 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     private var serverFd: Int32 = -1
-    private var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
-    private let mockClient = SocketMockClient()
-    private var candidateWindow = DebugCandidateWindow()
+    var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
+    let mockClient = SocketMockClient()
+    var candidateWindow = DebugCandidateWindow()
 
-    private let successorLLM = LLMSuccessorFetcher()
-    private let segmentLLM = LLMSegmentConverter()
+    let successorLLM = LLMSuccessorFetcher()
+    let segmentLLM = LLMSegmentConverter()
 
     /// `reset` のたびに増やし、直前のキー処理で飛ばした LLM 完了コールバックを無効化する。
-    private var llmEpoch: UInt64 = 0
+    var llmEpoch: UInt64 = 0
 
     /// `set_left_context` で明示指定した左コンテキスト。nil なら committedHistory から自動計算。
-    private var debugLeftContextOverride: String? = nil
+    var debugLeftContextOverride: String? = nil
 
     /// `deinit` から参照するため `nonisolated(unsafe)`。書き込みは MainActor のみ。
-    nonisolated(unsafe) private var snapshotURL: URL?
+    nonisolated(unsafe) var snapshotURL: URL?
 
     private init() {}
 
@@ -141,7 +141,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     // MARK: - Named key table (name → (keyCode, chars))
 
-    private static let namedKeys: [String: (UInt16, String)] = [
+    static let namedKeys: [String: (UInt16, String)] = [
         "space":     (49,  " "),
         "enter":     (36,  "\r"),
         "backspace": (51,  "\u{08}"),
@@ -162,9 +162,9 @@ final class DebugSocketServer: @unchecked Sendable {
 
     // MARK: - Protocol metadata / error envelope
 
-    private static let protocolVersion = 1
+    static let protocolVersion = 1
 
-    private static let stateFieldSchemas: [String: String] = [
+    static let stateFieldSchemas: [String: String] = [
         "inserted": "array<string>",
         "markedText": "string",
         "composedHiragana": "string",
@@ -193,7 +193,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "explain": "object",
     ]
 
-    private static func capabilities() -> [String: Any] {
+    static func capabilities() -> [String: Any] {
         [
             "supportsSchemaCommand": true,
             "supportsSchemaExamples": true,
@@ -216,7 +216,7 @@ final class DebugSocketServer: @unchecked Sendable {
         ]
     }
 
-    private static func buildInfo() -> [String: Any] {
+    static func buildInfo() -> [String: Any] {
         let info = Bundle.main.infoDictionary
         return [
             "commit": (info?["KeynacoBuildCommit"] as? String) ?? "unknown",
@@ -226,7 +226,7 @@ final class DebugSocketServer: @unchecked Sendable {
         ]
     }
 
-    private static func withProtocolMetadata(_ dict: [String: Any]) -> [String: Any] {
+    static func withProtocolMetadata(_ dict: [String: Any]) -> [String: Any] {
         var out = dict
         out["protocolVersion"] = protocolVersion
         out["capabilities"] = capabilities()
@@ -234,7 +234,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return out
     }
 
-    private static func errorPayload(
+    static func errorPayload(
         code: String,
         message: String,
         hint: String? = nil,
@@ -259,7 +259,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     // MARK: - fields / assert ヘルパー
 
-    private static func applyFields(_ dict: [String: Any], fields: [String]?) -> [String: Any] {
+    static func applyFields(_ dict: [String: Any], fields: [String]?) -> [String: Any] {
         guard let fields, !fields.isEmpty else { return dict }
         var keep = Set(fields)
         if dict["describe"] != nil { keep.insert("describe") }
@@ -271,17 +271,17 @@ final class DebugSocketServer: @unchecked Sendable {
         return dict.filter { keep.contains($0.key) }
     }
 
-    private static func jsonString(_ v: Any) -> String {
+    static func jsonString(_ v: Any) -> String {
         // スカラー値は JSONSerialization のトップレベルとして渡せないので配列でラップして比較する
         (try? JSONSerialization.data(withJSONObject: [v])).flatMap { String(data: $0, encoding: .utf8) } ?? "\(v)"
     }
 
-    private static func isEqualJSON(_ actual: Any?, _ expected: Any) -> Bool {
+    static func isEqualJSON(_ actual: Any?, _ expected: Any) -> Bool {
         guard let actual else { return false }
         return jsonString(actual) == jsonString(expected)
     }
 
-    private static func valueCount(_ value: Any?) -> Int? {
+    static func valueCount(_ value: Any?) -> Int? {
         switch value {
         case let arr as [Any]:
             return arr.count
@@ -294,7 +294,7 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    private static func containsValue(_ actual: Any?, expected: Any) -> Bool {
+    static func containsValue(_ actual: Any?, expected: Any) -> Bool {
         guard let actual else { return false }
         if let actualString = actual as? String, let expectedString = expected as? String {
             return actualString.contains(expectedString)
@@ -318,7 +318,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return false
     }
 
-    private static func matchesSchema(_ value: Any?, schema rawSchema: String) -> Bool {
+    static func matchesSchema(_ value: Any?, schema rawSchema: String) -> Bool {
         let schema = rawSchema.replacingOccurrences(of: " ", with: "").lowercased()
         if schema.hasPrefix("array<"), schema.hasSuffix(">") {
             guard let array = value as? [Any] else { return false }
@@ -347,7 +347,7 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    private static func applyAssert(
+    static func applyAssert(
         _ dict: [String: Any],
         assertions: [String: Any]?,
         containsAssertions: [String: Any]?,
@@ -461,14 +461,14 @@ final class DebugSocketServer: @unchecked Sendable {
         return wrapped
     }
 
-    private static func applyDescribe(_ dict: [String: Any], describe: Any?) -> [String: Any] {
+    static func applyDescribe(_ dict: [String: Any], describe: Any?) -> [String: Any] {
         guard let describe = describe else { return dict }
         var result = dict
         result["describe"] = describe
         return result
     }
 
-    private static func valueByPath(_ root: Any, path: String) -> Any? {
+    static func valueByPath(_ root: Any, path: String) -> Any? {
         if path.isEmpty { return root }
         let parts = path.split(separator: ".").map(String.init)
         var current: Any? = root
@@ -493,7 +493,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return current
     }
 
-    private static func resolveTemplateString(_ raw: String, vars: [String: Any]) -> Any {
+    static func resolveTemplateString(_ raw: String, vars: [String: Any]) -> Any {
         let pattern = #"\{\{([a-zA-Z0-9_.-]+)\}\}"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return raw }
         let nsRaw = raw as NSString
@@ -518,7 +518,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return replaced
     }
 
-    private static func resolveVars(in value: Any, vars: [String: Any]) -> Any {
+    static func resolveVars(in value: Any, vars: [String: Any]) -> Any {
         switch value {
         case let dict as [String: Any]:
             var out: [String: Any] = [:]
@@ -535,7 +535,7 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    private static func applyCapture(
+    static func applyCapture(
         _ capture: Any?,
         from result: [String: Any],
         vars: inout [String: Any]
@@ -562,7 +562,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return captured
     }
 
-    private static func finalize(_ dict: [String: Any], cmd: [String: Any]) -> [String: Any] {
+    static func finalize(_ dict: [String: Any], cmd: [String: Any]) -> [String: Any] {
         let withDescribe = applyDescribe(dict, describe: cmd["describe"])
         let withExplain = applyExplainIfRequested(withDescribe, cmd: cmd)
         let fields = cmd["fields"] as? [String]
@@ -581,7 +581,7 @@ final class DebugSocketServer: @unchecked Sendable {
         )
     }
 
-    private static func applyExplainIfRequested(_ dict: [String: Any], cmd: [String: Any]) -> [String: Any] {
+    static func applyExplainIfRequested(_ dict: [String: Any], cmd: [String: Any]) -> [String: Any] {
         guard (cmd["explain"] as? Bool) == true else { return dict }
 
         // 状態辞書を返すレスポンスにだけ explain を付与する
@@ -629,7 +629,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return out
     }
 
-    private static func waitConditionMatched(state: [String: Any], field: String, wait: [String: Any]) -> Bool {
+    static func waitConditionMatched(state: [String: Any], field: String, wait: [String: Any]) -> Bool {
         guard let actual = state[field] else { return false }
         if let equals = wait["equals"] {
             return isEqualJSON(actual, equals)
@@ -643,7 +643,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return false
     }
 
-    private func waitUntil(_ wait: [String: Any], cmd: [String: Any]) -> [String: Any] {
+    func waitUntil(_ wait: [String: Any], cmd: [String: Any]) -> [String: Any] {
         guard let field = wait["field"] as? String else {
             return Self.finalize(
                 Self.errorPayload(
@@ -702,7 +702,7 @@ final class DebugSocketServer: @unchecked Sendable {
         ], cmd: cmd)
     }
 
-    private func assertEventually(_ wait: [String: Any], cmd: [String: Any]) -> [String: Any] {
+    func assertEventually(_ wait: [String: Any], cmd: [String: Any]) -> [String: Any] {
         let field = wait["field"] as? String ?? "unknown"
         let raw = waitUntil(wait, cmd: [:])
         if (raw["matched"] as? Bool) == true {
@@ -737,7 +737,7 @@ final class DebugSocketServer: @unchecked Sendable {
         ], cmd: cmd)
     }
 
-    private static func compactFailureLine(_ failure: [String: Any]) -> String {
+    static func compactFailureLine(_ failure: [String: Any]) -> String {
         let phase = failure["phase"] as? String ?? "unknown"
         if phase == "step" {
             let stepIndex = failure["stepIndex"] as? Int ?? -1
@@ -759,7 +759,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return failure["message"] as? String ?? "assertion failed"
     }
 
-    private static let knownAssertionFields: Set<String> = [
+    static let knownAssertionFields: Set<String> = [
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
         "isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
@@ -769,7 +769,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "ok", "matched", "timedOut", "waitField", "state", "steps", "last",
     ]
 
-    private static let knownCommandKeys: Set<String> = [
+    static let knownCommandKeys: Set<String> = [
         "reset", "state", "get_log", "annotate",
         "wait_until", "assert_eventually", "seed_noun_bigram", "seed_history",
         "set_last_noun", "set_surrounding", "set_left_context",
@@ -777,7 +777,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "capture", "vars", "schema", "with_examples", "explain",
     ]
 
-    private static func schemaExamples() -> [[String: Any]] {
+    static func schemaExamples() -> [[String: Any]] {
         [
             [
                 "name": "schema_with_examples",
@@ -833,7 +833,7 @@ final class DebugSocketServer: @unchecked Sendable {
         ]
     }
 
-    private static func schemaResponse(cmd: [String: Any]) -> [String: Any] {
+    static func schemaResponse(cmd: [String: Any]) -> [String: Any] {
         var root: [String: Any] = [
             "schema": [
                 "commandTriggers": Array(knownCommandKeys).sorted(),
@@ -859,7 +859,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return finalize(root, cmd: cmd)
     }
 
-    private static func lintAssertionKeys(
+    static func lintAssertionKeys(
         _ cmd: [String: Any],
         location: String
     ) -> [[String: Any]] {
@@ -877,7 +877,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return issues
     }
 
-    private static func lintSuite(
+    static func lintSuite(
         suite: [[String: Any]],
         beforeEach: [[String: Any]],
         afterEach: [[String: Any]],
@@ -1025,7 +1025,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     // MARK: - コマンド処理（MainActor 上で実行）
 
-    private func processCommand(_ cmd: [String: Any]) -> [String: Any] {
+    func processCommand(_ cmd: [String: Any]) -> [String: Any] {
         if cmd["schema"] != nil {
             return Self.schemaResponse(cmd: cmd)
         }
@@ -1049,525 +1049,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return handleKeyEvent(cmd: cmd)
     }
 
-    private func handleReset(cmd: [String: Any]) -> [String: Any] {
-    cleanupSnapshot()
-    successorLLM.cancel()
-    segmentLLM.cancel()
-    llmEpoch &+= 1
-    let useRealDB = cmd["useRealDB"] as? Bool ?? false
-    let converter = ZenzaiSettings.makeConverter()
-    if useRealDB, let db = makeRealDBSnapshot() {
-        handler = InputHandler(db: db, azooKeyConverter: converter)
-    } else {
-        handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
-    }
-    InputHandler.isAsciiMode = false
-    candidateWindow = DebugCandidateWindow()
-    mockClient.reset()
-    debugLeftContextOverride = nil
-    IMESandboxWindow.shared.clearSandbox()
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
-    private func handleState(cmd: [String: Any]) -> [String: Any] {
-    var state = makeResponse(inserted: [])
-    state["changed"] = []
-    return Self.finalize(state, cmd: cmd)
-    }
-
-    private func handleGetLog(cmd: [String: Any]) -> [String: Any] {
-    let lineFilter = cmd["line"] as? Int
-    let entries = IMESandboxWindow.shared.exportLog(line: lineFilter)
-    return Self.finalize(["log": entries, "count": entries.count], cmd: cmd)
-    }
-
-    private func handleAnnotate(cmd: [String: Any]) -> [String: Any] {
-    let text = cmd["annotate"] as! String
-    IMESandboxWindow.shared.appendAnnotation(text)
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
-    private func handleLintSuite(cmd: [String: Any]) -> [String: Any] {
-    let suite = cmd["lint_suite"] as! [[String: Any]]
-    let beforeEach = cmd["before_each"] as? [[String: Any]] ?? []
-    let afterEach = cmd["after_each"] as? [[String: Any]] ?? []
-    return Self.lintSuite(suite: suite, beforeEach: beforeEach, afterEach: afterEach, cmd: cmd)
-    }
-
-    private func handleWaitUntil(cmd: [String: Any]) -> [String: Any] {
-    let wait = cmd["wait_until"] as! [String: Any]
-    return waitUntil(wait, cmd: cmd)
-    }
-
-    private func handleAssertEventually(cmd: [String: Any]) -> [String: Any] {
-    let wait = cmd["assert_eventually"] as! [String: Any]
-    return assertEventually(wait, cmd: cmd)
-    }
-
-    private func handleSeedNounBigram(cmd: [String: Any]) -> [String: Any] {
-    let seed = cmd["seed_noun_bigram"] as! [String: Any]
-    guard let prev   = seed["prev"]   as? String,
-          let input  = seed["input"]  as? String,
-          let output = seed["output"] as? String else {
-        return Self.finalize(
-            Self.errorPayload(
-                code: "SEED_NOUN_BIGRAM_MISSING_FIELDS",
-                message: "seed_noun_bigram requires prev, input, output",
-                hint: #"Use {"seed_noun_bigram":{"prev":"東京","input":"あめ","output":"雨"}}."#,
-                suggestedFixes: [
-                    ["seed_noun_bigram": ["prev": "東京", "input": "あめ", "output": "雨", "count": 5]]
-                ]
-            ),
-            cmd: cmd
-        )
-    }
-    let count = seed["count"] as? Int ?? 1
-    for _ in 0..<count {
-        handler.db.recordNounBigram(prev: prev, input: input, output: output)
-    }
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
-    private func handleSeedHistory(cmd: [String: Any]) -> [String: Any] {
-    let seed = cmd["seed_history"] as! [String: Any]
-    guard let input  = seed["input"]  as? String,
-          let output = seed["output"] as? String else {
-        return Self.finalize(
-            Self.errorPayload(
-                code: "SEED_HISTORY_MISSING_FIELDS",
-                message: "seed_history requires input and output",
-                hint: #"Use {"seed_history":{"input":"かんじ","output":"漢字"}}."#,
-                suggestedFixes: [
-                    ["seed_history": ["input": "かんじ", "output": "漢字", "times": 3]]
-                ]
-            ),
-            cmd: cmd
-        )
-    }
-    let times = seed["times"] as? Int ?? 1
-    for _ in 0..<times { handler.db.debugSeedHistory(input: input, output: output) }
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
-    private func handleSetLastNoun(cmd: [String: Any]) -> [String: Any] {
-    let noun = cmd["set_last_noun"] as! String
-    handler.lastConfirmedNounOutput = noun.isEmpty ? nil : noun
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
-    private func handleSetSurrounding(cmd: [String: Any]) -> [String: Any] {
-    let sur = cmd["set_surrounding"] as! [String: Any]
-    if let b = sur["before"] as? String { mockClient.documentBefore = b }
-    if let a = sur["after"] as? String { mockClient.documentAfter = a }
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
-    private func handleSetLeftContext(cmd: [String: Any]) -> [String: Any] {
-    let ctx = cmd["set_left_context"] as! String
-    debugLeftContextOverride = ctx.isEmpty ? nil : ctx
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
-    private func handleTestSuite(cmd: [String: Any]) -> [String: Any] {
-    let suite = cmd["test_suite"] as! [[String: Any]]
-    let defaultUseRealDB = cmd["useRealDB"] as? Bool ?? false
-    let globalVars = cmd["vars"] as? [String: Any] ?? [:]
-    let globalBeforeEach = cmd["before_each"] as? [[String: Any]] ?? []
-    let globalAfterEach = cmd["after_each"] as? [[String: Any]] ?? []
-    let failFast = cmd["fail_fast"] as? Bool ?? false
-    var scenarios: [[String: Any]] = []
-    var passCount = 0
-    let suiteStart = Date()
-
-    for (idx, scenario) in suite.enumerated() {
-        let scenarioStart = Date()
-        let name = scenario["name"] as? String ?? "scenario_\(idx + 1)"
-        let useRealDB = scenario["useRealDB"] as? Bool ?? defaultUseRealDB
-        _ = processCommand(["reset": true, "useRealDB": useRealDB])
-
-        guard let cmds = scenario["cmds"] as? [[String: Any]] else {
-            scenarios.append([
-                "name": name,
-                "ok": false,
-                "error": "cmds must be an array of command objects"
-            ])
-            continue
-        }
-
-        let scenarioBeforeEach = scenario["before_each"] as? [[String: Any]] ?? []
-        let scenarioAfterEach = scenario["after_each"] as? [[String: Any]] ?? []
-        var combined: [[String: Any]] = []
-        var stepPhases: [(phase: String, index: Int)] = []
-        for (i, c) in globalBeforeEach.enumerated() {
-            combined.append(c)
-            stepPhases.append(("before_each", i))
-        }
-        for (i, c) in scenarioBeforeEach.enumerated() {
-            combined.append(c)
-            stepPhases.append(("before_each", globalBeforeEach.count + i))
-        }
-        for (i, c) in cmds.enumerated() {
-            combined.append(c)
-            stepPhases.append(("cmd", i))
-        }
-        for (i, c) in scenarioAfterEach.enumerated() {
-            combined.append(c)
-            stepPhases.append(("after_each", i))
-        }
-        for (i, c) in globalAfterEach.enumerated() {
-            combined.append(c)
-            stepPhases.append(("after_each", scenarioAfterEach.count + i))
-        }
-
-        var seqCmd: [String: Any] = ["sequence": combined]
-        if let fields = scenario["fields"] as? [String] { seqCmd["fields"] = fields }
-        var scenarioVars = globalVars
-        if let localVars = scenario["vars"] as? [String: Any] {
-            for (k, v) in localVars { scenarioVars[k] = v }
-        }
-        if !scenarioVars.isEmpty { seqCmd["vars"] = scenarioVars }
-        let seqResult = processCommand(seqCmd)
-        let steps = seqResult["steps"] as? [[String: Any]] ?? []
-        let failedSteps = steps.filter { $0["assertion_failed"] != nil }.count
-        let last = seqResult["last"] as? [String: Any] ?? [:]
-        let expectError = scenario["expect_error"] as? Bool ?? false
-        let expectTimeout = scenario["expect_timeout"] as? Bool ?? false
-        let stepErrors: [[String: Any]] = steps.enumerated().compactMap { index, step in
-            guard let err = step["error"] else { return nil }
-            return [
-                "phase": "step",
-                "stepIndex": index,
-                "stepPhase": stepPhases.indices.contains(index) ? stepPhases[index].phase : "cmd",
-                "kind": "error",
-                "field": "error",
-                "expected": expectError ? "error" : "none",
-                "actual": err,
-                "message": "step returned error: \(err)"
-            ]
-        }
-        let stepTimeouts: [[String: Any]] = steps.enumerated().compactMap { index, step in
-            guard (step["timedOut"] as? Bool) == true else { return nil }
-            return [
-                "phase": "step",
-                "stepIndex": index,
-                "stepPhase": stepPhases.indices.contains(index) ? stepPhases[index].phase : "cmd",
-                "kind": "timeout",
-                "field": "timedOut",
-                "expected": expectTimeout,
-                "actual": true,
-                "message": "step timed out"
-            ]
-        }
-        let finalCheck = Self.applyAssert(
-            last,
-            assertions: scenario["assert"] as? [String: Any],
-            containsAssertions: scenario["assert_contains"] as? [String: Any],
-            notAssertions: scenario["assert_not"] as? [String: Any],
-            schemaAssertions: scenario["assert_schema"] as? [String: Any],
-            regexAssertions: scenario["assert_regex"] as? [String: Any]
-        )
-        let hasError = !stepErrors.isEmpty || seqResult["error"] != nil || finalCheck["error"] != nil
-        let hasTimeout = !stepTimeouts.isEmpty || (finalCheck["timedOut"] as? Bool ?? false)
-        var suiteExpectationFailures: [[String: Any]] = []
-        if expectError && !hasError {
-            suiteExpectationFailures.append([
-                "phase": "suite",
-                "kind": "expected_error",
-                "message": "expect_error=true but no error occurred"
-            ])
-        }
-        if !expectError && hasError {
-            suiteExpectationFailures.append([
-                "phase": "suite",
-                "kind": "unexpected_error",
-                "message": "unexpected error occurred"
-            ])
-        }
-        if expectTimeout && !hasTimeout {
-            suiteExpectationFailures.append([
-                "phase": "suite",
-                "kind": "expected_timeout",
-                "message": "expect_timeout=true but no timeout occurred"
-            ])
-        }
-        if !expectTimeout && hasTimeout {
-            suiteExpectationFailures.append([
-                "phase": "suite",
-                "kind": "unexpected_timeout",
-                "message": "unexpected timeout occurred"
-            ])
-        }
-        let hasFinalFailure = finalCheck["assertion_failed"] != nil
-        let ok = failedSteps == 0 &&
-                 !hasFinalFailure &&
-                 suiteExpectationFailures.isEmpty &&
-                 (expectError || !hasError) &&
-                 (expectTimeout || !hasTimeout)
-        if ok { passCount += 1 }
-
-        var failureDetails: [[String: Any]] = []
-        failureDetails.append(contentsOf: stepErrors)
-        failureDetails.append(contentsOf: stepTimeouts)
-        for (stepIndex, step) in steps.enumerated() {
-            guard let failures = step["assertion_failed"] as? [[String: Any]] else { continue }
-            for failure in failures {
-                var detail = failure
-                detail["phase"] = "step"
-                detail["stepIndex"] = stepIndex
-                if stepPhases.indices.contains(stepIndex) {
-                    detail["stepPhase"] = stepPhases[stepIndex].phase
-                    detail["stepInPhaseIndex"] = stepPhases[stepIndex].index
-                }
-                if let stepDescribe = step["describe"] {
-                    detail["stepDescribe"] = stepDescribe
-                }
-                failureDetails.append(detail)
-            }
-        }
-        failureDetails.append(contentsOf: suiteExpectationFailures)
-        if let finalFailures = finalCheck["assertion_failed"] as? [[String: Any]] {
-            for failure in finalFailures {
-                var detail = failure
-                detail["phase"] = "final"
-                failureDetails.append(detail)
-            }
-        }
-
-        var result: [String: Any] = [
-            "name": name,
-            "ok": ok,
-            "stepCount": steps.count,
-            "failedStepCount": failedSteps,
-            "failedAssertions": failureDetails,
-            "compactFailures": failureDetails.map(Self.compactFailureLine),
-            "hasError": hasError,
-            "hasTimeout": hasTimeout,
-            "durationMs": Int(Date().timeIntervalSince(scenarioStart) * 1000),
-            "last": finalCheck
-        ]
-        if scenario["describe"] != nil {
-            result = Self.applyDescribe(result, describe: scenario["describe"])
-        }
-        if scenario["return_steps"] as? Bool == true {
-            result["steps"] = steps
-        }
-        if scenario["return_vars"] as? Bool == true, let seqVars = seqResult["vars"] {
-            result["vars"] = seqVars
-        }
-        if let err = seqResult["error"] { result["error"] = err }
-        if !ok {
-            var repro: [String: Any] = [
-                "test_suite": [scenario]
-            ]
-            if useRealDB {
-                repro["useRealDB"] = true
-            }
-            if !globalBeforeEach.isEmpty {
-                repro["before_each"] = globalBeforeEach
-            }
-            if !globalAfterEach.isEmpty {
-                repro["after_each"] = globalAfterEach
-            }
-            if !globalVars.isEmpty {
-                repro["vars"] = globalVars
-            }
-            result["reproCommand"] = repro
-        }
-        scenarios.append(result)
-        if failFast && !ok { break }
-    }
-
-    let summary: [String: Any] = [
-        "total": scenarios.count,
-        "passed": passCount,
-        "failed": max(0, scenarios.count - passCount),
-        "durationMs": Int(Date().timeIntervalSince(suiteStart) * 1000),
-        "stoppedEarly": failFast && scenarios.count < suite.count
-    ]
-    return Self.finalize(["results": scenarios, "summary": summary], cmd: cmd)
-    }
-
-    private func handleSequence(cmd: [String: Any]) -> [String: Any] {
-    let seq = cmd["sequence"] as! [[String: Any]]
-    let fields     = cmd["fields"]     as? [String]
-    let assertions = cmd["assert"]     as? [String: Any]
-    let containsAssertions = cmd["assert_contains"] as? [String: Any]
-    let notAssertions = cmd["assert_not"] as? [String: Any]
-    var vars = cmd["vars"] as? [String: Any] ?? [:]
-    var steps: [[String: Any]] = []
-    for rawStep in seq {
-        let resolvedAny = Self.resolveVars(in: rawStep, vars: vars)
-        guard var resolvedStep = resolvedAny as? [String: Any] else {
-            steps.append(Self.errorPayload(
-                code: "INVALID_STEP_COMMAND",
-                message: "invalid step command",
-                hint: "Each sequence step must be an object.",
-                suggestedFixes: [
-                    ["sequence": [["key": "space"]]],
-                    ["schema": true]
-                ]
-            ))
-            continue
-        }
-        let captureSpec = resolvedStep["capture"]
-        resolvedStep.removeValue(forKey: "capture")
-        var result = processCommand(resolvedStep)
-        let captured = Self.applyCapture(captureSpec, from: result, vars: &vars)
-        if !captured.isEmpty {
-            result["captured"] = captured
-        }
-        steps.append(result)
-    }
-    let last = steps.last ?? [:]
-    let filteredSteps = steps.map { Self.applyFields($0, fields: fields) }
-    var filteredLast  = Self.applyAssert(
-        Self.applyFields(last, fields: fields),
-        assertions: assertions,
-        containsAssertions: containsAssertions,
-        notAssertions: notAssertions,
-        schemaAssertions: cmd["assert_schema"] as? [String: Any],
-        regexAssertions: cmd["assert_regex"] as? [String: Any]
-    )
-    filteredLast = Self.applyExplainIfRequested(filteredLast, cmd: cmd)
-    return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast, "vars": vars], describe: cmd["describe"])
-    }
-
-    private func handleTypeString(cmd: [String: Any]) -> [String: Any] {
-    let text = cmd["type_string"] as! String
-    let fields     = cmd["fields"]     as? [String]
-    let assertions = cmd["assert"]     as? [String: Any]
-    let containsAssertions = cmd["assert_contains"] as? [String: Any]
-    let notAssertions = cmd["assert_not"] as? [String: Any]
-    var steps: [[String: Any]] = []
-    for ch in text {
-        let s = String(ch)
-        steps.append(processCommand(["keyCode": 0, "chars": s, "base": s, "mods": 0]))
-    }
-    if let thenKey = cmd["then"] as? String {
-        steps.append(processCommand(["key": thenKey, "mods": cmd["mods"] ?? 0]))
-    }
-    var result = Self.applyAssert(
-        Self.applyFields(steps.last ?? [:], fields: fields),
-        assertions: assertions,
-        containsAssertions: containsAssertions,
-        notAssertions: notAssertions,
-        schemaAssertions: cmd["assert_schema"] as? [String: Any],
-        regexAssertions: cmd["assert_regex"] as? [String: Any]
-    )
-    result = Self.applyExplainIfRequested(result, cmd: cmd)
-    if cmd["return_steps"] as? Bool == true {
-        result["steps"] = steps.map { Self.applyFields($0, fields: fields) }
-    }
-    return Self.applyDescribe(result, describe: cmd["describe"])
-    }
-
-    private func handleKey(cmd: [String: Any]) -> [String: Any] {
-    let keyName = cmd["key"] as! String
-    guard let (resolvedKeyCode, resolvedChars) = Self.namedKeys[keyName] else {
-        return Self.finalize(
-            Self.errorPayload(
-                code: "UNKNOWN_KEY_NAME",
-                message: "unknown key name: \(keyName)",
-                hint: "Call {\"schema\": true} to inspect supported named keys.",
-                suggestedFixes: [
-                    ["schema": true],
-                    ["key": "space"],
-                    ["key": "enter"]
-                ]
-            ),
-            cmd: cmd
-        )
-    }
-    let mods = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
-    var expanded = cmd
-    expanded.removeValue(forKey: "key")
-    expanded["keyCode"] = Int(resolvedKeyCode)
-    expanded["chars"]   = resolvedChars
-    expanded["base"]    = resolvedChars
-    expanded["mods"]    = mods.rawValue
-    return processCommand(expanded)
-    }
-
-    private func handleKeyEvent(cmd: [String: Any]) -> [String: Any] {
-    let keyCode: UInt16
-    switch cmd["keyCode"] {
-    case let kc as UInt16: keyCode = kc
-    case let kc as Int:    keyCode = UInt16(kc)
-    default:
-    return Self.finalize(
-        Self.errorPayload(
-            code: "MISSING_KEYCODE",
-            message: "missing keyCode",
-            hint: "Use keyCode/chars/base/mods or the shorthand {\"key\":\"space\"}.",
-            suggestedFixes: [
-                ["key": "space"],
-                ["keyCode": 49, "chars": " ", "base": " ", "mods": 0],
-                ["schema": true]
-            ]
-        ),
-        cmd: cmd
-    )
-    }
-
-    let chars = cmd["chars"] as? String
-    let base  = cmd["base"]  as? String ?? chars
-    let mods  = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
-
-    let composingTextWasEmpty = handler.state.composingText.isEmpty
-    handler.leftSideContext = llmDocumentContextPrefix()
-    // virtualHistoryPrefix は handler.handle 前にセット（buildPendingCandidateList が参照するため）。
-    if composingTextWasEmpty {
-    handler.virtualHistoryPrefix = VirtualHistoryExtractor.extract(from: mockClient.documentBefore)
-    }
-    let before = makeResponse(inserted: [])
-    let (_, action) = handler.handle(
-    keyCode: keyCode,
-    characters: chars,
-    baseCharacters: base,
-    modifiers: mods,
-    candidate: candidateWindow.context,
-    client: mockClient
-    )
-    candidateWindow.apply(action: action)
-    // composingText が空に戻ったらクリア
-    if handler.state.composingText.isEmpty {
-    handler.virtualHistoryPrefix = []
-    }
-    // Successor 抑制: documentAfter が非空（文中挿入）のとき候補を出さない
-    if handler.isSuccessorMode,
-       let ctx = SurroundingIMKContext.fetch(from: mockClient),
-       !ctx.after.isEmpty {
-    handler.isSuccessorMode = false
-    handler.successorFirstChar = nil
-    handler.pendingSuccessorCandidates = []
-    handler.clearSuccessorLLMAuxiliaryState()
-    candidateWindow.apply(action: .dismiss)
-    }
-    let insertedTexts = mockClient.consume()
-    applyLLMScheduling()
-    for text in insertedTexts {
-    let db = handler.db
-    InputController.posClassifier.classify(output: text) { classifiedOutput, pos in
-        db.updatePOS(output: classifiedOutput, pos: pos)
-    }
-    }
-
-    var result = makeResponse(inserted: insertedTexts)
-    result["changed"] = Self.computeChangedFields(before: before, after: result)
-    IMESandboxWindow.shared.appendSocketSnapshot(result, inserted: insertedTexts)
-    if keyCode == 36 {
-    let stillComposing = !handler.state.composedHiragana.isEmpty
-        || !handler.state.composingText.isEmpty
-        || !handler.state.pendingRomaji.isEmpty
-    if !stillComposing {
-        IMESandboxWindow.shared.finishCurrentLine()
-    }
-    }
-    return Self.finalize(result, cmd: cmd)
-    }
-
-
-    private func makeResponse(inserted: [String]) -> [String: Any] {
+    func makeResponse(inserted: [String]) -> [String: Any] {
         var snap = handler.snapshot(markedText: mockClient.markedText)
         snap.candidateVisible   = candidateWindow.isVisible
         snap.selectedRow        = candidateWindow.selectedRow
@@ -1613,7 +1095,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return dict
     }
 
-    private static func candidateSection(
+    static func candidateSection(
         row: Int,
         fixedEnd: Int,
         predictionEnd: Int,
@@ -1631,7 +1113,7 @@ final class DebugSocketServer: @unchecked Sendable {
         return "dictionary_or_special"
     }
 
-    private static func makeCandidateEntries(
+    static func makeCandidateEntries(
         candidates: [String],
         fixedEnd: Int,
         predictionEnd: Int,
@@ -1651,7 +1133,7 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    private static let changedFieldTargets: [String] = [
+    static let changedFieldTargets: [String] = [
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
         "isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
@@ -1660,7 +1142,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "candidateEntries"
     ]
 
-    private static func computeChangedFields(
+    static func computeChangedFields(
         before: [String: Any],
         after: [String: Any]
     ) -> [String] {
@@ -1671,25 +1153,25 @@ final class DebugSocketServer: @unchecked Sendable {
 
     // MARK: - LLM スケジューリング（InputController と同順・文脈は committedHistory のみ）
 
-    private func llmDocumentContextPrefix() -> String {
+    func llmDocumentContextPrefix() -> String {
         if let override = debugLeftContextOverride { return override }
         return handler.committedHistory.suffix(5).joined()
     }
 
-    private func applyLLMScheduling() {
+    func applyLLMScheduling() {
         applySuccessorLLMScheduling()
         applySegmentPrefetchIfNeeded()
         applySegmentLLMScheduling()
     }
 
     /// `InputController.applyPostKeyDownEffects` と同様。デバッグ用 `segmentLLM` は本番の static インスタンスとは別。
-    private func applySegmentPrefetchIfNeeded() {
+    func applySegmentPrefetchIfNeeded() {
         guard !handler.state.isSegmentMode,
               handler.state.composedHiragana.count >= LLMSegmentConverter.segmentPrefetchMinHiraganaCount else { return }
         segmentLLM.prefetch(hiragana: handler.state.composedHiragana)
     }
 
-    private func applySuccessorLLMScheduling() {
+    func applySuccessorLLMScheduling() {
         guard let triggerContext = handler.successorLLMContext else { return }
         handler.successorLLMContext = nil
         let schedulingEpoch = llmEpoch
@@ -1719,7 +1201,7 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    private func applySegmentLLMScheduling() {
+    func applySegmentLLMScheduling() {
         let trigger = handler.segmentLLMTrigger
         guard case .start(let hiragana) = trigger else { return }
         handler.segmentLLMTrigger = .none
@@ -1758,221 +1240,6 @@ final class DebugSocketServer: @unchecked Sendable {
                 text = handler.state.composingText
             }
             mockClient.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-        }
-    }
-
-    // MARK: - 実 DB スナップショット（デバッグ用）
-
-    private func cleanupSnapshot() {
-        Self.removeSnapshotArtifacts(baseURL: snapshotURL)
-        snapshotURL = nil
-    }
-
-    /// `foo.db` と SQLite が隣接生成する `foo.db-wal` / `foo.db-shm` をまとめて削除する。
-    private nonisolated static func removeSnapshotArtifacts(baseURL: URL?) {
-        guard let base = baseURL else { return }
-        let fm = FileManager.default
-        try? fm.removeItem(at: base)
-        try? fm.removeItem(at: URL(fileURLWithPath: base.path + "-wal"))
-        try? fm.removeItem(at: URL(fileURLWithPath: base.path + "-shm"))
-    }
-
-    private func makeRealDBSnapshot() -> DatabaseManager? {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let src = appSupport.appendingPathComponent("keynaco", isDirectory: true).appendingPathComponent("history.db")
-        guard FileManager.default.fileExists(atPath: src.path) else { return nil }
-
-        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("keynaco-sandbox-\(UUID().uuidString).db")
-
-        guard copyDatabaseToSnapshot(src: src, dst: tmp) else { return nil }
-
-        snapshotURL = tmp
-        return DatabaseManager(snapshotPath: tmp.path)
-    }
-
-    /// まず `sqlite3_backup`、失敗時はチェックポイント + 本体ファイルコピー（後者は WAL がマージできない場合にデータ欠落しうる）。
-    private func copyDatabaseToSnapshot(src: URL, dst: URL) -> Bool {
-        try? FileManager.default.removeItem(at: dst)
-        Self.removeSnapshotArtifacts(baseURL: dst)
-
-        if copyDatabaseUsingBackup(src: src, dst: dst) {
-            return true
-        }
-        NSLog("[DebugSocketServer] sqlite3_backup failed; falling back to checkpoint + file copy (see checkpointAndCopyDbOnly comment)")
-        try? FileManager.default.removeItem(at: dst)
-        Self.removeSnapshotArtifacts(baseURL: dst)
-        return checkpointAndCopyDbOnly(src: src, dst: dst)
-    }
-
-    private func copyDatabaseUsingBackup(src: URL, dst: URL) -> Bool {
-        var destDb: OpaquePointer?
-        guard sqlite3_open_v2(dst.path, &destDb, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK,
-              let dest = destDb else { return false }
-        defer { sqlite3_close(dest) }
-
-        // バックアップ元はリーダーロックで足りる。READWRITE だと本番が WAL で掴んでいるとき BUSY になりやすい。
-        var srcDb: OpaquePointer?
-        guard sqlite3_open_v2(src.path, &srcDb, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
-              let source = srcDb else { return false }
-        defer { sqlite3_close(source) }
-        sqlite3_busy_timeout(source, 500)
-
-        guard let backup = sqlite3_backup_init(dest, "main", source, "main") else { return false }
-        defer { _ = sqlite3_backup_finish(backup) }
-
-        while true {
-            let rc = sqlite3_backup_step(backup, -1)
-            if rc == SQLITE_DONE { return true }
-            if rc == SQLITE_OK { continue }
-            if rc == SQLITE_BUSY || rc == SQLITE_LOCKED {
-                usleep(20_000)
-                continue
-            }
-            return false
-        }
-    }
-
-    /// 案 A: メインファイルのみコピー。`PRAGMA wal_checkpoint(FULL)` が効かないと `-wal` 内の未反映フレームはコピー先に乗らない（デバッグ用途では許容）。
-    private func checkpointAndCopyDbOnly(src: URL, dst: URL) -> Bool {
-        try? FileManager.default.removeItem(at: dst)
-        Self.removeSnapshotArtifacts(baseURL: dst)
-        var tmpDb: OpaquePointer?
-        if sqlite3_open_v2(src.path, &tmpDb, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK, let db = tmpDb {
-            sqlite3_busy_timeout(db, 500)
-            sqlite3_exec(db, "PRAGMA wal_checkpoint(FULL);", nil, nil, nil)
-            sqlite3_close(db)
-        }
-        do {
-            try FileManager.default.copyItem(at: src, to: dst)
-            return true
-        } catch {
-            NSLog("[DebugSocketServer] snapshot copy failed: \(error)")
-            return false
-        }
-    }
-}
-
-// MARK: - SocketMockClient
-
-/// SurroundingIMKContext.fetch() が IMKTextInput にキャストできるよう NSObject + IMKTextInput に準拠させる。
-/// documentBefore / documentAfter で「カーソル前後のテキスト」を模倣し、
-/// {"set_surrounding": {"before": "...", "after": "..."}} で外部から設定できる。
-final class SocketMockClient: NSObject, TextInputClient, IMKTextInput, @unchecked Sendable {
-    private var insertedTexts: [String] = []
-    private(set) var markedText: String = ""
-
-    /// カーソル前の確定済みテキスト（insertText で追記される）
-    var documentBefore: String = ""
-    /// カーソル後のテキスト（set_surrounding コマンドで設定。insertText では変化しない）
-    var documentAfter: String = ""
-
-    // MARK: TextInputClient
-
-    func insertText(_ text: String) {
-        insertedTexts.append(text)
-        documentBefore += text
-        markedText = ""
-    }
-    func setMarkedText(_ text: String, selectionRange: NSRange) { markedText = text }
-    func cursorRect() -> NSRect { .zero }
-
-    func consume() -> [String] { let r = insertedTexts; insertedTexts = []; return r }
-    func reset() { insertedTexts = []; markedText = ""; documentBefore = ""; documentAfter = "" }
-
-    // MARK: IMKTextInput — SurroundingIMKContext が使うメソッド
-
-    func selectedRange() -> NSRange {
-        NSRange(location: documentBefore.utf16.count, length: 0)
-    }
-
-    func attributedSubstring(from range: NSRange) -> NSAttributedString! {
-        let full = documentBefore + documentAfter
-        let utf16 = full.utf16
-        guard range.location != NSNotFound,
-              range.location >= 0,
-              range.location + range.length <= utf16.count else { return nil }
-        let si = utf16.index(utf16.startIndex, offsetBy: range.location)
-        let ei = utf16.index(si, offsetBy: range.length)
-        return NSAttributedString(string: String(utf16[si..<ei])!)
-    }
-
-    func length() -> Int { (documentBefore + documentAfter).utf16.count }
-
-    func string(from range: NSRange, actualRange: NSRangePointer!) -> String! {
-        attributedSubstring(from: range)?.string
-    }
-
-    // MARK: IMKTextInput — スタブ
-
-    func insertText(_ string: Any!, replacementRange: NSRange) {}
-    func setMarkedText(_ string: Any!, selectionRange: NSRange, replacementRange: NSRange) {}
-    func markedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
-    func validAttributesForMarkedText() -> [Any]! { [] }
-    func firstRect(forCharacterRange aRange: NSRange, actualRange: NSRangePointer!) -> NSRect { .zero }
-    func characterIndex(for point: NSPoint, tracking mappingMode: IMKLocationToOffsetMappingMode, inMarkedRange: UnsafeMutablePointer<ObjCBool>!) -> Int { NSNotFound }
-    func attributes(forCharacterIndex index: Int, lineHeightRectangle lineRect: UnsafeMutablePointer<NSRect>!) -> [AnyHashable: Any]! { nil }
-    func overrideKeyboard(withKeyboardNamed keyboardUniqueName: String!) {}
-    func selectMode(_ modeIdentifier: String!) {}
-    func supportsUnicode() -> Bool { true }
-    func bundleIdentifier() -> String! { nil }
-    func windowLevel() -> CGWindowLevel { 0 }
-    func supportsProperty(_ property: TSMDocumentPropertyTag) -> Bool { false }
-    func uniqueClientIdentifierString() -> String! { nil }
-}
-
-// MARK: - DebugCandidateWindow
-
-struct DebugCandidateWindow {
-    var isVisible = false
-    var candidates: [String] = []
-    var selectedRow = 0
-    var historyEnd = 0
-    var predictionEnd = 0
-    var fixedEnd = 0
-    var isExplicitlySelected = false
-
-    var selectedText: String? {
-        guard isVisible, candidates.indices.contains(selectedRow) else { return nil }
-        return candidates[selectedRow]
-    }
-
-    var context: CandidateContext {
-        CandidateContext(
-            isVisible: isVisible,
-            selectedRow: selectedRow,
-            selectedText: selectedText,
-            isExplicitlySelected: isExplicitlySelected,
-            historyEnd: historyEnd,
-            fixedEnd: fixedEnd
-        )
-    }
-
-    mutating func apply(action: CandidateAction) {
-        switch action {
-        case .none:
-            break
-        case .show(let cands, let he, let initial, let pe, let fe):
-            candidates = cands
-            isVisible = !cands.isEmpty
-            selectedRow = cands.isEmpty ? 0 : min(initial, cands.count - 1)
-            historyEnd = he; predictionEnd = pe; fixedEnd = fe; isExplicitlySelected = false
-        case .dismiss:
-            isVisible = false; candidates = []; selectedRow = 0; isExplicitlySelected = false
-        case .selectNext:
-            guard isVisible, !candidates.isEmpty else { break }
-            selectedRow = min(selectedRow + 1, candidates.count - 1); isExplicitlySelected = true
-        case .selectPrev:
-            guard isVisible, !candidates.isEmpty else { break }
-            selectedRow = max(selectedRow - 1, 0); isExplicitlySelected = true
-        case .deleteSelected:
-            guard isVisible, candidates.indices.contains(selectedRow) else { break }
-            let row = selectedRow
-            candidates.remove(at: row)
-            if row < predictionEnd { predictionEnd -= 1 }
-            if row < historyEnd    { historyEnd -= 1 }
-            if candidates.isEmpty { isVisible = false; selectedRow = 0 }
-            else { selectedRow = min(selectedRow, candidates.count - 1) }
         }
     }
 }
