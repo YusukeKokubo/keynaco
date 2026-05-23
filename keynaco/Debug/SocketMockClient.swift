@@ -31,6 +31,18 @@ final class SocketMockClient: NSObject, TextInputClient, IMKTextInput, @unchecke
     func consume() -> [String] { let r = insertedTexts; insertedTexts = []; return r }
     func reset() { insertedTexts = []; markedText = ""; documentBefore = ""; documentAfter = "" }
 
+    /// 確定直後 Backspace（`penalizeAll`）でアプリ側が削除するテキストを模倣する。
+    func removeDocumentSuffix(_ text: String) {
+        guard !text.isEmpty, documentBefore.hasSuffix(text) else { return }
+        documentBefore.removeLast(text.count)
+    }
+
+    /// IME が Backspace を消費しなかったとき、アプリが 1 文字削除する挙動を模倣する。
+    func removeLastDocumentCharacter() {
+        guard !documentBefore.isEmpty else { return }
+        documentBefore.removeLast()
+    }
+
     // MARK: IMKTextInput — SurroundingIMKContext が使うメソッド
 
     func selectedRange() -> NSRange {

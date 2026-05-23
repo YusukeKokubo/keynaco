@@ -151,7 +151,7 @@ print("regex_ok?", "assertion_failed" not in r_regex)
 # bi-gram をシードしてから Successor を確認
 send({"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}})
 r = send({"type_string": "kyou", "then": "enter"})
-print(f"isSuccessorMode: {r['isSuccessorMode']}, candidates: {r['candidates'][:3]}")
+print(f"isSuccessorCandidateActive: {r['isSuccessorCandidateActive']}, candidates: {r['candidates'][:3]}")
 
 # 複数操作を1往復でバッチ送信
 r = send({"sequence": [
@@ -290,7 +290,7 @@ eisu(英数)=102  kana(かな)=104
   "pendingRomaji": "",           // まだひらがなになっていないローマ字
   "composingText": "かんじ",     // composedHiragana + pendingRomaji
   "isAsciiMode": false,
-  "isSuccessorMode": false,      // 後続語予測モード
+  "isSuccessorCandidateActive": false, // 後続語候補表示中（組成空 + 候補 visible）
   "isSegmentMode": false,        // 文節調整モード
   "isBracketMode": false,        // 括弧候補モード
   "isExplicitlySelected": false, // ↑↓で明示的に候補を選択したか
@@ -383,7 +383,7 @@ print(f"successor candidates: {r['last']['candidates'][:5]}")
 ```python
 send({"reset": True})
 r = send({"type_string": "kyou", "then": "enter"})
-print(f"isSuccessorMode: {r['isSuccessorMode']}")
+print(f"isSuccessorCandidateActive: {r['isSuccessorCandidateActive']}")
 print(f"successor candidates: {r['candidates'][:5]}")
 ```
 
@@ -470,6 +470,7 @@ print(f"selectedRow={r['selectedRow']}, selectedText={r['selectedText']!r}")
 
 - **IMK パイプラインをバイパス**するため、クライアントアプリ依存の挙動（Electron の Enter 問題など）は再現しない
 - デフォルトのリセットではソケットサーバーは**インメモリ DB**。本番の `history.db` は **`{"reset": true, "useRealDB": true}`** を使ったときのみ一時コピーで参照する
+- デフォルトの `leftSideContext` は `mockClient.documentBefore`（`insertText` 累積、`set_surrounding.before` で設定可）。確定直後 Backspace（IME 非消費）では直前確定語を `documentBefore` から削除して本番 IMK の `before` 更新を模倣する。`set_left_context` で上書き可能
 - **LLM は Debug ビルドのサーバー上で動く**（上記「LLM（Debug ビルド）」）。完了タイミングを見るときは `{"state": true}` ポーリング
 - セッションをまたぐときは必ず `{"reset": true}` を送信して状態をリセットすること（`reset` で LLM フェッチもキャンセルされ `llmEpoch` が進む）
 - 調査結果を報告するときは、各キー入力後の状態を表形式か箇条書きで整理して示すと読みやすい

@@ -468,9 +468,17 @@ extension DebugSocketServer {
     let mods  = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
 
     let composingTextWasEmpty = handler.state.composingText.isEmpty
+    let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
+    let pendingRomajiWasEmpty = handler.state.pendingRomaji.isEmpty
+    let backspacePenalizeOutput: String? = (
+        keyCode == KeyCode.backspace
+        && composingTextWasEmpty
+        && composedHiraganaWasEmpty
+        && pendingRomajiWasEmpty
+    ) ? handler.lastConfirmedContext?.output : nil
     handler.leftSideContext = debugLeftContextPrefix()
     let before = makeResponse(inserted: [])
-    let (_, action) = handler.handle(
+    let (consumed, action) = handler.handle(
     keyCode: keyCode,
     characters: chars,
     baseCharacters: base,
@@ -478,6 +486,13 @@ extension DebugSocketServer {
     candidate: candidateWindow.context,
     client: mockClient
     )
+    if keyCode == KeyCode.backspace, !consumed {
+        if let output = backspacePenalizeOutput {
+            mockClient.removeDocumentSuffix(output)
+        } else {
+            mockClient.removeLastDocumentCharacter()
+        }
+    }
     candidateWindow.apply(action: action)
     // Successor 抑制: documentAfter が非空（文中挿入）のとき候補を出さない
     if case .show = action,

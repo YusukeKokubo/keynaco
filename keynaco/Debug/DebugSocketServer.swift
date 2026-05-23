@@ -26,7 +26,7 @@ final class DebugSocketServer: @unchecked Sendable {
     let mockClient = SocketMockClient()
     var candidateWindow = DebugCandidateWindow()
 
-    /// `set_left_context` で明示指定した左コンテキスト。nil なら committedHistory から自動計算。
+    /// `set_left_context` で明示指定した左コンテキスト。nil なら `mockClient.documentBefore` から自動計算。
     var debugLeftContextOverride: String? = nil
 
     /// `deinit` から参照するため `nonisolated(unsafe)`。書き込みは MainActor のみ。
@@ -1133,7 +1133,8 @@ final class DebugSocketServer: @unchecked Sendable {
 
     func debugLeftContextPrefix() -> String {
         if let override = debugLeftContextOverride { return override }
-        return handler.committedHistory.suffix(5).joined()
+        let before = mockClient.documentBefore
+        return before.count > 300 ? String(before.suffix(300)) : before
     }
 
     private func updateMockMarkedText() {
