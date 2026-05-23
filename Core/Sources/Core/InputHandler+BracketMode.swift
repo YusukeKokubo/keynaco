@@ -92,22 +92,6 @@ public extension InputHandler {
             let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
             if !isDateTime && !isNumber {
                 db.recordPrefixes(reading: normalizedInput, output: selected)
-                // 4文字以上の日本語読みのみセグメント分割して部分語を学習
-                if !normalizedInput.allSatisfy({ $0.isASCII }),
-                   normalizedInput.count >= Self.segmentizeMinReadingLength {
-                    let db = db; let conv = azooKeyConverter; let reading = normalizedInput
-                    let leftCtx = azooKeyLeftContext
-                    Task.detached(priority: .utility) {
-                        let segs = conv.segmentize(reading, leftSideContext: leftCtx)
-                        guard segs.count >= 2 else { return }
-                        for seg in segs {
-                            guard let output = seg.candidates.first else { continue }
-                            // 出力が読みと同じ（漢字化されていない）セグメントは学習価値なしのためスキップ
-                            if output == seg.reading { continue }
-                            db.recordPrefixes(reading: seg.reading, output: output)
-                        }
-                    }
-                }
             }
             let conv = azooKeyConverter; let r = inputKey; let t = selected
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
