@@ -99,15 +99,8 @@ public extension InputHandler {
                    normalizedInput.count >= Self.segmentizeMinReadingLength {
                     let db = db; let conv = azooKeyConverter; let reading = normalizedInput
                     let leftCtx = azooKeyLeftContext
-                    let cache = segmentizeCache
                     Task.detached(priority: .utility) {
-                        let segs: [(reading: String, candidates: [String])]
-                        if let cached = cache.get(reading) {
-                            segs = cached
-                        } else {
-                            segs = conv.segmentize(reading, leftSideContext: leftCtx)
-                            cache.set(reading, segs)
-                        }
+                        let segs = conv.segmentize(reading, leftSideContext: leftCtx)
                         guard segs.count >= 2 else { return }
                         for seg in segs {
                             guard let output = seg.candidates.first else { continue }

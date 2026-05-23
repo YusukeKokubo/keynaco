@@ -132,8 +132,6 @@ public struct InputHandler {
         committedHistory.last ?? virtualHistoryPrefix.last
     }
     public var segmentCandidateCache: [String: Segment] = [:]
-    /// segmentize 結果の LRU キャッシュ（class なので struct コピー後も共有）。
-    public var segmentizeCache = SegmentizeLRUCache()
     public mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
             committedHistory.removeAll()
