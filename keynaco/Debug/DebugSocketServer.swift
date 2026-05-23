@@ -1033,19 +1033,19 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["reset"] != nil { return handleReset(cmd: cmd) }
         if cmd["state"] != nil { return handleState(cmd: cmd) }
         if cmd["get_log"] != nil { return handleGetLog(cmd: cmd) }
-        if let text = cmd["annotate"] as? String { return handleAnnotate(cmd: cmd) }
-        if let suite = cmd["lint_suite"] as? [[String: Any]] { return handleLintSuite(cmd: cmd) }
-        if let wait = cmd["wait_until"] as? [String: Any] { return handleWaitUntil(cmd: cmd) }
-        if let wait = cmd["assert_eventually"] as? [String: Any] { return handleAssertEventually(cmd: cmd) }
-        if let seed = cmd["seed_noun_bigram"] as? [String: Any] { return handleSeedNounBigram(cmd: cmd) }
-        if let seed = cmd["seed_history"] as? [String: Any] { return handleSeedHistory(cmd: cmd) }
-        if let noun = cmd["set_last_noun"] as? String { return handleSetLastNoun(cmd: cmd) }
-        if let sur = cmd["set_surrounding"] as? [String: Any] { return handleSetSurrounding(cmd: cmd) }
-        if let ctx = cmd["set_left_context"] as? String { return handleSetLeftContext(cmd: cmd) }
-        if let suite = cmd["test_suite"] as? [[String: Any]] { return handleTestSuite(cmd: cmd) }
-        if let seq = cmd["sequence"] as? [[String: Any]] { return handleSequence(cmd: cmd) }
-        if let text = cmd["type_string"] as? String { return handleTypeString(cmd: cmd) }
-        if let keyName = cmd["key"] as? String { return handleKey(cmd: cmd) }
+        if cmd["annotate"] is String { return handleAnnotate(cmd: cmd) }
+        if cmd["lint_suite"] is [[String: Any]] { return handleLintSuite(cmd: cmd) }
+        if cmd["wait_until"] is [String: Any] { return handleWaitUntil(cmd: cmd) }
+        if cmd["assert_eventually"] is [String: Any] { return handleAssertEventually(cmd: cmd) }
+        if cmd["seed_noun_bigram"] is [String: Any] { return handleSeedNounBigram(cmd: cmd) }
+        if cmd["seed_history"] is [String: Any] { return handleSeedHistory(cmd: cmd) }
+        if cmd["set_last_noun"] is String { return handleSetLastNoun(cmd: cmd) }
+        if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
+        if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
+        if cmd["test_suite"] is [[String: Any]] { return handleTestSuite(cmd: cmd) }
+        if cmd["sequence"] is [[String: Any]] { return handleSequence(cmd: cmd) }
+        if cmd["type_string"] is String { return handleTypeString(cmd: cmd) }
+        if cmd["key"] is String { return handleKey(cmd: cmd) }
         return handleKeyEvent(cmd: cmd)
     }
 
