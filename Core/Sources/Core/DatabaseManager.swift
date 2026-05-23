@@ -81,6 +81,7 @@ public final class DatabaseManager: @unchecked Sendable {
             count   INTEGER NOT NULL DEFAULT 1,
             used_at INTEGER NOT NULL,
             pos TEXT DEFAULT NULL,
+            pos_raw TEXT DEFAULT NULL,
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
@@ -125,6 +126,7 @@ public final class DatabaseManager: @unchecked Sendable {
         // is_noun=1 → 'noun'、is_noun=0 → 'other' に変換（NULL はそのまま未分類）
         sqlite3_exec(db, "UPDATE history SET pos = 'noun' WHERE is_noun = 1 AND pos IS NULL", nil, nil, nil)
         sqlite3_exec(db, "UPDATE history SET pos = 'other' WHERE is_noun = 0 AND pos IS NULL", nil, nil, nil)
+        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_raw TEXT DEFAULT NULL", nil, nil, nil)
     }
 
     private func seedHiraganaPreferredIfNeeded() {
@@ -215,6 +217,7 @@ public final class DatabaseManager: @unchecked Sendable {
         public let output: String
         public let count: Int
         public let pos: String?
+        public let posRaw: String?
     }
 
     public struct UserDictEntry: Sendable {

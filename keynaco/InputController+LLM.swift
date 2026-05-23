@@ -35,9 +35,9 @@ extension InputController {
     func schedulePOSClassification(output: String, reading: String) {
         let db = handler.db
         let prevNoun = handler.lastConfirmedNounOutput
-        Self.posClassifier.classify(output: output) { [weak self] classifiedOutput, pos in
-            db.updatePOS(output: classifiedOutput, pos: pos)
-            if pos == "noun" {
+        Self.posClassifier.classify(output: output) { [weak self] classifiedOutput, pos, rawResponse in
+            db.updatePOS(output: classifiedOutput, pos: pos, posRaw: rawResponse)
+            if pos == "noun" || pos == "proper_noun" {
                 if let prev = prevNoun {
                     db.recordNounBigram(prev: prev, input: reading, output: classifiedOutput)
                 }
@@ -52,8 +52,8 @@ extension InputController {
         let db = DatabaseManager.shared
         let outputs = db.fetchUnclassifiedHistory(limit: 50)
         for output in outputs {
-            posClassifier.classify(output: output) { classifiedOutput, pos in
-                db.updatePOS(output: classifiedOutput, pos: pos)
+            posClassifier.classify(output: output) { classifiedOutput, pos, rawResponse in
+                db.updatePOS(output: classifiedOutput, pos: pos, posRaw: rawResponse)
             }
         }
     }

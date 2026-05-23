@@ -54,10 +54,11 @@ final class HistoryViewController: NSViewController {
     }
 
     private let columns: [(String, String, CGFloat, Bool)] = [
-        ("input",  "読み",         150, true),
-        ("output", "確定テキスト", 200, true),
-        ("pos",    "品詞",          70, false),
-        ("count",  "回数",          60, false),
+        ("input",   "読み",         150, true),
+        ("output",  "確定テキスト", 200, true),
+        ("pos",     "品詞",          70, false),
+        ("pos_raw", "LLM応答",      120, true),
+        ("count",   "回数",          60, false),
     ]
 
     private func makeBottomBar() -> NSView {
@@ -125,10 +126,11 @@ extension HistoryViewController: NSTableViewDelegate {
         let entry = data[row]
         let text: String
         switch id.rawValue {
-        case "input":  text = entry.input
-        case "output": text = entry.output
-        case "pos":    text = Self.posLabel(entry.pos)
-        case "count":  text = "\(entry.count)"
+        case "input":   text = entry.input
+        case "output":  text = entry.output
+        case "pos":     text = Self.posLabel(entry.pos)
+        case "pos_raw": text = entry.posRaw ?? "―"
+        case "count":   text = "\(entry.count)"
         default: return nil
         }
         let tf = tableView.makeView(withIdentifier: id, owner: nil) as? NSTextField ?? {
@@ -137,6 +139,7 @@ extension HistoryViewController: NSTableViewDelegate {
             return f
         }()
         tf.stringValue = text
+        tf.toolTip = nil
         return tf
     }
 
@@ -146,11 +149,12 @@ extension HistoryViewController: NSTableViewDelegate {
 
     private static func posLabel(_ pos: String?) -> String {
         switch pos {
-        case "noun":      return "名詞"
-        case "verb":      return "動詞"
-        case "adjective": return "形容詞"
-        case "other":     return "その他"
-        default:          return "―"
+        case "noun":        return "名詞"
+        case "proper_noun": return "固有名詞"
+        case "verb":        return "動詞"
+        case "adjective":   return "形容詞"
+        case "other":       return "その他"
+        default:            return "―"
         }
     }
 }

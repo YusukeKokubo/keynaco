@@ -45,7 +45,7 @@ extension DatabaseManager {
             return self.queryOutputScorePairsOnQueue("""
             SELECT output, SUM((\(Self.recencyExpr))) AS s FROM history
             WHERE input LIKE ?
-              AND (pos IS NULL OR pos = 'noun')
+              AND (pos IS NULL OR pos = 'noun' OR pos = 'proper_noun')
             GROUP BY output
             ORDER BY s DESC, MAX(used_at) DESC
             LIMIT 20
@@ -57,11 +57,12 @@ extension DatabaseManager {
     }
 
     /// `output` に対応する全履歴行の pos を更新する。
-    public func updatePOS(output: String, pos: String) {
+    public func updatePOS(output: String, pos: String, posRaw: String? = nil) {
         dispatchWrite {
-            self.executeOnQueue("UPDATE history SET pos = ? WHERE output = ?") {
+            self.executeOnQueue("UPDATE history SET pos = ?, pos_raw = ? WHERE output = ?") {
                 self.bindText($0, 1, pos)
-                self.bindText($0, 2, output)
+                if let raw = posRaw { self.bindText($0, 2, raw) } else { sqlite3_bind_null($0, 2) }
+                self.bindText($0, 3, output)
             }
         }
     }
@@ -82,7 +83,7 @@ extension DatabaseManager {
 
     public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
-            let sql = "SELECT input, output, count, pos FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+            let sql = "SELECT input, output, count, pos, pos_raw FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -91,9 +92,10 @@ extension DatabaseManager {
                 guard let i = sqlite3_column_text(stmt, 0),
                       let o = sqlite3_column_text(stmt, 1) else { continue }
                 let pos = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
+                let posRaw = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
                 results.append(HistoryEntry(
                     input: String(cString: i), output: String(cString: o),
-                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos
+                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, posRaw: posRaw
                 ))
             }
             return results

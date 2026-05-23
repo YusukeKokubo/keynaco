@@ -506,8 +506,8 @@ extension DebugSocketServer {
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
     let db = handler.db
-    InputController.posClassifier.classify(output: text) { classifiedOutput, pos in
-        db.updatePOS(output: classifiedOutput, pos: pos)
+    InputController.posClassifier.classify(output: text) { classifiedOutput, pos, rawResponse in
+        db.updatePOS(output: classifiedOutput, pos: pos, posRaw: rawResponse)
     }
     }
 
