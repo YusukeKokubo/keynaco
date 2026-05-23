@@ -534,9 +534,9 @@ extension DebugSocketServer {
         let map = Dictionary(grouping: entries, by: \.output)
         let results: [[String: Any]] = outputs.map { output in
             if let entry = map[output]?.first {
-                return ["output": output, "pos": entry.pos ?? "(nil)", "pos_tag": entry.posTag ?? "(未分類)"]
+                return ["output": output, "pos": entry.pos ?? "(nil)", "pos_tag": entry.posTag ?? "(未分類)", "pos_retry": entry.posRetry]
             }
-            return ["output": output, "pos": "(not in db)", "pos_tag": "(not in db)"]
+            return ["output": output, "pos": "(not in db)", "pos_tag": "(not in db)", "pos_retry": false]
         }
         return ["results": results]
     }
