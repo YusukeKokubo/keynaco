@@ -84,7 +84,7 @@ zenz-v3 は制御トークンを使って変換確率分布をバイアスする
 
 - **効果が出やすい**: 専門職（`医師`・`弁護士`）、特定分野（`競馬`・`アニメ`）、文体（`SNS`・`2ch`）。同音異義語の選択が変わる
 - **効果が出にくい**: 個人名（`田中太郎`）、挨拶文、汎用的すぎる語（`普通の人`）
-- keynaco は現在 `profile` のみ UI に露出。`topic`/`style`/`preference` も AzooKey API で同等にサポートされており、UI 追加の価値がある
+- keynaco は現在 `profile` のみ UI に露出。`topic`/`style`/`preference` は zenz-v3.1-small では測定可能な効果がないため UI から削除済み（`plans/POC260524.md` 参照）。AzooKey API 自体は引き続きサポートしているが、keynaco では使用しない。
 
 ## テスト実行
 
