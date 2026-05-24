@@ -146,4 +146,23 @@ final class RomajiConverterTests: XCTestCase {
     func testHyphenToLongVowel() {
         assertConvert("ra-men", converted: "らーめ", pending: "n")
     }
+
+    // MARK: - resolveRomajiPrefix
+
+    func testResolveRomajiPrefix_pendingSyllable() {
+        let result = RomajiConverter.resolveRomajiPrefix("k")
+        XCTAssertEqual(result.convertedKana, "")
+        XCTAssertEqual(result.remaining, "k")
+    }
+
+    func testResolveRomajiPrefix_completedSyllable() {
+        let result = RomajiConverter.resolveRomajiPrefix("ka")
+        XCTAssertEqual(result.convertedKana, "か")
+        XCTAssertEqual(result.remaining, "")
+    }
+
+    func testResolveRomajiPrefix_invalidPrefix() {
+        let result = RomajiConverter.resolveRomajiPrefix("gz")
+        XCTAssertFalse(RomajiConverter.isValidRomajiPrefix(result.remaining))
+    }
 }

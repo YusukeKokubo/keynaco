@@ -8,6 +8,7 @@ public enum CandidateAction: Sendable {
     case selectNext
     case selectPrev
     case deleteSelected
+    case replaceCandidates([String])
 }
 
 public struct CandidateContext: Sendable {
@@ -90,7 +91,7 @@ public struct InputHandler {
 
     public var state = CompositionState()
     public var ignoreNextModeSwitch = false
-    /// Successor 候補表示中の 1 打目ローマ字（2 打目不一致時に通常入力へ流す）
+    /// Successor モード中の蓄積ローマ字バッファ（nil = モード外）
     var successorBufferedRomaji: String? = nil
     /// 直前の確定後、次の 1 打目だけ Successor 候補を試す（`leftSideContext` なし時のフォールバック）
     var successorEligible = false

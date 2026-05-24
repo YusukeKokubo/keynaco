@@ -80,6 +80,23 @@
 
 ---
 
+## S-03e: Successor 多打絞り込み
+
+**前提**: `東京` 確定後。noun-bigram `(東京, かいぎ)` → `会議`、`(東京, きょう)` → `今日` を学習済み。
+
+| ステップ | キー | 動作 |
+|---------|------|------|
+| 1 | `k` | 1 打目 `romajiToInitialKana["k"]` → 「か」行・「き」行候補を `.show`（会議・今日） |
+| 2 | `a` | バッファ `ka` → 仮名 `か` 確定 → `.replaceCandidates` で「か」始まりに絞り込み（会議のみ） |
+| 3 | `n` `i` | バッファ `kani` → 仮名 `かに` 確定 → さらに絞り込み（該当候補のみ） |
+| — | 候補ゼロ | 全バッファを通常組成へ流し `.show`（通常変換候補） |
+
+未確定音節（例: `k` のみ、`sh`）は `.none` で候補リストを維持。無効ローマ字（例: `gz`）は従来どおり通常組成へフォールバック。
+
+*Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`（`testSuccessorFiltersOnSecondKey` 等）*
+
+---
+
 ## S-03b: Successor モードの後続語予測（noun-bigram）
 
 **前提**: `東京`（漢字末尾）を確定。事前に noun-bigram `(prev=東京, について, について)` を学習済み。`lastConfirmedNounOutput = 東京`。

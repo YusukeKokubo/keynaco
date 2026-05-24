@@ -167,6 +167,17 @@ final class CandidateWindow: NSPanel {
         orderFront(nil)
     }
 
+    /// 候補リストのみ差し替える（ウィンドウ位置は変えない）。
+    func replaceCandidates(_ candidates: [String]) {
+        self.candidates = candidates
+        selectedRow = candidates.isEmpty ? 0 : 0
+        isExplicitlySelected = false
+        tableView.reloadData()
+        if !candidates.isEmpty {
+            tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        }
+    }
+
     func dismiss() {
         orderOut(nil)
         candidates = []

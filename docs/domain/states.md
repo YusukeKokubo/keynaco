@@ -125,7 +125,7 @@ stateDiagram-v2
 |------|------|
 | Space / Enter | 選択候補を確定（`confirmSuccessor`）→ 待機 |
 | ↑↓ / Tab | 候補を移動 |
-| ローマ字 2 文字目 | 1 打目を通常組成に流してから 2 打目を処理 |
+| ローマ字 2 文字目以降 | バッファを伸ばし、仮名確定時に候補を絞り込み（`.replaceCandidates`）。未確定音節は候補維持。無効ローマ字・候補ゼロ時のみ通常組成へ |
 | → / Escape / Backspace | 候補解除 → 待機 |
 
 組成空で ASCII 英字 1 文字入力時、`trySuccessorCandidates` が候補を返せばこの状態に入る（確定直後の `successorEligible`、または `leftSideContext` 末尾の名詞文脈）。

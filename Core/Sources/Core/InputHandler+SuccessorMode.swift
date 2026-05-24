@@ -36,28 +36,40 @@ public extension InputHandler {
         return isKanji || isKatakana
     }
 
+    /// Successor 候補照会に使う prev（名詞）を解決する。
+    private func resolveSuccessorNoun() -> String? {
+        if let contextNoun = Self.extractNounFromContext(leftSideContext) {
+            return contextNoun
+        }
+        if successorEligible || successorBufferedRomaji != nil {
+            return lastCommittedOutput
+        }
+        return nil
+    }
+
+    /// 仮名プレフィックスで Successor 候補を絞り込む。0 件なら nil。
+    func trySuccessorCandidatesForKana(kanaPrefix: String) -> [String]? {
+        guard !kanaPrefix.isEmpty, let noun = resolveSuccessorNoun() else { return nil }
+        var seen = Set<String>()
+        var result: [String] = []
+        for s in db.fetchContentBigram(prev: noun, reading: kanaPrefix)
+            where seen.insert(s).inserted { result.append(s) }
+        for s in db.fetchHistoryPrefix(reading: kanaPrefix)
+            where seen.insert(s).inserted { result.append(s) }
+        return result.isEmpty ? nil : Array(result.prefix(LearningThresholds.successorMaxCandidates))
+    }
+
     /// ローマ字1文字に対応する Successor 候補。候補なしなら nil（通常入力へ）。
     func trySuccessorCandidates(romajiChar: String) -> [String]? {
         let key = romajiChar.lowercased()
         guard key.count == 1, let c = key.first, c.isLetter, c.isASCII,
               let kanas = Self.romajiToInitialKana[key], !kanas.isEmpty else { return nil }
-        let contextNoun = Self.extractNounFromContext(leftSideContext)
-        let noun: String?
-        if let contextNoun {
-            noun = contextNoun
-        } else if successorEligible {
-            noun = lastCommittedOutput
-        } else {
-            return nil
-        }
-        guard let noun else { return nil }
+        guard resolveSuccessorNoun() != nil else { return nil }
         var seen = Set<String>()
         var result: [String] = []
         for kana in kanas {
-            for s in db.fetchContentBigram(prev: noun, reading: kana)
-                where seen.insert(s).inserted { result.append(s) }
-            for s in db.fetchHistoryPrefix(reading: kana)
-                where seen.insert(s).inserted { result.append(s) }
+            guard let filtered = trySuccessorCandidatesForKana(kanaPrefix: kana) else { continue }
+            for s in filtered where seen.insert(s).inserted { result.append(s) }
         }
         return result.isEmpty ? nil : Array(result.prefix(LearningThresholds.successorMaxCandidates))
     }
@@ -101,22 +113,91 @@ public extension InputHandler {
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
         default:
-            let buffered = successorBufferedRomaji
-            successorBufferedRomaji = nil
-            if let buffered {
-                _ = state.addRomaji(buffered)
-            }
-            applyMarkedText(candidateText: nil, client: client)
-            return handleNormalInput(
-                keyCode: keyCode,
+            return handleSuccessorAdditionalKey(
                 characters: characters,
                 baseCharacters: baseCharacters,
                 modifiers: modifiers,
-                wasExplicitlySelected: false,
-                candidate: .hidden,
+                candidate: candidate,
                 client: client
             )
         }
+    }
+
+    /// Successor モード中の追加打鍵: ローマ字バッファを伸ばし、仮名確定時に候補を絞り込む。
+    private mutating func handleSuccessorAdditionalKey(
+        characters: String?,
+        baseCharacters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        let char = (baseCharacters ?? characters ?? "").lowercased()
+        guard char.count == 1, let c = char.first, c.isLetter, c.isASCII else {
+            return exitSuccessorToNormalInput(
+                prior: successorBufferedRomaji ?? "",
+                characters: characters,
+                baseCharacters: baseCharacters,
+                modifiers: modifiers,
+                candidate: candidate,
+                client: client
+            )
+        }
+
+        let prior = successorBufferedRomaji ?? ""
+        let newRomaji = prior + char
+        let (convertedKana, remaining) = RomajiConverter.resolveRomajiPrefix(newRomaji)
+        let priorKana = RomajiConverter.resolveRomajiPrefix(prior).convertedKana
+
+        if !convertedKana.isEmpty, convertedKana != priorKana {
+            if let filtered = trySuccessorCandidatesForKana(kanaPrefix: convertedKana) {
+                successorBufferedRomaji = newRomaji
+                applyMarkedText(candidateText: convertedKana, client: client)
+                return (true, .replaceCandidates(filtered))
+            }
+            successorBufferedRomaji = nil
+            _ = state.addRomaji(newRomaji)
+            applyMarkedText(candidateText: nil, client: client)
+            return (true, buildCandidateList())
+        }
+
+        if RomajiConverter.isValidRomajiPrefix(remaining) {
+            successorBufferedRomaji = newRomaji
+            return (true, .none)
+        }
+
+        return exitSuccessorToNormalInput(
+            prior: prior,
+            characters: char,
+            baseCharacters: char,
+            modifiers: modifiers,
+            candidate: candidate,
+            client: client
+        )
+    }
+
+    /// バッファを通常組成に流してから現打鍵を通常入力へ委譲する。
+    private mutating func exitSuccessorToNormalInput(
+        prior: String,
+        characters: String?,
+        baseCharacters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        successorBufferedRomaji = nil
+        if !prior.isEmpty {
+            _ = state.addRomaji(prior)
+        }
+        applyMarkedText(candidateText: nil, client: client)
+        return handleNormalInput(
+            keyCode: 0,
+            characters: characters,
+            baseCharacters: baseCharacters,
+            modifiers: modifiers,
+            wasExplicitlySelected: false,
+            candidate: .hidden,
+            client: client
+        )
     }
 
     mutating func confirmSuccessor(_ particle: String, client: TextInputClient) {

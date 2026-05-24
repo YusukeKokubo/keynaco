@@ -55,6 +55,11 @@ struct DebugCandidateWindow {
             if row < historyEnd    { historyEnd -= 1 }
             if candidates.isEmpty { isVisible = false; selectedRow = 0 }
             else { selectedRow = min(selectedRow, candidates.count - 1) }
+        case .replaceCandidates(let cands):
+            candidates = cands
+            isVisible = !cands.isEmpty
+            selectedRow = cands.isEmpty ? 0 : 0
+            isExplicitlySelected = false
         }
     }
 }

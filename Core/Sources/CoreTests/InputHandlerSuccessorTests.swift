@@ -291,4 +291,71 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
         }
         XCTAssertEqual(candidates, ["会議に出席する"])
     }
+
+    // MARK: - Successor 多打絞り込み
+
+    func testSuccessorFiltersOnSecondKey() {
+        recordFetchableContentBigram(prev: "東京", input: "かいぎ", output: "会議")
+        recordFetchableContentBigram(prev: "東京", input: "きょう", output: "今日")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        let showResult = type(chars: "k", base: "k")
+        guard case .show(let initial, _, _, _, _) = showResult.candidateAction else {
+            XCTFail("1 打目で .show: \(showResult.candidateAction)"); return
+        }
+        XCTAssertTrue(initial.contains("会議") && initial.contains("今日"))
+
+        let filterResult = type(chars: "a", base: "a", candidateVisible: true, selectedRow: 0, selectedText: initial[0])
+        guard case .replaceCandidates(let filtered) = filterResult.candidateAction else {
+            XCTFail("2 打目で .replaceCandidates: \(filterResult.candidateAction)"); return
+        }
+        XCTAssertEqual(filtered, ["会議"])
+        XCTAssertEqual(client.markedText, "か")
+    }
+
+    func testSuccessorFiltersMultiSyllable() {
+        recordFetchableContentBigram(prev: "東京", input: "かに", output: "確認")
+        recordFetchableContentBigram(prev: "東京", input: "かい", output: "会議")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        type(chars: "k", base: "k")
+        type(chars: "a", base: "a", candidateVisible: true, selectedRow: 0, selectedText: "会議")
+        type(chars: "n", base: "n", candidateVisible: true, selectedRow: 0, selectedText: "会議")
+        let filterResult = type(chars: "i", base: "i", candidateVisible: true, selectedRow: 0, selectedText: "会議")
+        guard case .replaceCandidates(let filtered) = filterResult.candidateAction else {
+            XCTFail("4 打目で .replaceCandidates: \(filterResult.candidateAction)"); return
+        }
+        XCTAssertEqual(filtered, ["確認"])
+        XCTAssertEqual(handler.successorBufferedRomaji, "kani")
+    }
+
+    func testSuccessorZeroCandidatesFallsBackToNormalCompose() {
+        recordFetchableContentBigram(prev: "東京", input: "かい", output: "会議")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        type(chars: "k", base: "k")
+        type(chars: "a", base: "a", candidateVisible: true, selectedRow: 0, selectedText: "会議")
+        type(chars: "k", base: "k", candidateVisible: true, selectedRow: 0, selectedText: "会議")
+        let result = type(chars: "u", base: "u", candidateVisible: true, selectedRow: 0, selectedText: "会議")
+        guard case .show = result.candidateAction else {
+            XCTFail("候補ゼロ後は通常組成の .show: \(result.candidateAction)"); return
+        }
+        XCTAssertEqual(handler.state.composedHiragana, "かく")
+        XCTAssertNil(handler.successorBufferedRomaji)
+    }
+
+    func testSuccessorIncompleteSyllableKeepsCandidates() {
+        recordFetchableContentBigram(prev: "東京", input: "し", output: "試")
+        typeRomaji("tokyo")
+        press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
+        let showResult = type(chars: "s", base: "s")
+        guard case .show = showResult.candidateAction else {
+            XCTFail("1 打目で .show"); return
+        }
+        let waitResult = type(chars: "h", base: "h", candidateVisible: true, selectedRow: 0, selectedText: "試")
+        guard case .none = waitResult.candidateAction else {
+            XCTFail("未確定音節 \"sh\" は .none: \(waitResult.candidateAction)"); return
+        }
+        XCTAssertEqual(handler.successorBufferedRomaji, "sh")
+    }
 }

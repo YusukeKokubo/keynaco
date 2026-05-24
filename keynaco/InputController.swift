@@ -177,6 +177,16 @@ class InputController: IMKInputController, @unchecked Sendable {
                 handler.db.deleteHistory(output: text)
                 candidateWindow.removeCandidate(at: row)
             }
+        case .replaceCandidates(let candidates):
+            #if DEBUG
+            EventViewerWindow.shared.addCandidates(candidates, selectedIndex: 0)
+            #endif
+            candidateWindow.replaceCandidates(candidates)
+            let isSuccessorReplace = composingWasEmpty && !handler.isBracketMode && handler.state.composedHiragana.isEmpty
+            if isSuccessorReplace, !candidates.isEmpty {
+                let markedText = candidates[0]
+                adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
+            }
         }
 
         if handler.documentSurroundingContextInvalidated {

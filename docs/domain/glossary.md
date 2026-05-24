@@ -107,7 +107,7 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 `commitText` 確定直後、または `confirmSuccessor` で **名詞系**（`isNounLike`）を確定した直後に立ち、次の 1 打目だけ `leftSideContext` が空でも `lastCommittedOutput` を prev に Successor を試す。1 打目処理後・Escape・確定直後 Backspace（`penalizeAll`）でクリア。格助詞等のひらがな確定後は立てない。
 
 ### successorBufferedRomaji
-Successor 候補表示中の 1 打目ローマ字。2 打目不一致時に通常組成へ流す。
+Successor モード中の蓄積ローマ字バッファ（nil = モード外）。追加打鍵で伸ばし、仮名が確定するたびに候補を絞り込む。無効ローマ字・候補ゼロ時に通常組成へ流す。
 
 *Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`*
 
