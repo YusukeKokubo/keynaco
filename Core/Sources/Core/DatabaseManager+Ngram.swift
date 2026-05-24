@@ -90,21 +90,4 @@ extension DatabaseManager {
             }
         }
     }
-
-    public func fetchContentBigramTop(prev: String, limit: Int = 20) -> [String] {
-        dbQueue.sync {
-            let now = self.nowEpoch()
-            return self.queryStringsOnQueue("""
-            SELECT output FROM content_bigram
-            WHERE prev = ?
-            GROUP BY output
-            ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
-            LIMIT ?
-            """) {
-                self.bindText($0, 1, prev)
-                self.bindRecency($0, at: 2, now: now)
-                sqlite3_bind_int($0, 4, Int32(limit))
-            }
-        }
-    }
 }

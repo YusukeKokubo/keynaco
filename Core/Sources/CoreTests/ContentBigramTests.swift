@@ -19,22 +19,10 @@ final class ContentBigramTests: XCTestCase {
         XCTAssertTrue(db.fetchContentBigram(prev: "東京", reading: "あめ").isEmpty)
     }
 
-    func testFetchContentBigramTop() {
-        let db = DatabaseManager(inMemory: true)
-        db.recordContentBigram(prev: "東京", input: "あめ", output: "雨")
-        db.recordContentBigram(prev: "東京", input: "かいしゃ", output: "会社")
-        db.recordContentBigram(prev: "東京", input: "かいしゃ", output: "会社")
-        db.recordContentBigram(prev: "東京", input: "かいしゃ", output: "会社")
-
-        let top = db.fetchContentBigramTop(prev: "東京", limit: 2)
-        XCTAssertEqual(top.first, "会社")
-        XCTAssertTrue(top.contains("雨"))
-    }
-
     func testRecordContentBigramSkipsEmptyPrev() {
         let db = DatabaseManager(inMemory: true)
         db.recordContentBigram(prev: "", input: "あめ", output: "雨")
-        XCTAssertTrue(db.fetchContentBigramTop(prev: "").isEmpty)
+        XCTAssertTrue(db.fetchContentBigram(prev: "", reading: "あ").isEmpty)
     }
 
     func testLemmatizeForPrevVerb() {
