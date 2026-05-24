@@ -5,9 +5,6 @@ final class ZenzaiViewController: NSViewController {
 
     private let enabledSwitch = NSSwitch()
     private let profileField = NSTextField()
-    private let topicField = NSTextField()
-    private let styleField = NSTextField()
-    private let preferenceField = NSTextField()
     private let limitField = NSTextField()
     private let limitStepper = NSStepper()
     private let applyButton: NSButton = {
@@ -27,15 +24,6 @@ final class ZenzaiViewController: NSViewController {
         profileField.placeholderString = "例: ITエンジニア,技術文書"
         profileField.stringValue = d.string(forKey: ZenzaiSettings.profileKey) ?? ""
         let row2 = rowStack(label: "プロフィール", control: profileField)
-        topicField.placeholderString = "例: 料理,レシピ"
-        topicField.stringValue = d.string(forKey: ZenzaiSettings.topicKey) ?? ""
-        let row3 = rowStack(label: "トピック", control: topicField)
-        styleField.placeholderString = "例: ですます,箇条書き"
-        styleField.stringValue = d.string(forKey: ZenzaiSettings.styleKey) ?? ""
-        let row4 = rowStack(label: "文体", control: styleField)
-        preferenceField.placeholderString = "例: 旧字体優先"
-        preferenceField.stringValue = d.string(forKey: ZenzaiSettings.preferenceKey) ?? ""
-        let row5 = rowStack(label: "好み", control: preferenceField)
         limitStepper.minValue = 1
         limitStepper.maxValue = 50
         limitStepper.increment = 1
@@ -51,7 +39,7 @@ final class ZenzaiViewController: NSViewController {
         limitRow.spacing = 8
         applyButton.target = self
         applyButton.action = #selector(applyTapped)
-        let main = NSStackView(views: [row1, row2, row3, row4, row5, limitRow, applyButton])
+        let main = NSStackView(views: [row1, row2, limitRow, applyButton])
         main.orientation = .vertical
         main.alignment = .leading
         main.spacing = 12
@@ -103,9 +91,6 @@ final class ZenzaiViewController: NSViewController {
         let d = UserDefaults.standard
         d.set(enabledSwitch.state == .on, forKey: ZenzaiSettings.enabledKey)
         d.set(profileField.stringValue, forKey: ZenzaiSettings.profileKey)
-        d.set(topicField.stringValue, forKey: ZenzaiSettings.topicKey)
-        d.set(styleField.stringValue, forKey: ZenzaiSettings.styleKey)
-        d.set(preferenceField.stringValue, forKey: ZenzaiSettings.preferenceKey)
         let fromField = Int(limitField.stringValue).map { max(1, min(50, $0)) }
         let n = fromField ?? max(1, min(50, Int(limitStepper.intValue)))
         limitField.stringValue = "\(n)"
