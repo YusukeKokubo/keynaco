@@ -15,6 +15,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
     /// ユーザー設定の Zenzai 有効フラグ。モデル URL 未取得などで実リランキングがフォールバックしていても `true` になり得る（ベストエフォート。プロモート行は辞書 top-1）。
     public var isZenzaiEnabled: Bool { zenzaiEnabled }
     private let zenzaiProfile: String
+    private let zenzaiTopic: String
+    private let zenzaiStyle: String
+    private let zenzaiPreference: String
     private let zenzaiInferenceLimit: Int
     private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }
 
@@ -52,12 +55,15 @@ public final class AzooKeyConverter: @unchecked Sendable {
     }
 
     public convenience init() {
-        self.init(zenzaiEnabled: false, zenzaiProfile: "", zenzaiInferenceLimit: 5)
+        self.init(zenzaiEnabled: false, zenzaiProfile: "", zenzaiTopic: "", zenzaiStyle: "", zenzaiPreference: "", zenzaiInferenceLimit: 5)
     }
 
-    public init(zenzaiEnabled: Bool = false, zenzaiProfile: String = "", zenzaiInferenceLimit: Int = 5) {
+    public init(zenzaiEnabled: Bool = false, zenzaiProfile: String = "", zenzaiTopic: String = "", zenzaiStyle: String = "", zenzaiPreference: String = "", zenzaiInferenceLimit: Int = 5) {
         self.zenzaiEnabled = zenzaiEnabled
         self.zenzaiProfile = zenzaiProfile
+        self.zenzaiTopic = zenzaiTopic
+        self.zenzaiStyle = zenzaiStyle
+        self.zenzaiPreference = zenzaiPreference
         self.zenzaiInferenceLimit = max(1, min(zenzaiInferenceLimit, 50))
         let memoryURL = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
@@ -93,6 +99,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
             versionDependentMode: .v3(
                 .init(
                     profile: zenzaiProfile.isEmpty ? nil : zenzaiProfile,
+                    topic: zenzaiTopic.isEmpty ? nil : zenzaiTopic,
+                    style: zenzaiStyle.isEmpty ? nil : zenzaiStyle,
+                    preference: zenzaiPreference.isEmpty ? nil : zenzaiPreference,
                     leftSideContext: leftSideContext
                 )
             )
