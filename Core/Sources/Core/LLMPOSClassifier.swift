@@ -22,7 +22,7 @@ public final class LLMPOSClassifier {
 
         let session = LanguageModelSession(model: SystemLanguageModel.default) {
             """
-            You are a Japanese POS tagger. Reply with tag:confidence on a single line.
+            You are a Japanese POS tagger. Reply with ONLY tag:confidence on a single line. No explanation.
             - tag: one of the tags listed below
             - confidence: high / mid / low
 
@@ -34,12 +34,25 @@ public final class LLMPOSClassifier {
             particle/case, particle/topic, particle/aux
             other/conjunction, other/interjection, other/clause, other/unknown
 
-            Examples:
+            proper_noun = real-world named entity (city, person, org). Generic words are noun/*, not proper_noun.
+
+            Examples (noun/common or noun/suru — NOT proper_noun):
+            入力 → noun/suru:high
+            設定 → noun/suru:high
+            固有名詞 → noun/common:high
+            地名 → noun/common:high
             実装 → noun/suru:high
+            確認 → noun/suru:high
+
+            Examples (proper_noun — actual named entities):
             東京 → proper_noun/place:high
-            東京タワー → proper_noun/org:high
-            田中さん → proper_noun/person:high
+            東京タワー → proper_noun/place:high
             田中 → proper_noun/person:mid
+            田中さん → proper_noun/person:high
+            Apple → proper_noun/org:high
+            TypeScript → proper_noun/org:high
+
+            Examples (verb/adjective/particle):
             確認して → verb/te:high
             見つかった → verb/ta:high
             欲しい → adjective/i:high

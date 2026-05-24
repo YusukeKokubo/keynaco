@@ -69,22 +69,31 @@ extension DatabaseManager {
         }
     }
 
-    /// 直近に確定した固有名詞（pos LIKE 'proper_noun%'）を重複排除して返す。
+    /// 直近に確定した固有名詞（subcategory 付き・高信頼度）を重複排除して返す。
     /// Zenzai の topic パラメーター自動推論に使用。
+    /// - subcategory（/place・/person・/org）が必須: bare "proper_noun" はパース失敗の可能性が高い
+    /// - pos_retry=0: 高/中信頼度のみ（低信頼度は除外）
+    /// - 助詞付きエントリ除外: output が助詞で終わるものは誤分類とみなす
     public func recentProperNouns(limit: Int) -> [String] {
-        dbQueue.sync {
+        let particles = ["が", "を", "は", "に", "で", "へ", "と", "の", "から", "まで", "より", "など", "て", "も"]
+        return dbQueue.sync {
             var results: [String] = []
             let sql = """
             SELECT output FROM history
-            WHERE pos LIKE 'proper_noun%'
+            WHERE pos IN ('proper_noun/place', 'proper_noun/person', 'proper_noun/org')
+              AND pos_retry = 0
             GROUP BY output
             ORDER BY MAX(used_at) DESC, SUM(count) DESC
             LIMIT ?
             """
             guard let stmt = self.cachedStmt(for: sql) else { return results }
-            sqlite3_bind_int(stmt, 1, Int32(limit))
+            sqlite3_bind_int(stmt, 1, Int32(limit * 3))
             while sqlite3_step(stmt) == SQLITE_ROW {
-                if let p = sqlite3_column_text(stmt, 0) { results.append(String(cString: p)) }
+                guard let p = sqlite3_column_text(stmt, 0) else { continue }
+                let word = String(cString: p)
+                guard !particles.contains(where: { word.hasSuffix($0) }) else { continue }
+                results.append(word)
+                if results.count >= limit { break }
             }
             return results
         }

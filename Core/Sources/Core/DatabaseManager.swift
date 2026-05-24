@@ -143,6 +143,13 @@ public final class DatabaseManager: @unchecked Sendable {
                 END
             WHERE pos = 'proper_noun' AND pos_tag IS NOT NULL
             """, nil, nil, nil)
+        // pos_tag に ':confidence' がない旧形式エントリは信頼度不明のため再分類対象にする
+        sqlite3_exec(db, """
+            UPDATE history SET pos_retry = 1
+            WHERE pos IS NOT NULL AND pos != 'other'
+              AND pos_retry = 0
+              AND (pos_tag IS NULL OR pos_tag NOT LIKE '%:%')
+            """, nil, nil, nil)
     }
 
     private func seedHiraganaPreferredIfNeeded() {
