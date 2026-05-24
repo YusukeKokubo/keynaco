@@ -79,6 +79,46 @@ final class LLMPOSClassifierTests: XCTestCase {
         XCTAssertTrue(LLMPOSClassifier.needsRetry(posTag: "verb/te:confidence")) // 不正トークン
     }
 
+    // MARK: - isLikelySuruNounStem
+
+    func testIsLikelySuruNounStem() {
+        XCTAssertTrue(LLMPOSClassifier.isLikelySuruNounStem("入力"))
+        XCTAssertTrue(LLMPOSClassifier.isLikelySuruNounStem("実装"))
+        XCTAssertTrue(LLMPOSClassifier.isLikelySuruNounStem("確認"))
+        XCTAssertTrue(LLMPOSClassifier.isLikelySuruNounStem("東京"))
+        XCTAssertFalse(LLMPOSClassifier.isLikelySuruNounStem("行く"))
+        XCTAssertFalse(LLMPOSClassifier.isLikelySuruNounStem("確認して"))
+        XCTAssertFalse(LLMPOSClassifier.isLikelySuruNounStem("a"))
+    }
+
+    func testShouldOmitClassificationContext() {
+        XCTAssertTrue(LLMPOSClassifier.shouldOmitClassificationContext("入力"))
+        XCTAssertTrue(LLMPOSClassifier.shouldOmitClassificationContext("実装"))
+        XCTAssertFalse(LLMPOSClassifier.shouldOmitClassificationContext("東京"))
+    }
+
+    // MARK: - applySuruNounHeuristic
+
+    func testApplySuruNounHeuristic() {
+        let adjusted = LLMPOSClassifier.applySuruNounHeuristic(
+            output: "入力", pos: "verb", posTag: "verb:high", posRetry: false
+        )
+        XCTAssertEqual(adjusted.pos, "noun")
+        XCTAssertEqual(adjusted.posTag, "noun:mid")
+        XCTAssertFalse(adjusted.posRetry)
+
+        let unchanged = LLMPOSClassifier.applySuruNounHeuristic(
+            output: "行く", pos: "verb", posTag: "verb:high", posRetry: false
+        )
+        XCTAssertEqual(unchanged.pos, "verb")
+        XCTAssertEqual(unchanged.posTag, "verb:high")
+
+        let nounUnchanged = LLMPOSClassifier.applySuruNounHeuristic(
+            output: "入力", pos: "noun", posTag: "noun:high", posRetry: false
+        )
+        XCTAssertEqual(nounUnchanged.pos, "noun")
+    }
+
     // MARK: - parsePOSString（後方互換）
 
     func testParsePOSStringBackcompat() {

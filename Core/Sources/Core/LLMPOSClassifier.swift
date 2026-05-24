@@ -8,16 +8,62 @@ private let logger = Logger(subsystem: "com.leaner.keynaco", category: "POSClass
 /// Apple Intelligence が利用できない環境では何もしない（pos = NULL のまま → 全件表示）。
 @MainActor
 public final class LLMPOSClassifier {
+    private struct POSJob {
+        let output: String
+        let context: String?
+        let completion: @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+    }
+
     private var runningOutputs: Set<String> = []
+    private var jobQueue: [POSJob] = []
+    private var isProcessingQueue = false
 
     public init() {}
 
+    /// 確定順 FIFO で 1 件ずつ分類する。noun_bigram 記録の順序保証用。
+    public func enqueue(
+        output: String,
+        context: String? = nil,
+        completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+    ) {
+        jobQueue.append(POSJob(output: output, context: context, completion: completion))
+        drainQueue()
+    }
+
     /// `output` の品詞を非同期に判定し、結果を `completion` に返す。
     /// `context` は直前の確定済みテキスト（文脈）。渡すと固有名詞の subcategory 精度が上がる。
-    /// 同じ output が並行して複数回呼ばれた場合は重複実行しない。
-    public func classify(output: String, context: String? = nil, completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void) {
-        guard case .available = SystemLanguageModel.default.availability else { return }
-        guard !runningOutputs.contains(output) else { return }
+    /// 同じ output が並行して複数回呼ばれた場合は重複実行しない。バックフィル・デバッグ用。
+    public func classify(
+        output: String,
+        context: String? = nil,
+        completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+    ) {
+        runClassification(output: output, context: context, completion: completion)
+    }
+
+    private func drainQueue() {
+        guard !isProcessingQueue, !jobQueue.isEmpty else { return }
+        isProcessingQueue = true
+        let job = jobQueue.removeFirst()
+        let started = runClassification(output: job.output, context: job.context) { [weak self] output, pos, posTag, posRetry in
+            job.completion(output, pos, posTag, posRetry)
+            self?.isProcessingQueue = false
+            self?.drainQueue()
+        }
+        if !started {
+            isProcessingQueue = false
+            drainQueue()
+        }
+    }
+
+    @discardableResult
+    private func runClassification(
+        output: String,
+        context: String? = nil,
+        completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+    ) -> Bool {
+        guard case .available = SystemLanguageModel.default.availability else { return false }
+        guard !runningOutputs.contains(output) else { return false }
         runningOutputs.insert(output)
 
         let session = LanguageModelSession(model: SystemLanguageModel.default) {
@@ -25,6 +71,12 @@ public final class LLMPOSClassifier {
             # Role
             Japanese POS Tagger for IME commit history.
             Reply: "tag:confidence" (high/mid/low).
+
+            # Rules
+            - Each token is an IME commit unit (surface form, no okurigana attached).
+            - Classify by dictionary POS, not by possible sentence continuation.
+            - サ変名詞 (実装, 入力, 確認, 設定, etc.) without する attached → noun.
+            - Use preceding context only for proper_noun subcategory; do not flip noun/verb on standalone tokens.
 
             # Tagset
             - noun, verb, adjective, particle
@@ -46,6 +98,13 @@ public final class LLMPOSClassifier {
             ドラゴンボール → proper_noun/work:high
             スラムダンク → proper_noun/work:high
             実装 → noun:high
+            実装する → verb:high
+            入力 → noun:high
+            入力する → verb:high
+            変換 → noun:high
+            確認 → noun:high
+            設定 → noun:high
+            管理 → noun:high
             確認して → verb:high
             欲しい → adjective:high
             が → particle:high
@@ -66,14 +125,50 @@ public final class LLMPOSClassifier {
             do {
                 let response = try await session.respond(to: prompt)
                 let posTag = Self.normalizeTag(response.content)
-                let pos = Self.categoryFromTag(posTag)
-                let retry = Self.needsRetry(posTag: posTag)
+                var pos = Self.categoryFromTag(posTag)
+                var retry = Self.needsRetry(posTag: posTag)
+                let adjusted = Self.applySuruNounHeuristic(output: output, pos: pos, posTag: posTag, posRetry: retry)
+                pos = adjusted.pos
+                retry = adjusted.posRetry
                 if pos == "other" {
                     logger.warning("POS=other: output=\(output, privacy: .public) tag=\(posTag, privacy: .public)")
                 }
-                completion(output, pos, posTag, retry)
+                completion(output, pos, adjusted.posTag, retry)
             } catch {}
         }
+        return true
+    }
+
+    /// 送り仮名なしの漢字 2〜4 字語幹（サ変名詞候補）。
+    static nonisolated func isLikelySuruNounStem(_ output: String) -> Bool {
+        guard output.count >= 2, output.count <= 4 else { return false }
+        for scalar in output.unicodeScalars {
+            guard scalar.properties.isIdeographic else { return false }
+        }
+        return true
+    }
+
+    /// 前文脈を渡すと verb に倒されやすいサ変名詞。context 省略判定用。
+    static nonisolated func shouldOmitClassificationContext(_ output: String) -> Bool {
+        suruNounContextOmitWords.contains(output)
+    }
+
+    private static nonisolated let suruNounContextOmitWords: Set<String> = [
+        "実装", "入力", "変換", "確認", "設定", "管理", "作成", "削除", "更新", "追加",
+        "実行", "保存", "検索", "表示", "登録", "修正", "反映", "取得", "送信", "受信",
+    ]
+
+    /// LLM が verb と返したサ変名詞語幹を noun に昇格する。
+    static nonisolated func applySuruNounHeuristic(
+        output: String,
+        pos: String,
+        posTag: String,
+        posRetry: Bool
+    ) -> (pos: String, posTag: String, posRetry: Bool) {
+        guard pos == "verb", isLikelySuruNounStem(output) else {
+            return (pos, posTag, posRetry)
+        }
+        return ("noun", "noun:mid", false)
     }
 
     /// LLM 応答から `tag:confidence` 形式のタグ部分を正規化して返す。
