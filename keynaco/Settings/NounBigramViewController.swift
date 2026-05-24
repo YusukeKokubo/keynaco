@@ -15,9 +15,9 @@ final class NounBigramViewController: NSViewController {
     }
 
     private let columnDefs: [ColumnDef] = [
-        ColumnDef(id: "prev",    title: "前の語",       minWidth: 60, defaultWidth: 140, sortKey: nil),
-        ColumnDef(id: "input",   title: "読み",         minWidth: 60, defaultWidth: 120, sortKey: nil),
-        ColumnDef(id: "output",  title: "確定テキスト", minWidth: 60, defaultWidth: 160, sortKey: nil),
+        ColumnDef(id: "prev",    title: "前の語",       minWidth: 60, defaultWidth: 140, sortKey: "prev"),
+        ColumnDef(id: "input",   title: "読み",         minWidth: 60, defaultWidth: 120, sortKey: "input"),
+        ColumnDef(id: "output",  title: "確定テキスト", minWidth: 60, defaultWidth: 160, sortKey: "output"),
         ColumnDef(id: "count",   title: "回数",         minWidth: 40, defaultWidth: 60,  sortKey: "count"),
         ColumnDef(id: "used_at", title: "最終変換",     minWidth: 80, defaultWidth: 110, sortKey: "used_at"),
     ]
@@ -109,14 +109,14 @@ final class NounBigramViewController: NSViewController {
     }
 
     private func sortData(by descriptor: NSSortDescriptor) {
-        let ascending = descriptor.ascending
+        let asc = descriptor.ascending
         switch descriptor.key {
-        case "count":
-            data.sort { ascending ? $0.count < $1.count : $0.count > $1.count }
-        case "used_at":
-            data.sort { ascending ? $0.usedAt < $1.usedAt : $0.usedAt > $1.usedAt }
-        default:
-            break
+        case "prev":    data.sort { asc ? $0.prev < $1.prev : $0.prev > $1.prev }
+        case "input":   data.sort { asc ? $0.input < $1.input : $0.input > $1.input }
+        case "output":  data.sort { asc ? $0.output < $1.output : $0.output > $1.output }
+        case "count":   data.sort { asc ? $0.count < $1.count : $0.count > $1.count }
+        case "used_at": data.sort { asc ? $0.usedAt < $1.usedAt : $0.usedAt > $1.usedAt }
+        default:        break
         }
         tableView.reloadData()
     }
