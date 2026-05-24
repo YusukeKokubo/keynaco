@@ -505,10 +505,7 @@ extension DebugSocketServer {
     }
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
-    let db = handler.db
-    InputController.posClassifier.classify(output: text) { classifiedOutput, pos, posTag, posRetry in
-        db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
-    }
+        schedulePOSClassification(output: text, reading: handler.lastCommittedReading ?? "")
     }
 
     var result = makeResponse(inserted: insertedTexts)
@@ -538,7 +535,37 @@ extension DebugSocketServer {
             }
             return ["output": output, "pos": "(not in db)", "pos_tag": "(not in db)", "pos_retry": false]
         }
-        return ["results": results]
+        return Self.finalize(["results": results], cmd: cmd)
+    }
+
+    func handleQueryNounBigram(cmd: [String: Any]) -> [String: Any] {
+        let prev = cmd["query_noun_bigram_prev"] as? String
+        let entries = handler.db.fetchAllNounBigram()
+        let filtered = prev.map { p in entries.filter { $0.prev == p } } ?? entries
+        let results: [[String: Any]] = filtered.map {
+            ["prev": $0.prev, "input": $0.input, "output": $0.output, "count": $0.count]
+        }
+        return Self.finalize([
+            "results": results,
+            "lastConfirmedNounOutput": handler.lastConfirmedNounOutput as Any,
+        ], cmd: cmd)
+    }
+
+    /// InputController.schedulePOSClassification と同経路で POS 分類・noun_bigram 記録を行う。
+    func schedulePOSClassification(output: String, reading: String) {
+        let db = handler.db
+        let historyJoined = handler.committedHistory.suffix(5).joined()
+        let context = historyJoined.isEmpty ? nil : historyJoined
+        InputController.posClassifier.enqueue(output: output, context: context) { [weak self] classifiedOutput, pos, posTag, posRetry in
+            guard let self else { return }
+            db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
+            if pos == "noun" || pos.hasPrefix("proper_noun") {
+                if let prev = self.handler.lastConfirmedNounOutput {
+                    db.recordNounBigram(prev: prev, input: reading, output: classifiedOutput)
+                }
+                self.handler.lastConfirmedNounOutput = classifiedOutput
+            }
+        }
     }
 }
 

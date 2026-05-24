@@ -1022,6 +1022,9 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["seed_noun_bigram"] is [String: Any] { return handleSeedNounBigram(cmd: cmd) }
         if cmd["seed_history"] is [String: Any] { return handleSeedHistory(cmd: cmd) }
         if cmd["query_pos"] is [Any] { return handleQueryPos(cmd: cmd) }
+        if cmd["query_noun_bigram"] != nil || cmd["query_noun_bigram_prev"] is String {
+            return handleQueryNounBigram(cmd: cmd)
+        }
         if cmd["set_last_noun"] is String { return handleSetLastNoun(cmd: cmd) }
         if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
         if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
