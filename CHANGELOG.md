@@ -4,6 +4,73 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 
 ---
 
+## 2026-05-23〜24 — content_bigram・POS 分類・設定 UI
+
+### 追加
+- **content_bigram** — `noun_bigram` を `content_bigram` に置き換え、prev を名詞・固有名詞に加え動詞も対象に拡張。動詞 prev は LLM 品詞分類の `verb:confidence:lemma` で基本形に正規化し `history.lemma` にキャッシュ
+- **POSCommitSequencer** — POS 分類（DB キャッシュ / LLM）と content_bigram 記録を分離し、確定順 FIFO で副作用を適用。連続確定時のサ変名詞誤分類を改善
+- **LLM 品詞分類の拡張** — 固有名詞を `proper_noun` として名詞から分離。階層タグ（`product`/`work` 等）・自信度・再試行フラグを導入。文脈付き分類と `recentProperNouns` フィルタで精度を改善
+- **Noun-Bigram 管理タブ** — 設定画面に content_bigram エントリの一覧・削除 UI を追加
+- **変換履歴タブの拡充** — 「最終変換」列（`MM/dd HH:mm`）と品詞・回数・最終変換での昇順/降順ソートを追加
+
+### 削除
+- **変換履歴の AI スキャン** — Apple Intelligence 依存で実用性が低い `LLMCleanser` と「AI スキャン」シートを削除
+- **Zenzai topic/style/preference** — 設定 UI 追加後 POC260524 で topic 自動推論を検証したが効果不足のためパラメータと UI を削除（`profile` のみ残存）
+
+### 修正
+- **連続確定時の content_bigram 記録** — `prevNoun` を POS 分類 completion 時点で読み取り、高速連続確定でもペアが記録されるよう修正
+- **デバッグサンドボックス** — `useRealDB` を本番 DB 直結に変更し、reset 後の `posCommitSequencer` 再生成・POS/noun_bigram 記録経路を本番と一致させた
+
+---
+
+## 2026-05-23 — IME パイプライン簡素化・Successor 入力起動
+
+### 追加
+- **Successor の履歴前方一致** — noun-bigram が空でも `isNounLike` な prev 語から Successor を起動し、`fetchHistoryPrefix` の結果も候補にマージ（例: 「東京」確定後に `t` →「タワー」）
+- **デバッグサンドボックス行ベース UI** — 左ペインを行単位ログに再構成。`get_log` の行単位返却・行コピー・`set_left_context` / `isZenzaiEnabled` フィールドを追加
+
+### 変更
+- **Successor を入力起動に統一** — 確定直後フラグ（`isSuccessorMode` / `suggestSuccessors`）を廃止。組成空の 1 打目 ASCII 入力で `leftSideContext` から prev を取り候補を試す設計に一本化
+- **Successor を noun-bigram 予測に特化** — 格助詞 fallback リストを削除。noun-bigram → 履歴前方一致の 2 ソースに整理（後日 content_bigram に移行）
+- **候補リスト組み立ての再構成** — `CandidateAssembler` を純粋関数化しセクション宣言的に再構成（PLAN260519）
+
+### 削除
+- **LLMSegmentConverter** — Zenzai ON 環境で効果がなく、セグメント LLM 全文一括変換を削除
+- **LLMMisconversionChecker** — 確定後のオンデバイス LLM 誤変換スキャンを削除し LLM リソースを POS 分類に集中
+- **`boundary_pref` テーブルと境界学習** — セグメント手動境界の永続化を廃止
+- **確定時 shadow segmentize 学習** — Enter 確定後の非同期セグメント分割による `recordPrefixes` 登録を廃止
+- **仮想文脈（virtualHistoryPrefix）** — IMK カーソル前文注入を試行したが Phase 2 で廃止
+
+### 修正
+- **Successor チェーン** — 格助詞確定後は連鎖を停止。Backspace 時に eligible 状態をクリア
+- **`nn` + 母音** — `hiddenPendingN` を破棄し母音単体（`na` 等）に変換するよう修正
+- **KanaKanjiConverter 並行アクセス** — `NSLock` で `converter.*` 呼び出しを直列化（`Task.detached` からのデータ競合防止）
+
+---
+
+## 2026-05-20〜22 — noun_bigram・候補品質・Zenzai プロモーション
+
+### 追加
+- **noun_bigram** — 名詞ペア共起学習を導入し Successor / 予測候補の prev 語予測に利用（後日 content_bigram に移行）
+- **LLM 履歴名詞フィルタ** — 変換履歴候補を LLM 品詞分類で名詞系のみに絞り込み
+- **Zenzai top-1 プロモーション強化** — 履歴なし autoShow 時に Zenzai 第 1 候補を先頭に昇格。続けて履歴あり時も初期表示されるよう修正
+- **カタカナ候補を末尾に常時追加** — 候補リスト末尾にカタカナ変換を常設
+- **Successor 長候補分割** — 助詞境界で長い表層候補を分割して表示
+
+### 変更
+- **履歴の `is_noun` を `pos` 列に拡張** — 品詞テキスト（`noun` / `proper_noun:person` / `verb` 等）を DB に保存し、LLM による履歴候補の名詞フィルタリングに利用
+- **N-gram 学習の一本化** — ユーザー bi-gram / trigram / skip-bigram 学習を廃止。preset_bigram（固定ペア）+ noun_bigram（後に content_bigram）に移行
+- **Successor を名詞末尾限定から拡張** — 当初は漢字・カタカナ末尾のみに制限したが、最終的には `isNounLike` 判定と入力起動モデルに統合（05-23）
+- **autoShow 時のひらがな先頭固定** — 辞書のみ変換で候補が少ないときは全行表示し、読みのひらがなを row 0 に固定
+- **セグメント学習** — `output == reading` のセグメント（未変換文節）は `recordPrefixes` をスキップ
+
+### 修正
+- **候補選択中の Space** — `isExplicitlySelected` 時に Space が再変換せず次候補へ移動するよう修正
+- **変換履歴テーブル** — 「回数」列が隠れないよう列リサイズを修正
+- **Zenzai 設定** — リセットバグの修正と保存フィードバックの追加
+
+---
+
 ## 2026-05-17〜19 — hiraganaPreferred 一般化・候補順序・部分語学習
 
 ### 追加
