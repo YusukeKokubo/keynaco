@@ -108,7 +108,7 @@ cd Core && swift test
 - `Core/` の公開型は `public` 必須（`@testable import` はテストのみ有効。App からは `internal` は不可）
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
 - `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト。`docs/domain/scenarios.md` と対応
-- **E2E 動作確認**: 状態（Successor・Segment・Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）
+- **E2E 動作確認**: 状態（Successor・Segment・Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）。Successor モードは POS 分類が非同期なので `{"set_left_context": "名詞"}` + `seed_noun_bigram` + `useRealDB:true` でバイパスする。sandbox で通常文字を送るには `{"type_string": "k"}` を使う（`{"key": "k"}` は特殊キーのみ有効）
 
 ## キー入力の挙動（特殊ケース）
 
