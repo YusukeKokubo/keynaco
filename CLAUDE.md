@@ -47,7 +47,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 `main.swift` → `NSManualApplication`（`NSApplication` サブクラス）→ `AppDelegate` →
 `IMKServer` を生成し `InputController`（`IMKInputController` サブクラス）を登録。
-`@objc(ClassName)` アノテーションが必須（後述）。
 
 ## ビルド・インストール
 
@@ -56,8 +55,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 ```bash
 xcodebuild build -scheme keynaco -destination "platform=macOS"
 ```
-
-AzooKey（`AzooKeyKanaKanjiConverter`）が仮名漢字変換の中核エンジン。`Core/Package.swift` で SPM 依存として管理。
 
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
 - **`@unchecked Sendable` + `Task.detached` の注意**: `@unchecked Sendable` はコンパイラの並行性チェックをバイパスするため、内部の非スレッドセーフな状態を `Task.detached` から触ると無音でデータ競合になる。`AzooKeyConverter.converter`（`KanaKanjiConverter` / Zenzai の `llama_context`）は非スレッドセーフ。`converter.*` を呼ぶメソッドはすべて `converterLock.withLock` を通すこと（過去に SIGABRT クラッシュを引き起こした実績あり）。
@@ -109,7 +106,6 @@ cd Core && swift test
 ## テスト方針
 
 - `Core/` の公開型は `public` 必須（`@testable import` はテストのみ有効。App からは `internal` は不可）
-- XCUITest / CGEvent は不採用（`typeText()` は IME をバイパス。CGEvent は Accessibility 権限依存で CI 不安定）
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
 - `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト。`docs/domain/scenarios.md` と対応
 - **E2E 動作確認**: 状態（Successor・Segment・Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）
