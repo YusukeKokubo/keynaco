@@ -35,7 +35,6 @@
 		BECB3D246AF08901817AFD4E /* EventViewerWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96925E03EBB4612285CA9FF /* EventViewerWindow.swift */; };
 		CC81B691B4422E5779491EE0 /* UserDictViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */; };
 		CF5D2357CC1B6C7209F9918F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC83CA0F9C13530D08702297 /* main.swift */; };
-		A8C9D0E12F3A4B5C6D7E8F04 /* CleanserSheetViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C9D0E12F3A4B5C6D7E8F03 /* CleanserSheetViewController.swift */; };
 		E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A755C9097E561BF05FF3D11 /* InputController.swift */; };
 		7C3D2E1F4051627384A5B6C7 /* InputController+LLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */; };
 		E5F60718293A4B5C6D7E8F09 /* InputController+IMKAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */; };
@@ -84,7 +83,6 @@
 		B35A13234A024ED9F84F3147 /* SurroundingIMKContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundingIMKContext.swift; sourceTree = "<group>"; };
 		BC83CA0F9C13530D08702297 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A8C9D0E12F3A4B5C6D7E8F03 /* CleanserSheetViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanserSheetViewController.swift; sourceTree = "<group>"; };
 		C9289632F6594D9EE9A07926 /* IMESandboxWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMESandboxWindow.swift; sourceTree = "<group>"; };
 		E6A89E465235280624AF1A85 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
 		45BB50D896044E0EB5C1CC28 /* HiraganaPreferredViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HiraganaPreferredViewController.swift; sourceTree = "<group>"; };
@@ -155,8 +153,7 @@
 		1C8A83DDFE8CB25CA31F9835 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
-				A8C9D0E12F3A4B5C6D7E8F03 /* CleanserSheetViewController.swift */,
-				45BB50D896044E0EB5C1CC28 /* HiraganaPreferredViewController.swift */,
+					45BB50D896044E0EB5C1CC28 /* HiraganaPreferredViewController.swift */,
 			FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */,
 				184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */,
 				EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */,
@@ -335,8 +332,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */,
-				A8C9D0E12F3A4B5C6D7E8F04 /* CleanserSheetViewController.swift in Sources */,
-				8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
+					8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
 				1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */,
 				D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */,
 				D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */,
