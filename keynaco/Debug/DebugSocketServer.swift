@@ -25,7 +25,7 @@ final class DebugSocketServer: @unchecked Sendable {
     var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
     /// 本番 InputController の POS キューと競合しないよう Debug 専用インスタンスを使う。
     let posClassifier = LLMPOSClassifier()
-    lazy var posCommitSequencer = POSCommitSequencer(db: handler.db, classifier: posClassifier)
+    var posCommitSequencer: POSCommitSequencer
     let mockClient = SocketMockClient()
     var candidateWindow = DebugCandidateWindow()
 
@@ -35,7 +35,9 @@ final class DebugSocketServer: @unchecked Sendable {
     /// `deinit` から参照するため `nonisolated(unsafe)`。書き込みは MainActor のみ。
     nonisolated(unsafe) var snapshotURL: URL?
 
-    private init() {}
+    private init() {
+        posCommitSequencer = POSCommitSequencer(db: handler.db, classifier: posClassifier)
+    }
 
     deinit {
         Self.removeSnapshotArtifacts(baseURL: snapshotURL)

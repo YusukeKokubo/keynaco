@@ -16,6 +16,7 @@ extension DebugSocketServer {
     } else {
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
     }
+    posCommitSequencer = POSCommitSequencer(db: handler.db, classifier: posClassifier)
     InputHandler.isAsciiMode = false
     candidateWindow = DebugCandidateWindow()
     mockClient.reset()
