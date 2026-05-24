@@ -6,6 +6,23 @@ final class HistoryViewController: NSViewController {
     private let deleteButton = NSButton(title: "選択を削除", target: nil, action: nil)
     private var data: [DatabaseManager.HistoryEntry] = []
 
+    private struct ColumnDef {
+        let id: String
+        let title: String
+        let minWidth: CGFloat
+        let defaultWidth: CGFloat
+        let sortKey: String?
+    }
+
+    private let columnDefs: [ColumnDef] = [
+        ColumnDef(id: "input",   title: "読み",         minWidth: 60,  defaultWidth: 150, sortKey: nil),
+        ColumnDef(id: "output",  title: "確定テキスト", minWidth: 60,  defaultWidth: 200, sortKey: nil),
+        ColumnDef(id: "pos",     title: "品詞",         minWidth: 60,  defaultWidth: 90,  sortKey: "pos"),
+        ColumnDef(id: "pos_tag", title: "LLMタグ",      minWidth: 60,  defaultWidth: 120, sortKey: nil),
+        ColumnDef(id: "count",   title: "回数",         minWidth: 40,  defaultWidth: 60,  sortKey: "count"),
+        ColumnDef(id: "used_at", title: "最終変換",     minWidth: 80,  defaultWidth: 110, sortKey: "used_at"),
+    ]
+
     override func loadView() {
         view = NSView()
 
@@ -16,18 +33,15 @@ final class HistoryViewController: NSViewController {
         view.addSubview(scrollView)
 
         tableView.usesAlternatingRowBackgroundColors = true
-        tableView.columnAutoresizingStyle = .noColumnAutoresizing
-        for (id, title, width, flexible) in columns {
-            let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
-            col.title = title
-            col.width = width
-            if flexible {
-                col.minWidth = 80
-                col.resizingMask = .autoresizingMask
-            } else {
-                col.minWidth = width
-                col.maxWidth = width
-                col.resizingMask = []
+        tableView.columnAutoresizingStyle = .sequentialColumnAutoresizingStyle
+        for def in columnDefs {
+            let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(def.id))
+            col.title = def.title
+            col.width = def.defaultWidth
+            col.minWidth = def.minWidth
+            col.resizingMask = [.userResizingMask, .autoresizingMask]
+            if let key = def.sortKey {
+                col.sortDescriptorPrototype = NSSortDescriptor(key: key, ascending: true)
             }
             tableView.addTableColumn(col)
         }
@@ -52,14 +66,6 @@ final class HistoryViewController: NSViewController {
             view.heightAnchor.constraint(greaterThanOrEqualToConstant: 300),
         ])
     }
-
-    private let columns: [(String, String, CGFloat, Bool)] = [
-        ("input",   "読み",         150, true),
-        ("output",  "確定テキスト", 200, true),
-        ("pos",     "品詞",          70, false),
-        ("pos_tag", "LLMタグ",       120, true),
-        ("count",   "回数",          60, false),
-    ]
 
     private func makeBottomBar() -> NSView {
         let bar = NSView()
@@ -101,8 +107,35 @@ final class HistoryViewController: NSViewController {
 
     @objc private func reload() {
         data = DatabaseManager.shared.fetchAllHistory()
-        tableView.reloadData()
+        applyCurrentSort()
         deleteButton.isEnabled = false
+    }
+
+    private func applyCurrentSort() {
+        guard let descriptor = tableView.sortDescriptors.first else {
+            tableView.reloadData()
+            return
+        }
+        sortData(by: descriptor)
+    }
+
+    private func sortData(by descriptor: NSSortDescriptor) {
+        let ascending = descriptor.ascending
+        switch descriptor.key {
+        case "pos":
+            data.sort {
+                let a = Self.posLabel($0.pos)
+                let b = Self.posLabel($1.pos)
+                return ascending ? a < b : a > b
+            }
+        case "count":
+            data.sort { ascending ? $0.count < $1.count : $0.count > $1.count }
+        case "used_at":
+            data.sort { ascending ? $0.usedAt < $1.usedAt : $0.usedAt > $1.usedAt }
+        default:
+            break
+        }
+        tableView.reloadData()
     }
 
     @objc private func deleteSelected() {
@@ -131,6 +164,7 @@ extension HistoryViewController: NSTableViewDelegate {
         case "pos":     text = Self.posLabel(entry.pos)
         case "pos_tag": text = entry.posTag ?? "―"
         case "count":   text = "\(entry.count)"
+        case "used_at": text = Self.formatDate(entry.usedAt)
         default: return nil
         }
         let tf = tableView.makeView(withIdentifier: id, owner: nil) as? NSTextField ?? {
@@ -143,8 +177,24 @@ extension HistoryViewController: NSTableViewDelegate {
         return tf
     }
 
+    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        guard let descriptor = tableView.sortDescriptors.first else { return }
+        sortData(by: descriptor)
+    }
+
     func tableViewSelectionDidChange(_ notification: Notification) {
         deleteButton.isEnabled = tableView.selectedRow >= 0
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm"
+        return f
+    }()
+
+    private static func formatDate(_ epoch: Int64) -> String {
+        guard epoch > 0 else { return "―" }
+        return dateFormatter.string(from: Date(timeIntervalSince1970: Double(epoch)))
     }
 
     private static func posLabel(_ pos: String?) -> String {

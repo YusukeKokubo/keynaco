@@ -242,6 +242,7 @@ public final class DatabaseManager: @unchecked Sendable {
         public let pos: String?
         public let posTag: String?
         public let posRetry: Bool
+        public let usedAt: Int64
     }
 
     public struct UserDictEntry: Sendable {

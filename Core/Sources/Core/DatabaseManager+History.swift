@@ -85,7 +85,7 @@ extension DatabaseManager {
 
     public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
-            let sql = "SELECT input, output, count, pos, pos_tag, pos_retry FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+            let sql = "SELECT input, output, count, pos, pos_tag, pos_retry, used_at FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -96,9 +96,11 @@ extension DatabaseManager {
                 let pos = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
                 let posTag = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
                 let posRetry = sqlite3_column_int(stmt, 5) != 0
+                let usedAt = sqlite3_column_int64(stmt, 6)
                 results.append(HistoryEntry(
                     input: String(cString: i), output: String(cString: o),
-                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, posTag: posTag, posRetry: posRetry
+                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, posTag: posTag, posRetry: posRetry,
+                    usedAt: usedAt
                 ))
             }
             return results
