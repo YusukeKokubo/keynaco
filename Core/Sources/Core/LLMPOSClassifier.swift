@@ -22,36 +22,35 @@ public final class LLMPOSClassifier {
 
         let session = LanguageModelSession(model: SystemLanguageModel.default) {
             """
-            You are a Japanese POS tagger. Reply with tag:confidence on a single line.
-            - tag: one of the tags listed below
-            - confidence: high / mid / low
+            # Role
+            Japanese POS Tagger for IME commit history.
+            Reply: "tag:confidence" (high/mid/low).
 
-            Tags:
-            noun/common, noun/suru, noun/number
-            proper_noun/place, proper_noun/person, proper_noun/org
-            verb/te, verb/ta, verb/dict
-            adjective/i, adjective/na, adjective/adv
-            particle/case, particle/topic, particle/aux
-            other/conjunction, other/interjection, other/clause, other/unknown
+            # Tagset
+            - noun, verb, adjective, particle
+            - proper_noun/[type]:
+              - place (geo/facility), person (name)
+              - org: Active entities that announce, hire, or decide. ("Apple が提訴した")
+              - product: Consumable tools, devices, apps, or services. ("iPhone を買った")
+              - work: Creative titles treated as atomic units. ("ドラゴンボールを読む")
+            - other/conjunction, other/interjection, other/clause, other/unknown
 
-            Examples:
-            実装 → noun/suru:high
-            入力 → noun/suru:high
-            固有名詞 → noun/common:high
-            地名 → noun/common:high
-            東京 → proper_noun/place:high
-            東京タワー → proper_noun/place:high
-            田中さん → proper_noun/person:high
-            田中 → proper_noun/person:mid
+            # Examples
             Apple → proper_noun/org:high
-            TypeScript → proper_noun/org:high
-            確認して → verb/te:high
-            見つかった → verb/ta:high
-            欲しい → adjective/i:high
-            必要な → adjective/na:mid
-            早速 → adjective/adv:mid
-            は → particle/topic:high
-            が → particle/case:high
+            iPhone → proper_noun/product:high
+            Microsoft → proper_noun/org:high
+            Windows 11 → proper_noun/product:high
+            TypeScript → proper_noun/product:high
+            東京 → proper_noun/place:high
+            田中 → proper_noun/person:mid
+            ドラゴンボール → proper_noun/work:high
+            スラムダンク → proper_noun/work:high
+            実装 → noun:high
+            確認して → verb:high
+            欲しい → adjective:high
+            が → particle:high
+            しかし → other/conjunction:high
+            ええっと → other/interjection:high
             """
         }
 
@@ -88,7 +87,8 @@ public final class LLMPOSClassifier {
 
         // `tag:confidence` 形式から最初のトークンを抽出（スペース・改行・説明文が付いていても対応）
         let knownPrefixes = [
-            "proper_noun/place", "proper_noun/person", "proper_noun/org", "proper_noun",
+            "proper_noun/place", "proper_noun/person", "proper_noun/org",
+            "proper_noun/product", "proper_noun/work", "proper_noun",
             "noun/common", "noun/suru", "noun/number", "noun",
             "verb/te", "verb/ta", "verb/dict", "verb",
             "adjective/i", "adjective/na", "adjective/adv", "adjective",
@@ -110,7 +110,7 @@ public final class LLMPOSClassifier {
     }
 
     /// `tag:confidence` または `tag` から pos 値を返す。
-    /// proper_noun は subcategory（/place・/person・/org）まで保持して返す。
+    /// proper_noun / other は subcategory まで保持して返す。
     /// subcategory のない proper_noun は "proper_noun" のまま。
     static nonisolated func categoryFromTag(_ tag: String) -> String {
         // :confidence を除く
@@ -119,12 +119,17 @@ public final class LLMPOSClassifier {
         let category = parts.first ?? tagOnly
         switch category {
         case "proper_noun":
-            // proper_noun/place, proper_noun/person, proper_noun/org はそのまま保持
-            let known = ["place", "person", "org"]
+            let known = ["place", "person", "org", "product", "work"]
             if parts.count >= 2, known.contains(parts[1]) {
                 return "proper_noun/" + parts[1]
             }
             return "proper_noun"
+        case "other":
+            let known = ["conjunction", "interjection", "clause", "unknown"]
+            if parts.count >= 2, known.contains(parts[1]) {
+                return "other/" + parts[1]
+            }
+            return "other"
         case "noun":                                 return "noun"
         case "verb":                                 return "verb"
         case "adjective":                            return "adjective"

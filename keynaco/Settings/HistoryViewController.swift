@@ -154,9 +154,15 @@ extension HistoryViewController: NSTableViewDelegate {
         case "proper_noun/place":   return "固有名詞（地名）"
         case "proper_noun/person":  return "固有名詞（人名）"
         case "proper_noun/org":     return "固有名詞（組織）"
+        case "proper_noun/product":  return "固有名詞（製品）"
+        case "proper_noun/work":     return "固有名詞（作品）"
         case "verb":                return "動詞"
         case "adjective":           return "形容詞"
         case "other":               return "その他"
+        case "other/conjunction":   return "その他（接続詞）"
+        case "other/interjection":  return "その他（感動詞）"
+        case "other/clause":        return "その他（節）"
+        case "other/unknown":       return "その他（不明）"
         default:                    return "―"
         }
     }

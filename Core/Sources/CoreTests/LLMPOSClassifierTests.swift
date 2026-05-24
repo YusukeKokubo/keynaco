@@ -40,20 +40,23 @@ final class LLMPOSClassifierTests: XCTestCase {
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/place"),    "proper_noun/place")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/person"),   "proper_noun/person")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/org"),      "proper_noun/org")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/product"),  "proper_noun/product")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/work"),     "proper_noun/work")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun/product:high"), "proper_noun/product")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("proper_noun"),          "proper_noun")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/te"),              "verb")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/ta"),              "verb")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("verb/dict"),            "verb")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("adjective/i"),          "adjective")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("adjective/na"),         "adjective")
-        // particle/* と other/* はすべて pos="other"、理由は posTag に残る
+        // particle/* は pos="other"、other/* は subcategory を pos に保持
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("particle/case"),        "other")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("particle/topic"),       "other")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("particle/aux"),         "other")
-        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/conjunction"),    "other")
-        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/interjection"),   "other")
-        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/clause"),         "other")
-        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/unknown"),        "other")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/conjunction"),    "other/conjunction")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/interjection"),   "other/interjection")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/clause"),         "other/clause")
+        XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other/unknown"),        "other/unknown")
         XCTAssertEqual(LLMPOSClassifier.categoryFromTag("other"),                "other")
     }
 
