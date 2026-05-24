@@ -99,7 +99,7 @@ send({"reset": True})
 |------|-----------|
 | 文字列を一括送信（最終状態のみ） | `{"type_string": "kanzi"}` |
 | 文字列→変換キー（最終状態のみ） | `{"type_string": "kanzi", "then": "space"}` |
-| 文字列→確定（全ステップも取得） | `{"type_string": "kyou", "then": "enter", "return_steps": true}` |
+| 文字列→確定（全ステップも取得） | `{"type_string": "jissou", "then": "enter", "return_steps": true}` |
 | サーバースキーマ取得（AI向け） | `{"schema": true}` |
 | examples 付きスキーマ取得 | `{"schema": true, "with_examples": true}` |
 | 状態説明付きレスポンス | `{"state": true, "explain": true}` / `{"type_string":"kanzi","then":"space","explain":true}` |
@@ -148,9 +148,10 @@ print("schema_ok?", "assertion_failed" not in r_schema)
 r_regex = send({"state": True, "assert_regex": {"composedHiragana": ".*"}})
 print("regex_ok?", "assertion_failed" not in r_regex)
 
-# bi-gram をシードしてから Successor を確認
-send({"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}})
-r = send({"type_string": "kyou", "then": "enter"})
+# bi-gram をシードしてから Successor を確認（useRealDB 必須。インメモリ DB では POS 分類が完了しない）
+send({"reset": True, "useRealDB": True})
+send({"seed_noun_bigram": {"prev": "実装", "input": "する", "output": "する", "count": 5}})
+r = send({"type_string": "jissou", "then": "enter"})
 print(f"isSuccessorCandidateActive: {r['isSuccessorCandidateActive']}, candidates: {r['candidates'][:3]}")
 
 # 複数操作を1往復でバッチ送信
@@ -198,9 +199,9 @@ suite2 = send({
     "fail_fast": True,
     "test_suite": [
         {
-            "name": "kyou→enter",
-            "cmds": [{"type_string": "kyou", "then": "enter"}],
-            "assert_contains": {"candidates": "は"}
+            "name": "jissou→enter",
+            "cmds": [{"type_string": "jissou", "then": "enter"}],
+            "assert_contains": {"candidates": "する"}
         }
     ]
 })
@@ -343,6 +344,81 @@ eisu(英数)=102  kana(かな)=104
 - `[fixedEnd, historyEnd)` — ユーザー辞書 + 履歴候補（Shift+Delete 削除可能）
 - `[historyEnd, ...)` — AzooKey 辞書候補
 
+## テストケース設計の落とし穴
+
+**テストを書く前に必ずこの節を確認すること。** 以下の罠にはまると無駄な試行錯誤が発生する。
+
+### 罠1: 特殊変換される語を避ける
+
+一部の語は AzooKey が辞書外の特殊変換を返す。テストケースに使うと意図しない結果になる。
+
+| 語 | 問題 |
+|----|------|
+| `kyou`（きょう） | 今日の日付「2026年5月24日」に変換される |
+| `kinou`（きのう） | 昨日の日付に変換される可能性あり |
+
+**代替**: 汎用名詞（`kanzi`→漢字、`jissou`→実装、`nyuuryoku`→入力）を使う。
+
+### 罠2: ローマ字の不連続に注意する
+
+`type_string` の文字列はキーコードを1文字ずつ送るため、ローマ字が完成しないと `composedHiragana` と `pendingRomaji` に分割される。
+
+```
+"tokyo" → composedHiragana="と", pendingRomaji="kyo"
+           ↑ "と" だけ変換候補に出て意図した挙動にならない
+```
+
+**対策**: `type_string` 送信後に `composedHiragana` を確認してから assert を書く。
+
+```python
+r = send({"type_string": "tokyo", "fields": ["composedHiragana", "pendingRomaji"]})
+print(r["composedHiragana"], r["pendingRomaji"])
+# → 期待と違ったら読みを修正する（例: "toukyou" にする）
+```
+
+正しいローマ字が分からない場合は先に確認してから assert するとよい。
+
+### 罠3: 1位候補を決め打ちしない
+
+空のインメモリ DB では AzooKey の辞書順がそのまま出る。同音異義語の1位は文脈・設定によって変わるため `inserted: ["特定の語"]` のような完全一致 assert は壊れやすい。
+
+```python
+# Bad: "漢字" が1位とは限らない
+"assert": {"inserted": ["漢字"]}
+
+# Good: 候補リストに含まれることだけを確認
+"assert_contains": {"candidates": "漢字"}
+```
+
+### 罠4: Successor モードはインメモリ DB では起動しない
+
+Successor モードの起動には2つが必要:
+1. 確定語の POS が `noun`/`proper_noun` に分類されていること（Apple Intelligence による**非同期**処理）
+2. その語を `prev` とする noun_bigram が DB に存在すること
+
+sandbox のインメモリ DB でこれらを満たすには、POS 分類が完了するまで待つか、実 DB を使う必要がある。短時間セッションでは POS は完了しないため、Successor は起動しない。
+
+```python
+# Successor を確認したい場合: useRealDB + 過去に入力実績のある語を使う
+send({"reset": True, "useRealDB": True})
+r = send({"type_string": "jissou", "then": "space"})
+r2 = send({"key": "enter"})
+# isSuccessorCandidateActive が true になるのは、実 DB に bigram が蓄積された語のみ
+```
+
+### 罠5: ローマ字の seed_history と type_string を揃える
+
+`seed_history` の `input` は**ひらがな**（読み）、`type_string` は**ローマ字**。
+`type_string` が変換した `composedHiragana` と `seed_history` の `input` が一致しないと履歴がヒットしない。
+
+```python
+# seed の input は type_string で作られるひらがなに合わせる
+send({"seed_history": {"input": "じっそう", "output": "実装", "times": 3}})
+r = send({"type_string": "jissou", "then": "space"})  # jissou → じっそう ✓
+```
+
+---
+
 ## 典型的な調査パターン
 
 ### 1. 入力列を追って状態変化を確認
@@ -378,13 +454,16 @@ print(f"inserted: {r['last']['inserted']}")
 print(f"successor candidates: {r['last']['candidates'][:5]}")
 ```
 
-### 4. Successor モードの確認
+### 4. Successor モードの確認（useRealDB 必須）
 
 ```python
-send({"reset": True})
-r = send({"type_string": "kyou", "then": "enter"})
-print(f"isSuccessorCandidateActive: {r['isSuccessorCandidateActive']}")
-print(f"successor candidates: {r['candidates'][:5]}")
+# インメモリ DB では POS 分類が非同期のため Successor は起動しない。
+# useRealDB: true で実 DB を使い、過去に入力実績のある名詞で確認する。
+send({"reset": True, "useRealDB": True})
+r = send({"type_string": "jissou", "then": "space"})
+r2 = send({"key": "enter"})
+print(f"isSuccessorCandidateActive: {r2['isSuccessorCandidateActive']}")
+print(f"successor candidates: {r2['candidates'][:5]}")
 ```
 
 ### 5. セグメントモードの確認
