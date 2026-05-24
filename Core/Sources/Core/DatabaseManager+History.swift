@@ -69,6 +69,27 @@ extension DatabaseManager {
         }
     }
 
+    /// 直近に確定した固有名詞（pos LIKE 'proper_noun%'）を重複排除して返す。
+    /// Zenzai の topic パラメーター自動推論に使用。
+    public func recentProperNouns(limit: Int) -> [String] {
+        dbQueue.sync {
+            var results: [String] = []
+            let sql = """
+            SELECT output FROM history
+            WHERE pos LIKE 'proper_noun%'
+            GROUP BY output
+            ORDER BY MAX(used_at) DESC, SUM(count) DESC
+            LIMIT ?
+            """
+            guard let stmt = self.cachedStmt(for: sql) else { return results }
+            sqlite3_bind_int(stmt, 1, Int32(limit))
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let p = sqlite3_column_text(stmt, 0) { results.append(String(cString: p)) }
+            }
+            return results
+        }
+    }
+
     /// 未分類（pos IS NULL）または再試行待ち（pos_retry = 1）の出力語を最大 `limit` 件返す（重複排除）。
     public func fetchUnclassifiedHistory(limit: Int) -> [String] {
         dbQueue.sync {

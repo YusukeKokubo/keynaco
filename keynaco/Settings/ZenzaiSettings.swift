@@ -13,7 +13,14 @@ enum ZenzaiSettings {
         let d = UserDefaults.standard
         let enabled = d.object(forKey: enabledKey) as? Bool ?? false
         let profile = d.string(forKey: profileKey) ?? ""
-        let topic = d.string(forKey: topicKey) ?? ""
+        let manualTopic = d.string(forKey: topicKey) ?? ""
+        let topic: String
+        if manualTopic.isEmpty {
+            let nouns = DatabaseManager.shared.recentProperNouns(limit: 5)
+            topic = String(nouns.joined(separator: ",").prefix(25))
+        } else {
+            topic = manualTopic
+        }
         let style = d.string(forKey: styleKey) ?? ""
         let preference = d.string(forKey: preferenceKey) ?? ""
         let limit = d.object(forKey: inferenceLimitKey) as? Int ?? 5
