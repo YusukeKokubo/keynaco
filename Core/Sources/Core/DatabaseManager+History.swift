@@ -87,14 +87,21 @@ extension DatabaseManager {
         posRetry: Bool = false
     ) {
         dispatchWrite {
-            self.executeOnQueue(
-                "UPDATE history SET pos = ?, pos_tag = ?, lemma = ?, pos_retry = ? WHERE output = ?"
-            ) {
+            // 動詞は LLM が返した辞書形で lemma を上書き。それ以外は確定時にセットした output を保持。
+            let sql = lemma != nil
+                ? "UPDATE history SET pos = ?, pos_tag = ?, lemma = ?, pos_retry = ? WHERE output = ?"
+                : "UPDATE history SET pos = ?, pos_tag = ?, pos_retry = ? WHERE output = ?"
+            self.executeOnQueue(sql) {
                 self.bindText($0, 1, pos)
                 if let tag = posTag { self.bindText($0, 2, tag) } else { sqlite3_bind_null($0, 2) }
-                if let lemma { self.bindText($0, 3, lemma) } else { sqlite3_bind_null($0, 3) }
-                sqlite3_bind_int($0, 4, posRetry ? 1 : 0)
-                self.bindText($0, 5, output)
+                if let lemma {
+                    self.bindText($0, 3, lemma)
+                    sqlite3_bind_int($0, 4, posRetry ? 1 : 0)
+                    self.bindText($0, 5, output)
+                } else {
+                    sqlite3_bind_int($0, 3, posRetry ? 1 : 0)
+                    self.bindText($0, 4, output)
+                }
             }
         }
     }
@@ -167,14 +174,15 @@ extension DatabaseManager {
         dispatchWrite {
             let t = self.nowEpoch()
             self.executeOnQueue("""
-            INSERT INTO history (input, output, count, used_at)
-            VALUES (?, ?, 1, ?)
+            INSERT INTO history (input, output, count, used_at, lemma)
+            VALUES (?, ?, 1, ?, ?)
             ON CONFLICT(input, output) DO UPDATE SET
                 count   = count + 1,
                 used_at = excluded.used_at;
             """) {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
                 sqlite3_bind_int64($0, 3, t)
+                self.bindText($0, 4, output)
             }
         }
     }
@@ -192,14 +200,15 @@ extension DatabaseManager {
         dispatchWrite {
             let t = self.nowEpoch()
             self.executeOnQueue("""
-            INSERT INTO history (input, output, count, used_at)
-            VALUES (?, ?, 1, ?)
+            INSERT INTO history (input, output, count, used_at, lemma)
+            VALUES (?, ?, 1, ?, ?)
             ON CONFLICT(input, output) DO UPDATE SET
                 count   = count + 1,
                 used_at = excluded.used_at;
             """) {
                 self.bindText($0, 1, reading); self.bindText($0, 2, output)
                 sqlite3_bind_int64($0, 3, t)
+                self.bindText($0, 4, output)
             }
         }
     }
