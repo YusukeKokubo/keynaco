@@ -15,12 +15,14 @@ final class HistoryViewController: NSViewController {
     }
 
     private let columnDefs: [ColumnDef] = [
-        ColumnDef(id: "input",   title: "読み",         minWidth: 60,  defaultWidth: 150, sortKey: nil),
-        ColumnDef(id: "output",  title: "確定テキスト", minWidth: 60,  defaultWidth: 200, sortKey: nil),
-        ColumnDef(id: "pos",     title: "品詞",         minWidth: 60,  defaultWidth: 90,  sortKey: "pos"),
-        ColumnDef(id: "pos_tag", title: "LLMタグ",      minWidth: 60,  defaultWidth: 120, sortKey: nil),
-        ColumnDef(id: "count",   title: "回数",         minWidth: 40,  defaultWidth: 60,  sortKey: "count"),
-        ColumnDef(id: "used_at", title: "最終変換",     minWidth: 80,  defaultWidth: 110, sortKey: "used_at"),
+        ColumnDef(id: "input",     title: "読み",         minWidth: 60,  defaultWidth: 150, sortKey: nil),
+        ColumnDef(id: "output",    title: "確定テキスト", minWidth: 60,  defaultWidth: 200, sortKey: nil),
+        ColumnDef(id: "pos",       title: "品詞",         minWidth: 60,  defaultWidth: 90,  sortKey: "pos"),
+        ColumnDef(id: "pos_tag",   title: "LLMタグ",      minWidth: 60,  defaultWidth: 120, sortKey: nil),
+        ColumnDef(id: "lemma",     title: "見出し語",     minWidth: 60,  defaultWidth: 100, sortKey: nil),
+        ColumnDef(id: "pos_retry", title: "再試行",       minWidth: 40,  defaultWidth: 55,  sortKey: nil),
+        ColumnDef(id: "count",     title: "回数",         minWidth: 40,  defaultWidth: 60,  sortKey: "count"),
+        ColumnDef(id: "used_at",   title: "最終変換",     minWidth: 80,  defaultWidth: 110, sortKey: "used_at"),
     ]
 
     override func loadView() {
@@ -149,12 +151,14 @@ extension HistoryViewController: NSTableViewDelegate {
         let entry = data[row]
         let text: String
         switch id.rawValue {
-        case "input":   text = entry.input
-        case "output":  text = entry.output
-        case "pos":     text = Self.posLabel(entry.pos)
-        case "pos_tag": text = entry.posTag ?? "―"
-        case "count":   text = "\(entry.count)"
-        case "used_at": text = Self.formatDate(entry.usedAt)
+        case "input":     text = entry.input
+        case "output":    text = entry.output
+        case "pos":       text = Self.posLabel(entry.pos)
+        case "pos_tag":   text = entry.posTag ?? "―"
+        case "lemma":     text = entry.lemma ?? "―"
+        case "pos_retry": text = entry.posRetry ? "✓" : "―"
+        case "count":     text = "\(entry.count)"
+        case "used_at":   text = Self.formatDate(entry.usedAt)
         default: return nil
         }
         let tf = tableView.makeView(withIdentifier: id, owner: nil) as? NSTextField ?? {
