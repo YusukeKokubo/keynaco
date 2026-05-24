@@ -1,6 +1,7 @@
 #if DEBUG
 
 import Foundation
+import FoundationModels
 import KeynacoCore
 import AppKit
 import InputMethodKit
@@ -10,8 +11,8 @@ extension DebugSocketServer {
     cleanupSnapshot()
     let useRealDB = cmd["useRealDB"] as? Bool ?? false
     let converter = ZenzaiSettings.makeConverter()
-    if useRealDB, let db = makeRealDBSnapshot() {
-        handler = InputHandler(db: db, azooKeyConverter: converter)
+    if useRealDB {
+        handler = InputHandler(db: DatabaseManager.shared, azooKeyConverter: converter)
     } else {
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
     }
@@ -505,7 +506,8 @@ extension DebugSocketServer {
     }
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
-        schedulePOSClassification(output: text, reading: handler.lastCommittedReading ?? "")
+        let reading = handler.lastConfirmedContext?.input ?? handler.lastCommittedReading ?? ""
+        schedulePOSClassification(output: text, reading: reading)
     }
 
     var result = makeResponse(inserted: insertedTexts)
@@ -551,19 +553,31 @@ extension DebugSocketServer {
         ], cmd: cmd)
     }
 
+    func handlePosAvailability(cmd: [String: Any]) -> [String: Any] {
+        let avail = SystemLanguageModel.default.availability
+        let desc: String
+        switch avail {
+        case .available: desc = "available"
+        default: desc = String(describing: avail)
+        }
+        return Self.finalize(["availability": desc], cmd: cmd)
+    }
+
     /// InputController.schedulePOSClassification と同経路で POS 分類・noun_bigram 記録を行う。
     func schedulePOSClassification(output: String, reading: String) {
         let db = handler.db
         let historyJoined = handler.committedHistory.suffix(5).joined()
         let context = historyJoined.isEmpty ? nil : historyJoined
-        InputController.posClassifier.enqueue(output: output, context: context) { [weak self] classifiedOutput, pos, posTag, posRetry in
+        posClassifier.enqueue(output: output, context: context) { [weak self] classifiedOutput, pos, posTag, posRetry in
             guard let self else { return }
             db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
             if pos == "noun" || pos.hasPrefix("proper_noun") {
                 if let prev = self.handler.lastConfirmedNounOutput {
                     db.recordNounBigram(prev: prev, input: reading, output: classifiedOutput)
                 }
-                self.handler.lastConfirmedNounOutput = classifiedOutput
+                var h = self.handler
+                h.lastConfirmedNounOutput = classifiedOutput
+                self.handler = h
             }
         }
     }

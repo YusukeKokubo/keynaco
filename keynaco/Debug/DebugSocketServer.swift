@@ -23,6 +23,8 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private var serverFd: Int32 = -1
     var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
+    /// 本番 InputController の POS キューと競合しないよう Debug 専用インスタンスを使う。
+    let posClassifier = LLMPOSClassifier()
     let mockClient = SocketMockClient()
     var candidateWindow = DebugCandidateWindow()
 
@@ -1025,6 +1027,7 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["query_noun_bigram"] != nil || cmd["query_noun_bigram_prev"] is String {
             return handleQueryNounBigram(cmd: cmd)
         }
+        if cmd["pos_availability"] != nil { return handlePosAvailability(cmd: cmd) }
         if cmd["set_last_noun"] is String { return handleSetLastNoun(cmd: cmd) }
         if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
         if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
@@ -1067,6 +1070,8 @@ final class DebugSocketServer: @unchecked Sendable {
             "focusedSegmentIndex": snap.focusedSegmentIndex,
             "isZenzaiEnabled":    handler.azooKeyConverter.isZenzaiEnabled,
             "leftSideContext":    handler.leftSideContext,
+            "lastConfirmedNounOutput": handler.lastConfirmedNounOutput as Any,
+            "lastCommittedReading": handler.lastCommittedReading as Any,
             "surroundingAfter":   mockClient.documentAfter,
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,

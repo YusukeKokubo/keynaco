@@ -52,8 +52,20 @@ public final class LLMPOSClassifier {
             self?.drainQueue()
         }
         if !started {
+            // 同一 output の classify が走行中なら job を捨てずに再試行する
+            if case .available = SystemLanguageModel.default.availability,
+               runningOutputs.contains(job.output) {
+                jobQueue.insert(job, at: 0)
+                isProcessingQueue = false
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .milliseconds(200))
+                    self?.drainQueue()
+                }
+                return
+            }
             isProcessingQueue = false
             drainQueue()
+            return
         }
     }
 
@@ -135,7 +147,9 @@ public final class LLMPOSClassifier {
                     logger.warning("POS=other: output=\(output, privacy: .public) tag=\(posTag, privacy: .public)")
                 }
                 completion(output, pos, adjusted.posTag, retry)
-            } catch {}
+            } catch {
+                logger.error("POS classify failed: output=\(output, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            }
         }
         return true
     }
