@@ -34,9 +34,7 @@ extension InputController {
     /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。名詞なら noun_bigram を記録する。
     func schedulePOSClassification(output: String, reading: String, context: String? = nil) {
         let db = handler.db
-        // サ変名詞語幹は前文脈で verb に倒されやすいため context を省略する
-        let effectiveContext = LLMPOSClassifier.shouldOmitClassificationContext(output) ? nil : context
-        Self.posClassifier.enqueue(output: output, context: effectiveContext) { [weak self] classifiedOutput, pos, posTag, posRetry in
+        Self.posClassifier.enqueue(output: output, context: context) { [weak self] classifiedOutput, pos, posTag, posRetry in
             db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
             if pos == "noun" || pos.hasPrefix("proper_noun") {
                 if let prev = self?.handler.lastConfirmedNounOutput {

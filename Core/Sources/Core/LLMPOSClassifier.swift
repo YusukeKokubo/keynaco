@@ -26,7 +26,8 @@ public final class LLMPOSClassifier {
         context: String? = nil,
         completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
     ) {
-        jobQueue.append(POSJob(output: output, context: context, completion: completion))
+        let effectiveContext = Self.shouldOmitClassificationContext(output) ? nil : context
+        jobQueue.append(POSJob(output: output, context: effectiveContext, completion: completion))
         drainQueue()
     }
 
