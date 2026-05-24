@@ -67,6 +67,15 @@ public final class POSCommitSequencer {
         self.classifier = classifier
     }
 
+    /// bigram に記録しない機能語（助詞・助動詞・接続詞等）。LLM 分類を呼ぶ前にはじく。
+    private static let stopWords: Set<String> = [
+        "の", "を", "が", "は", "に", "で", "と", "も", "へ", "より",
+        "から", "まで", "にて", "にも", "には", "では", "とは", "でも",
+        "など", "か", "ね", "よ", "な", "わ", "ぞ", "ぜ", "さ",
+        "て", "で", "ば", "たら", "なら", "けど", "けれど", "が", "し",
+        "だ", "です", "ます", "ました", "ません", "した", "する", "した",
+    ]
+
     /// 確定語を受け取り、POS 解決後に確定順で content_bigram / lastConfirmedContentWordOutput を更新する。
     public func commit(
         output: String,
@@ -74,6 +83,7 @@ public final class POSCommitSequencer {
         context: String? = nil,
         contentWordState: ContentWordState
     ) {
+        guard !Self.stopWords.contains(output) else { return }
         nextID += 1
         let entry = PendingCommit(
             id: nextID,
