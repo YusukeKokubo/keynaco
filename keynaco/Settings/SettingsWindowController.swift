@@ -26,12 +26,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         hiraganaPreferredItem.label = "ひらがな優先"
         let historyItem = NSTabViewItem(viewController: HistoryViewController())
         historyItem.label = "変換履歴"
+        let nounBigramItem = NSTabViewItem(viewController: NounBigramViewController())
+        nounBigramItem.label = "Noun-Bigram"
         let zenzaiVC = ZenzaiViewController()
         let zenzaiItem = NSTabViewItem(viewController: zenzaiVC)
         zenzaiItem.label = "Zenzai"
         tabVC.addTabViewItem(userDictItem)
         tabVC.addTabViewItem(hiraganaPreferredItem)
         tabVC.addTabViewItem(historyItem)
+        tabVC.addTabViewItem(nounBigramItem)
         tabVC.addTabViewItem(zenzaiItem)
 
         window.contentViewController = tabVC
