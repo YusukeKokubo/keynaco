@@ -20,7 +20,7 @@ public final class LLMPOSClassifier {
 
     public init() {}
 
-    /// 確定順 FIFO で 1 件ずつ分類する。noun_bigram 記録の順序保証用。
+    /// 確定順 FIFO で 1 件ずつ分類する（`POSCommitSequencer` から利用）。
     public func enqueue(
         output: String,
         context: String? = nil,

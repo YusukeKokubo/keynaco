@@ -25,6 +25,7 @@ final class DebugSocketServer: @unchecked Sendable {
     var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
     /// 本番 InputController の POS キューと競合しないよう Debug 専用インスタンスを使う。
     let posClassifier = LLMPOSClassifier()
+    lazy var posCommitSequencer = POSCommitSequencer(db: handler.db, classifier: posClassifier)
     let mockClient = SocketMockClient()
     var candidateWindow = DebugCandidateWindow()
 

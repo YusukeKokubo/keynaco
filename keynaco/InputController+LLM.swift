@@ -31,18 +31,22 @@ extension InputController {
         return historyJoined
     }
 
+    private static let posCommitSequencer = POSCommitSequencer(
+        db: DatabaseManager.shared,
+        classifier: posClassifier
+    )
+
     /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。名詞なら noun_bigram を記録する。
     func schedulePOSClassification(output: String, reading: String, context: String? = nil) {
-        let db = handler.db
-        Self.posClassifier.enqueue(output: output, context: context) { [weak self] classifiedOutput, pos, posTag, posRetry in
-            db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
-            if pos == "noun" || pos.hasPrefix("proper_noun") {
-                if let prev = self?.handler.lastConfirmedNounOutput {
-                    db.recordNounBigram(prev: prev, input: reading, output: classifiedOutput)
-                }
-                self?.handler.lastConfirmedNounOutput = classifiedOutput
-            }
-        }
+        Self.posCommitSequencer.commit(
+            output: output,
+            reading: reading,
+            context: context,
+            nounState: POSCommitSequencer.NounState(
+                get: { [weak self] in self?.handler.lastConfirmedNounOutput },
+                set: { [weak self] noun in self?.handler.lastConfirmedNounOutput = noun }
+            )
+        )
     }
 
     /// 未分類（pos IS NULL）または再試行待ち（pos_retry = 1）の履歴エントリを最大 50 件バックグラウンドで分類する（起動時に1回呼ぶ）。

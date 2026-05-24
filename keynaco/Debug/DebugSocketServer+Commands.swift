@@ -565,21 +565,20 @@ extension DebugSocketServer {
 
     /// InputController.schedulePOSClassification と同経路で POS 分類・noun_bigram 記録を行う。
     func schedulePOSClassification(output: String, reading: String) {
-        let db = handler.db
         let historyJoined = handler.committedHistory.suffix(5).joined()
         let context = historyJoined.isEmpty ? nil : historyJoined
-        posClassifier.enqueue(output: output, context: context) { [weak self] classifiedOutput, pos, posTag, posRetry in
-            guard let self else { return }
-            db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
-            if pos == "noun" || pos.hasPrefix("proper_noun") {
-                if let prev = self.handler.lastConfirmedNounOutput {
-                    db.recordNounBigram(prev: prev, input: reading, output: classifiedOutput)
+        posCommitSequencer.commit(
+            output: output,
+            reading: reading,
+            context: context,
+            nounState: POSCommitSequencer.NounState(
+                get: { [weak self] in self?.handler.lastConfirmedNounOutput },
+                set: { [weak self] noun in
+                    guard let self else { return }
+                    self.handler.lastConfirmedNounOutput = noun
                 }
-                var h = self.handler
-                h.lastConfirmedNounOutput = classifiedOutput
-                self.handler = h
-            }
-        }
+            )
+        )
     }
 }
 

@@ -56,6 +56,24 @@ extension DatabaseManager {
         }
     }
 
+    /// 高信頼度で分類済みの POS を返す。未分類・再試行待ちの場合は nil。
+    public func fetchCachedPOS(output: String) -> POSCommitSequencer.Classification? {
+        dbQueue.sync {
+            let sql = """
+            SELECT pos, pos_tag, pos_retry FROM history
+            WHERE output = ? AND pos IS NOT NULL AND pos_retry = 0
+            LIMIT 1
+            """
+            guard let stmt = self.cachedStmt(for: sql) else { return nil }
+            self.bindText(stmt, 1, output)
+            guard sqlite3_step(stmt) == SQLITE_ROW,
+                  let posPtr = sqlite3_column_text(stmt, 0) else { return nil }
+            let pos = String(cString: posPtr)
+            let posTag = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+            return POSCommitSequencer.Classification(pos: pos, posTag: posTag, posRetry: false)
+        }
+    }
+
     /// `output` に対応する全履歴行の pos を更新する。
     /// `posRetry=true` の場合は次回分類時に再実行対象となる（低信頼度・フォーマット崩れ時に使用）。
     public func updatePOS(output: String, pos: String, posTag: String? = nil, posRetry: Bool = false) {
