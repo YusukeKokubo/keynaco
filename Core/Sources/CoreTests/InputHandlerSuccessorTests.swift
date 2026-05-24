@@ -27,7 +27,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     // MARK: - Successor 候補（組成空 + 1 打目トリガー）
 
     func testSuccessorShowsOnFirstKeyAfterCommit() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         typeRomaji("tokyo")
         let commitResult = press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         assertDismiss(commitResult.candidateAction, "確定直後は候補を出さない")
@@ -39,7 +39,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorUsesLeftSideContext() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         handler.leftSideContext = "今日は東京に"
         let showResult = type(chars: "g", base: "g")
         guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
@@ -49,7 +49,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorSpaceConfirmsNounBigram() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         type(chars: "g", base: "g")
@@ -60,7 +60,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorEscapeDismisses() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         type(chars: "g", base: "g")
@@ -70,7 +70,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorUnmatchedKeyFallsThroughToNormalCompose() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let result = type(chars: "q", base: "q")
@@ -90,8 +90,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorChain() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
-        handler.db.recordNounBigram(prev: "が", input: "すき", output: "好き")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "が", input: "すき", output: "好き")
 
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
@@ -114,7 +114,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testBackspaceAfterCommitClearsSuccessorEligible() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         XCTAssertTrue(handler.successorEligible)
@@ -128,7 +128,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorArrowNavigates() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         type(chars: "g", base: "g")
@@ -139,7 +139,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorRomajiUniqueFiltersAndConfirmWithSpace() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let filterResult = type(chars: "g", base: "g")
@@ -153,8 +153,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorRomajiAmbiguousFilters() {
-        handler.db.recordNounBigram(prev: "東京", input: "に", output: "に")
-        handler.db.recordNounBigram(prev: "東京", input: "の", output: "の")
+        recordFetchableContentBigram(prev: "東京", input: "に", output: "に")
+        recordFetchableContentBigram(prev: "東京", input: "の", output: "の")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let result = type(chars: "n", base: "n")
@@ -166,7 +166,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorAfterKanjiCommit() {
-        handler.db.recordNounBigram(prev: "東京", input: "たわー", output: "タワー")
+        recordFetchableContentBigram(prev: "東京", input: "たわー", output: "タワー")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let result = type(chars: "t", base: "t")
@@ -177,7 +177,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorAfterKatakanaCommit() {
-        handler.db.recordNounBigram(prev: "コーヒー", input: "しょっぷ", output: "ショップ")
+        recordFetchableContentBigram(prev: "コーヒー", input: "しょっぷ", output: "ショップ")
         typeRomaji("koohii")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "コーヒー")
         let result = type(chars: "s", base: "s")
@@ -208,8 +208,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorBigramOrderedByFrequency() {
-        for _ in 0..<3 { handler.db.recordNounBigram(prev: "東京", input: "さいきん", output: "最近") }
-        handler.db.recordNounBigram(prev: "東京", input: "さらに", output: "さらに")
+        for _ in 0..<3 { recordFetchableContentBigram(prev: "東京", input: "さいきん", output: "最近") }
+        recordFetchableContentBigram(prev: "東京", input: "さらに", output: "さらに")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let showResult = type(chars: "s", base: "s")
@@ -226,7 +226,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorBufferedKeyFallthroughOnSecondKeyMismatch() {
-        handler.db.recordNounBigram(prev: "東京", input: "が", output: "が")
+        recordFetchableContentBigram(prev: "東京", input: "が", output: "が")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         type(chars: "g", base: "g")
@@ -236,7 +236,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorWithHiraganaBigramAfterCommit() {
-        handler.db.recordNounBigram(prev: "おつかれ", input: "です", output: "です")
+        recordFetchableContentBigram(prev: "おつかれ", input: "です", output: "です")
         typeRomaji("otsukare")
         press(keyCode: 36)
         let result = type(chars: "d", base: "d")
@@ -247,8 +247,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorNKeyShowsBothNiAndNo() {
-        handler.db.recordNounBigram(prev: "東京", input: "に", output: "に")
-        handler.db.recordNounBigram(prev: "東京", input: "の", output: "の")
+        recordFetchableContentBigram(prev: "東京", input: "に", output: "に")
+        recordFetchableContentBigram(prev: "東京", input: "の", output: "の")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let result = type(chars: "n", base: "n")
@@ -260,8 +260,8 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorNKeyKanaArrayOrderPreserved() {
-        for _ in 0..<3 { handler.db.recordNounBigram(prev: "東京", input: "の", output: "の") }
-        handler.db.recordNounBigram(prev: "東京", input: "に", output: "に")
+        for _ in 0..<3 { recordFetchableContentBigram(prev: "東京", input: "の", output: "の") }
+        recordFetchableContentBigram(prev: "東京", input: "に", output: "に")
         typeRomaji("tokyo")
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
         let result = type(chars: "n", base: "n")
@@ -278,7 +278,7 @@ final class InputHandlerSuccessorTests: InputHandlerTestCase {
     }
 
     func testSuccessorPrefixSplit_longBigramOnFirstKey() {
-        handler.db.recordNounBigram(
+        recordFetchableContentBigram(
             prev: "東京",
             input: "かいぎにしゅっせきする",
             output: "会議に出席する"

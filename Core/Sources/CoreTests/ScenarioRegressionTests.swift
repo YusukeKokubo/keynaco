@@ -102,7 +102,8 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         var h = handler!
         h.committedHistory = ["東京"]
         h.successorEligible = true
-        h.db.recordNounBigram(prev: "東京", input: "に", output: "に")
+        h.db.recordContentBigram(prev: "東京", input: "に", output: "に")
+        h.db.recordContentBigram(prev: "東京", input: "に", output: "に")
         let result = h.handle(
             keyCode: 0, characters: "n", baseCharacters: "n",
             modifiers: [], candidate: .hidden, client: client!
@@ -115,7 +116,7 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
 
     /// Successor 1 打目: 長い bi-gram を助詞境界で prefix 展開する（PLAN260520b）
     func testSuccessorPrefixSplit_longBigramOnFirstKey() {
-        handler.db.recordNounBigram(
+        recordFetchableContentBigram(
             prev: "東京",
             input: "かいぎにしゅっせきする",
             output: "会議に出席する"

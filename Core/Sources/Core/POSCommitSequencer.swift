@@ -1,17 +1,19 @@
 import Foundation
 
-/// POS 分類（DB キャッシュ / LLM）と noun_bigram 記録を分離し、確定順で副作用を適用する。
+/// POS 分類（DB キャッシュ / LLM）と content_bigram 記録を分離し、確定順で副作用を適用する。
 @MainActor
 public final class POSCommitSequencer {
     public struct Classification: Sendable, Equatable {
         public let pos: String
         public let posTag: String
         public let posRetry: Bool
+        public let lemma: String?
 
-        public init(pos: String, posTag: String, posRetry: Bool) {
+        public init(pos: String, posTag: String, posRetry: Bool, lemma: String? = nil) {
             self.pos = pos
             self.posTag = posTag
             self.posRetry = posRetry
+            self.lemma = lemma
         }
     }
 
@@ -21,11 +23,17 @@ public final class POSCommitSequencer {
         func enqueue(
             output: String,
             context: String?,
-            completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+            completion: @escaping @MainActor (
+                _ output: String,
+                _ pos: String,
+                _ posTag: String,
+                _ posRetry: Bool,
+                _ lemma: String?
+            ) -> Void
         )
     }
 
-    public struct NounState {
+    public struct ContentWordState {
         public var get: @MainActor () -> String?
         public var set: @MainActor (String) -> Void
 
@@ -59,12 +67,12 @@ public final class POSCommitSequencer {
         self.classifier = classifier
     }
 
-    /// 確定語を受け取り、POS 解決後に確定順で noun_bigram / lastConfirmedNounOutput を更新する。
+    /// 確定語を受け取り、POS 解決後に確定順で content_bigram / lastConfirmedContentWordOutput を更新する。
     public func commit(
         output: String,
         reading: String,
         context: String? = nil,
-        nounState: NounState
+        contentWordState: ContentWordState
     ) {
         nextID += 1
         let entry = PendingCommit(
@@ -75,16 +83,16 @@ public final class POSCommitSequencer {
             classification: nil
         )
         pending.append(entry)
-        beginResolution(for: entry.id, nounState: nounState)
+        beginResolution(for: entry.id, contentWordState: contentWordState)
     }
 
-    private func beginResolution(for commitID: UInt64, nounState: NounState) {
+    private func beginResolution(for commitID: UInt64, contentWordState: ContentWordState) {
         guard let index = pending.firstIndex(where: { $0.id == commitID }) else { return }
         let commit = pending[index]
         guard commit.classification == nil else { return }
 
         if let cached = db.fetchCachedPOS(output: commit.output) {
-            resolve(commitID: commitID, classification: cached, nounState: nounState)
+            resolve(commitID: commitID, classification: cached, contentWordState: contentWordState)
             return
         }
 
@@ -95,20 +103,21 @@ public final class POSCommitSequencer {
         }
 
         inFlightOutputs.insert(output)
-        classifier.enqueue(output: output, context: commit.context) { [weak self] classifiedOutput, pos, posTag, posRetry in
+        classifier.enqueue(output: output, context: commit.context) { [weak self] classifiedOutput, pos, posTag, posRetry, lemma in
             guard let self else { return }
-            let classification = Classification(pos: pos, posTag: posTag, posRetry: posRetry)
+            let classification = Classification(pos: pos, posTag: posTag, posRetry: posRetry, lemma: lemma)
             self.db.updatePOS(
                 output: classifiedOutput,
                 pos: pos,
                 posTag: posTag,
+                lemma: lemma,
                 posRetry: posRetry
             )
             self.finishInFlightClassification(
                 output: classifiedOutput,
                 initiatorID: commitID,
                 classification: classification,
-                nounState: nounState
+                contentWordState: contentWordState
             )
         }
     }
@@ -117,12 +126,12 @@ public final class POSCommitSequencer {
         output: String,
         initiatorID: UInt64,
         classification: Classification,
-        nounState: NounState
+        contentWordState: ContentWordState
     ) {
-        resolve(commitID: initiatorID, classification: classification, nounState: nounState)
+        resolve(commitID: initiatorID, classification: classification, contentWordState: contentWordState)
         let waiterIDs = outputWaiterIDs.removeValue(forKey: output) ?? []
         for waiterID in waiterIDs {
-            resolve(commitID: waiterID, classification: classification, nounState: nounState)
+            resolve(commitID: waiterID, classification: classification, contentWordState: contentWordState)
         }
         inFlightOutputs.remove(output)
     }
@@ -130,22 +139,22 @@ public final class POSCommitSequencer {
     private func resolve(
         commitID: UInt64,
         classification: Classification,
-        nounState: NounState
+        contentWordState: ContentWordState
     ) {
         guard let index = pending.firstIndex(where: { $0.id == commitID }) else { return }
         guard pending[index].classification == nil else { return }
         pending[index].classification = classification
-        drainSideEffects(nounState: nounState)
+        drainSideEffects(contentWordState: contentWordState)
     }
 
-    private func drainSideEffects(nounState: NounState) {
+    private func drainSideEffects(contentWordState: ContentWordState) {
         while let head = pending.first, let classification = head.classification {
             pending.removeFirst()
             applySideEffects(
                 output: head.output,
                 reading: head.reading,
                 classification: classification,
-                nounState: nounState
+                contentWordState: contentWordState
             )
         }
     }
@@ -154,13 +163,16 @@ public final class POSCommitSequencer {
         output: String,
         reading: String,
         classification: Classification,
-        nounState: NounState
+        contentWordState: ContentWordState
     ) {
-        guard classification.pos == "noun" || classification.pos.hasPrefix("proper_noun") else { return }
-        if let prev = nounState.get() {
-            db.recordNounBigram(prev: prev, input: reading, output: output)
+        let isContentWord = classification.pos == "noun"
+            || classification.pos.hasPrefix("proper_noun")
+            || classification.pos == "verb"
+        guard isContentWord else { return }
+        if let prev = contentWordState.get() {
+            db.recordContentBigram(prev: prev, input: reading, output: output)
         }
-        nounState.set(output)
+        contentWordState.set(contentWordForPrev(output: output, classification: classification))
     }
 }
 

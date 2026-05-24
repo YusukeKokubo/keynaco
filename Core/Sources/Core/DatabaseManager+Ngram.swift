@@ -1,15 +1,34 @@
 import Foundation
+import NaturalLanguage
 import SQLite3
 
-extension DatabaseManager {
-    // MARK: - Noun-Bigram
+func lemmatizeForPrev(_ text: String, pos: String) -> String {
+    guard pos == "verb" else { return text }
+    let tagger = NLTagger(tagSchemes: [.lemma])
+    tagger.string = text
+    var result = text
+    tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .lemma) { tag, _ in
+        if let tag { result = tag.rawValue }
+        return false
+    }
+    return result.isEmpty ? text : result
+}
 
-    public func recordNounBigram(prev: String, input: String, output: String) {
+func contentWordForPrev(output: String, classification: POSCommitSequencer.Classification) -> String {
+    guard classification.pos == "verb" else { return output }
+    if let lemma = classification.lemma, !lemma.isEmpty { return lemma }
+    return lemmatizeForPrev(output, pos: "verb")
+}
+
+extension DatabaseManager {
+    // MARK: - Content-Bigram
+
+    public func recordContentBigram(prev: String, input: String, output: String) {
         guard !prev.isEmpty else { return }
         dispatchWrite {
             let t = self.nowEpoch()
             self.executeOnQueue("""
-            INSERT INTO noun_bigram (prev, input, output, count, used_at)
+            INSERT INTO content_bigram (prev, input, output, count, used_at)
             VALUES (?, ?, ?, 1, ?)
             ON CONFLICT(prev, input, output) DO UPDATE SET
                 count   = count + 1,
@@ -21,12 +40,12 @@ extension DatabaseManager {
         }
     }
 
-    public func fetchNounBigram(prev: String, reading: String) -> [String] {
+    public func fetchContentBigram(prev: String, reading: String) -> [String] {
         dbQueue.sync {
             let now = self.nowEpoch()
             return self.queryStringsOnQueue("""
-            SELECT output FROM noun_bigram
-            WHERE prev = ? AND input LIKE ?
+            SELECT output FROM content_bigram
+            WHERE prev = ? AND input LIKE ? AND count >= 2
             ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
             LIMIT 10
             """) {
@@ -36,7 +55,7 @@ extension DatabaseManager {
         }
     }
 
-    public struct NounBigramEntry: Sendable {
+    public struct ContentBigramEntry: Sendable {
         public let prev: String
         public let input: String
         public let output: String
@@ -44,18 +63,18 @@ extension DatabaseManager {
         public let usedAt: Int64
     }
 
-    public func fetchAllNounBigram() -> [NounBigramEntry] {
+    public func fetchAllContentBigram() -> [ContentBigramEntry] {
         dbQueue.sync {
-            let sql = "SELECT prev, input, output, count, used_at FROM noun_bigram ORDER BY count DESC, used_at DESC LIMIT 1000"
+            let sql = "SELECT prev, input, output, count, used_at FROM content_bigram ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-            var results: [NounBigramEntry] = []
+            var results: [ContentBigramEntry] = []
             while sqlite3_step(stmt) == SQLITE_ROW {
                 guard let p = sqlite3_column_text(stmt, 0),
                       let i = sqlite3_column_text(stmt, 1),
                       let o = sqlite3_column_text(stmt, 2) else { continue }
-                results.append(NounBigramEntry(
+                results.append(ContentBigramEntry(
                     prev: String(cString: p), input: String(cString: i), output: String(cString: o),
                     count: Int(sqlite3_column_int(stmt, 3)), usedAt: sqlite3_column_int64(stmt, 4)
                 ))
@@ -64,19 +83,19 @@ extension DatabaseManager {
         }
     }
 
-    public func deleteNounBigramEntry(prev: String, input: String, output: String) {
+    public func deleteContentBigramEntry(prev: String, input: String, output: String) {
         dispatchWrite {
-            self.executeOnQueue("DELETE FROM noun_bigram WHERE prev = ? AND input = ? AND output = ?") {
+            self.executeOnQueue("DELETE FROM content_bigram WHERE prev = ? AND input = ? AND output = ?") {
                 self.bindText($0, 1, prev); self.bindText($0, 2, input); self.bindText($0, 3, output)
             }
         }
     }
 
-    public func fetchNounBigramTop(prev: String, limit: Int = 20) -> [String] {
+    public func fetchContentBigramTop(prev: String, limit: Int = 20) -> [String] {
         dbQueue.sync {
             let now = self.nowEpoch()
             return self.queryStringsOnQueue("""
-            SELECT output FROM noun_bigram
+            SELECT output FROM content_bigram
             WHERE prev = ?
             GROUP BY output
             ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC

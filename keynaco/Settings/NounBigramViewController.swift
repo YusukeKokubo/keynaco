@@ -4,7 +4,7 @@ import KeynacoCore
 final class NounBigramViewController: NSViewController {
     private let tableView = DeletableTableView()
     private let deleteButton = NSButton(title: "選択を削除", target: nil, action: nil)
-    private var data: [DatabaseManager.NounBigramEntry] = []
+    private var data: [DatabaseManager.ContentBigramEntry] = []
 
     private struct ColumnDef {
         let id: String
@@ -95,7 +95,7 @@ final class NounBigramViewController: NSViewController {
     }
 
     @objc private func reload() {
-        data = DatabaseManager.shared.fetchAllNounBigram()
+        data = DatabaseManager.shared.fetchAllContentBigram()
         applyCurrentSort()
         deleteButton.isEnabled = false
     }
@@ -125,7 +125,7 @@ final class NounBigramViewController: NSViewController {
         let row = tableView.selectedRow
         guard row >= 0 else { return }
         let entry = data[row]
-        DatabaseManager.shared.deleteNounBigramEntry(prev: entry.prev, input: entry.input, output: entry.output)
+        DatabaseManager.shared.deleteContentBigramEntry(prev: entry.prev, input: entry.input, output: entry.output)
         data.remove(at: row)
         tableView.removeRows(at: IndexSet(integer: row), withAnimation: .effectFade)
         deleteButton.isEnabled = tableView.selectedRow >= 0

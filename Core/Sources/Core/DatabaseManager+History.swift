@@ -60,7 +60,7 @@ extension DatabaseManager {
     public func fetchCachedPOS(output: String) -> POSCommitSequencer.Classification? {
         dbQueue.sync {
             let sql = """
-            SELECT pos, pos_tag, pos_retry FROM history
+            SELECT pos, pos_tag, pos_retry, lemma FROM history
             WHERE output = ? AND pos IS NOT NULL AND pos_retry = 0
             LIMIT 1
             """
@@ -70,19 +70,31 @@ extension DatabaseManager {
                   let posPtr = sqlite3_column_text(stmt, 0) else { return nil }
             let pos = String(cString: posPtr)
             let posTag = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
-            return POSCommitSequencer.Classification(pos: pos, posTag: posTag, posRetry: false)
+            let lemma = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
+            return POSCommitSequencer.Classification(
+                pos: pos, posTag: posTag, posRetry: false, lemma: lemma
+            )
         }
     }
 
     /// `output` に対応する全履歴行の pos を更新する。
     /// `posRetry=true` の場合は次回分類時に再実行対象となる（低信頼度・フォーマット崩れ時に使用）。
-    public func updatePOS(output: String, pos: String, posTag: String? = nil, posRetry: Bool = false) {
+    public func updatePOS(
+        output: String,
+        pos: String,
+        posTag: String? = nil,
+        lemma: String? = nil,
+        posRetry: Bool = false
+    ) {
         dispatchWrite {
-            self.executeOnQueue("UPDATE history SET pos = ?, pos_tag = ?, pos_retry = ? WHERE output = ?") {
+            self.executeOnQueue(
+                "UPDATE history SET pos = ?, pos_tag = ?, lemma = ?, pos_retry = ? WHERE output = ?"
+            ) {
                 self.bindText($0, 1, pos)
                 if let tag = posTag { self.bindText($0, 2, tag) } else { sqlite3_bind_null($0, 2) }
-                sqlite3_bind_int($0, 3, posRetry ? 1 : 0)
-                self.bindText($0, 4, output)
+                if let lemma { self.bindText($0, 3, lemma) } else { sqlite3_bind_null($0, 3) }
+                sqlite3_bind_int($0, 4, posRetry ? 1 : 0)
+                self.bindText($0, 5, output)
             }
         }
     }
@@ -103,7 +115,7 @@ extension DatabaseManager {
 
     public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
-            let sql = "SELECT input, output, count, pos, pos_tag, pos_retry, used_at FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+            let sql = "SELECT input, output, count, pos, pos_tag, pos_retry, lemma, used_at FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -114,11 +126,12 @@ extension DatabaseManager {
                 let pos = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
                 let posTag = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
                 let posRetry = sqlite3_column_int(stmt, 5) != 0
-                let usedAt = sqlite3_column_int64(stmt, 6)
+                let lemma = sqlite3_column_text(stmt, 6).map { String(cString: $0) }
+                let usedAt = sqlite3_column_int64(stmt, 7)
                 results.append(HistoryEntry(
                     input: String(cString: i), output: String(cString: o),
                     count: Int(sqlite3_column_int(stmt, 2)), pos: pos, posTag: posTag, posRetry: posRetry,
-                    usedAt: usedAt
+                    lemma: lemma, usedAt: usedAt
                 ))
             }
             return results

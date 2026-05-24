@@ -11,7 +11,13 @@ public final class LLMPOSClassifier {
     private struct POSJob {
         let output: String
         let context: String?
-        let completion: @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+        let completion: @MainActor (
+            _ output: String,
+            _ pos: String,
+            _ posTag: String,
+            _ posRetry: Bool,
+            _ lemma: String?
+        ) -> Void
     }
 
     private var runningOutputs: Set<String> = []
@@ -24,7 +30,13 @@ public final class LLMPOSClassifier {
     public func enqueue(
         output: String,
         context: String? = nil,
-        completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+        completion: @escaping @MainActor (
+            _ output: String,
+            _ pos: String,
+            _ posTag: String,
+            _ posRetry: Bool,
+            _ lemma: String?
+        ) -> Void
     ) {
         let effectiveContext = Self.shouldOmitClassificationContext(output) ? nil : context
         jobQueue.append(POSJob(output: output, context: effectiveContext, completion: completion))
@@ -37,7 +49,13 @@ public final class LLMPOSClassifier {
     public func classify(
         output: String,
         context: String? = nil,
-        completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+        completion: @escaping @MainActor (
+            _ output: String,
+            _ pos: String,
+            _ posTag: String,
+            _ posRetry: Bool,
+            _ lemma: String?
+        ) -> Void
     ) {
         runClassification(output: output, context: context, completion: completion)
     }
@@ -46,8 +64,8 @@ public final class LLMPOSClassifier {
         guard !isProcessingQueue, !jobQueue.isEmpty else { return }
         isProcessingQueue = true
         let job = jobQueue.removeFirst()
-        let started = runClassification(output: job.output, context: job.context) { [weak self] output, pos, posTag, posRetry in
-            job.completion(output, pos, posTag, posRetry)
+        let started = runClassification(output: job.output, context: job.context) { [weak self] output, pos, posTag, posRetry, lemma in
+            job.completion(output, pos, posTag, posRetry, lemma)
             self?.isProcessingQueue = false
             self?.drainQueue()
         }
@@ -73,7 +91,13 @@ public final class LLMPOSClassifier {
     private func runClassification(
         output: String,
         context: String? = nil,
-        completion: @escaping @MainActor (_ output: String, _ pos: String, _ posTag: String, _ posRetry: Bool) -> Void
+        completion: @escaping @MainActor (
+            _ output: String,
+            _ pos: String,
+            _ posTag: String,
+            _ posRetry: Bool,
+            _ lemma: String?
+        ) -> Void
     ) -> Bool {
         guard case .available = SystemLanguageModel.default.availability else { return false }
         guard !runningOutputs.contains(output) else { return false }
@@ -83,13 +107,17 @@ public final class LLMPOSClassifier {
             """
             # Role
             Japanese POS Tagger for IME commit history.
-            Reply: "tag:confidence" (high/mid/low).
+
+            # Response format
+            - Default: "tag:confidence" (high/mid/low)
+            - Verb only: "tag:confidence:lemma" (dictionary form)
 
             # Rules
             - Each token is an IME commit unit (surface form, no okurigana attached).
             - Classify by dictionary POS, not by possible sentence continuation.
             - サ変名詞 (実装, 入力, 確認, 設定, etc.) without する attached → noun.
             - Use preceding context only for proper_noun subcategory; do not flip noun/verb on standalone tokens.
+            - For verbs, always append dictionary form (lemma) as the third field.
 
             # Tagset
             - noun, verb, adjective, particle
@@ -111,14 +139,17 @@ public final class LLMPOSClassifier {
             ドラゴンボール → proper_noun/work:high
             スラムダンク → proper_noun/work:high
             実装 → noun:high
-            実装する → verb:high
+            実装する → verb:high:実装する
             入力 → noun:high
-            入力する → verb:high
+            入力する → verb:high:入力する
             変換 → noun:high
             確認 → noun:high
             設定 → noun:high
             管理 → noun:high
-            確認して → verb:high
+            行った → verb:high:行く
+            設定した → verb:high:設定する
+            確認して → verb:high:確認する
+            書きます → verb:high:書く
             欲しい → adjective:high
             が → particle:high
             しかし → other/conjunction:high
@@ -137,16 +168,17 @@ public final class LLMPOSClassifier {
             defer { self?.runningOutputs.remove(output) }
             do {
                 let response = try await session.respond(to: prompt)
-                let posTag = Self.normalizeTag(response.content)
+                let (posTag, lemma) = Self.parseTagAndLemma(response.content)
                 var pos = Self.categoryFromTag(posTag)
                 var retry = Self.needsRetry(posTag: posTag)
                 let adjusted = Self.applySuruNounHeuristic(output: output, pos: pos, posTag: posTag, posRetry: retry)
                 pos = adjusted.pos
                 retry = adjusted.posRetry
+                let effectiveLemma = pos == "verb" ? lemma : nil
                 if pos == "other" {
                     logger.warning("POS=other: output=\(output, privacy: .public) tag=\(posTag, privacy: .public)")
                 }
-                completion(output, pos, adjusted.posTag, retry)
+                completion(output, pos, adjusted.posTag, retry, effectiveLemma)
             } catch {
                 logger.error("POS classify failed: output=\(output, privacy: .public) error=\(String(describing: error), privacy: .public)")
             }
@@ -186,37 +218,49 @@ public final class LLMPOSClassifier {
         return ("noun", "noun:mid", false)
     }
 
-    /// LLM 応答から `tag:confidence` 形式のタグ部分を正規化して返す。
-    /// 説明文が混入していても known タグを含む部分を抽出する。
-    static nonisolated func normalizeTag(_ raw: String) -> String {
+    private static nonisolated let knownTagPrefixes = [
+        "proper_noun/place", "proper_noun/person", "proper_noun/org",
+        "proper_noun/product", "proper_noun/work", "proper_noun",
+        "noun/common", "noun/suru", "noun/number", "noun",
+        "verb/te", "verb/ta", "verb/dict", "verb",
+        "adjective/i", "adjective/na", "adjective/adv", "adjective",
+        "particle/case", "particle/topic", "particle/aux", "particle",
+        "other/conjunction", "other/interjection", "other/clause", "other/unknown", "other",
+    ]
+
+    private static nonisolated func cleanedResponse(_ raw: String) -> String {
         let cleaned = raw.unicodeScalars.filter { $0 != "*" && $0 != "`" }
-        let text = String(cleaned)
+        return String(cleaned)
             .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+    }
 
-        // `tag:confidence` 形式から最初のトークンを抽出（スペース・改行・説明文が付いていても対応）
-        let knownPrefixes = [
-            "proper_noun/place", "proper_noun/person", "proper_noun/org",
-            "proper_noun/product", "proper_noun/work", "proper_noun",
-            "noun/common", "noun/suru", "noun/number", "noun",
-            "verb/te", "verb/ta", "verb/dict", "verb",
-            "adjective/i", "adjective/na", "adjective/adv", "adjective",
-            "particle/case", "particle/topic", "particle/aux", "particle",
-            "other/conjunction", "other/interjection", "other/clause", "other/unknown", "other",
-        ]
-        for prefix in knownPrefixes {
-            if let range = text.range(of: prefix) {
-                // タグの後に :confidence が続く場合はそのまま保持
-                let afterTag = text[range.upperBound...]
-                if afterTag.hasPrefix(":") {
-                    let confidence = afterTag.dropFirst().prefix(while: { $0.isLetter })
-                    return prefix + ":" + confidence
-                }
-                return prefix
-            }
+    /// LLM 応答から `tag:confidence` と動詞 lemma を抽出する。
+    static nonisolated func parseTagAndLemma(_ raw: String) -> (posTag: String, lemma: String?) {
+        let text = cleanedResponse(raw)
+        for prefix in knownTagPrefixes {
+            guard let range = text.range(of: prefix) else { continue }
+            let afterTag = text[range.upperBound...]
+            guard afterTag.hasPrefix(":") else { return (prefix, nil) }
+            let rest = afterTag.dropFirst()
+            let colonParts = rest.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            let confidence = colonParts.first.map(String.init) ?? ""
+            let posTag = confidence.isEmpty ? prefix : "\(prefix):\(confidence)"
+            let lemma: String? = {
+                guard categoryFromTag(posTag) == "verb", colonParts.count > 1 else { return nil }
+                let value = String(colonParts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+                return value.isEmpty ? nil : value
+            }()
+            return (posTag, lemma)
         }
-        return text
+        return (text, nil)
+    }
+
+    /// LLM 応答から `tag:confidence` 形式のタグ部分を正規化して返す。
+    /// 説明文が混入していても known タグを含む部分を抽出する。
+    static nonisolated func normalizeTag(_ raw: String) -> String {
+        parseTagAndLemma(raw).posTag
     }
 
     /// `tag:confidence` または `tag` から pos 値を返す。

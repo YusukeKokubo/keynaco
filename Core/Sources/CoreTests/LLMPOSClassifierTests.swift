@@ -17,7 +17,33 @@ final class LLMPOSClassifierTests: XCTestCase {
         XCTAssertEqual(LLMPOSClassifier.normalizeTag("verb/te:low"),            "verb/te:low")
     }
 
-    func testExplanatoryResponseExtraction() {
+    // MARK: - parseTagAndLemma
+
+    func testParseTagAndLemmaVerbWithLemma() {
+        let parsed = LLMPOSClassifier.parseTagAndLemma("verb:high:行く")
+        XCTAssertEqual(parsed.posTag, "verb:high")
+        XCTAssertEqual(parsed.lemma, "行く")
+    }
+
+    func testParseTagAndLemmaVerbSubtypeWithLemma() {
+        let parsed = LLMPOSClassifier.parseTagAndLemma("verb/ta:high:行く")
+        XCTAssertEqual(parsed.posTag, "verb/ta:high")
+        XCTAssertEqual(parsed.lemma, "行く")
+    }
+
+    func testParseTagAndLemmaNounHasNoLemma() {
+        let parsed = LLMPOSClassifier.parseTagAndLemma("noun:high")
+        XCTAssertEqual(parsed.posTag, "noun:high")
+        XCTAssertNil(parsed.lemma)
+    }
+
+    func testParseTagAndLemmaExtractsFromExplanatoryResponse() {
+        let parsed = LLMPOSClassifier.parseTagAndLemma("行った → verb:high:行く")
+        XCTAssertEqual(parsed.posTag, "verb:high")
+        XCTAssertEqual(parsed.lemma, "行く")
+    }
+
+    func testConfidenceParsingLegacy() {
         // 説明文が混入しても known タグを抽出できる
         XCTAssertEqual(LLMPOSClassifier.normalizeTag("田中 → proper_noun/person:mid"),               "proper_noun/person:mid")
         XCTAssertEqual(LLMPOSClassifier.normalizeTag("「山田太郎」の品詞タグは proper_noun/person です。"), "proper_noun/person")

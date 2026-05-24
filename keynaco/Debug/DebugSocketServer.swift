@@ -1073,7 +1073,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "focusedSegmentIndex": snap.focusedSegmentIndex,
             "isZenzaiEnabled":    handler.azooKeyConverter.isZenzaiEnabled,
             "leftSideContext":    handler.leftSideContext,
-            "lastConfirmedNounOutput": handler.lastConfirmedNounOutput as Any,
+            "lastConfirmedContentWordOutput": handler.lastConfirmedContentWordOutput as Any,
             "lastCommittedReading": handler.lastCommittedReading as Any,
             "surroundingAfter":   mockClient.documentAfter,
             "candidateEntries":   Self.makeCandidateEntries(

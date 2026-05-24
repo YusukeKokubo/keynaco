@@ -79,7 +79,7 @@ extension DebugSocketServer {
     }
     let count = seed["count"] as? Int ?? 1
     for _ in 0..<count {
-        handler.db.recordNounBigram(prev: prev, input: input, output: output)
+        handler.db.recordContentBigram(prev: prev, input: input, output: output)
     }
     return Self.finalize(["ok": true], cmd: cmd)
     }
@@ -107,7 +107,7 @@ extension DebugSocketServer {
 
     func handleSetLastNoun(cmd: [String: Any]) -> [String: Any] {
     let noun = cmd["set_last_noun"] as! String
-    handler.lastConfirmedNounOutput = noun.isEmpty ? nil : noun
+    handler.lastConfirmedContentWordOutput = noun.isEmpty ? nil : noun
     return Self.finalize(["ok": true], cmd: cmd)
     }
 
@@ -543,14 +543,14 @@ extension DebugSocketServer {
 
     func handleQueryNounBigram(cmd: [String: Any]) -> [String: Any] {
         let prev = cmd["query_noun_bigram_prev"] as? String
-        let entries = handler.db.fetchAllNounBigram()
+        let entries = handler.db.fetchAllContentBigram()
         let filtered = prev.map { p in entries.filter { $0.prev == p } } ?? entries
         let results: [[String: Any]] = filtered.map {
             ["prev": $0.prev, "input": $0.input, "output": $0.output, "count": $0.count]
         }
         return Self.finalize([
             "results": results,
-            "lastConfirmedNounOutput": handler.lastConfirmedNounOutput as Any,
+            "lastConfirmedContentWordOutput": handler.lastConfirmedContentWordOutput as Any,
         ], cmd: cmd)
     }
 
@@ -564,7 +564,7 @@ extension DebugSocketServer {
         return Self.finalize(["availability": desc], cmd: cmd)
     }
 
-    /// InputController.schedulePOSClassification と同経路で POS 分類・noun_bigram 記録を行う。
+    /// InputController.schedulePOSClassification と同経路で POS 分類・content_bigram 記録を行う。
     func schedulePOSClassification(output: String, reading: String) {
         let historyJoined = handler.committedHistory.suffix(5).joined()
         let context = historyJoined.isEmpty ? nil : historyJoined
@@ -572,11 +572,11 @@ extension DebugSocketServer {
             output: output,
             reading: reading,
             context: context,
-            nounState: POSCommitSequencer.NounState(
-                get: { [weak self] in self?.handler.lastConfirmedNounOutput },
-                set: { [weak self] noun in
+            contentWordState: POSCommitSequencer.ContentWordState(
+                get: { [weak self] in self?.handler.lastConfirmedContentWordOutput },
+                set: { [weak self] word in
                     guard let self else { return }
-                    self.handler.lastConfirmedNounOutput = noun
+                    self.handler.lastConfirmedContentWordOutput = word
                 }
             )
         )

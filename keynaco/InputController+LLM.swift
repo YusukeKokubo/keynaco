@@ -36,15 +36,15 @@ extension InputController {
         classifier: posClassifier
     )
 
-    /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。名詞なら noun_bigram を記録する。
+    /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。内容語なら content_bigram を記録する。
     func schedulePOSClassification(output: String, reading: String, context: String? = nil) {
         Self.posCommitSequencer.commit(
             output: output,
             reading: reading,
             context: context,
-            nounState: POSCommitSequencer.NounState(
-                get: { [weak self] in self?.handler.lastConfirmedNounOutput },
-                set: { [weak self] noun in self?.handler.lastConfirmedNounOutput = noun }
+            contentWordState: POSCommitSequencer.ContentWordState(
+                get: { [weak self] in self?.handler.lastConfirmedContentWordOutput },
+                set: { [weak self] word in self?.handler.lastConfirmedContentWordOutput = word }
             )
         )
     }
@@ -55,8 +55,8 @@ extension InputController {
         let db = DatabaseManager.shared
         let outputs = db.fetchUnclassifiedHistory(limit: 50)
         for output in outputs {
-            posClassifier.classify(output: output) { classifiedOutput, pos, posTag, posRetry in
-                db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, posRetry: posRetry)
+            posClassifier.classify(output: output) { classifiedOutput, pos, posTag, posRetry, lemma in
+                db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, lemma: lemma, posRetry: posRetry)
             }
         }
     }

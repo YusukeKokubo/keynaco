@@ -54,7 +54,7 @@ public extension InputHandler {
         var seen = Set<String>()
         var result: [String] = []
         for kana in kanas {
-            for s in db.fetchNounBigram(prev: noun, reading: kana)
+            for s in db.fetchContentBigram(prev: noun, reading: kana)
                 where seen.insert(s).inserted { result.append(s) }
             for s in db.fetchHistoryPrefix(reading: kana)
                 where seen.insert(s).inserted { result.append(s) }

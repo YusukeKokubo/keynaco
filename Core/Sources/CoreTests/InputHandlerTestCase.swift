@@ -70,10 +70,16 @@ class InputHandlerTestCase: XCTestCase {
         for c in s { type(chars: String(c), base: String(c)) }
     }
 
-    /// noun_bigram 予測テスト用: 学習行と `lastConfirmedNounOutput` をセットする。
-    func seedNounBigramPrediction(prev: String, input: String, output: String) {
-        handler.db.recordNounBigram(prev: prev, input: input, output: output)
-        handler.lastConfirmedNounOutput = prev
+    /// content_bigram 予測テスト用: 学習行（count >= 2）と `lastConfirmedContentWordOutput` をセットする。
+    func seedContentBigramPrediction(prev: String, input: String, output: String) {
+        recordFetchableContentBigram(prev: prev, input: input, output: output)
+        handler.lastConfirmedContentWordOutput = prev
+    }
+
+    /// `fetchContentBigram` が返す最低 count（2）を満たすよう記録する。
+    func recordFetchableContentBigram(prev: String, input: String, output: String) {
+        handler.db.recordContentBigram(prev: prev, input: input, output: output)
+        handler.db.recordContentBigram(prev: prev, input: input, output: output)
     }
 
     /// 既定の `setUp` 後に AzooKey スタブ等へ差し替える。

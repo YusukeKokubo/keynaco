@@ -83,10 +83,11 @@ public final class DatabaseManager: @unchecked Sendable {
             pos TEXT DEFAULT NULL,
             pos_tag TEXT DEFAULT NULL,
             pos_retry INTEGER NOT NULL DEFAULT 0,
+            lemma TEXT DEFAULT NULL,
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
-        CREATE TABLE IF NOT EXISTS noun_bigram (
+        CREATE TABLE IF NOT EXISTS content_bigram (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             prev    TEXT    NOT NULL,
             input   TEXT    NOT NULL,
@@ -95,7 +96,7 @@ public final class DatabaseManager: @unchecked Sendable {
             used_at INTEGER NOT NULL,
             UNIQUE(prev, input, output)
         );
-        CREATE INDEX IF NOT EXISTS idx_noun_bigram ON noun_bigram(prev, input);
+        CREATE INDEX IF NOT EXISTS idx_content_bigram ON content_bigram(prev, input);
         CREATE TABLE IF NOT EXISTS user_dict (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             input   TEXT    NOT NULL,
@@ -116,7 +117,7 @@ public final class DatabaseManager: @unchecked Sendable {
 
     /// 廃止した bigram / trigram / skip_bigram テーブルを既存 DB から削除する。
     private func dropDeprecatedNgramTables() {
-        for table in ["skip_bigram", "trigram", "bigram", "boundary_pref"] {
+        for table in ["skip_bigram", "trigram", "bigram", "boundary_pref", "noun_bigram"] {
             sqlite3_exec(db, "DROP TABLE IF EXISTS \(table)", nil, nil, nil)
         }
     }
@@ -132,6 +133,7 @@ public final class DatabaseManager: @unchecked Sendable {
         // pos_raw から pos_tag へデータを移行（pos_raw は互換のため残す）
         sqlite3_exec(db, "UPDATE history SET pos_tag = pos_raw WHERE pos_tag IS NULL AND pos_raw IS NOT NULL", nil, nil, nil)
         sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_retry INTEGER NOT NULL DEFAULT 0", nil, nil, nil)
+        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN lemma TEXT DEFAULT NULL", nil, nil, nil)
         // pos_tag の subcategory を pos 列に反映（proper_noun → proper_noun/place|person|org）
         sqlite3_exec(db, """
             UPDATE history SET pos =
@@ -242,6 +244,7 @@ public final class DatabaseManager: @unchecked Sendable {
         public let pos: String?
         public let posTag: String?
         public let posRetry: Bool
+        public let lemma: String?
         public let usedAt: Int64
     }
 
@@ -280,7 +283,7 @@ public final class DatabaseManager: @unchecked Sendable {
 
         dispatchWrite {
             let cutoff = self.nowEpoch() - 180 * 86400
-            for table in ["history", "noun_bigram"] {
+            for table in ["history", "content_bigram"] {
                 self.executeOnQueue("DELETE FROM \(table) WHERE count = 1 AND used_at < ?") { stmt in
                     sqlite3_bind_int64(stmt, 1, cutoff)
                 }
