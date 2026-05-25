@@ -514,8 +514,8 @@ extension DebugSocketServer {
     /// InputController.schedulePOSClassification と同経路で POS 分類を行う。
     func schedulePOSClassification(output: String, reading: String) {
         guard HiraganaPreferredBuiltins.stopWords[output] == nil else { return }
-        let historyJoined = handler.committedHistory.suffix(5).joined()
-        let context = historyJoined.isEmpty ? nil : historyJoined
+        let buffer = handler.sessionTextBuffer
+        let context = buffer.isEmpty ? nil : buffer
         posClassifier.enqueue(output: output, context: context) { [db = handler.db] classifiedOutput, pos, posTag, posRetry, lemma in
             db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, lemma: lemma, posRetry: posRetry)
         }

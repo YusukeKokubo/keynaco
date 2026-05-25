@@ -4,9 +4,9 @@ import InputMethodKit
 
 extension InputController {
 
-    /// LLM 用の文脈プレフィックス。IMK の `before`（キャッシュ・location 一致時）が非空なら、`committedHistory.suffix(5)` が空でないときは先頭にその全量を付けたうえで `before` を続ける（`before` は最大 300 字に切り詰めた後、結合総長が 400 字を超えないようカーソル近傍の末尾側を採用）。`historyJoined` は切り捨てない。`before` が空またはキャッシュ不一致時は `committedHistory.suffix(5)` のみ。
+    /// LLM 用の文脈プレフィックス。IMK の `before`（キャッシュ・location 一致時）が非空なら、`sessionTextBuffer` が空でないときは先頭にその全量を付けたうえで `before` を続ける（`before` は最大 300 字に切り詰めた後、結合総長が 400 字を超えないようカーソル近傍の末尾側を採用）。`sessionTextBuffer` は切り捨てない。`before` が空またはキャッシュ不一致時は `sessionTextBuffer` のみ。
     func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
-        let historyJoined = handler.committedHistory.suffix(5).joined()
+        let historyJoined = handler.sessionTextBuffer
         let loc = adapter.selectedRange().location
         guard loc != NSNotFound else { return historyJoined }
 
