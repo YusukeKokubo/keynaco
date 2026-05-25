@@ -27,4 +27,9 @@ class BaseAzooKeyStub: AzooKeyConverting, @unchecked Sendable {
         _ = (hiragana, leftSideContext)
         return []
     }
+
+    func lcidForCommitted(reading: String, output: String) -> Int? {
+        _ = (reading, output)
+        return nil
+    }
 }

@@ -5,6 +5,8 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String]
     func commit(reading: String, text: String)
     func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])]
+    /// 確定済み `(reading, output)` に対応する AzooKey 辞書エントリの代表 `lcid` を返す。
+    func lcidForCommitted(reading: String, output: String) -> Int?
 }
 
 public extension AzooKeyConverting {
@@ -25,6 +27,8 @@ public extension AzooKeyConverting {
     func segmentize(_ hiragana: String) -> [(reading: String, candidates: [String])] {
         segmentize(hiragana, leftSideContext: nil)
     }
+
+    func lcidForCommitted(reading: String, output: String) -> Int? { nil }
 }
 
 extension AzooKeyConverter: AzooKeyConverting {}

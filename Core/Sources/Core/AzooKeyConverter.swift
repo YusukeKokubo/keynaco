@@ -207,4 +207,23 @@ public final class AzooKeyConverter: @unchecked Sendable {
         @unknown default: return 1
         }
     }
+
+    /// 確定済み `(reading, output)` に対応する候補の代表 `lcid` を辞書ルックアップで返す（Zenzai 不使用）。
+    public func lcidForCommitted(reading: String, output: String) -> Int? {
+        guard !reading.isEmpty else { return nil }
+        var text = ComposingText()
+        text.insertAtCursorPosition(reading, inputStyle: .direct)
+        return converterLock.withLock {
+            let result = converter.requestCandidates(text, options: baseOptions)
+            guard let match = result.mainResults.first(where: { $0.text == output }) else { return nil }
+            return Self.primaryLcid(from: match.data)
+        }
+    }
+
+    private static func primaryLcid(from data: [DicdataElement]) -> Int? {
+        if let content = data.first(where: { !CIDData.isJoshi(cid: $0.lcid) && $0.lcid != 0 && $0.lcid != CIDData.EOS.cid }) {
+            return content.lcid
+        }
+        return data.first?.lcid
+    }
 }

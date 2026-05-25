@@ -31,12 +31,16 @@ extension InputController {
         return historyJoined
     }
 
-    /// 確定語の品詞を LLM で非同期判定し、DB の pos を更新する。
-    func schedulePOSClassification(output: String, reading: String, context: String? = nil) {
+    /// 確定語の品詞を AzooKey 辞書で判定し、DB の pos を更新する。
+    func schedulePOSClassification(output: String, reading: String) {
         guard HiraganaPreferredBuiltins.stopWords[output] == nil else { return }
-        Self.posClassifier.enqueue(output: output, context: context) { classifiedOutput, pos, posTag, posRetry, lemma in
+        let converter = handler.azooKeyConverter
+        Task { @MainActor in
+            guard let c = AzooKeyPOSClassifier.classify(
+                output: output, reading: reading, converter: converter
+            ) else { return }
             DatabaseManager.shared.updatePOS(
-                output: classifiedOutput, pos: pos, posTag: posTag, lemma: lemma, posRetry: posRetry
+                output: output, pos: c.pos, posTag: c.posTag, lemma: nil, posRetry: false
             )
         }
     }
@@ -45,11 +49,15 @@ extension InputController {
     @MainActor
     static func performPOSBackfill() {
         let db = DatabaseManager.shared
-        let outputs = db.fetchUnclassifiedHistory(limit: 50)
-        for output in outputs {
-            posClassifier.classify(output: output) { classifiedOutput, pos, posTag, posRetry, lemma in
-                db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, lemma: lemma, posRetry: posRetry)
-            }
+        let entries = db.fetchUnclassifiedHistoryEntries(limit: 50)
+        let converter = posBackfillConverter
+        for entry in entries {
+            guard let c = AzooKeyPOSClassifier.classify(
+                output: entry.output, reading: entry.reading, converter: converter
+            ) else { continue }
+            db.updatePOS(
+                output: entry.output, pos: c.pos, posTag: c.posTag, lemma: nil, posRetry: false
+            )
         }
     }
 

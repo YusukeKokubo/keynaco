@@ -1,7 +1,6 @@
 #if DEBUG
 
 import Foundation
-import FoundationModels
 import KeynacoCore
 import AppKit
 import InputMethodKit
@@ -502,143 +501,18 @@ extension DebugSocketServer {
     }
 
     func handlePosAvailability(cmd: [String: Any]) -> [String: Any] {
-        let avail = SystemLanguageModel.default.availability
-        let desc: String
-        switch avail {
-        case .available: desc = "available"
-        default: desc = String(describing: avail)
-        }
-        return Self.finalize(["availability": desc], cmd: cmd)
-    }
-
-    // MARK: - POC: 最小構造体テスト（@Generable + respond(to:generating:) の動作確認）
-
-    /// `{"poc_generable_smoke": true}` → フィールド1つの最小 @Generable struct が動くか確認
-    func handlePocGenerableSmoke(cmd: [String: Any]) async -> [String: Any] {
-        let start = Date()
-        let (answer, errMsg) = await posClassifierV2.smokeTest()
-        let elapsed = Date().timeIntervalSince(start)
-        if let answer {
-            return Self.finalize(["result": answer, "elapsedMs": Int(elapsed * 1000)], cmd: cmd)
-        } else {
-            return Self.finalize(["error": errMsg ?? "unknown", "elapsedMs": Int(elapsed * 1000)], cmd: cmd)
-        }
-    }
-
-    // MARK: - POC: @Generable 構造化出力分類器 V2
-
-    /// `{"poc_classify_v2": true}` → 検証セット全件を V2 で分類してレポートを返す。
-    /// `{"poc_classify_v2": {"outputs": ["設定", "が"]}}` → 指定単語を分類して返す。
-    func handlePocClassifyV2(cmd: [String: Any]) async -> [String: Any] {
-        let payload = cmd["poc_classify_v2"]
-        let customOutputs = (payload as? [String: Any])?["outputs"] as? [String]
-
-        if let outputs = customOutputs {
-            // 単語指定モード: 指定単語を 1 件ずつ分類
-            var results: [[String: Any]] = []
-            for output in outputs {
-                let start = Date()
-                let (result, errMsg) = await posClassifierV2.classify(output: output)
-                let elapsed = Date().timeIntervalSince(start)
-                let label = result.map { POSLabelV2(rawValue: $0.pos) ?? .other }
-                var row: [String: Any] = [
-                    "output": output,
-                    "pos": result?.pos ?? "(nil)",
-                    "posString": label?.posString ?? "(nil)",
-                    "confidence": result?.confidence ?? "-",
-                    "hide": label?.shouldHideFromCandidates ?? false,
-                    "elapsedMs": Int(elapsed * 1000)
-                ]
-                if let err = errMsg { row["error"] = err }
-                results.append(row)
-            }
-            return Self.finalize(["results": results, "mode": "custom"], cmd: cmd)
-        }
-
-        // 検証セットモード: POC 検証セット全件を実行
-        let validationResults = await posClassifierV2.runValidation()
-        let passCount = validationResults.filter(\.pass).count
-        let rows: [[String: Any]] = validationResults.map { r in
-            var row: [String: Any] = [
-                "output":      r.output,
-                "expected":    r.expected.rawValue,
-                "actual":      r.actual?.rawValue ?? "(nil)",
-                "confidence":  r.confidence,
-                "pass":        r.pass,
-                "elapsedMs":   Int(r.elapsedSeconds * 1000)
-            ]
-            if let err = r.errorMessage { row["error"] = err }
-            return row
-        }
-        let summary: [String: Any] = [
-            "total":  validationResults.count,
-            "passed": passCount,
-            "failed": validationResults.count - passCount,
-            "passRate": String(format: "%.0f%%", Double(passCount) / Double(validationResults.count) * 100)
-        ]
-        return Self.finalize(["results": rows, "summary": summary, "mode": "validation"], cmd: cmd)
-    }
-
-    // MARK: - POC: Tool Calling（respond(to:generating:) ハング回避検証）
-
-    /// `{"poc_tool_calling": true}` → Tool Calling 経由で検証セット全件を分類してレポートを返す。
-    /// `{"poc_tool_calling": {"outputs": ["設定", ...]}}` → 単語指定モード。
-    func handlePocToolCalling(cmd: [String: Any]) async -> [String: Any] {
-        let payload = cmd["poc_tool_calling"]
-        let customOutputs = (payload as? [String: Any])?["outputs"] as? [String]
-
-        if let outputs = customOutputs {
-            var results: [[String: Any]] = []
-            for output in outputs {
-                let start = Date()
-                let (pos, confidence, errMsg) = await posClassifierV2.classifyViaToolCalling(output: output)
-                let elapsed = Date().timeIntervalSince(start)
-                let label = POSLabelV2(rawValue: pos)
-                var row: [String: Any] = [
-                    "output": output,
-                    "pos": pos,
-                    "posString": label?.posString ?? pos,
-                    "confidence": confidence,
-                    "hide": label?.shouldHideFromCandidates ?? false,
-                    "elapsedMs": Int(elapsed * 1000)
-                ]
-                if let err = errMsg { row["error"] = err }
-                results.append(row)
-            }
-            return Self.finalize(["results": results, "mode": "custom", "method": "tool_calling"], cmd: cmd)
-        }
-
-        let validationResults = await posClassifierV2.runToolCallingValidation()
-        let passCount = validationResults.filter(\.pass).count
-        let rows: [[String: Any]] = validationResults.map { r in
-            var row: [String: Any] = [
-                "output":     r.output,
-                "expected":   r.expected.rawValue,
-                "actual":     r.actual?.rawValue ?? "(nil)",
-                "confidence": r.confidence,
-                "pass":       r.pass,
-                "elapsedMs":  Int(r.elapsedSeconds * 1000)
-            ]
-            if let err = r.errorMessage { row["error"] = err }
-            return row
-        }
-        let summary: [String: Any] = [
-            "total":    validationResults.count,
-            "passed":   passCount,
-            "failed":   validationResults.count - passCount,
-            "passRate": String(format: "%.0f%%", Double(passCount) / Double(validationResults.count) * 100)
-        ]
-        return Self.finalize(["results": rows, "summary": summary, "mode": "validation", "method": "tool_calling"], cmd: cmd)
+        Self.finalize(["availability": "available", "engine": "AzooKey"], cmd: cmd)
     }
 
     /// InputController.schedulePOSClassification と同経路で POS 分類を行う。
     func schedulePOSClassification(output: String, reading: String) {
         guard HiraganaPreferredBuiltins.stopWords[output] == nil else { return }
-        let buffer = handler.sessionTextBuffer
-        let context = buffer.isEmpty ? nil : buffer
-        posClassifier.enqueue(output: output, context: context) { [db = handler.db] classifiedOutput, pos, posTag, posRetry, lemma in
-            db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, lemma: lemma, posRetry: posRetry)
-        }
+        guard let c = AzooKeyPOSClassifier.classify(
+            output: output, reading: reading, converter: posLookupConverter
+        ) else { return }
+        handler.db.updatePOS(
+            output: output, pos: c.pos, posTag: c.posTag, lemma: nil, posRetry: false
+        )
     }
 }
 

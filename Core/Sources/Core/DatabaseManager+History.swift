@@ -120,6 +120,31 @@ extension DatabaseManager {
         }
     }
 
+    /// 未分類エントリを output 単位で返す。reading は同一 output の中で count 最大の input。
+    public func fetchUnclassifiedHistoryEntries(limit: Int) -> [(output: String, reading: String)] {
+        dbQueue.sync {
+            var results: [(output: String, reading: String)] = []
+            let sql = """
+            SELECT output, input FROM (
+                SELECT output, input,
+                       ROW_NUMBER() OVER (PARTITION BY output ORDER BY count DESC, used_at DESC) AS rn
+                FROM history
+                WHERE pos IS NULL OR pos_retry = 1
+            )
+            WHERE rn = 1
+            LIMIT ?
+            """
+            guard let stmt = self.cachedStmt(for: sql) else { return results }
+            sqlite3_bind_int(stmt, 1, Int32(limit))
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let o = sqlite3_column_text(stmt, 0),
+                      let i = sqlite3_column_text(stmt, 1) else { continue }
+                results.append((output: String(cString: o), reading: String(cString: i)))
+            }
+            return results
+        }
+    }
+
     public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
             let sql = "SELECT input, output, count, pos, pos_tag, pos_retry, lemma, used_at FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"

@@ -32,8 +32,7 @@ let package = Package(
             path: "Sources/Core",
             swiftSettings: [.interoperabilityMode(.Cxx)],
             linkerSettings: [
-                .linkedLibrary("sqlite3"),
-                .linkedFramework("FoundationModels")
+                .linkedLibrary("sqlite3")
             ]
         ),
         .testTarget(

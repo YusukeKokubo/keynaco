@@ -12,7 +12,7 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
     nonisolated(unsafe) private var zenzaiSettingsObserver: NSObjectProtocol?
     nonisolated(unsafe) private var hiraganaPreferredObserver: NSObjectProtocol?
-    static let posClassifier = LLMPOSClassifier()
+    static let posBackfillConverter = AzooKeyConverter()
 
     static let candidateWindow: CandidateWindow = {
         let w = CandidateWindow(
@@ -190,8 +190,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         if adapter.didInsertText {
             schedulePOSClassification(
                 output: adapter.lastInsertedText,
-                reading: handler.lastCommittedReading ?? "",
-                context: resolvedLLMDocumentContextPrefix(adapter: adapter)
+                reading: handler.lastCommittedReading ?? ""
             )
         }
 
