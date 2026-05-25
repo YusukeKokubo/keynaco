@@ -11,7 +11,8 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
 - `RomajiConverter` = ローマ字→ひらがな変換ルールの実装
 - `AzooKeyConverting` / `AzooKeyConverter` = ひらがな→漢字変換エンジンの DI プロトコルと実装（`TextInputClient` と同じ役割）。`AzooKeyConverter` は `KanaKanjiConverterModuleWithDefaultDictionary` のラッパー（学習データを `~/Library/Application Support/keynaco/` に保存）。`isZenzaiEnabled` はユーザー設定（モデル未ロード時も true になり得る）。`buildCandidateList` は `composedHiragana` が変わらない限り `requestCandidates` を再呼び出しせずキャッシュを返す（LRU 上限 50 件）
-- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。機能ごとに extension 分割: `+History.swift`（履歴 fetch/record）、`+Ngram.swift`（content-bigram）、`+UserDict.swift`（ユーザー辞書 CRUD）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `content_bigram` / `user_dict` / `hiragana_preferred` の **4 テーブル**を持つ。起動時に廃止テーブル `bigram` / `trigram` / `skip_bigram` / `boundary_pref` / `noun_bigram` を `DROP` する（既存 DB のマイグレーション用。現行コードはこれらを参照しない）。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）。`user_dict` のみ time-decay なし（永続登録）。`performGCIfNeeded()` で count=1 かつ 180日超のエントリを定期削除。**設計不変条件**: `recordPrefixes` はフル読みのみ1行記録（プレフィックス展開なし）。文節単位の学習は Space → セグメントモード確定時のみ（通常 Enter 確定は合成読み×出力の1行のみ）。`fetchHistoryScoredMerged` は `LIKE 'reading%'` で exact + 前方一致を一括取得し `GROUP BY output` の `SUM` で集計する（exact/prefix を別クエリに分離して `MAX` で合計する設計は NG — 異なる読み長で確定した回数が合算されなくなる）
+- `DatabaseManager` = 変換履歴の記録・参照・削除（SKK辞書検索ではない）。機能ごとに extension 分割: `+History.swift`（履歴 fetch/record）、`+UserDict.swift`（ユーザー辞書 CRUD）。`InputHandler` のイニシャライザで DI（テストは `inMemory: true`）。`history` / `user_dict` / `hiragana_preferred` の **3 テーブル**を持つ。起動時に廃止テーブル `bigram` / `trigram` / `skip_bigram` / `boundary_pref` / `noun_bigram` / `content_bigram` を `DROP` する（既存 DB のマイグレーション用。現行コードはこれらを参照しない）。実 DB は `~/Library/Application Support/keynaco/history.db`。SQLite 定型句は private ヘルパー `queryStrings` / `execute`（クロージャ方式）に集約。全 fetch/record で `nowEpoch()`（`clock` var 経由）を使い時間減衰スコア `count / (1 + age_days / τ)` でソート（τ=30日）。`user_dict` のみ time-decay なし（永続登録）。`performGCIfNeeded()` で `history` の count=1 かつ 180日超のエントリを定期削除。**設計不変条件**: `recordPrefixes` はフル読みのみ1行記録（プレフィックス展開なし）。文節単位の学習は Space → セグメントモード確定時のみ（通常 Enter 確定は合成読み×出力の1行のみ）。`fetchHistoryScoredMerged` は `LIKE 'reading%'` で exact + 前方一致を一括取得し `GROUP BY output` の `SUM` で集計する（exact/prefix を別クエリに分離して `MAX` で合計する設計は NG — 異なる読み長で確定した回数が合算されなくなる）
+- `sessionTextBuffer` = Zenzai 左文脈用のインメモリ文字列バッファ（上限 50 字）。`commitText` で確定テキストを追記（読点 `、` 等の `readingPunctuations` はスキップ、文末 `。` 等は追記）。`sentenceTerminators` 確定時は `committedHistory` のみクリアしバッファは維持。ASCII Enter・組成なし Enter・`activateServer` でバッファもクリア。`InputController.resolvedLLMDocumentContextPrefix` が IMK `before` と結合する素材として使う
 - `SettingsWindowController` / `HistoryViewController` / `UserDictViewController` / `HiraganaPreferredViewController` / `CleanserSheetViewController` / `ZenzaiViewController` = `keynaco/Settings/` 配下の設定画面。`NSTabViewController` で「ユーザー辞書」「ひらがな優先」「変換履歴」「Zenzai」の **4 タブ**を提供。ユーザー辞書は読み（ひらがな）→登録テキストの CRUD。`CleanserSheetViewController` は変換履歴の AI スキャン用シート
 - `ZenzaiSettings` / `ZenzaiViewController` = `keynaco/Settings/` 配下の Zenzai 設定。有効フラグ・プロフィール文字列・推論トークン上限を `UserDefaults` 経由で保存。`AzooKeyConverter.isZenzaiEnabled` が参照する
 - `CandidateAction` / `CandidateContext` = `InputHandler` が返す候補ウィンドウ操作指示と状態スナップショット。`isExplicitlySelected`（↑↓で動かしたか）と `historyEnd`（固定+ユーザー辞書+予測+履歴セクションの末尾インデックス）と `fixedEnd`（カナ固定+ユーザー辞書の末尾インデックス。`fixedEnd <= row < historyEnd` の行が Shift+Delete 可能）が重要
@@ -32,14 +33,13 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
 1. ひらがな / カタカナ固定候補（`hiraganaPreferred`・外来語記号・**autoShow 時の辞書のみ変換**で先頭に挿入。後者は履歴・予測・ユーザー辞書・数値/日時が無いとき読みのひらがなを row 0 に置き、読みのカタカナ表記は辞書ブロックから除外する）
 2. **ユーザー辞書**候補（完全一致のみ、`fixedCount` の直後に挿入）
-3. **Zenzai top-1**（`azooKeyConverter.isZenzaiEnabled` かつ左文脈ありのときのみ、ユーザー辞書の直後に AzooKey 候補先頭を 1 行固定。`isZenzaiEnabled` はユーザー設定でありモデル未ロード時も true になり得る。辞書ブロックからは同じ表層を除き、N-gram 予測との重複も除く）
-4. content-bigram 予測（`lastConfirmedContentWordOutput` × 読み。Apple Intelligence による品詞分類後に蓄積。動詞の基本形は POS 分類と同一 LLM リクエストで `verb:confidence:lemma` として取得し `history.lemma` にキャッシュ。`fetchContentBigram` は `count >= 2` のみ返す）
-5. 履歴（`fetchHistoryScoredMerged`：`LIKE 'reading%'` で全読みを統合 SUM 集計。時間減衰スコアが閾値 **以上**の行のみ。このブロックの件数が `historyEnd` 計算の履歴件数）
-6. 数字候補（`generateNumberCandidates`：全角数字 + 桁区切り。数字のみ入力時に生成、`historyEnd` の直後に挿入。変換履歴には記録しない）
-7. 日時候補（`generateDateTimeCandidates`：きょう/いま/ことし等、数字候補の直後に挿入。変換履歴には記録しない）
-8. AzooKey 辞書候補（プロモート済み top-1 は除外済み）
+3. **Zenzai top-1**（`azooKeyConverter.isZenzaiEnabled` かつ左文脈ありのときのみ、ユーザー辞書の直後に AzooKey 候補先頭を 1 行固定。`isZenzaiEnabled` はユーザー設定でありモデル未ロード時も true になり得る。辞書ブロックからは同じ表層を除く）
+4. 履歴（`fetchHistoryScoredMerged`：`LIKE 'reading%'` で全読みを統合 SUM 集計。時間減衰スコアが閾値 **以上**の行のみ。このブロックの件数が `historyEnd` 計算の履歴件数）
+5. 数字候補（`generateNumberCandidates`：全角数字 + 桁区切り。数字のみ入力時に生成、`historyEnd` の直後に挿入。変換履歴には記録しない）
+6. 日時候補（`generateDateTimeCandidates`：きょう/いま/ことし等、数字候補の直後に挿入。変換履歴には記録しない）
+7. AzooKey 辞書候補（プロモート済み top-1 は除外済み）
 
-`autoShow=true`（文字入力中の自動表示）のとき、高スコア履歴・辞書・content-bigram・ユーザー辞書がすべて 0 件なら表示しない。
+`autoShow=true`（文字入力中の自動表示）のとき、高スコア履歴・辞書・ユーザー辞書がすべて 0 件なら表示しない。
 
 Shift+Delete 可能な範囲: `fixedEnd <= row < historyEnd`（`fixedCount <= row < fixedEnd` のユーザー辞書行・Zenzai プロモート行は削除不可。`CandidateAction.fixedEnd` は Zenzai 行を含む）。
 

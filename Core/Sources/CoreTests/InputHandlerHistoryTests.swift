@@ -280,4 +280,40 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertEqual(handler.lastCommittedOutput, "大阪")
         XCTAssertEqual(handler.committedHistory, ["大阪"])
     }
+
+    // MARK: - sessionTextBuffer
+
+    func testSessionTextBufferNotResetBySentenceTerminator() {
+        handler.commitText(text: "報告", client: client)
+        handler.commitText(text: "。", client: client)
+        XCTAssertTrue(handler.committedHistory.isEmpty)
+        XCTAssertEqual(handler.sessionTextBuffer, "報告。")
+    }
+
+    func testSessionTextBufferTruncatesAt50() {
+        let long = String(repeating: "あ", count: 40)
+        handler.commitText(text: long, client: client)
+        handler.commitText(text: String(repeating: "い", count: 20), client: client)
+        XCTAssertEqual(handler.sessionTextBuffer.count, 50)
+        XCTAssertTrue(handler.sessionTextBuffer.hasSuffix("い"))
+    }
+
+    func testSessionTextBufferSkipsReadingPunctuations() {
+        handler.commitText(text: "東京", client: client)
+        handler.commitText(text: "、", client: client)
+        XCTAssertEqual(handler.sessionTextBuffer, "東京")
+    }
+
+    func testSessionTextBufferClearedOnAsciiEnter() {
+        handler.commitText(text: "word", client: client)
+        InputHandler.isAsciiMode = true
+        press(keyCode: 36)
+        XCTAssertEqual(handler.sessionTextBuffer, "")
+    }
+
+    func testSessionTextBufferClearedOnBareEnter() {
+        handler.commitText(text: "報告", client: client)
+        press(keyCode: 36)
+        XCTAssertEqual(handler.sessionTextBuffer, "")
+    }
 }

@@ -99,22 +99,14 @@ final class ZenzaiLeftContextTests: XCTestCase {
         XCTAssertEqual(candidates[0], "開催", "Zenzai top-1 が row 0 に昇格するはず")
     }
 
-    /// committedHistory から leftSideContext を構築するフロー:
-    /// 「東京」「で」を確定後に leftSideContext を設定してから「かいさい」変換。
-    func testZenzaiPromotedFromCommittedHistory() {
-        // 「とうきょう」→ Space →「とうきょう」（モックは候補を返さないのでひらがなで確定）→ Enter
+    /// sessionTextBuffer から leftSideContext を構築するフロー。
+    func testZenzaiPromotedFromSessionTextBuffer() {
         typeRomaji("toukyou")
         pressSpace()
         pressEnter(candidateVisible: true, selectedRow: 0, selectedText: "とうきょう")
-        XCTAssertEqual(handler.committedHistory, ["とうきょう"])
-
-        // 「で」→ Enter（変換なし）
         typeRomaji("de")
         pressEnter()
-        XCTAssertEqual(handler.committedHistory, ["とうきょう", "で"])
-
-        // InputController が行うのと同じ: committedHistory → leftSideContext
-        handler.leftSideContext = handler.committedHistory.suffix(5).joined()
+        handler.leftSideContext = handler.sessionTextBuffer
         XCTAssertEqual(handler.leftSideContext, "とうきょうで")
 
         typeRomaji("kaisai")
@@ -122,7 +114,14 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 1, "committedHistory 由来の左文脈で Zenzai 発火 → fixedEnd = 1")
+        XCTAssertEqual(fixedEnd, 1, "sessionTextBuffer 由来の左文脈で Zenzai 発火 → fixedEnd = 1")
         XCTAssertEqual(candidates[0], "開催", "Zenzai top-1「開催」が row 0 に昇格するはず")
+    }
+
+    func testSessionBufferPersistsAcrossSentenceBoundary() {
+        handler.commitText(text: "報告", client: client)
+        handler.commitText(text: "。", client: client)
+        XCTAssertTrue(handler.committedHistory.isEmpty)
+        XCTAssertFalse(handler.sessionTextBuffer.isEmpty, "文末後も sessionTextBuffer は残る")
     }
 }

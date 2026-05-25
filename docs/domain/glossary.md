@@ -70,11 +70,17 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 1. ひらがな / カタカナ（固定枠）
 2. ユーザー辞書（完全一致 + 前方一致）
 3. **Zenzai top-1**（Zenzai 設定 ON かつ左文脈ありのときのみ）
-4. 予測候補（noun-bigram。`lastConfirmedNounOutput` が必要）
-5. 履歴（時間減衰スコアが閾値以上の行。完全一致読みのみ上位グループ）
-6. 数字候補（数字のみ読みのとき）
-7. 日時候補（`きょう` / `いま` 等のとき）
-8. AzooKey 辞書候補（Zenzai プロモート済みは除外）
+4. 履歴（時間減衰スコアが閾値以上の行。完全一致読みのみ上位グループ）
+5. 数字候補（数字のみ読みのとき）
+6. 日時候補（`きょう` / `いま` 等のとき）
+7. AzooKey 辞書候補（Zenzai プロモート済みは除外）
+
+（旧）予測候補（content_bigram）は 2026-05-25 に削除。
+
+### sessionTextBuffer
+Zenzai 左文脈用のインメモリバッファ（上限 50 字）。`commitText` で確定語を追記し、文末 `。` でもリセットしない。ASCII Enter・組成なし Enter・アプリ切替でクリア。
+
+*Tests: `Core/Sources/CoreTests/InputHandlerHistoryTests.swift`, `ZenzaiLeftContextTests.swift`*
 
 ### 括弧モード（isBracketMode）
 `[` / `(` / `!` / `?` / `/` / `.` / `,` / `@` / `#` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補リストを候補ウィンドウで表示するモード（`bracketCandidates != nil`）。  
