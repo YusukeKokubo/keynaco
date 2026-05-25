@@ -123,8 +123,8 @@ send({"reset": True})
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
 | フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
 | インラインアサート | `{"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}}` |
-| noun-bigram シード | `{"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}}` |
 | 履歴シード | `{"seed_history": {"input": "かんじ", "output": "漢字", "times": 3}}` |
+| sessionTextBuffer 確認 | `{"state": true, "fields": ["sessionTextBuffer", "committedHistory"]}` — 文末後も buffer が残るか（[PLAN260525](../../plans/PLAN260525.md)） |
 | Zenzai 左コンテキスト固定 | `{"set_left_context": "申請書を"}` — Zenzai プロモートの有効化に必須。空文字で解除 |
 
 `then` に指定できる名前: `space` / `enter` / `backspace` / `escape` / `tab` / `down` / `up` / `left` / `right` / `f6`–`f10` / `eisu` / `kana`
@@ -148,11 +148,11 @@ print("schema_ok?", "assertion_failed" not in r_schema)
 r_regex = send({"state": True, "assert_regex": {"composedHiragana": ".*"}})
 print("regex_ok?", "assertion_failed" not in r_regex)
 
-# bi-gram をシードしてから Successor を確認（useRealDB 必須。インメモリ DB では POS 分類が完了しない）
-send({"reset": True, "useRealDB": True})
-send({"seed_noun_bigram": {"prev": "実装", "input": "する", "output": "する", "count": 5}})
-r = send({"type_string": "jissou", "then": "enter"})
-print(f"isSuccessorCandidateActive: {r['isSuccessorCandidateActive']}, candidates: {r['candidates'][:3]}")
+# 履歴をシードしてから変換を確認
+send({"reset": True})
+send({"seed_history": {"input": "じっそう", "output": "実装", "times": 3}})
+r = send({"type_string": "jissou", "then": "space", "fields": ["candidates"]})
+print(r["candidates"][:3])
 
 # 複数操作を1往復でバッチ送信
 r = send({"sequence": [
@@ -191,7 +191,7 @@ print(suite["summary"])  # {"total": 1, "passed": 1, "failed": 0}
 # before_each / after_each で共通セットアップを DRY にする
 suite2 = send({
     "before_each": [
-        {"seed_noun_bigram": {"prev": "東京", "input": "あめ", "output": "雨", "count": 5}}
+        {"seed_history": {"input": "あめ", "output": "雨", "times": 2}}
     ],
     "after_each": [
         {"state": True, "describe": "終了時状態確認"}
@@ -264,8 +264,8 @@ print(waited["matched"], waited["state"]["candidates"])
 
 | コマンド | 説明 |
 |---------|------|
-| `{"reset": true}` | インメモリ DB でリセット。必要なら `seed_noun_bigram` / `seed_history` でデータを注入する。 |
-| `{"reset": true, "useRealDB": true}` | 実体の `~/Library/Application Support/keynaco/history.db` を一時コピーして開く。変換履歴・ユーザー辞書・`boundary_pref`・学習 noun-bigram などがそのまま使える。 |
+| `{"reset": true}` | インメモリ DB でリセット。必要なら `seed_history` でデータを注入する。 |
+| `{"reset": true, "useRealDB": true}` | 実体の `~/Library/Application Support/keynaco/history.db` を一時コピーして開く。変換履歴・ユーザー辞書などがそのまま使える。 |
 
 `history.db` が存在しない、またはコピー失敗（DB ロック等）のときは `useRealDB` は無視され、上と同じインメモリ DB にフォールバックする。スナップショットにはユーザーの変換履歴・語彙が含まれるため、ログ共有時は取り扱いに注意する。
 
@@ -392,18 +392,19 @@ print(r["composedHiragana"], r["pendingRomaji"])
 
 ### 罠4: Successor モードはインメモリ DB では起動しない
 
-Successor モードの起動には2つが必要:
-1. 確定語の POS が `noun`/`proper_noun` に分類されていること（Apple Intelligence による**非同期**処理）
-2. その語を `prev` とする noun_bigram が DB に存在すること
+Successor モードの起動には `leftSideContext` 末尾の名詞相当語と履歴前方一致が必要。content_bigram は 2026-05-25 に削除済み（[PLAN260525](../../plans/PLAN260525.md)）。
 
-sandbox のインメモリ DB でこれらを満たすには、POS 分類が完了するまで待つか、実 DB を使う必要がある。短時間セッションでは POS は完了しないため、Successor は起動しない。
+Zenzai 左文脈は `sessionTextBuffer`（`set_left_context` または確定の積み重ね）で検証する。
 
 ```python
-# Successor を確認したい場合: useRealDB + 過去に入力実績のある語を使う
-send({"reset": True, "useRealDB": True})
-r = send({"type_string": "jissou", "then": "space"})
-r2 = send({"key": "enter"})
-# isSuccessorCandidateActive が true になるのは、実 DB に bigram が蓄積された語のみ
+# Zenzai + sessionTextBuffer: 文末後も文脈が残ること
+send({"reset": True})
+send({"type_string": "houkoku", "then": "space"})
+send({"key": "enter", "fields": ["sessionTextBuffer"]})
+send({"type_string": "。", "then": "enter"})
+r = send({"state": True, "fields": ["sessionTextBuffer", "committedHistory"]})
+assert r["sessionTextBuffer"] != ""
+assert r["committedHistory"] == []  # 文末で history はクリア、buffer は残る
 ```
 
 ### 罠5: ローマ字の seed_history と type_string を揃える

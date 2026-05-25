@@ -78,7 +78,7 @@ Space や句読点の前に pending を `composedHiragana` へ取り込む処理
 （旧）予測候補（content_bigram）は 2026-05-25 に削除。
 
 ### sessionTextBuffer
-Zenzai 左文脈用のインメモリバッファ（上限 50 字）。`commitText` で確定語を追記し、文末 `。` でもリセットしない。ASCII Enter・組成なし Enter・アプリ切替でクリア。
+Zenzai 左文脈用のインメモリバッファ（上限 50 字）。`commitText` で確定語を追記し、文末 `。` でもリセットしない。ASCII Enter・組成なし Enter・アプリ切替でクリア。`resolvedLLMDocumentContextPrefix` の素材（[`plans/PLAN260525.md`](../../plans/PLAN260525.md) 参照）。
 
 *Tests: `Core/Sources/CoreTests/InputHandlerHistoryTests.swift`, `ZenzaiLeftContextTests.swift`*
 

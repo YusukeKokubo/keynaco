@@ -4,6 +4,25 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 
 ---
 
+## 2026-05-25 — sessionTextBuffer・content_bigram 廃止
+
+設計: [`plans/POC260525.md`](plans/POC260525.md) / 実装: [`plans/PLAN260525.md`](plans/PLAN260525.md)（`5edf2bc` → `86c163a`）
+
+### 追加
+- **sessionTextBuffer** — Zenzai 左文脈用インメモリバッファ（上限 50 字・文末 `。` でもリセットしない）。`resolvedLLMDocumentContextPrefix` の素材を `committedHistory.suffix(5)` から差し替え（`861bd8b`, `b66232e`）
+- **HiraganaPreferredBuiltins** — 組み込み固定語・LLM スキップ語を Core に集約（`5edf2bc`）
+
+### 削除
+- **content_bigram** — 実データで `count >= 2` を満たす行がなく予測に寄与しないため DB・候補・POSCommitSequencer 経路を削除（`5edf2bc`）
+- **POSCommitSequencer** — POS 分類は `LLMPOSClassifier.enqueue` 直呼びに簡素化（`5edf2bc`）
+- **Noun-Bigram 設定タブ** — content_bigram 管理 UI を削除（`5edf2bc`）
+- **デバッグ `seed_noun_bigram` / `query_noun_bigram` / `set_last_noun`** — content_bigram 依存コマンドを削除（`5edf2bc`）
+
+### 変更
+- **デバッグ state** — `sessionTextBuffer` フィールドを追加（`b0b8f08`）
+
+---
+
 ## 2026-05-23〜24 — content_bigram・POS 分類・設定 UI
 
 ### 追加

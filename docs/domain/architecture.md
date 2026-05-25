@@ -2,6 +2,8 @@
 
 CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 
+関連プラン: [`plans/POC260525.md`](../../plans/POC260525.md)（検証）→ [`plans/PLAN260525.md`](../../plans/PLAN260525.md)（実装・コミット `5edf2bc`〜`86c163a`）。
+
 ## コンポーネント一覧
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` もここで管理
