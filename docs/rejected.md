@@ -35,7 +35,25 @@
 - **名詞抽出の精度が低い**: `extractNounFromContext` は Unicode 範囲チェックのみで、助詞が直後にある場合に誤抽出することがある
 - **ローマ字 2 打目で体験が断絶**: 2 打目で仮名が確定した瞬間に通常組成へフォールバックするため、恩恵を受けられるのが実質 1 打目のみになる
 
-**方針転換**: content-bigram のデータは保持したまま、Successor モードは削除。bigram を通常変換の候補ランキングに統合する（確定直後に続くひらがな組成に対して、前語との共起実績を候補の優先順位に反映する）方向で再設計する。
+**方針転換**: content-bigram のデータは保持したまま、Successor モードは削除。bigram を通常変換の候補ランキングに統合する方向で再設計する予定だったが、実 DB を確認したところデータが蓄積されていないことが判明し、テーブルごと廃止した（[F-2](#f-2-content_bigram-noun-bigram-テーブルの廃止2026-05-25) 参照）。
+
+---
+
+## F-2 content_bigram（noun-bigram）テーブルの廃止（2026-05-25）
+
+**概要**: `content_bigram` テーブルは (prev_word, input_reading, output) のトリプルを記録し、`count >= 2` のペアを通常変換の候補ランキングに反映する設計だった。F-1 Successor モードのデータ基盤として導入。`NounBigramViewController` でデバッグ UI から蓄積状況を確認できるようにした。
+
+**試みたこと**: `POSCommitSequencer` が Apple Intelligence の POS 分類結果を使い、content word（名詞・固有名詞）の確定時に bigram を記録。`fetchContentBigram` でクエリして変換候補の優先順位に加える実装。
+
+**不採用の理由**:
+
+- **データが蓄積されない**: 実 DB を確認したところ 49 件全件で count=1。同一 (prev, reading, output) トリプルを 2 回以上確定することは日常的な日本語入力では極めてまれであり、`count >= 2` の閾値を満たすレコードが実質ゼロ
+- **設計前提が崩れた**: F-1 Successor モード削除後、bigram の用途は「候補ランキング補正」のみになったが、データが空のため効果もゼロ
+- **sessionTextBuffer で代替**: leftSideContext を強化する `sessionTextBuffer`（PLAN260525）により、文脈依存の同音異義語 disambiguation は Zenzai に委ねられる。bigram による独自ランキングの必要性がなくなった
+
+**判断**: `content_bigram` テーブル・`POSCommitSequencer`・`NounBigramViewController` をすべて削除（commit `5edf2bc`）。POS 分類自体（`LLMPOSClassifier`）はひらがな優先機能で引き続き使用するため維持。
+
+> 関連: [F-1 Successor モード](#f-1-successor-モード後続語サジェスト2026-05-25)、[PLAN260525](../plans/PLAN260525.md)
 
 ---
 

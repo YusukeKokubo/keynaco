@@ -1137,8 +1137,18 @@ final class DebugSocketServer: @unchecked Sendable {
 
     func debugLeftContextPrefix() -> String {
         if let override = debugLeftContextOverride { return override }
+        let historyJoined = handler.sessionTextBuffer
         let before = mockClient.documentBefore
-        return before.count > 300 ? String(before.suffix(300)) : before
+        if !before.isEmpty {
+            let beforeTruncated = before.count > 300 ? String(before.suffix(300)) : before
+            if !historyJoined.isEmpty {
+                let maxBefore = max(0, 400 - historyJoined.count)
+                let trimmed = beforeTruncated.count > maxBefore ? String(beforeTruncated.suffix(maxBefore)) : beforeTruncated
+                return historyJoined + trimmed
+            }
+            return beforeTruncated
+        }
+        return historyJoined
     }
 
     private func updateMockMarkedText() {

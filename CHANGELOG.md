@@ -20,6 +20,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 
 ### 変更
 - **デバッグ state** — `sessionTextBuffer` フィールドを追加（`b0b8f08`）
+- **`docs/rejected.md`** — F-2 (content_bigram 廃止) を追記。F-1 の方針転換に「テーブルごと廃止した (F-2 参照)」を追記
 
 ---
 
