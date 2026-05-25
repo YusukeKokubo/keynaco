@@ -10,6 +10,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
 
+    func applicationWillTerminate(_ notification: Notification) {
+        guard SyncSettings.syncOnQuit,
+              let _ = SyncSettings.nasPath else { return }
+        let sema = DispatchSemaphore(value: 0)
+        SyncSettings.exportToNAS { _, _ in sema.signal() }
+        sema.wait()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
 

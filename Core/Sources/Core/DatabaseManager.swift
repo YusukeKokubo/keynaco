@@ -53,6 +53,20 @@ public final class DatabaseManager: @unchecked Sendable {
 
     // MARK: - セットアップ
 
+    public static var dbPath: String {
+        let dir = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("keynaco", isDirectory: true)
+        return dir.appendingPathComponent("history.db").path
+    }
+
+    /// WAL をフラッシュしてから外部ツール（rsync 等）でファイルをコピーできる状態にする。
+    public func checkpoint() {
+        dbQueue.sync {
+            _ = sqlite3_wal_checkpoint_v2(self.db, nil, SQLITE_CHECKPOINT_FULL, nil, nil)
+        }
+    }
+
     private func openDatabase() {
         let dir = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

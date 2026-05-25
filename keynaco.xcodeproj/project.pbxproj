@@ -12,6 +12,8 @@
 		D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */; };
 		D0A1B2C3D4E5F60718293A05 /* SocketMockClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */; };
 		D0A1B2C3D4E5F60718293A07 /* DebugCandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */; };
+		761C292474FD40D284EA7F01 /* SyncSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30F6E70CF1C424C85A9FB4E /* SyncSettings.swift */; };
+		5FE58DDD8020494D8A0DDC01 /* SyncViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A665825F76FD4C1498DD6F00 /* SyncViewController.swift */; };
 		1FEE62AC67AF46B79608E006 /* HiraganaPreferredViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BB50D896044E0EB5C1CC28 /* HiraganaPreferredViewController.swift */; };
 		26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */; };
 		2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */; };
@@ -54,6 +56,8 @@
 /* Begin PBXFileReference section */
 		022B67AD4C0C026C0F7A0564 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		15033BFDFA6A888F753B0666 /* keynacoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = keynacoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E30F6E70CF1C424C85A9FB4E /* SyncSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettings.swift; sourceTree = "<group>"; };
+		A665825F76FD4C1498DD6F00 /* SyncViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncViewController.swift; sourceTree = "<group>"; };
 		184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		19DE79F93A3BDB8CDBC90A08 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		312B6C32AF05015A07740280 /* .gitattributes */ = {isa = PBXFileReference; path = .gitattributes; sourceTree = "<group>"; };
@@ -159,6 +163,8 @@
 				EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */,
 				7C150B0401BC4C609E82079A /* ZenzaiSettings.swift */,
 				9CD4B32B2C294E56820A1632 /* ZenzaiViewController.swift */,
+				E30F6E70CF1C424C85A9FB4E /* SyncSettings.swift */,
+				A665825F76FD4C1498DD6F00 /* SyncViewController.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -351,6 +357,8 @@
 				CC81B691B4422E5779491EE0 /* UserDictViewController.swift in Sources */,
 				8A9990EB76F54E21875AA952 /* ZenzaiSettings.swift in Sources */,
 				67352544F047475D84590AFE /* ZenzaiViewController.swift in Sources */,
+				761C292474FD40D284EA7F01 /* SyncSettings.swift in Sources */,
+				5FE58DDD8020494D8A0DDC01 /* SyncViewController.swift in Sources */,
 				CF5D2357CC1B6C7209F9918F /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
