@@ -250,8 +250,13 @@ public extension InputHandler {
         }
 
         let readingKatakana = KanaUtils.hiraganaToKatakana(hiragana)
-        let azooKeyItems = sources.azooKeyUniq.filter {
-            !(addsDefaultFixedHiragana && $0 == readingKatakana)
+        let azooKeyItems = sources.azooKeyUniq.filter { candidate in
+            guard addsDefaultFixedHiragana && candidate == readingKatakana else { return true }
+            // カタカナ・ひらがな以外の実質的な変換候補がない（未知語）場合のみ
+            // insertedSet からも外して末尾のカタカナセクションに表示させる
+            let hasRealCandidates = sources.azooKeyCandidates.contains { $0 != readingKatakana && $0 != hiragana }
+            if !hasRealCandidates { insertedSet.remove(candidate) }
+            return false
         }
         if !azooKeyItems.isEmpty {
             sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))

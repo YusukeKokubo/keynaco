@@ -172,6 +172,32 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertGreaterThanOrEqual(fixedEnd, 2)
     }
 
+    func testUnknownWordShowsKatakanaCandidate() {
+        // 未知語（カタカナ・ひらがな以外の候補なし）: カタカナがカタカナセクションに現れる
+        setUpWithConverter(SnapStub(["グロトスク", "ぐろとすく"]))
+        handler.state.composedHiragana = "ぐろとすく"
+        handler.state.pendingRomaji = ""
+        let action = handler.buildCandidateList(autoShow: true)
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertTrue(candidates.contains("グロトスク"), "未知語でもカタカナ候補が表示されるはず")
+        XCTAssertTrue(candidates.contains("ぐろとすく"), "ひらがなも表示されるはず")
+    }
+
+    func testKnownWordWithZenzaiDoesNotShowKatakanaInMainList() {
+        // 実質的な変換候補がある場合: カタカナは主要リストに出ない（既存の仕様を保護）
+        setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: true))
+        handler.leftSideContext = "prefix"
+        handler.state.composedHiragana = "よいのでは"
+        handler.state.pendingRomaji = ""
+        let action = handler.buildCandidateList(autoShow: true)
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertFalse(candidates.contains("ヨイノデハ"), "変換候補がある場合はカタカナを除外")
+    }
+
     func testBareConversionWithoutZenzaiPutsHiraganaFirst() {
         // Zenzai なし・履歴なし・autoShow: ひらがなが先頭
         setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: false))
