@@ -21,7 +21,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | パス | 内容 |
 |------|------|
 | `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
-| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 6 ファイル。Zenzai タブ含む） |
+| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 8 ファイル。Zenzai タブ・NAS同期タブ含む） |
 | `keynaco/Resources/` | バンドルリソース（`zenz-v3.1-small-gguf/` = Zenzai モデル git submodule） |
 | `keynaco/Debug/` | デバッグ用ツール（`DebugSocketServer`・`DebugCandidateWindow`・`EventViewerWindow`・`IMESandboxWindow`・`SocketMockClient` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
@@ -66,8 +66,7 @@ xcodebuild build -scheme keynaco -destination "platform=macOS"
   git -C keynaco/Resources/zenz-v3.1-small-gguf lfs pull
   ```
   モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る
-- LLM 機能（`LLMPOSClassifier`）は `FoundationModels` フレームワーク（Apple Intelligence）を使用。macOS 26 で Apple Intelligence が有効なデバイスでないと `SystemLanguageModel.default.availability` が `.unavailable` を返しスキップされる（IME 基本動作は継続）。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
-- **Apple Intelligence は必須前提**：noun_bigram の蓄積・POS 分類など学習機能のコアは Apple Intelligence に依存する設計。Apple Intelligence なし環境でのフォールバックは論点にしない。
+- POS 分類（`AzooKeyPOSClassifier`）は AzooKey 辞書の `lcid` + 接続詞/感動詞辞書によるルールベース実装。Apple Intelligence 不要。起動時に `AzooKeyPOSBackfill` で未分類エントリを一括再分類する。以前の `LLMPOSClassifier`（FoundationModels）は精度壊滅（77% が `other`）のため削除済み（`plans/PLAN260525c.md` 参照）。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
 
 ### Zenzai 制御パラメータ（zenz-v3 の条件付き変換）
 
