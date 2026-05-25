@@ -4,6 +4,23 @@
 
 ---
 
+## F-1 Successor モード（後続語サジェスト）（2026-05-25）
+
+**概要**: 組成なし・ASCII モードでない状態で ASCII 英字 1 文字を入力した瞬間、直前確定語（または `leftSideContext` 末尾の名詞）を prev として content-bigram + 変換履歴を照会し、後続語候補を表示するモード。確定後さらにローマ字を打つことで仮名プレフィックスで候補を絞り込む。
+
+**試みたこと**: `InputHandler+SuccessorMode.swift`（`trySuccessorCandidates` / `handleSuccessorCandidateKey` 等）として実装。`successorEligible` フラグで確定直後の 1 打目を捕捉し、`leftSideContext` 末尾の名詞抽出（`extractNounFromContext`）でセッションをまたいだ文脈も活用。候補は `content_bigram` → `history` の順で優先。
+
+**不採用の理由**:
+
+- **UX とタイピングが合わない**: 組成前に英字を打ってモードに入るという設計が、日本語入力のリズムと相性が悪い。ユーザーが意識しないと恩恵を受けられない
+- **学習データの問題**: `content_bigram` は `count >= 2`（同一ペアを 2 回以上確定）かつ Apple Intelligence 必須のため、使い始めはほぼ空振りになる
+- **名詞抽出の精度が低い**: `extractNounFromContext` は Unicode 範囲チェックのみで、助詞が直後にある場合に誤抽出することがある
+- **ローマ字 2 打目で体験が断絶**: 2 打目で仮名が確定した瞬間に通常組成へフォールバックするため、恩恵を受けられるのが実質 1 打目のみになる
+
+**方針転換**: content-bigram のデータは保持したまま、Successor モードは削除。bigram を通常変換の候補ランキングに統合する（確定直後に続くひらがな組成に対して、前語との共起実績を候補の優先順位に反映する）方向で再設計する。
+
+---
+
 ## E-2 AzooKey needTypoCorrection による typo 許容変換（2026-05-06）
 
 **概要**: `ConvertRequestOptions.needTypoCorrection = true` を設定することで、AzooKey のラティス探索に `TypoCorrectionGenerator` を追加し、読み入力の typo を補正した変換候補を出す。
