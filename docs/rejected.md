@@ -4,6 +4,32 @@
 
 ---
 
+## H-1 FoundationModels @Generable 構造化出力による品詞分類（2026-05-25）
+
+**概要**: `LLMPOSClassifier` のプレーンテキストパース方式を廃止し、`@Generable` + Guided Generation（`respond(generating:)`）で品詞ラベルを構造化出力させる。スキーマ違反トークンを生成できなくなるためガベージ出力問題を根本解決できると想定した。Tool Calling（`struct POSTagTool: Tool`）も代替アプローチとして検証した。
+
+**試みたこと**:
+
+- `@Generable struct POSResultV2`（`pos: String` + `.anyOf(...)` 制約）で `respond(generating:)` を呼ぶ
+- フィールド1つのみの最小 `@Generable struct SmokeTestResult` で smoke test
+- `struct POSTagTool: Tool`（`Arguments = POSToolParameters`、返り値 `String`）+ `respond(to:)` の Tool Calling アプローチ
+
+**結果**: 3アプローチすべてで `respond` が返らない永続的ハング（45秒タイムアウト確認）。エラーも例外も投げない。
+
+**不採用の理由（根本原因）**:
+
+- IME Extension（Input Method Extension）には通常アプリより厳しいサンドボックスプロファイルが適用される
+- Guided Generation のスキーマ検証・Tool 呼び出しは `generatived` / `com.apple.modelcatalog.catalog` への XPC 通信を経由する
+- IME サンドボックスが XPC 通信を拒否（Error 159: Sandbox restriction）
+- クライアントプロセスに完了シグナルも例外も届かないままデッドロック
+- コードの問題ではなく **macOS 26 Beta のシステムバグ**。workaround なし
+
+**判断**: OS アップデートで修正されるまで利用不可。`respond(to:)` プレーンテキスト方式（現行 `LLMPOSClassifier`）は動作するため、プロンプト改善で精度向上を図る方針に切り替え（→ [PLAN260525b](../plans/PLAN260525b.md)）。将来 Apple が IME Extension のサンドボックスポリシーを緩和した場合に再評価する。
+
+> 関連: [POC260525b](../plans/POC260525b.md)
+
+---
+
 ## G-1 Zenzai 制御パラメーター（topic / style / preference）の UI 公開（2026-05-24）
 
 **概要**: zenz-v3 の制御トークン `topic`・`style`・`preference` を設定 UI に追加し、ユーザーが文書の話題・文体・好みを手動設定できるようにした。また `DatabaseManager.recentProperNouns(limit:)` で history.db の固有名詞を自動推論して `topic` に補完する PoC も実施した。
