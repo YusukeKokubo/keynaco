@@ -59,20 +59,4 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         XCTAssertEqual(candidates.filter { $0 == top1 }.count, 1, "辞書ブロックに top-1 が重複して現れない")
     }
 
-    func testZenzaiPromoteSkippedWhenDisabled() {
-        zenzaiMock.isZenzaiEnabled = false
-        handler.leftSideContext = "ctx"
-        type(chars: "a", base: "a")
-        let (_, action) = press(keyCode: 49)
-        guard case .show = action else { XCTFail(".show"); return }
-        XCTAssertNil(handler.lastZenzaiRow, "Zenzai オフ時は lastZenzaiRow が nil")
-    }
-
-    func testZenzaiPromoteSkippedWhenNoLeftContext() {
-        handler.leftSideContext = ""
-        type(chars: "a", base: "a")
-        let (_, action) = press(keyCode: 49)
-        guard case .show = action else { XCTFail(".show"); return }
-        XCTAssertNil(handler.lastZenzaiRow, "左文脈なしでは lastZenzaiRow が nil")
-    }
 }

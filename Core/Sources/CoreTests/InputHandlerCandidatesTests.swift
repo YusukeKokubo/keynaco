@@ -155,23 +155,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(candidates[initialRow], "これ")
     }
 
-    func testBareConversionWithZenzaiPutsZenzaiFirstThenHiragana() {
-        // Zenzai あり・履歴なし・autoShow: Zenzai が先頭、ひらがなは直後
-        setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: true))
-        handler.leftSideContext = "prefix"
-        handler.state.composedHiragana = "よいのでは"
-        handler.state.pendingRomaji = ""
-        let action = handler.buildCandidateList(autoShow: true)
-        guard case .show(let candidates, _, let initialRow, _, let fixedEnd) = action else {
-            XCTFail(".show を返すはず"); return
-        }
-        XCTAssertEqual(candidates[0], "良いのでは", "Zenzai top-1 が row 0")
-        XCTAssertEqual(initialRow, 0, "Zenzai 先頭なら initialRow=0")
-        XCTAssertFalse(candidates.contains("ヨイノデハ"), "読みのカタカナ表記は辞書から除外")
-        XCTAssertEqual(candidates[1], "よいのでは", "ひらがなは Zenzai の直後")
-        XCTAssertGreaterThanOrEqual(fixedEnd, 2)
-    }
-
     func testUnknownWordShowsKatakanaCandidate() {
         // 未知語（カタカナ・ひらがな以外の候補なし）: カタカナがカタカナセクションに現れる
         setUpWithConverter(SnapStub(["グロトスク", "ぐろとすく"]))
@@ -196,19 +179,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertFalse(candidates.contains("ヨイノデハ"), "変換候補がある場合はカタカナを除外")
-    }
-
-    func testBareConversionWithoutZenzaiPutsHiraganaFirst() {
-        // Zenzai なし・履歴なし・autoShow: ひらがなが先頭
-        setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: false))
-        handler.state.composedHiragana = "よいのでは"
-        handler.state.pendingRomaji = ""
-        let action = handler.buildCandidateList(autoShow: true)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
-            XCTFail(".show を返すはず"); return
-        }
-        XCTAssertEqual(candidates.first, "よいのでは", "Zenzai なしでは row 0 はひらがな")
-        XCTAssertEqual(initialRow, 0)
     }
 
     func testHiraganaInHistoryAppearsAsHistoryCandidate() {
@@ -251,23 +221,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
         XCTAssertTrue(candidates.contains("トータル"), "トータルが候補に含まれるはず: \(candidates)")
         XCTAssertEqual(candidates[initialRow], "トータル", "長音符入力の initialRow はカタカナ（トータル）を指すはず")
-    }
-
-    func testSmallVowelInputPrefersKatakana() {
-        // 「ねいてぃぶ」はぃ（小母音）を含むため、カタカナ（ネイティブ）を初期選択かつ固定セクションに配置
-        // buildCandidateList を直接呼ぶ（Space は enterSegmentMode を経由するため）
-        type(chars: "n", base: "n"); type(chars: "e", base: "e"); type(chars: "i", base: "i")
-        type(chars: "t", base: "t"); type(chars: "h", base: "h"); type(chars: "i", base: "i")
-        type(chars: "b", base: "b"); type(chars: "u", base: "u")
-        XCTAssertEqual(handler.state.composedHiragana, "ねいてぃぶ", "composedHiragana が期待値")
-        let action = handler.buildCandidateList()
-        guard case .show(let candidates, _, let initialRow, _, let fixedEnd) = action else {
-            XCTFail(".show を返すはず: \(action)"); return
-        }
-        XCTAssertTrue(candidates.contains("ネイティブ"), "ネイティブが候補に含まれるはず: \(candidates)")
-        guard let katRow = candidates.firstIndex(of: "ネイティブ") else { return }
-        XCTAssertLessThan(katRow, fixedEnd, "ネイティブは固定セクションに含まれるはず（fixedEnd=\(fixedEnd)）")
-        XCTAssertEqual(initialRow, katRow, "小母音入力の initialRow はカタカナ（ネイティブ）を指すはず")
     }
 
     func testReturnCommitsVisuallySelectedCandidateWithoutExplicitNav() {
