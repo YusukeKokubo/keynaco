@@ -151,3 +151,7 @@ Caps Lock トグルは未実装。実装時は `handle(event:client:)` で `.fla
 ## 不採用の機能
 
 [`docs/rejected.md`](docs/rejected.md) を参照。
+
+## 設計判断の原則
+
+[`docs/principles.md`](docs/principles.md) を参照。新機能の実装前・大きなリファクタリング前に読み返す。
