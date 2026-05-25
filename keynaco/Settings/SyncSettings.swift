@@ -33,7 +33,10 @@ enum SyncSettings {
             completion(false, "NAS パスが未設定です")
             return
         }
-        run(args: ["-av", "--checksum", nasPath, DatabaseManager.dbPath], completion: completion)
+        run(args: ["-av", "--checksum", nasPath, DatabaseManager.dbPath]) { ok, output in
+            if ok { DatabaseManager.shared.reopen() }
+            completion(ok, output)
+        }
     }
 
     private static func run(args: [String], completion: @escaping @Sendable (Bool, String) -> Void) {

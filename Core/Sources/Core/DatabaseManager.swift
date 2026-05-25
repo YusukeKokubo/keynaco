@@ -67,6 +67,17 @@ public final class DatabaseManager: @unchecked Sendable {
         }
     }
 
+    /// ファイルが外部から置き換えられた後（NAS インポート等）に接続を張り直す。
+    public func reopen() {
+        dbQueue.sync {
+            for (_, stmt) in self.stmtCache { sqlite3_finalize(stmt) }
+            self.stmtCache = [:]
+            sqlite3_close(self.db)
+            self.db = nil
+        }
+        openDatabase()
+    }
+
     private func openDatabase() {
         let dir = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
