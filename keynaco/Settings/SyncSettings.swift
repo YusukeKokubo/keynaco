@@ -33,8 +33,11 @@ enum SyncSettings {
             completion(false, "NAS パスが未設定です")
             return
         }
+        // WAL が残ったまま rsync でファイルを置き換えると旧 WAL が新 DB にチェックポイントされて破損する。
+        // 先に接続を閉じて WAL/SHM を削除してから rsync する。
+        DatabaseManager.shared.closeForImport()
         run(args: ["-av", "--checksum", nasPath, DatabaseManager.dbPath]) { ok, output in
-            if ok { DatabaseManager.shared.reopen() }
+            DatabaseManager.shared.reopen()
             completion(ok, output)
         }
     }
