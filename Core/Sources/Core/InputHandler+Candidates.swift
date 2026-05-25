@@ -67,10 +67,6 @@ public extension InputHandler {
         let highHistoryCount = highHistory.count
         let totalHistoryCount = highHistoryCount
 
-        let contentBigramRaw = lastConfirmedContentWordOutput.map {
-            db.fetchContentBigram(prev: $0, reading: state.composedHiragana)
-        } ?? []
-
         let historySeen = Set(historyScored.map(\.output))
         let zenzaiPromoted: String? = {
             guard azooKeyConverter.isZenzaiEnabled,
@@ -82,9 +78,8 @@ public extension InputHandler {
             !historySeen.contains($0) && $0 != zenzaiPromoted
         }
         let candidateSeen = historySeen.union(Set(azooKeyCandidates))
-        // content_bigram は文脈的予測なので AzooKey と重複していても prediction セクションに表示する。
-        let uniquePredictions = contentBigramRaw.filter { !historySeen.contains($0) }
-        let predictCount = uniquePredictions.count
+        let uniquePredictions: [String] = []
+        let predictCount = 0
 
         return CandidateListSources(
             h: h,

@@ -87,16 +87,6 @@ public final class DatabaseManager: @unchecked Sendable {
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
-        CREATE TABLE IF NOT EXISTS content_bigram (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            prev    TEXT    NOT NULL,
-            input   TEXT    NOT NULL,
-            output  TEXT    NOT NULL,
-            count   INTEGER NOT NULL DEFAULT 1,
-            used_at INTEGER NOT NULL,
-            UNIQUE(prev, input, output)
-        );
-        CREATE INDEX IF NOT EXISTS idx_content_bigram ON content_bigram(prev, input);
         CREATE TABLE IF NOT EXISTS user_dict (
             id      INTEGER PRIMARY KEY AUTOINCREMENT,
             input   TEXT    NOT NULL,
@@ -117,7 +107,7 @@ public final class DatabaseManager: @unchecked Sendable {
 
     /// 廃止した bigram / trigram / skip_bigram テーブルを既存 DB から削除する。
     private func dropDeprecatedNgramTables() {
-        for table in ["skip_bigram", "trigram", "bigram", "boundary_pref", "noun_bigram"] {
+        for table in ["skip_bigram", "trigram", "bigram", "boundary_pref", "noun_bigram", "content_bigram"] {
             sqlite3_exec(db, "DROP TABLE IF EXISTS \(table)", nil, nil, nil)
         }
     }
@@ -283,7 +273,7 @@ public final class DatabaseManager: @unchecked Sendable {
 
         dispatchWrite {
             let cutoff = self.nowEpoch() - 180 * 86400
-            for table in ["history", "content_bigram"] {
+            for table in ["history"] {
                 self.executeOnQueue("DELETE FROM \(table) WHERE count = 1 AND used_at < ?") { stmt in
                     sqlite3_bind_int64(stmt, 1, cutoff)
                 }

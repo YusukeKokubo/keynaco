@@ -57,7 +57,7 @@ extension DatabaseManager {
     }
 
     /// 高信頼度で分類済みの POS を返す。未分類・再試行待ちの場合は nil。
-    public func fetchCachedPOS(output: String) -> POSCommitSequencer.Classification? {
+    public func fetchCachedPOS(output: String) -> POSClassification? {
         dbQueue.sync {
             let sql = """
             SELECT pos, pos_tag, pos_retry, lemma FROM history
@@ -71,7 +71,7 @@ extension DatabaseManager {
             let pos = String(cString: posPtr)
             let posTag = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
             let lemma = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
-            return POSCommitSequencer.Classification(
+            return POSClassification(
                 pos: pos, posTag: posTag, posRetry: false, lemma: lemma
             )
         }

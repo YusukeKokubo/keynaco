@@ -3,7 +3,7 @@ import AppKit
 public extension InputHandler {
 
     func isHiraganaPreferred(_ h: String) -> Bool {
-        hiraganaPreferredSet.contains(h)
+        hiraganaPreferredSet.contains(h) || HiraganaPreferredBuiltins.stopWords[h] != nil
     }
 
     /// 複数の配列を順序保持して重複排除しながら連結する（O(n) 版 flatten + deduplicate）。

@@ -14,7 +14,6 @@
 		D0A1B2C3D4E5F60718293A07 /* DebugCandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */; };
 		1FEE62AC67AF46B79608E006 /* HiraganaPreferredViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BB50D896044E0EB5C1CC28 /* HiraganaPreferredViewController.swift */; };
 		26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */; };
-		B1C2D3E4F5A6B7C8D9E1F1A3 /* NounBigramViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A6B7C8D9E0F1A2 /* NounBigramViewController.swift */; };
 		2E0D016EA1F527EEA736BC7C /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */; };
 		383C6D8382017E700D66CC8E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 443A77590841CE5845242FCF /* Assets.xcassets */; };
 		417423818A8C02627A56F0D9 /* KeynacoCore in Frameworks */ = {isa = PBXBuildFile; productRef = EC543AEB962323EE3612849B /* KeynacoCore */; };
@@ -90,7 +89,6 @@
 		EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDictViewController.swift; sourceTree = "<group>"; };
 		EF84CE1FD39376C1BC2A710C /* NSManualApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NSManualApplication.swift; sourceTree = "<group>"; };
 		FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewController.swift; sourceTree = "<group>"; };
-		B1C2D3E4F5A6B7C8D9E0F1A2 /* NounBigramViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NounBigramViewController.swift; sourceTree = "<group>"; };
 		9CD4B32B2C294E56820A1632 /* ZenzaiViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenzaiViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -157,7 +155,6 @@
 			children = (
 					45BB50D896044E0EB5C1CC28 /* HiraganaPreferredViewController.swift */,
 			FCDF061BE37570AA93FEACBD /* HistoryViewController.swift */,
-				B1C2D3E4F5A6B7C8D9E0F1A2 /* NounBigramViewController.swift */,
 				184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */,
 				EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */,
 				7C150B0401BC4C609E82079A /* ZenzaiSettings.swift */,
@@ -344,7 +341,6 @@
 				BECB3D246AF08901817AFD4E /* EventViewerWindow.swift in Sources */,
 				1FEE62AC67AF46B79608E006 /* HiraganaPreferredViewController.swift in Sources */,
 				26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */,
-				B1C2D3E4F5A6B7C8D9E1F1A3 /* NounBigramViewController.swift in Sources */,
 				9D8C79D665B585F63D5695FF /* IMESandboxWindow.swift in Sources */,
 				E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */,
 				E5F60718293A4B5C6D7E8F09 /* InputController+IMKAdapter.swift in Sources */,

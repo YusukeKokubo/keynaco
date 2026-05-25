@@ -16,7 +16,6 @@ extension DebugSocketServer {
     } else {
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
     }
-    posCommitSequencer = POSCommitSequencer(db: handler.db, classifier: posClassifier)
     InputHandler.isAsciiMode = false
     candidateWindow = DebugCandidateWindow()
     mockClient.reset()
@@ -60,30 +59,6 @@ extension DebugSocketServer {
     return assertEventually(wait, cmd: cmd)
     }
 
-    func handleSeedNounBigram(cmd: [String: Any]) -> [String: Any] {
-    let seed = cmd["seed_noun_bigram"] as! [String: Any]
-    guard let prev   = seed["prev"]   as? String,
-          let input  = seed["input"]  as? String,
-          let output = seed["output"] as? String else {
-        return Self.finalize(
-            Self.errorPayload(
-                code: "SEED_NOUN_BIGRAM_MISSING_FIELDS",
-                message: "seed_noun_bigram requires prev, input, output",
-                hint: #"Use {"seed_noun_bigram":{"prev":"東京","input":"あめ","output":"雨"}}."#,
-                suggestedFixes: [
-                    ["seed_noun_bigram": ["prev": "東京", "input": "あめ", "output": "雨", "count": 5]]
-                ]
-            ),
-            cmd: cmd
-        )
-    }
-    let count = seed["count"] as? Int ?? 1
-    for _ in 0..<count {
-        handler.db.recordContentBigram(prev: prev, input: input, output: output)
-    }
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
     func handleSeedHistory(cmd: [String: Any]) -> [String: Any] {
     let seed = cmd["seed_history"] as! [String: Any]
     guard let input  = seed["input"]  as? String,
@@ -102,12 +77,6 @@ extension DebugSocketServer {
     }
     let times = seed["times"] as? Int ?? 1
     for _ in 0..<times { handler.db.debugSeedHistory(input: input, output: output) }
-    return Self.finalize(["ok": true], cmd: cmd)
-    }
-
-    func handleSetLastNoun(cmd: [String: Any]) -> [String: Any] {
-    let noun = cmd["set_last_noun"] as! String
-    handler.lastConfirmedContentWordOutput = noun.isEmpty ? nil : noun
     return Self.finalize(["ok": true], cmd: cmd)
     }
 
@@ -532,19 +501,6 @@ extension DebugSocketServer {
         return Self.finalize(["results": results], cmd: cmd)
     }
 
-    func handleQueryNounBigram(cmd: [String: Any]) -> [String: Any] {
-        let prev = cmd["query_noun_bigram_prev"] as? String
-        let entries = handler.db.fetchAllContentBigram()
-        let filtered = prev.map { p in entries.filter { $0.prev == p } } ?? entries
-        let results: [[String: Any]] = filtered.map {
-            ["prev": $0.prev, "input": $0.input, "output": $0.output, "count": $0.count]
-        }
-        return Self.finalize([
-            "results": results,
-            "lastConfirmedContentWordOutput": handler.lastConfirmedContentWordOutput as Any,
-        ], cmd: cmd)
-    }
-
     func handlePosAvailability(cmd: [String: Any]) -> [String: Any] {
         let avail = SystemLanguageModel.default.availability
         let desc: String
@@ -555,22 +511,14 @@ extension DebugSocketServer {
         return Self.finalize(["availability": desc], cmd: cmd)
     }
 
-    /// InputController.schedulePOSClassification と同経路で POS 分類・content_bigram 記録を行う。
+    /// InputController.schedulePOSClassification と同経路で POS 分類を行う。
     func schedulePOSClassification(output: String, reading: String) {
+        guard HiraganaPreferredBuiltins.stopWords[output] == nil else { return }
         let historyJoined = handler.committedHistory.suffix(5).joined()
         let context = historyJoined.isEmpty ? nil : historyJoined
-        posCommitSequencer.commit(
-            output: output,
-            reading: reading,
-            context: context,
-            contentWordState: POSCommitSequencer.ContentWordState(
-                get: { [weak self] in self?.handler.lastConfirmedContentWordOutput },
-                set: { [weak self] word in
-                    guard let self else { return }
-                    self.handler.lastConfirmedContentWordOutput = word
-                }
-            )
-        )
+        posClassifier.enqueue(output: output, context: context) { [db = handler.db] classifiedOutput, pos, posTag, posRetry, lemma in
+            db.updatePOS(output: classifiedOutput, pos: pos, posTag: posTag, lemma: lemma, posRetry: posRetry)
+        }
     }
 }
 

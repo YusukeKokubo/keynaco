@@ -93,10 +93,8 @@ public struct InputHandler {
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }
     public var lastConfirmedContext: LastConfirmedContext? = nil
-    /// 直前の確定の読み（`commitText` 時の `finalizedText`）。POS 分類後の content_bigram 記録用。
+    /// 直前の確定の読み（`commitText` 時の `finalizedText`）。
     public var lastCommittedReading: String? = nil
-    /// LLM 品詞分類で最後に確定した内容語（名詞・固有名詞・動詞）の表層。content_bigram の prev として使う。動詞は基本形。
-    public var lastConfirmedContentWordOutput: String? = nil
     public var lastAzooKeyInput: String = ""
     /// `buildCandidateList` の AzooKey 候補キャッシュ照合用（`leftSideContext` が変わると再取得）
     public var lastAzooKeyContext: String = ""

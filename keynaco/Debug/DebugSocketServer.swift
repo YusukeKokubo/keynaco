@@ -25,7 +25,6 @@ final class DebugSocketServer: @unchecked Sendable {
     var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
     /// 本番 InputController の POS キューと競合しないよう Debug 専用インスタンスを使う。
     let posClassifier = LLMPOSClassifier()
-    var posCommitSequencer: POSCommitSequencer
     let mockClient = SocketMockClient()
     var candidateWindow = DebugCandidateWindow()
 
@@ -35,9 +34,7 @@ final class DebugSocketServer: @unchecked Sendable {
     /// `deinit` から参照するため `nonisolated(unsafe)`。書き込みは MainActor のみ。
     nonisolated(unsafe) var snapshotURL: URL?
 
-    private init() {
-        posCommitSequencer = POSCommitSequencer(db: handler.db, classifier: posClassifier)
-    }
+    private init() {}
 
     deinit {
         Self.removeSnapshotArtifacts(baseURL: snapshotURL)
@@ -769,8 +766,8 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let knownCommandKeys: Set<String> = [
         "reset", "state", "get_log", "annotate",
-        "wait_until", "assert_eventually", "seed_noun_bigram", "seed_history",
-        "set_last_noun", "set_surrounding", "set_left_context",
+        "wait_until", "assert_eventually", "seed_history",
+        "set_surrounding", "set_left_context",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
         "capture", "vars", "schema", "with_examples", "explain",
     ]
@@ -1024,14 +1021,9 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["lint_suite"] is [[String: Any]] { return handleLintSuite(cmd: cmd) }
         if cmd["wait_until"] is [String: Any] { return handleWaitUntil(cmd: cmd) }
         if cmd["assert_eventually"] is [String: Any] { return handleAssertEventually(cmd: cmd) }
-        if cmd["seed_noun_bigram"] is [String: Any] { return handleSeedNounBigram(cmd: cmd) }
         if cmd["seed_history"] is [String: Any] { return handleSeedHistory(cmd: cmd) }
         if cmd["query_pos"] is [Any] { return handleQueryPos(cmd: cmd) }
-        if cmd["query_noun_bigram"] != nil || cmd["query_noun_bigram_prev"] is String {
-            return handleQueryNounBigram(cmd: cmd)
-        }
         if cmd["pos_availability"] != nil { return handlePosAvailability(cmd: cmd) }
-        if cmd["set_last_noun"] is String { return handleSetLastNoun(cmd: cmd) }
         if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
         if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
         if cmd["test_suite"] is [[String: Any]] { return handleTestSuite(cmd: cmd) }
@@ -1072,7 +1064,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "focusedSegmentIndex": snap.focusedSegmentIndex,
             "isZenzaiEnabled":    handler.azooKeyConverter.isZenzaiEnabled,
             "leftSideContext":    handler.leftSideContext,
-            "lastConfirmedContentWordOutput": handler.lastConfirmedContentWordOutput as Any,
             "lastCommittedReading": handler.lastCommittedReading as Any,
             "surroundingAfter":   mockClient.documentAfter,
             "candidateEntries":   Self.makeCandidateEntries(

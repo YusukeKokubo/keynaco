@@ -472,21 +472,14 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
 
     // MARK: - ユーザー辞書候補
 
-    func testUserDictAppearsBeforePredictions() {
+    func testUserDictAppearsInCandidates() {
         handler.db.addUserDict(input: "かいしゃ", output: "Acme Corp")
-        seedContentBigramPrediction(prev: "東京", input: "かいしゃ", output: "Acme Inc.")
-        handler.committedHistory = ["東京"]
         typeRomaji("kaisha")
         let (_, action) = press(keyCode: 49)
         guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail(".show を返すはず: \(action)"); return
         }
-        let udIdx = candidates.firstIndex(of: "Acme Corp")
-        let bgIdx = candidates.firstIndex(of: "Acme Inc.")
-        XCTAssertNotNil(udIdx, "ユーザー辞書エントリが候補に含まれるはず: \(candidates)")
-        if let u = udIdx, let b = bgIdx {
-            XCTAssertLessThan(u, b, "ユーザー辞書エントリが予測候補より前に来るはず")
-        }
+        XCTAssertTrue(candidates.contains("Acme Corp"), "ユーザー辞書エントリが候補に含まれるはず: \(candidates)")
     }
 
     func testUserDictFixedEndProtectsEntries() {
@@ -512,19 +505,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
     }
 
     // MARK: - 重複排除
-
-    func testNoDuplicatesAcrossHistoryAndNounBigram() {
-        handler.db.record(input: "から", output: "から")
-        seedContentBigramPrediction(prev: "て", input: "から", output: "から")
-        handler.committedHistory = ["て"]
-        typeRomaji("kara")
-        let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, _) = action else {
-            XCTFail(".show を返すはず: \(action)"); return
-        }
-        let count = candidates.filter { $0 == "から" }.count
-        XCTAssertEqual(count, 1, "履歴と noun-bigram に同じ候補があっても重複なし: \(candidates)")
-    }
 
     // MARK: - 低スコア履歴は候補に載せない
 
@@ -659,40 +639,6 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛", "辞書A", "辞書B", "アイ"],
                      historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
-    }
-
-    // MARK: - B: 予測（noun-bigram）
-
-    func testSnap_B1_PredictionOnly() {
-        // noun-bigram 予測のみ: predictionEnd=1, historyEnd=predictionEnd
-        useStub(SnapStub(["辞書A", "辞書B"]))
-        seedContentBigramPrediction(prev: "東京", input: "あい", output: "予測A")
-        handler.committedHistory = ["東京"]
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["予測A", "辞書A", "辞書B", "アイ"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 0, initialRow: 0)
-    }
-
-    func testContentBigramPredictionWithVerbLemmaPrev() {
-        useStub(SnapStub(["辞書A", "辞書B"]))
-        seedContentBigramPrediction(prev: "行く", input: "がっこう", output: "学校")
-        typeRomaji("gakkou")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["学校", "辞書A", "辞書B", "ガッコウ"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 0, initialRow: 0)
-    }
-
-    func testSnap_B2_PredictionAndHighHistory() {
-        // noun-bigram 予測 + 高スコア履歴: 予測が先頭、履歴が続く
-        useStub(SnapStub(["辞書A", "辞書B"]))
-        seedContentBigramPrediction(prev: "東京", input: "あい", output: "予測A")
-        handler.committedHistory = ["東京"]
-        handler.db.record(input: "あい", output: "愛")
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["予測A", "愛", "辞書A", "辞書B", "アイ"],
-                     historyEnd: 2, predictionEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
     // MARK: - C: hiraganaPreferred
@@ -937,7 +883,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     // MARK: - I: 全セクション組み合わせ
 
     func testSnap_I1_AllSectionsCombined() {
-        // userDict + Zenzai(fixed) + prediction + highHistory
+        // userDict + Zenzai(fixed) + highHistory
         let t = Int64(1_000_000_000)
         useStub(SnapStub(["辞書A"], zenzai: true))
         handler.db.clock = { t }
@@ -946,13 +892,11 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")   // high history (now)
         handler.leftSideContext = "prefix"
         handler.db.addUserDict(input: "あい", output: "UD合い")
-        seedContentBigramPrediction(prev: "東京", input: "あい", output: "予測A")
-        handler.committedHistory = ["東京"]
         typeRomaji("ai")
-        // fixedEnd=2(userDict+zenzai), predictionEnd=3, historyEnd=4
+        // fixedEnd=2(userDict+zenzai), predictionEnd=2, historyEnd=3
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["UD合い", "辞書A", "予測A", "愛", "アイ"],
-                     historyEnd: 4, predictionEnd: 3, fixedEnd: 2, initialRow: 0)
+                     candidates: ["UD合い", "辞書A", "愛", "アイ"],
+                     historyEnd: 3, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 
     func testSnap_I2_HiraganaPreferredWithZenzai() {
@@ -1022,25 +966,6 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates.filter { $0 == top1 }.count, 1, "辞書ブロックに top-1 が重複して現れない（履歴二重は未設定のため全体でも1回）")
-    }
-
-    func testZenzaiPromotedTop1ExcludedFromPredictionBlockWhenBigramMatches() {
-        let top1 = "予測と同じ"
-        zenzaiMock.candidateLines = [top1, "辞書だけ"]
-        handler.leftSideContext = "prefix"
-        handler.committedHistory = ["東京"]
-        recordFetchableContentBigram(prev: "東京", input: "てすと", output: top1)
-        recordFetchableContentBigram(prev: "東京", input: "てすと", output: "予測だけ別語")
-        handler.lastConfirmedContentWordOutput = "東京"
-        typeRomaji("tesuto")
-        let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, let predictionEnd, let fixedEnd) = action else {
-            XCTFail(".show を返すはず"); return
-        }
-        let predictionSlice = candidates[fixedEnd..<predictionEnd]
-        XCTAssertTrue(predictionSlice.contains(top1),
-                      "content_bigram は Zenzai top-1 と重複していても予測ゾーンに含める: \(predictionSlice)")
-        XCTAssertTrue(predictionSlice.contains("予測だけ別語"))
     }
 
     func testZenzaiPromoteSkippedWhenDisabled() {
