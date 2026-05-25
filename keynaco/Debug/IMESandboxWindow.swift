@@ -760,6 +760,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             "fixedEnd":            s.fixedEnd,
             "candidates":          s.candidates,
             "committedHistory":    s.committedHistory,
+            "sessionTextBuffer":   s.sessionTextBuffer,
             "segmentTexts":        s.segmentTexts,
             "focusedSegmentIndex": s.focusedSegmentIndex,
         ]

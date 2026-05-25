@@ -22,6 +22,7 @@ public struct InputHandlerSnapshot: Sendable {
     public var candidates: [String]
 
     public var committedHistory: [String]
+    public var sessionTextBuffer: String
 
     public var segmentTexts: [String]
     public var focusedSegmentIndex: Int
