@@ -21,6 +21,8 @@ enum SyncSettings {
             completion(false, "NAS パスが未設定です")
             return
         }
+        let dir = URL(fileURLWithPath: nasPath).deletingLastPathComponent().path
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         DatabaseManager.shared.checkpoint()
         run(args: ["-av", "--checksum", DatabaseManager.dbPath, nasPath], completion: completion)
     }

@@ -115,14 +115,14 @@ final class SyncViewController: NSViewController {
 
     @objc private func browse() {
         let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = []
-        panel.allowsOtherFileTypes = true
-        panel.title = "NAS 上の history.db を選択"
-        panel.message = "SMB マウント済みの NAS 上の history.db を指定してください"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.title = "NAS 上の同期先フォルダを選択"
+        panel.message = "SMB マウント済みの NAS 上のフォルダを選択してください。history.db はここに作成されます。"
+        panel.prompt = "選択"
         if panel.runModal() == .OK, let url = panel.url {
-            pathField.stringValue = url.path
+            pathField.stringValue = url.appendingPathComponent("history.db").path
         }
     }
 
