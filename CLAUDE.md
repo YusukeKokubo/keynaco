@@ -21,15 +21,16 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | パス | 内容 |
 |------|------|
 | `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
-| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 7 ファイル。Zenzai タブ含む） |
+| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 6 ファイル。Zenzai タブ含む） |
 | `keynaco/Resources/` | バンドルリソース（`zenz-v3.1-small-gguf/` = Zenzai モデル git submodule） |
 | `keynaco/Debug/` | デバッグ用ツール（`DebugSocketServer`・`DebugCandidateWindow`・`EventViewerWindow`・`IMESandboxWindow`・`SocketMockClient` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
+| `Core/Sources/Core/` | `KeynacoCore` の実装（`InputHandler` 等） |
 | `Core/Sources/CoreTests/` | `KeynacoCore` のユニットテスト（XCTest） |
 | `keynacoTests/` | アプリ専用テスト（`SurroundingIMKContext` 等） |
 | `keynaco.xcodeproj` | Xcode プロジェクト（リポジトリ管理。ローカル SPM で `Core/` を参照） |
 | `docs/` | `principles.md`（設計原則）・`rejected.md`（不採用機能）・`domain/`（用語・状態遷移・シナリオ） |
-| `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` 形式） |
+| `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` / `POC<YYMMDD>.md` 形式） |
 | `scripts/` | 開発用スクリプト（下記参照） |
 | `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
