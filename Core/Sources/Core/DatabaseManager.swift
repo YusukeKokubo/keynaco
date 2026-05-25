@@ -25,6 +25,7 @@ public final class DatabaseManager: @unchecked Sendable {
         createTables()
         dropDeprecatedNgramTables()
         ensureHistoryPOSColumn()
+        dropDeprecatedHistoryColumns()
         seedHiraganaPreferredIfNeeded()
     }
 
@@ -42,6 +43,7 @@ public final class DatabaseManager: @unchecked Sendable {
         guard sqlite3_open_v2(snapshotPath, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { return }
         createTables()
         dropDeprecatedNgramTables()
+        dropDeprecatedHistoryColumns()
     }
 
     deinit {
@@ -115,9 +117,6 @@ public final class DatabaseManager: @unchecked Sendable {
             count   INTEGER NOT NULL DEFAULT 1,
             used_at INTEGER NOT NULL,
             pos TEXT DEFAULT NULL,
-            pos_tag TEXT DEFAULT NULL,
-            pos_retry INTEGER NOT NULL DEFAULT 0,
-            lemma TEXT DEFAULT NULL,
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
@@ -149,16 +148,12 @@ public final class DatabaseManager: @unchecked Sendable {
     /// 既存 DB（pos 列がない）向けマイグレーション。is_noun からの変換も行う。
     func ensureHistoryPOSColumn() {
         sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos TEXT DEFAULT NULL", nil, nil, nil)
-        // is_noun=1 → 'noun'、is_noun=0 → 'other' に変換（NULL はそのまま未分類）
         sqlite3_exec(db, "UPDATE history SET pos = 'noun' WHERE is_noun = 1 AND pos IS NULL", nil, nil, nil)
         sqlite3_exec(db, "UPDATE history SET pos = 'other' WHERE is_noun = 0 AND pos IS NULL", nil, nil, nil)
+        // 旧 LLM 列が残っている DB 向け: pos_tag から pos を補完してから DROP する
         sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_raw TEXT DEFAULT NULL", nil, nil, nil)
         sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_tag TEXT DEFAULT NULL", nil, nil, nil)
-        // pos_raw から pos_tag へデータを移行（pos_raw は互換のため残す）
         sqlite3_exec(db, "UPDATE history SET pos_tag = pos_raw WHERE pos_tag IS NULL AND pos_raw IS NOT NULL", nil, nil, nil)
-        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN pos_retry INTEGER NOT NULL DEFAULT 0", nil, nil, nil)
-        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN lemma TEXT DEFAULT NULL", nil, nil, nil)
-        // pos_tag の subcategory を pos 列に反映（proper_noun → proper_noun/place|person|org）
         sqlite3_exec(db, """
             UPDATE history SET pos =
                 CASE
@@ -169,13 +164,32 @@ public final class DatabaseManager: @unchecked Sendable {
                 END
             WHERE pos = 'proper_noun' AND pos_tag IS NOT NULL
             """, nil, nil, nil)
-        // pos_tag に ':confidence' がない旧形式エントリは信頼度不明のため再分類対象にする
-        sqlite3_exec(db, """
-            UPDATE history SET pos_retry = 1
-            WHERE pos IS NOT NULL AND pos != 'other'
-              AND pos_retry = 0
-              AND (pos_tag IS NULL OR pos_tag NOT LIKE '%:%')
-            """, nil, nil, nil)
+    }
+
+    /// 廃止した LLM 品詞列（pos_tag / pos_retry / lemma / pos_raw）を既存 DB から削除する。
+    private func dropDeprecatedHistoryColumns() {
+        let deprecated = ["pos_raw", "pos_tag", "pos_retry", "lemma"]
+        var changed = false
+        for col in deprecated where historyHasColumn(col) {
+            sqlite3_exec(db, "ALTER TABLE history DROP COLUMN \(col)", nil, nil, nil)
+            changed = true
+        }
+        if changed {
+            for (_, stmt) in stmtCache { sqlite3_finalize(stmt) }
+            stmtCache = [:]
+        }
+    }
+
+    private func historyHasColumn(_ name: String) -> Bool {
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, "PRAGMA table_info(history)", -1, &stmt, nil) == SQLITE_OK else {
+            return false
+        }
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let ptr = sqlite3_column_text(stmt, 1), String(cString: ptr) == name { return true }
+        }
+        return false
     }
 
     private func seedHiraganaPreferredIfNeeded() {
@@ -266,9 +280,6 @@ public final class DatabaseManager: @unchecked Sendable {
         public let output: String
         public let count: Int
         public let pos: String?
-        public let posTag: String?
-        public let posRetry: Bool
-        public let lemma: String?
         public let usedAt: Int64
     }
 

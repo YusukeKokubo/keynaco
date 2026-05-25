@@ -39,24 +39,18 @@ extension InputController {
             guard let c = AzooKeyPOSClassifier.classify(
                 output: output, reading: reading, converter: converter
             ) else { return }
-            DatabaseManager.shared.updatePOS(
-                output: output, pos: c.pos, posTag: c.posTag, lemma: nil, posRetry: false
-            )
+            DatabaseManager.shared.updatePOS(output: output, pos: c.pos)
         }
     }
 
-    /// 未分類（pos IS NULL）または再試行待ち（pos_retry = 1）の履歴エントリを最大 50 件バックグラウンドで分類する（起動時に1回呼ぶ）。
-    @MainActor
-    static func performPOSBackfill() {
-        let db = DatabaseManager.shared
-        let entries = db.fetchUnclassifiedHistoryEntries(limit: 50)
-        let converter = posBackfillConverter
-        for entry in entries {
-            guard let c = AzooKeyPOSClassifier.classify(
-                output: entry.output, reading: entry.reading, converter: converter
-            ) else { continue }
-            db.updatePOS(
-                output: entry.output, pos: c.pos, posTag: c.posTag, lemma: nil, posRetry: false
+    /// 未分類（pos IS NULL）の履歴を AzooKey で一括再分類する（起動時にバックグラウンド実行）。
+    nonisolated static func performPOSBackfill(limit: Int? = nil) {
+        let result = AzooKeyPOSBackfill.run(limit: limit)
+        if result.total > 0 {
+            NSLog(
+                "[keynaco] POS backfill: classified=%d skipped=%d total=%d remaining=%d",
+                result.classified, result.skipped, result.total,
+                DatabaseManager.shared.countUnclassifiedHistoryOutputs()
             )
         }
     }

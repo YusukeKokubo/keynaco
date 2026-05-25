@@ -48,19 +48,4 @@ final class AzooKeyPOSClassifierTests: XCTestCase {
     func testUnknownWithoutReadingReturnsNil() {
         XCTAssertNil(AzooKeyPOSClassifier.classify(output: "設定", reading: "", converter: converter))
     }
-
-    func testPosRetryIsAlwaysFalseWhenClassified() {
-        let cases: [(String, String)] = [
-            ("しかし", "しかし"), ("設定", "せってい"), ("東京", "とうきょう"),
-        ]
-        for (output, reading) in cases {
-            let c = AzooKeyPOSClassifier.classify(output: output, reading: reading, converter: converter)
-            XCTAssertFalse(c?.posRetry ?? false, output)
-        }
-    }
-
-    func testLemmaIsAlwaysNilWhenClassified() {
-        let c = AzooKeyPOSClassifier.classify(output: "設定", reading: "せってい", converter: converter)
-        XCTAssertNil(c?.lemma)
-    }
 }

@@ -484,7 +484,7 @@ extension DebugSocketServer {
     return Self.finalize(result, cmd: cmd)
     }
 
-    /// `{"query_pos": ["東京", "確認して", ...]}` → `{"results": [{"output":"東京","pos":"proper_noun","pos_tag":"proper_noun/place"}, ...]}`
+    /// `{"query_pos": ["東京", "確認して", ...]}` → `{"results": [{"output":"東京","pos":"proper_noun/place"}, ...]}`
     func handleQueryPos(cmd: [String: Any]) -> [String: Any] {
         guard let outputs = cmd["query_pos"] as? [String] else {
             return ["error": "query_pos must be an array of strings"]
@@ -493,9 +493,9 @@ extension DebugSocketServer {
         let map = Dictionary(grouping: entries, by: \.output)
         let results: [[String: Any]] = outputs.map { output in
             if let entry = map[output]?.first {
-                return ["output": output, "pos": entry.pos ?? "(nil)", "pos_tag": entry.posTag ?? "(未分類)", "pos_retry": entry.posRetry]
+                return ["output": output, "pos": entry.pos ?? "(nil)"]
             }
-            return ["output": output, "pos": "(not in db)", "pos_tag": "(not in db)", "pos_retry": false]
+            return ["output": output, "pos": "(not in db)"]
         }
         return Self.finalize(["results": results], cmd: cmd)
     }
@@ -504,15 +504,33 @@ extension DebugSocketServer {
         Self.finalize(["availability": "available", "engine": "AzooKey"], cmd: cmd)
     }
 
+    /// `{"pos_backfill": true}` → 未分類 history を全件再分類。
+    /// `{"pos_backfill": {"limit": 100}}` → 最大 100 output まで。
+    func handlePosBackfill(cmd: [String: Any]) -> [String: Any] {
+        let payload = cmd["pos_backfill"]
+        let limit = (payload as? [String: Any])?["limit"] as? Int
+        let remainingBefore = handler.db.countUnclassifiedHistoryOutputs()
+        var result: POSBackfillResult!
+        DispatchQueue.global(qos: .utility).sync {
+            result = AzooKeyPOSBackfill.run(db: handler.db, converter: posLookupConverter, limit: limit)
+        }
+        let remainingAfter = handler.db.countUnclassifiedHistoryOutputs()
+        return Self.finalize([
+            "classified": result.classified,
+            "skipped": result.skipped,
+            "total": result.total,
+            "remainingBefore": remainingBefore,
+            "remainingAfter": remainingAfter,
+        ], cmd: cmd)
+    }
+
     /// InputController.schedulePOSClassification と同経路で POS 分類を行う。
     func schedulePOSClassification(output: String, reading: String) {
         guard HiraganaPreferredBuiltins.stopWords[output] == nil else { return }
         guard let c = AzooKeyPOSClassifier.classify(
             output: output, reading: reading, converter: posLookupConverter
         ) else { return }
-        handler.db.updatePOS(
-            output: output, pos: c.pos, posTag: c.posTag, lemma: nil, posRetry: false
-        )
+        handler.db.updatePOS(output: output, pos: c.pos)
     }
 }
 

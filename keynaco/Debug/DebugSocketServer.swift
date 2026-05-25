@@ -1025,6 +1025,7 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["seed_history"] is [String: Any] { return handleSeedHistory(cmd: cmd) }
         if cmd["query_pos"] is [Any] { return handleQueryPos(cmd: cmd) }
         if cmd["pos_availability"] != nil { return handlePosAvailability(cmd: cmd) }
+        if cmd["pos_backfill"] != nil { return handlePosBackfill(cmd: cmd) }
         if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
         if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
         if cmd["test_suite"] is [[String: Any]] { return handleTestSuite(cmd: cmd) }

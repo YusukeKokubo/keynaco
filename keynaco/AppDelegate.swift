@@ -38,7 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         Task.detached(priority: .background) {
             DatabaseManager.shared.performGCIfNeeded()
         }
-        Task { @MainActor in
+        Task.detached(priority: .background) {
             InputController.performPOSBackfill()
         }
     }

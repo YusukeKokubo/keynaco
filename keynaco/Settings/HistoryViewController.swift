@@ -18,9 +18,6 @@ final class HistoryViewController: NSViewController {
         ColumnDef(id: "input",     title: "読み",         minWidth: 60,  defaultWidth: 150, sortKey: "input"),
         ColumnDef(id: "output",    title: "確定テキスト", minWidth: 60,  defaultWidth: 200, sortKey: "output"),
         ColumnDef(id: "pos",       title: "品詞",         minWidth: 60,  defaultWidth: 90,  sortKey: "pos"),
-        ColumnDef(id: "pos_tag",   title: "LLMタグ",      minWidth: 60,  defaultWidth: 120, sortKey: "pos_tag"),
-        ColumnDef(id: "lemma",     title: "見出し語",     minWidth: 60,  defaultWidth: 100, sortKey: "lemma"),
-        ColumnDef(id: "pos_retry", title: "再試行",       minWidth: 40,  defaultWidth: 55,  sortKey: "pos_retry"),
         ColumnDef(id: "count",     title: "回数",         minWidth: 40,  defaultWidth: 60,  sortKey: "count"),
         ColumnDef(id: "used_at",   title: "最終変換",     minWidth: 80,  defaultWidth: 110, sortKey: "used_at"),
     ]
@@ -117,9 +114,6 @@ final class HistoryViewController: NSViewController {
         case "input":     data.sort { asc ? $0.input < $1.input : $0.input > $1.input }
         case "output":    data.sort { asc ? $0.output < $1.output : $0.output > $1.output }
         case "pos":       data.sort { asc ? Self.posLabel($0.pos) < Self.posLabel($1.pos) : Self.posLabel($0.pos) > Self.posLabel($1.pos) }
-        case "pos_tag":   data.sort { asc ? ($0.posTag ?? "") < ($1.posTag ?? "") : ($0.posTag ?? "") > ($1.posTag ?? "") }
-        case "lemma":     data.sort { asc ? ($0.lemma ?? "") < ($1.lemma ?? "") : ($0.lemma ?? "") > ($1.lemma ?? "") }
-        case "pos_retry": data.sort { asc ? !$0.posRetry && $1.posRetry : $0.posRetry && !$1.posRetry }
         case "count":     data.sort { asc ? $0.count < $1.count : $0.count > $1.count }
         case "used_at":   data.sort { asc ? $0.usedAt < $1.usedAt : $0.usedAt > $1.usedAt }
         default:          break
@@ -151,9 +145,6 @@ extension HistoryViewController: NSTableViewDelegate {
         case "input":     text = entry.input
         case "output":    text = entry.output
         case "pos":       text = Self.posLabel(entry.pos)
-        case "pos_tag":   text = entry.posTag ?? "―"
-        case "lemma":     text = entry.lemma ?? "―"
-        case "pos_retry": text = entry.posRetry ? "✓" : "―"
         case "count":     text = "\(entry.count)"
         case "used_at":   text = Self.formatDate(entry.usedAt)
         default: return nil

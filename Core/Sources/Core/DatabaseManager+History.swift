@@ -56,61 +56,21 @@ extension DatabaseManager {
         }
     }
 
-    /// 高信頼度で分類済みの POS を返す。未分類・再試行待ちの場合は nil。
-    public func fetchCachedPOS(output: String) -> POSClassification? {
-        dbQueue.sync {
-            let sql = """
-            SELECT pos, pos_tag, pos_retry, lemma FROM history
-            WHERE output = ? AND pos IS NOT NULL AND pos_retry = 0
-            LIMIT 1
-            """
-            guard let stmt = self.cachedStmt(for: sql) else { return nil }
-            self.bindText(stmt, 1, output)
-            guard sqlite3_step(stmt) == SQLITE_ROW,
-                  let posPtr = sqlite3_column_text(stmt, 0) else { return nil }
-            let pos = String(cString: posPtr)
-            let posTag = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
-            let lemma = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
-            return POSClassification(
-                pos: pos, posTag: posTag, posRetry: false, lemma: lemma
-            )
-        }
-    }
-
     /// `output` に対応する全履歴行の pos を更新する。
-    /// `posRetry=true` の場合は次回分類時に再実行対象となる（低信頼度・フォーマット崩れ時に使用）。
-    public func updatePOS(
-        output: String,
-        pos: String,
-        posTag: String? = nil,
-        lemma: String? = nil,
-        posRetry: Bool = false
-    ) {
+    public func updatePOS(output: String, pos: String) {
         dispatchWrite {
-            // 動詞は LLM が返した辞書形で lemma を上書き。それ以外は確定時にセットした output を保持。
-            let sql = lemma != nil
-                ? "UPDATE history SET pos = ?, pos_tag = ?, lemma = ?, pos_retry = ? WHERE output = ?"
-                : "UPDATE history SET pos = ?, pos_tag = ?, pos_retry = ? WHERE output = ?"
-            self.executeOnQueue(sql) {
+            self.executeOnQueue("UPDATE history SET pos = ? WHERE output = ?") {
                 self.bindText($0, 1, pos)
-                if let tag = posTag { self.bindText($0, 2, tag) } else { sqlite3_bind_null($0, 2) }
-                if let lemma {
-                    self.bindText($0, 3, lemma)
-                    sqlite3_bind_int($0, 4, posRetry ? 1 : 0)
-                    self.bindText($0, 5, output)
-                } else {
-                    sqlite3_bind_int($0, 3, posRetry ? 1 : 0)
-                    self.bindText($0, 4, output)
-                }
+                self.bindText($0, 2, output)
             }
         }
     }
 
-    /// 未分類（pos IS NULL）または再試行待ち（pos_retry = 1）の出力語を最大 `limit` 件返す（重複排除）。
+    /// 未分類（pos IS NULL）の出力語を最大 `limit` 件返す（重複排除）。
     public func fetchUnclassifiedHistory(limit: Int) -> [String] {
         dbQueue.sync {
             var results: [String] = []
-            let sql = "SELECT DISTINCT output FROM history WHERE pos IS NULL OR pos_retry = 1 LIMIT ?"
+            let sql = "SELECT DISTINCT output FROM history WHERE pos IS NULL LIMIT ?"
             guard let stmt = self.cachedStmt(for: sql) else { return results }
             sqlite3_bind_int(stmt, 1, Int32(limit))
             while sqlite3_step(stmt) == SQLITE_ROW {
@@ -120,22 +80,39 @@ extension DatabaseManager {
         }
     }
 
+    /// 未分類 output 件数（`pos IS NULL`、output 単位）。
+    public func countUnclassifiedHistoryOutputs() -> Int {
+        dbQueue.sync {
+            let sql = """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT output FROM history WHERE pos IS NULL
+            )
+            """
+            guard let stmt = self.cachedStmt(for: sql) else { return 0 }
+            guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+            return Int(sqlite3_column_int(stmt, 0))
+        }
+    }
+
     /// 未分類エントリを output 単位で返す。reading は同一 output の中で count 最大の input。
-    public func fetchUnclassifiedHistoryEntries(limit: Int) -> [(output: String, reading: String)] {
+    /// `limit` 省略時は全件。
+    public func fetchUnclassifiedHistoryEntries(limit: Int? = nil) -> [(output: String, reading: String)] {
         dbQueue.sync {
             var results: [(output: String, reading: String)] = []
+            let limitClause = limit.map { _ in "LIMIT ?" } ?? ""
             let sql = """
             SELECT output, input FROM (
                 SELECT output, input,
                        ROW_NUMBER() OVER (PARTITION BY output ORDER BY count DESC, used_at DESC) AS rn
                 FROM history
-                WHERE pos IS NULL OR pos_retry = 1
+                WHERE pos IS NULL
             )
             WHERE rn = 1
-            LIMIT ?
+            \(limitClause)
             """
-            guard let stmt = self.cachedStmt(for: sql) else { return results }
-            sqlite3_bind_int(stmt, 1, Int32(limit))
+            guard let stmt = self.prepareUncachedStmt(sql) else { return results }
+            defer { sqlite3_finalize(stmt) }
+            if let limit { sqlite3_bind_int(stmt, 1, Int32(limit)) }
             while sqlite3_step(stmt) == SQLITE_ROW {
                 guard let o = sqlite3_column_text(stmt, 0),
                       let i = sqlite3_column_text(stmt, 1) else { continue }
@@ -145,9 +122,16 @@ extension DatabaseManager {
         }
     }
 
+    /// LIMIT 句の有無で SQL が変わるため stmt キャッシュを使わない。
+    private func prepareUncachedStmt(_ sql: String) -> OpaquePointer? {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+        return stmt
+    }
+
     public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
-            let sql = "SELECT input, output, count, pos, pos_tag, pos_retry, lemma, used_at FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+            let sql = "SELECT input, output, count, pos, used_at FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -156,14 +140,10 @@ extension DatabaseManager {
                 guard let i = sqlite3_column_text(stmt, 0),
                       let o = sqlite3_column_text(stmt, 1) else { continue }
                 let pos = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
-                let posTag = sqlite3_column_text(stmt, 4).map { String(cString: $0) }
-                let posRetry = sqlite3_column_int(stmt, 5) != 0
-                let lemma = sqlite3_column_text(stmt, 6).map { String(cString: $0) }
-                let usedAt = sqlite3_column_int64(stmt, 7)
+                let usedAt = sqlite3_column_int64(stmt, 4)
                 results.append(HistoryEntry(
                     input: String(cString: i), output: String(cString: o),
-                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, posTag: posTag, posRetry: posRetry,
-                    lemma: lemma, usedAt: usedAt
+                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, usedAt: usedAt
                 ))
             }
             return results
@@ -199,15 +179,14 @@ extension DatabaseManager {
         dispatchWrite {
             let t = self.nowEpoch()
             self.executeOnQueue("""
-            INSERT INTO history (input, output, count, used_at, lemma)
-            VALUES (?, ?, 1, ?, ?)
+            INSERT INTO history (input, output, count, used_at)
+            VALUES (?, ?, 1, ?)
             ON CONFLICT(input, output) DO UPDATE SET
                 count   = count + 1,
                 used_at = excluded.used_at;
             """) {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
                 sqlite3_bind_int64($0, 3, t)
-                self.bindText($0, 4, output)
             }
         }
     }
@@ -225,15 +204,14 @@ extension DatabaseManager {
         dispatchWrite {
             let t = self.nowEpoch()
             self.executeOnQueue("""
-            INSERT INTO history (input, output, count, used_at, lemma)
-            VALUES (?, ?, 1, ?, ?)
+            INSERT INTO history (input, output, count, used_at)
+            VALUES (?, ?, 1, ?)
             ON CONFLICT(input, output) DO UPDATE SET
                 count   = count + 1,
                 used_at = excluded.used_at;
             """) {
                 self.bindText($0, 1, reading); self.bindText($0, 2, output)
                 sqlite3_bind_int64($0, 3, t)
-                self.bindText($0, 4, output)
             }
         }
     }

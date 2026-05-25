@@ -8,10 +8,10 @@ public enum AzooKeyPOSClassifier {
         converter: AzooKeyConverting
     ) -> POSClassification? {
         if Self.conjunctions.contains(output) {
-            return POSClassification(pos: "other/conjunction", posTag: "other/conjunction", posRetry: false)
+            return POSClassification(pos: "other/conjunction")
         }
         if Self.interjections.contains(output) {
-            return POSClassification(pos: "other/interjection", posTag: "other/interjection", posRetry: false)
+            return POSClassification(pos: "other/interjection")
         }
         guard !reading.isEmpty,
               let lcid = converter.lcidForCommitted(reading: reading, output: output) else {
