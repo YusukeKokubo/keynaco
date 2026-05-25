@@ -9,7 +9,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | [`docs/domain/glossary.md`](docs/domain/glossary.md) | 用語定義・不変条件 |
 | [`docs/domain/states.md`](docs/domain/states.md) | 状態遷移図・状態別キー動作 |
 | [`docs/domain/scenarios.md`](docs/domain/scenarios.md) | 具体的な入力トレース例 |
-| [`docs/domain/architecture.md`](docs/domain/architecture.md) | コンポーネント詳細・Successor モード・候補優先順位 |
+| [`docs/domain/architecture.md`](docs/domain/architecture.md) | コンポーネント詳細・候補優先順位 |
 
 **更新ルール**: キー入力の挙動・状態遷移・候補表示ロジックに影響する変更を加えたとき、コードと同じコミットで該当箇所を更新する。
 - 用語の定義・不変条件が変わった → `glossary.md`
@@ -108,7 +108,7 @@ cd Core && swift test
 - `Core/` の公開型は `public` 必須（`@testable import` はテストのみ有効。App からは `internal` は不可）
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
 - `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト。`docs/domain/scenarios.md` と対応
-- **E2E 動作確認**: 状態（Successor・Segment・Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）。Successor モードは POS 分類が非同期なので `{"set_left_context": "名詞"}` + `seed_noun_bigram` + `useRealDB:true` でバイパスする。sandbox で通常文字を送るには `{"type_string": "k"}` を使う（`{"key": "k"}` は特殊キーのみ有効）
+- **E2E 動作確認**: 状態（Segment・Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）。sandbox で通常文字を送るには `{"type_string": "k"}` を使う（`{"key": "k"}` は特殊キーのみ有効）
 
 ## キー入力の挙動（特殊ケース）
 
@@ -142,7 +142,7 @@ InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInp
 
 ### Electron 系アプリで Enter が届かない
 
-`setMarkedText("")`（空文字）のまま候補を表示すると、Electron は「IME が非アクティブ」と判断し Enter をアプリ側で処理する。Successor モード等で候補選択中は実テキストを marked text に設定すること。
+`setMarkedText("")`（空文字）のまま候補を表示すると、Electron は「IME が非アクティブ」と判断し Enter をアプリ側で処理する。候補選択中は実テキストを marked text に設定すること。
 
 ### flagsChanged で Caps Lock を検知する
 

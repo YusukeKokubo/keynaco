@@ -93,30 +93,10 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 
 ---
 
-## Successor モード（SuccessorMode）
-
-組成なし・ASCII モードでない状態で ASCII 英字 1 文字を入力した瞬間、後続語候補を表示する機能。`isSuccessorMode` 等の事前フラグは持たず、`candidate.isVisible && composedHiragana.isEmpty` で候補選択中のキー処理を分岐する。
-
-### trySuccessorCandidates
-`leftSideContext` 末尾の名詞らしい語（`extractNounFromContext`）または確定直後の `lastCommittedOutput`（`successorEligible` 時）を prev に、入力 1 文字の読み前方一致で noun-bigram + 履歴を照会する。候補があれば `.show`、なければ通常入力へ。
-
-### extractNounFromContext
-`leftSideContext` 末尾の非漢字・非カタカナをスキップし、続く漢字・カタカナ連続スパンを返す（例: `"今日は東京に"` → `"東京"`）。
-
-### successorEligible
-`commitText` 確定直後、または `confirmSuccessor` で **名詞系**（`isNounLike`）を確定した直後に立ち、次の 1 打目だけ `leftSideContext` が空でも `lastCommittedOutput` を prev に Successor を試す。1 打目処理後・Escape・確定直後 Backspace（`penalizeAll`）でクリア。格助詞等のひらがな確定後は立てない。
-
-### successorBufferedRomaji
-Successor モード中の蓄積ローマ字バッファ（nil = モード外）。追加打鍵で伸ばし、仮名が確定するたびに候補を絞り込む。無効ローマ字・候補ゼロ時に通常組成へ流す。
-
-*Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`*
-
----
-
 ## 学習・履歴
 
 ### lastCommittedOutput
-直前に確定した変換結果（`committedHistory.last`）。Successor の 1 打目 DB 照会等に使う。
+直前に確定した変換結果（`committedHistory.last`）。content-bigram の prev 参照等に使う。
 
 ### lastConfirmedContext
 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。  
@@ -138,7 +118,7 @@ Successor モード中の蓄積ローマ字バッファ（nil = モード外）�
 Apple Intelligence 必須前提。無効時は noun-bigram は蓄積されず予測候補も出ない。
 
 #### lastConfirmedNounOutput
-LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` および Successor の参照キー。セッションをまたいでリセットしない。
+LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` キー。セッションをまたいでリセットしない。
 
 #### penalizeAll（訂正シグナル）
 確定直後 Backspace 時に呼ばれ、history の該当行を count -1（0以下で削除）する。

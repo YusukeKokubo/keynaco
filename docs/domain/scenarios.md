@@ -17,9 +17,9 @@
 | 4 | `j` | 組成中 | `かん` | `j` | `かんj` | — |
 | 5 | `i` | 組成中 | `かんじ` | `` | `かんじ` | — |
 | 6 | Space | セグメントモード | — | — | `漢字`（AzooKey 先頭） | 表示 |
-| 7 | Enter | 待機 | — | — | — | 非表示 → Successor モードへ（末尾が漢字のため） |
+| 7 | Enter | 待機 | — | — | — | 非表示 |
 
-**確定後**: `漢字` が挿入される。末尾が漢字（`isNounLike` 真）なので Successor モードへ自動遷移。
+**確定後**: `漢字` が挿入される。
 
 *Tests: `Tests/InputHandlerCompositionTests.swift`*
 
@@ -53,98 +53,6 @@
 
 ---
 
-## S-03: Successor モードの 1 打目（入力起動）
-
-**前提**: `東京` を確定済み（`successorEligible = true`）または `leftSideContext` が `"今日は東京に"` 等。noun-bigram `(東京, が)` を学習済み。
-
-| ステップ | キー | 動作 |
-|---------|------|------|
-| 0 | — | 確定直後は候補ウィンドウを出さない |
-| 1 | `g` | `trySuccessorCandidates("g")` → 候補「が」を `.show` |
-| 2a | Space | 先頭候補「が」を確定 |
-| 2b | `z` | `g` を通常組成に流す → `gz` の pending から通常組成 |
-
-*Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`*
-
----
-
-## S-03a: Successor 長い後続語（prefix 展開なし）
-
-**前提**: `東京` 確定後、保留に `会議に出席する`（noun-bigram）。1 打目 `k` で読みフィルタを通過。
-
-| ステップ | キー | candidates（例） | 動作 |
-|---------|------|------------------|------|
-| 1 | `k` | `会議に出席する` | DB 再クエリ + pending merge の結果をそのまま表示（助詞境界 prefix 展開は行わない） |
-
-*Tests: `Tests/ScenarioRegressionTests.swift`（`testSuccessorPrefixSplit_longBigramOnFirstKey`）*
-
----
-
-## S-03e: Successor 多打絞り込み
-
-**前提**: `東京` 確定後。noun-bigram `(東京, かいぎ)` → `会議`、`(東京, きょう)` → `今日` を学習済み。
-
-| ステップ | キー | 動作 |
-|---------|------|------|
-| 1 | `k` | 1 打目 `romajiToInitialKana["k"]` → 「か」行・「き」行候補を `.show`（会議・今日） |
-| 2 | `a` | バッファ `ka` → 仮名 `か` 確定 → `.replaceCandidates` で「か」始まりに絞り込み（会議のみ） |
-| 3 | `n` `i` | バッファ `kani` → 仮名 `かに` 確定 → さらに絞り込み（該当候補のみ） |
-| — | 候補ゼロ | 全バッファを通常組成へ流し `.show`（通常変換候補） |
-
-未確定音節（例: `k` のみ、`sh`）は `.none` で候補リストを維持。無効ローマ字（例: `gz`）は従来どおり通常組成へフォールバック。
-
-*Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`（`testSuccessorFiltersOnSecondKey` 等）*
-
----
-
-## S-03b: Successor モードの後続語予測（noun-bigram）
-
-**前提**: `東京`（漢字末尾）を確定。事前に noun-bigram `(prev=東京, について, について)` を学習済み。`lastConfirmedNounOutput = 東京`。
-
-| ステップ | キー | 状態 | candidates | 動作 |
-|---------|------|------|-----------|------|
-| 0 | — | Successor モード | 保存（`pendingSuccessorCandidates`） | noun-bigram あり → 確定直後は `.dismiss`（ウィンドウは開かない） |
-| 1a | `n`（「に」「の」行） | Successor モード | `["について", "に", "の", ...]` | 1打目 `romajiToInitialKana["n"]`→「な」行フィルタで一致候補を表示 |
-| 1b | Space | 待機 | — | 1打後、先頭候補を確定 |
-| 1c | マッチしないキー | 待機 | — | 一致候補なし → モード解除→通常入力 |
-
-`isNounLike` が偽（ひらがな末尾）なら noun-bigram があっても Successor モードには入らない。  
-名詞末尾で noun-bigram が空でも isNounLike なら Successor モードに入る。1 打目で `fetchHistoryPrefix` が履歴から候補を補完する。
-
-*Tests: `Tests/InputHandlerSuccessorTests.swift`*
-
----
-
-## S-03d: Successor 履歴前方一致（noun-bigram 空）
-
-**前提**: 「東京タワー」を複数回確定すると `recordPrefixes` により `たわー` → `タワー` 等の前方一致エントリが履歴に蓄積される。noun-bigram `(東京, タワー)` は未学習。
-
-| ステップ | キー | 状態 | candidates | 動作 |
-|---------|------|------|-----------|------|
-| 0 | — | Successor モード | 保存（空） | noun-bigram なし → 確定直後は `.dismiss` |
-| 1 | `t` | Successor モード | `["タワー", ...]` | 1打目 `fetchHistoryPrefix("た")` で履歴から「タワー」を表示 |
-| 2 | Enter | 待機 | — | 「タワー」確定 |
-
-*Tests: sandbox 回帰（`seed_history input=たわー output=タワー` + `toukyou` Space Enter → `t`）*
-
----
-
-## S-03c: Successor チェーン（名詞→格助詞確定後）
-
-**前提**: `東京` を確定。noun-bigram `(東京, が)` を学習済み。
-
-| ステップ | キー | 状態 | 動作 |
-|---------|------|------|------|
-| 0 | — | Successor モード | noun-bigram あり（`が` が学習済み）→ `.dismiss`（確定直後はウィンドウなし） |
-| 1 | `g` | Successor モード | `pendingSuccessorCandidates` を読みフィルタして表示（`["が", ...]`）|
-| 2 | Space | 待機 | 「が」確定 → ひらがな末尾（`isNounLike` 偽）→ `successorEligible` を立てず Successor 終了 |
-
-**変更点（旧仕様との差異）**: 以前は「が」確定後も `suggestSuccessors()` が再呼び出しされ、`(が, 好き)` など N-gram があればチェーンが継続していた。現在はひらがな末尾確定後は Successor に入らないため、格助詞の後は通常の組成に戻る。
-
-*Tests: `Tests/InputHandlerSuccessorTests.swift`*
-
----
-
 ## S-04: Shift+文字（日本語モードで英字組成）
 
 **入力**: `t` Shift+`O` Shift+`K` `y` `o` Enter
@@ -168,8 +76,6 @@
 - `noun_bigram` を `lastConfirmedNounOutput × 読み` で検索（例: prev=`東京`, reading=`に*`）
 - ヒット例: `に` → 候補: `に` / `は` / `の`
 - 候補リスト優先順位: ひらがな・カタカナ固定 → ユーザー辞書 →（Zenzai ON かつ左文脈ありなら）**辞書先頭 1 行** → **予測（noun-bigram）** → 履歴 → 残りの辞書
-
-*Tests: `Tests/InputHandlerSuccessorTests.swift`*
 
 ---
 

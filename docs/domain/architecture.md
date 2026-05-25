@@ -5,7 +5,7 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 ## コンポーネント一覧
 
 - `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` もここで管理
-- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+NormalInput.swift`（通常キー処理・ASCII/かなモード切替）、`InputHandler+Candidates.swift`（候補リスト構築）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+Numbers.swift`（数字入力時の全角・桁区切り候補生成）、`InputHandler+SegmentMode.swift`（文節調整）、`InputHandler+SuccessorMode.swift`（後続語予測）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII 記号 → 全角候補列に変換。`"?": ["？", "?"]`・`"!": ["！", "!"]`・`"/": ["・", "／", "/"]`・`".": ["。", "．", "…"]`・`",": ["、", "，"]` 等、記号全般に対応）。`sentenceTerminators`（`["。", "！", "？"]`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する（Enter キー空確定時は別途 `removeAll()`）。**句読点（`readingPunctuations`）確定時は `recordPrefixes` をスキップし** `pushCommitted` でも `committedHistory` に追加しない（句読点が next-word 予測を汚すのを防ぐ）
+- `InputHandler` = 入力ロジック本体（テスト可能）、Swift 6 strict concurrency。実装は機能ごとに extension 分割: `InputHandler+NormalInput.swift`（通常キー処理・ASCII/かなモード切替）、`InputHandler+Candidates.swift`（候補リスト構築）、`InputHandler+DateTime.swift`（日時候補生成）、`InputHandler+Numbers.swift`（数字入力時の全角・桁区切り候補生成）、`InputHandler+SegmentMode.swift`（文節調整）。`isAsciiMode` は `static` — 全インスタンス共有でアプリ切替後もモードを維持。テストの `setUp` でリセット必須。`isBracketMode`（`bracketCandidates != nil`）: `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを**待機中**（組成空）に入力したとき、対応する全角候補ウィンドウを表示するモード（`bracketOptions` マップで ASCII 記号 → 全角候補列に変換。`"?": ["？", "?"]`・`"!": ["！", "!"]`・`"/": ["・", "／", "/"]`・`".": ["。", "．", "…"]`・`",": ["、", "，"]` 等、記号全般に対応）。`sentenceTerminators`（`["。", "！", "？"]`）確定時に `committedHistory.removeAll()` を呼び、文をまたいだ n-gram 学習を防止する（Enter キー空確定時は別途 `removeAll()`）。**句読点（`readingPunctuations`）確定時は `recordPrefixes` をスキップし** `pushCommitted` でも `committedHistory` に追加しない（句読点が next-word 予測を汚すのを防ぐ）
 - `TextInputClient` = `insertText` / `setMarkedText` を抽象化するプロトコル（テストでは `MockTextClient`、本番では IMK クライアントをラップ）
 - `CompositionState` = 未確定文字列の状態（composedHiragana + pendingRomaji）、ローマ字→ひらがな変換を内包。`hiddenPendingN` フラグで "nn" → "ん" 後の pending "n" を不可視化（標準 IME 準拠）。Backspace 時は "ん" + hidden n をまとめて1操作で削除する
   - `SegmentState`（`segmentState`）を持ち `isSegmentMode` が true の間はセグメント調整モード。Space 押下時に AzooKey の変換結果をセグメント分割して遷移
@@ -26,33 +26,6 @@ CLAUDE.md の「コンポーネント構成」の詳細リファレンス。
 変換エンジンは `AzooKeyKanaKanjiConverter`（`Core/Package.swift` の依存）の組み込み辞書を使用。SQLite は変換履歴のみ管理する。
 カタカナ候補は `hiraganaToKatakana` で自動生成し、変換候補の先頭（履歴より後）に差し込む。
 `KanaUtils` = ひらがな↔カタカナ変換ユーティリティ（`hiraganaToKatakana` / `hiraganaToHankakuKatakana` / `toZenkakuAscii`）。F7–F9 変換確定とカタカナ候補生成で使用。
-`NotificationNames` = `KeynacoCore` 公開の通知名定義（`Core/Sources/Core/NotificationNames.swift`）。
-
-## Successor モード
-
-組成なし・ASCII モードでない状態で ASCII 英字キーを入力した瞬間、`leftSideContext` 末尾の名詞らしい語（漢字・カタカナ連続スパン）または `lastCommittedOutput` を prev として後続語候補を表示する。`isSuccessorMode` 等の事前フラグは持たず、`candidate.isVisible && composedHiragana.isEmpty` で候補選択中のキー処理を分岐する。
-
-**候補の優先順位**（読み前方一致で絞ったうえで）：
-
-1. content-bigram（prev 語との共起実績。名詞・固有名詞・動詞が prev になりうる。動詞 prev は `LLMPOSClassifier` 応答 `verb:confidence:lemma` の基本形。lemma 未取得時は `NLTagger` → 表層の順でフォールバック）
-2. 変換履歴（`fetchHistoryPrefix` 読み前方一致）
-
-**トリガー条件**:
-
-- 組成が空（`composedHiragana` および `pendingRomaji` が空）
-- ASCII モードでない
-- 入力キーが `romajiToInitialKana` に含まれる ASCII 英字 1 文字
-- DB クエリで候補が 1 件以上
-
-**キー処理**:
-
-- 候補表示中（組成空）は Space/Enter で確定、`↑↓` で選択、Escape/Backspace/→ でキャンセル
-- 2 打目が不一致のとき 1 打目を通常入力に流してから 2 打目を処理（`pendingRomaji` バッファ）
-- 確定後は連鎖しない（次打鍵で再度 `trySuccessorCandidates` を評価）
-- カーソルが文末でない（文中挿入）場合は候補を表示しない（`InputController.applyPostKeyDownEffects`）
-- 候補選択中は marked text に実テキストを設定する（Electron 対策）
-- 最大候補数: `successorMaxCandidates = 5`（`LearningThresholds`）
-
 ## 候補表示の優先順位
 
 `buildCandidateList()` が組み立てる候補リスト（上が高優先）:

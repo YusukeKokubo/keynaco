@@ -10,7 +10,6 @@
 | **候補選択中** | 組成中 + `isExplicitlySelected = true`（↑↓ 操作済み）|
 | **括弧モード** | `bracketCandidates != nil`（組成空で `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを入力） |
 | **セグメントモード** | `isSegmentMode = true` |
-| **Successor 候補表示中** | `candidate.isVisible && composedHiragana.isEmpty` |
 
 ---
 
@@ -49,12 +48,6 @@ stateDiagram-v2
     セグメントモード --> 待機 : Enter（確定）
     セグメントモード --> 組成中 : Escape（組成に戻す）
 
-    待機 --> Successorモード : 確定直後にカーソルが文末 かつ isNounLike（1 打目待ち）
-    Successorモード --> Successorモード : 1 打目で候補表示
-    Successorモード --> 待機 : 候補確定後に次候補なし
-    Successorモード --> 待機 : →（キャンセル）
-    Successorモード --> 待機 : Escape
-    Successorモード --> 待機 : Enter（候補なし）
 ```
 
 ---
@@ -119,26 +112,6 @@ stateDiagram-v2
 
 *Tests: `Tests/InputHandlerSegmentTests.swift`*
 
-### Successor 候補表示中
-
-| キー | 動作 |
-|------|------|
-| Space / Enter | 選択候補を確定（`confirmSuccessor`）→ 待機 |
-| ↑↓ / Tab | 候補を移動 |
-| ローマ字 2 文字目以降 | バッファを伸ばし、仮名確定時に候補を絞り込み（`.replaceCandidates`）。未確定音節は候補維持。無効ローマ字・候補ゼロ時のみ通常組成へ |
-| → / Escape / Backspace | 候補解除 → 待機 |
-
-組成空で ASCII 英字 1 文字入力時、`trySuccessorCandidates` が候補を返せばこの状態に入る（確定直後の `successorEligible`、または `leftSideContext` 末尾の名詞文脈）。
-
-*Tests: `Core/Sources/CoreTests/InputHandlerSuccessorTests.swift`*
-
----
-
 ## 補足
 
-- **Successor の再帰防止**: 格助詞チェックは廃止。候補が空なら自然に `.dismiss` になるため、無限ループは起きない
-- **Successor の文中挿入抑制**: カーソルが文末でない場合、`InputController.applyPostKeyDownEffects` が Successor 候補の `.show` を抑制する
-- **候補取得**: `extractNounFromContext(leftSideContext)` または確定直後の `lastCommittedOutput`（`successorEligible`）を prev に noun-bigram + `fetchHistoryPrefix` を照会
-- **確定直後 Backspace**: `penalizeAll` と同時に `successorEligible` をクリア（訂正意図の次打鍵で Successor を出さない）
-- **Electron 対策**: Successor 候補選択中は `setMarkedText` に実テキストを渡す（空文字だと Enter がアプリ側に奪われる）
 - **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
