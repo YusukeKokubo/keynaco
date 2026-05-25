@@ -106,6 +106,8 @@ public struct InputHandler {
     /// Zenzai がプロモートした候補の行インデックス。文脈なし・Zenzai 無効時は `nil`。
     public var lastZenzaiRow: Int? = nil
     public var committedHistory: [String] = []
+    /// Zenzai 左文脈用のセッションバッファ（上限 50 字・文末でリセットしない）。
+    public var sessionTextBuffer: String = ""
     /// `pushCommitted` で文末記号により `committedHistory` を消した直後に立て、`InputController` が IMK 文脈キャッシュを捨てる。
     public var documentSurroundingContextInvalidated = false
     public var lastCommittedOutput: String? {
@@ -121,6 +123,14 @@ public struct InputHandler {
         if InputHandler.readingPunctuations.contains(text) { return }
         committedHistory.append(text)
         if committedHistory.count > 5 { committedHistory.removeFirst() }
+    }
+
+    public mutating func appendToSessionBuffer(_ text: String) {
+        guard !InputHandler.readingPunctuations.contains(text) else { return }
+        sessionTextBuffer += text
+        if sessionTextBuffer.count > 50 {
+            sessionTextBuffer = String(sessionTextBuffer.suffix(50))
+        }
     }
 
     public let db: DatabaseManager
@@ -232,6 +242,7 @@ public struct InputHandler {
             fullReading: fullReading
         )
         pushCommitted(text)
+        appendToSessionBuffer(text)
         client.insertText(text)
         state = CompositionState()
     }
@@ -336,6 +347,7 @@ extension InputHandler {
         if keyCode == KeyCode.escape { InputHandler.isAsciiMode = false; return (true, .none) }
         if keyCode == KeyCode.enter {
             committedHistory.removeAll()
+            sessionTextBuffer = ""
             documentSurroundingContextInvalidated = true
             return (false, .none)
         }
@@ -364,6 +376,7 @@ extension InputHandler {
         case KeyCode.enter:
             guard !state.composingText.isEmpty else {
                 committedHistory.removeAll()
+                sessionTextBuffer = ""
                 documentSurroundingContextInvalidated = true
                 return (false, .none)
             }

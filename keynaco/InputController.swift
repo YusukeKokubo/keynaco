@@ -104,6 +104,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         MainActor.assumeIsolated {
             ic.handler.state = CompositionState()
             ic.handler.committedHistory = []
+            ic.handler.sessionTextBuffer = ""
             ic.cachedSurroundingContext = nil
             ic.handler.leftSideContext = ""
             ic.handler.ignoreNextModeSwitch = true
