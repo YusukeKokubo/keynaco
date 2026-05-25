@@ -3,12 +3,7 @@ import SQLite3
 
 extension DatabaseManager {
     static let defaultHiraganaPreferredWords: [String] = [
-        "が", "を", "に", "で", "へ", "と", "から", "まで", "より", "の", "は", "も",
-        "けど", "けれど", "ので", "ながら", "でも", "ても",
-        "そして", "しかし", "また", "ただ", "では",
-        "これ", "それ", "あれ", "ここ", "そこ", "あそこ",
-        "ちょっと", "とか", "とりあえず", "なんか",
-        "だけ", "など",
+        "ちょっと", "とりあえず",
     ]
 
     public func fetchHiraganaPreferredSet() -> Set<String> {

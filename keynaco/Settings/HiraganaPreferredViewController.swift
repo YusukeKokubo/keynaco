@@ -6,7 +6,23 @@ final class HiraganaPreferredViewController: NSViewController {
     private let tableView = DeletableTableView()
     private let deleteButton = NSButton(title: "選択を削除", target: nil, action: nil)
     private let wordField = NSTextField()
-    private var data: [String] = []
+    private var userData: [String] = []
+
+    private enum RowItem {
+        case header(String)
+        case builtin(word: String, category: String)
+        case user(String)
+    }
+    private var rows: [RowItem] = []
+
+    private func buildRows() {
+        let builtins = POSCommitSequencer.stopWords
+            .sorted { $0.key < $1.key }
+        rows = [.header("ユーザー追加語")]
+            + userData.map { .user($0) }
+            + [.header("組み込み固定語")]
+            + builtins.map { .builtin(word: $0.key, category: $0.value) }
+    }
 
     override func loadView() {
         view = NSView()
@@ -19,11 +35,19 @@ final class HiraganaPreferredViewController: NSViewController {
 
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("word"))
-        col.title = "語彙"
-        col.width = 300
-        col.minWidth = 40
-        tableView.addTableColumn(col)
+
+        let wordCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("word"))
+        wordCol.title = "語彙"
+        wordCol.width = 160
+        wordCol.minWidth = 40
+        tableView.addTableColumn(wordCol)
+
+        let categoryCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("category"))
+        categoryCol.title = "分類"
+        categoryCol.width = 120
+        categoryCol.minWidth = 40
+        tableView.addTableColumn(categoryCol)
+
         tableView.delegate = self
         tableView.dataSource = self
         tableView.onDeleteSelected = { [weak self] in self?.deleteSelected() }
@@ -126,7 +150,8 @@ final class HiraganaPreferredViewController: NSViewController {
     }
 
     @objc private func reload() {
-        data = DatabaseManager.shared.fetchAllHiraganaPreferred()
+        userData = DatabaseManager.shared.fetchAllHiraganaPreferred()
+        buildRows()
         tableView.reloadData()
         deleteButton.isEnabled = false
     }
@@ -153,12 +178,9 @@ final class HiraganaPreferredViewController: NSViewController {
 
     @objc private func deleteSelected() {
         let row = tableView.selectedRow
-        guard row >= 0 else { return }
-        let word = data[row]
+        guard row >= 0, case .user(let word) = rows[row] else { return }
         DatabaseManager.shared.deleteHiraganaPreferred(word: word)
-        data.remove(at: row)
-        tableView.removeRows(at: IndexSet(integer: row), withAnimation: .effectFade)
-        deleteButton.isEnabled = tableView.selectedRow >= 0
+        reload()
         NotificationCenter.default.post(name: .keynacoHiraganaPreferredDidChange, object: nil)
     }
 
@@ -181,22 +203,55 @@ final class HiraganaPreferredViewController: NSViewController {
 }
 
 extension HiraganaPreferredViewController: NSTableViewDataSource {
-    func numberOfRows(in tableView: NSTableView) -> Int { data.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 }
 
 extension HiraganaPreferredViewController: NSTableViewDelegate {
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
+        if case .header = rows[row] { return true }
+        return false
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        switch rows[row] {
+        case .header, .builtin: return false
+        case .user: return true
+        }
+    }
+
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard tableColumn?.identifier.rawValue == "word" else { return nil }
-        let tf = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("word"), owner: nil) as? NSTextField ?? {
+        let id = tableColumn?.identifier.rawValue
+        switch rows[row] {
+        case .header(let title):
+            return NSTextField(labelWithString: title)
+        case .builtin(let word, let category):
+            let text = id == "word" ? word : id == "category" ? category : ""
+            let tf = makeCell(id: id ?? "", text: text)
+            tf.textColor = .secondaryLabelColor
+            return tf
+        case .user(let word):
+            let text = id == "word" ? word : ""
+            return makeCell(id: id ?? "", text: text)
+        }
+    }
+
+    private func makeCell(id: String, text: String) -> NSTextField {
+        let tf = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(id), owner: nil) as? NSTextField ?? {
             let f = NSTextField(labelWithString: "")
-            f.identifier = NSUserInterfaceItemIdentifier("word")
+            f.identifier = NSUserInterfaceItemIdentifier(id)
             return f
         }()
-        tf.stringValue = data[row]
+        tf.stringValue = text
+        tf.textColor = .labelColor
         return tf
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
-        deleteButton.isEnabled = tableView.selectedRow >= 0
+        let row = tableView.selectedRow
+        guard row >= 0, case .user = rows[row] else {
+            deleteButton.isEnabled = false
+            return
+        }
+        deleteButton.isEnabled = true
     }
 }
