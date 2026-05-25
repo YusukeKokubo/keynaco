@@ -4,6 +4,24 @@
 
 ---
 
+## G-1 Zenzai 制御パラメーター（topic / style / preference）の UI 公開（2026-05-24）
+
+**概要**: zenz-v3 の制御トークン `topic`・`style`・`preference` を設定 UI に追加し、ユーザーが文書の話題・文体・好みを手動設定できるようにした。また `DatabaseManager.recentProperNouns(limit:)` で history.db の固有名詞を自動推論して `topic` に補完する PoC も実施した。
+
+**試みたこと**: `ZenzaiViewController` に topic/style/preference の入力フィールドを追加。`ZenzaiSettings.makeConverter()` でこれらを制御トークンとして AzooKey API に渡す実装。topic 自動推論は `pos IN ('proper_noun/place', 'proper_noun/person', 'proper_noun/org')` かつ `pos_retry=0` のエントリを上位 5 件取得してカンマ区切りで渡す方式（詳細は `plans/POC260524.md`）。
+
+**不採用の理由**:
+
+- **leftSideContext が支配的**: 同音異義語の disambiguation は `leftSideContext` だけで十分に機能する（`すいふと` + 技術文脈 → SWIFT プロモート、`じゃば` + 蛇文脈 → 蛇場/蛇ば など）。topic の追加効果を単独で確認できなかった
+- **zenz-v3.1-small では topic が無効**: `topic="Swift,GitHub,Xcode,Apple"` および `topic="IT,プログラミング,技術"` を設定しても、全テストケースで topic 空と差異なし。fixedEnd も変化しなかった（POC260524.md シミュレーション実測）
+- **topic 自動推論はノイズが多い**: `LLMPOSClassifier` の誤分類率が高く、直近固有名詞の上位が common noun（`入力`・`固有名詞`）や助詞付き語彙（`情報が`）で占められる。有害なバイアスになる可能性がある
+
+**判断**: UI から topic/style/preference を削除し `profile` のみ残す。自動推論コード（`recentProperNouns`）は現状維持するが ROI を投じない。将来の zenz-v3 上位モデルで再評価する。
+
+> 関連: [POC260524](../plans/POC260524.md)
+
+---
+
 ## F-1 Successor モード（後続語サジェスト）（2026-05-25）
 
 **概要**: 組成なし・ASCII モードでない状態で ASCII 英字 1 文字を入力した瞬間、直前確定語（または `leftSideContext` 末尾の名詞）を prev として content-bigram + 変換履歴を照会し、後続語候補を表示するモード。確定後さらにローマ字を打つことで仮名プレフィックスで候補を絞り込む。
