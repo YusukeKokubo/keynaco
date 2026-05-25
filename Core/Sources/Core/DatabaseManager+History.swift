@@ -56,6 +56,18 @@ extension DatabaseManager {
         }
     }
 
+    /// `output` がすでに分類済みなら pos を返す。未分類または未登録なら nil。
+    public func posForOutput(_ output: String) -> String? {
+        dbQueue.sync {
+            let sql = "SELECT pos FROM history WHERE output = ? AND pos IS NOT NULL LIMIT 1"
+            guard let stmt = self.cachedStmt(for: sql) else { return nil }
+            self.bindText(stmt, 1, output)
+            defer { sqlite3_reset(stmt) }
+            guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+            return sqlite3_column_text(stmt, 0).map { String(cString: $0) }
+        }
+    }
+
     /// `output` に対応する全履歴行の pos を更新する。
     public func updatePOS(output: String, pos: String) {
         dispatchWrite {
