@@ -146,6 +146,14 @@ public final class LLMPOSClassifier {
             確認 → noun:high
             設定 → noun:high
             管理 → noun:high
+            申請 → noun:high
+            担当者 → noun:high
+            取引先 → noun:high
+            情報 → noun:high
+            追加 → noun:high
+            変更 → noun:high
+            チーム → noun:high
+            データ → noun:high
             行った → verb:high:行く
             設定した → verb:high:設定する
             確認して → verb:high:確認する
@@ -195,6 +203,15 @@ public final class LLMPOSClassifier {
         return true
     }
 
+    /// 全文字がカタカナの 2 字以上の語（外来語名詞候補）。
+    static nonisolated func isLikelyKatakanaNoun(_ output: String) -> Bool {
+        guard output.count >= 2 else { return false }
+        for scalar in output.unicodeScalars {
+            guard (0x30A0...0x30FF).contains(scalar.value) else { return false }
+        }
+        return true
+    }
+
     /// 前文脈を渡すと verb に倒されやすいサ変名詞。context 省略判定用。
     static nonisolated func shouldOmitClassificationContext(_ output: String) -> Bool {
         suruNounContextOmitWords.contains(output)
@@ -203,19 +220,27 @@ public final class LLMPOSClassifier {
     private static nonisolated let suruNounContextOmitWords: Set<String> = [
         "実装", "入力", "変換", "確認", "設定", "管理", "作成", "削除", "更新", "追加",
         "実行", "保存", "検索", "表示", "登録", "修正", "反映", "取得", "送信", "受信",
+        "申請", "承認", "却下", "同期", "連携", "共有", "集計", "分析", "移行", "導入",
     ]
 
-    /// LLM が verb と返したサ変名詞語幹を noun に昇格する。
+    /// LLM が verb または other と返したサ変名詞語幹・カタカナ語を noun に昇格する。
     static nonisolated func applySuruNounHeuristic(
         output: String,
         pos: String,
         posTag: String,
         posRetry: Bool
     ) -> (pos: String, posTag: String, posRetry: Bool) {
-        guard pos == "verb", isLikelySuruNounStem(output) else {
+        switch pos {
+        case "verb":
+            guard isLikelySuruNounStem(output) else { return (pos, posTag, posRetry) }
+            return ("noun", "noun:mid", false)
+        case "other":
+            if isLikelySuruNounStem(output) { return ("noun", "noun:mid", false) }
+            if isLikelyKatakanaNoun(output)  { return ("noun", "noun:mid", false) }
+            return (pos, posTag, posRetry)
+        default:
             return (pos, posTag, posRetry)
         }
-        return ("noun", "noun:mid", false)
     }
 
     private static nonisolated let knownTagPrefixes = [

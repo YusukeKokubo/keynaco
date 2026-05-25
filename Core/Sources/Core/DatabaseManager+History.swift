@@ -45,7 +45,7 @@ extension DatabaseManager {
             return self.queryOutputScorePairsOnQueue("""
             SELECT output, SUM((\(Self.recencyExpr))) AS s FROM history
             WHERE input LIKE ?
-              AND (pos IS NULL OR pos = 'noun' OR pos LIKE 'proper_noun%')
+              AND (pos IS NULL OR pos NOT IN ('other/conjunction', 'other/interjection'))
             GROUP BY output
             ORDER BY s DESC, MAX(used_at) DESC
             LIMIT 20
