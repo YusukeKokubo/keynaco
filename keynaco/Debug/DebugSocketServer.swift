@@ -1058,7 +1058,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "pendingRomaji":      snap.pendingRomaji,
             "composingText":      snap.composingText,
             "isAsciiMode":        snap.isAsciiMode,
-            "isSuccessorCandidateActive": snap.successorCandidateActive,
             "isSegmentMode":      snap.isSegmentMode,
             "isBracketMode":      snap.isBracketMode,
             "isExplicitlySelected": snap.isExplicitlySelected,

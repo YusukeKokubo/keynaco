@@ -281,14 +281,12 @@ public struct RomajiConverter {
         return result
     }
 
-    /// ローマ字列を副作用なしで仮名に解決する（Successor 絞り込み用）。
     /// - Returns: `convertedKana` は確定済みひらがな、`remaining` は未確定ローマ字
     public static func resolveRomajiPrefix(_ romaji: String) -> (convertedKana: String, remaining: String) {
         let result = convert(romaji)
         return (result.converted, result.pending)
     }
 
-    /// 指定のローマ字文字列がテーブルの prefix として有効か（Successor 多打フィルタ用）。
     public static func isValidRomajiPrefix(_ romaji: String) -> Bool {
         romaji.isEmpty || prefixes.contains(romaji.lowercased())
     }

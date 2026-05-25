@@ -61,12 +61,4 @@ extension InputController {
         }
     }
 
-    /// IMK の `handle` / `activateServer` は nonisolated のため、通知だけ static で送る（MainActor の `self` を捕らない）。
-    nonisolated static func postSuccessorPendingNotification(pending: Bool) {
-        NotificationCenter.default.post(
-            name: .keynacoSuccessorPendingChanged,
-            object: nil,
-            userInfo: ["pending": pending]
-        )
-    }
 }

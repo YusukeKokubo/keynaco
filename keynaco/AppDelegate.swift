@@ -9,9 +9,6 @@ nonisolated(unsafe) var gServer: IMKServer?
 class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
-    private var successorPendingObserver: NSObjectProtocol?
-
-    private var successorPending = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
@@ -67,15 +64,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem?.button?.title = "⌨"
 
-        successorPendingObserver = NotificationCenter.default.addObserver(
-            forName: .keynacoSuccessorPendingChanged,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            let pending = (note.userInfo?["pending"] as? Bool) ?? false
-            MainActor.assumeIsolated { self?.applySuccessorPending(pending: pending) }
-        }
-
         let menu = NSMenu()
         menu.autoenablesItems = false
 
@@ -98,22 +86,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         statusItem?.button?.target = self
         statusItem?.button?.action = #selector(statusBarButtonClicked(_:))
         statusItem?.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
-    }
-
-    private func applySuccessorPending(pending: Bool) {
-        successorPending = pending
-        updateStatusItemTitle()
-    }
-
-    private func updateStatusItemTitle() {
-        guard let button = statusItem?.button else { return }
-        if successorPending {
-            button.title = "⌨…"
-            button.contentTintColor = nil
-        } else {
-            button.title = "⌨"
-            button.contentTintColor = nil
-        }
     }
 
     @objc private func statusBarButtonClicked(_ sender: Any?) {

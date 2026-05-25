@@ -97,49 +97,6 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         XCTAssertEqual(client.inserted, ["tOKyo"])
     }
 
-    /// セッション内 `committedHistory` / `leftSideContext` から Successor が起動する
-    func testCommittedHistory_successorFromSession() {
-        var h = handler!
-        h.committedHistory = ["東京"]
-        h.successorEligible = true
-        h.db.recordContentBigram(prev: "東京", input: "に", output: "に")
-        h.db.recordContentBigram(prev: "東京", input: "に", output: "に")
-        let result = h.handle(
-            keyCode: 0, characters: "n", baseCharacters: "n",
-            modifiers: [], candidate: .hidden, client: client!
-        )
-        guard case .show(let candidates, _, _, _, _) = result.candidateAction else {
-            XCTFail("committedHistory から prev を取って候補表示: \(result.candidateAction)"); return
-        }
-        XCTAssertTrue(candidates.contains("に"))
-    }
-
-    /// Successor 1 打目: 長い bi-gram を助詞境界で prefix 展開する（PLAN260520b）
-    func testSuccessorPrefixSplit_longBigramOnFirstKey() {
-        recordFetchableContentBigram(
-            prev: "東京",
-            input: "かいぎにしゅっせきする",
-            output: "会議に出席する"
-        )
-        typeRomaji("tokyo")
-        press(
-            keyCode: KeyCode.enter,
-            candidateVisible: true,
-            selectedRow: 0,
-            selectedText: "東京"
-        )
-        let showResult = type(chars: "k", base: "k")
-        guard case .show(let candidates, _, _, _, _) = showResult.candidateAction else {
-            XCTFail("1 打目で .show: \(showResult.candidateAction)")
-            return
-        }
-        XCTAssertEqual(
-            candidates,
-            ["会議に出席する"],
-            "長い後続語は DB 再クエリ結果をそのまま表示（prefix 展開なし）"
-        )
-    }
-
     func testS02_trace_ka_down_down_right_confirms_hiragana() {
         typeRomaji("ka")
         _ = press(keyCode: KeyCode.downArrow, candidateVisible: true)

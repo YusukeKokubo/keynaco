@@ -132,21 +132,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             #if DEBUG
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
             #endif
-            // 文中挿入時（カーソルが末尾でない）は Successor 候補を表示しない
-            let isSuccessorShow = composingWasEmpty && !handler.isBracketMode && handler.state.composedHiragana.isEmpty
-            if isSuccessorShow,
-               let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding),
-               !ctx.after.isEmpty {
-                candidateWindow.dismiss()
-                break
-            }
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
-            if isSuccessorShow {
-                // Successor 候補表示時は選択候補を marked text に設定する。
-                // 空文字ではなく実際のテキストを持つことで Electron 系アプリが Enter を IME に転送するようになる。
-                let markedText = candidates.isEmpty ? "" : candidates[min(initialRow, candidates.count - 1)]
-                adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
-            }
         case .dismiss:
             candidateWindow.dismiss()
         case .selectNext:
@@ -182,11 +168,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             EventViewerWindow.shared.addCandidates(candidates, selectedIndex: 0)
             #endif
             candidateWindow.replaceCandidates(candidates)
-            let isSuccessorReplace = composingWasEmpty && !handler.isBracketMode && handler.state.composedHiragana.isEmpty
-            if isSuccessorReplace, !candidates.isEmpty {
-                let markedText = candidates[0]
-                adapter.setMarkedText(markedText, selectionRange: NSRange(location: markedText.count, length: 0))
-            }
         }
 
         if handler.documentSurroundingContextInvalidated {

@@ -74,7 +74,6 @@ public enum KeyCode {
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
 ///
 /// 機能ごとの実装は extension で別ファイルに分散している：
-/// - `InputHandler+SuccessorMode.swift`：後続語サジェストと 1 打目の保留マージ
 /// - `InputHandler+SegmentMode.swift`  ：文節分割と境界調整
 /// - `InputHandler+Candidates.swift`   ：候補リスト構築・候補表示中・通常入力
 public struct InputHandler {
@@ -91,10 +90,6 @@ public struct InputHandler {
 
     public var state = CompositionState()
     public var ignoreNextModeSwitch = false
-    /// Successor モード中の蓄積ローマ字バッファ（nil = モード外）
-    var successorBufferedRomaji: String? = nil
-    /// 直前の確定後、次の 1 打目だけ Successor 候補を試す（`leftSideContext` なし時のフォールバック）
-    var successorEligible = false
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }
     public var lastConfirmedContext: LastConfirmedContext? = nil
@@ -152,11 +147,6 @@ public struct InputHandler {
         let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
         clearLastConfirmedContextUnlessBackspace(isBackspace: isBackspace)
 
-        if isSuccessorCandidateSession(candidate) {
-            return handleSuccessorCandidateKey(
-                keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-                modifiers: modifiers, candidate: candidate, client: client)
-        }
         if isBracketMode {
             return handleBracketModeKey(
                 keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
@@ -244,9 +234,6 @@ public struct InputHandler {
             fullReading: fullReading
         )
         pushCommitted(text)
-        if !isPunctuation && !skipHistory {
-            successorEligible = true
-        }
         client.insertText(text)
         state = CompositionState()
     }
@@ -294,7 +281,6 @@ public struct InputHandler {
                 fullReading: ctx.fullReading
             )
             lastConfirmedContext = nil
-            successorEligible = false
         }
         guard handled else { return (false, .none) }
         let action: CandidateAction = needsRefresh ? buildCandidateList() : .dismiss
@@ -303,7 +289,6 @@ public struct InputHandler {
     }
 
     public mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
-        successorEligible = false
         guard state.reset() else { return (false, .none) }
         applyMarkedText(candidateText: nil, client: client)
         return (true, .dismiss)
@@ -315,10 +300,6 @@ public struct InputHandler {
 extension InputHandler {
     private mutating func clearLastConfirmedContextUnlessBackspace(isBackspace: Bool) {
         if !isBackspace { lastConfirmedContext = nil }
-    }
-
-    private func isSuccessorCandidateSession(_ candidate: CandidateContext) -> Bool {
-        candidate.isVisible && state.composedHiragana.isEmpty && !isBracketMode && !state.isSegmentMode
     }
 
     private mutating func handleFunctionKeyIfNeeded(

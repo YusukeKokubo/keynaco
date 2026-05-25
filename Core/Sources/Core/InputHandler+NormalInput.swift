@@ -42,25 +42,6 @@ public extension InputHandler {
         let base = baseCharacters ?? chars
         let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
 
-        if state.composedHiragana.isEmpty, state.pendingRomaji.isEmpty, successorBufferedRomaji == nil,
-           !isNonAscii, modifiers.intersection([.shift]).isEmpty {
-            let romajiKey = base.lowercased()
-            if successorEligible || Self.extractNounFromContext(leftSideContext) != nil {
-                if let candidates = trySuccessorCandidates(romajiChar: romajiKey) {
-                    successorEligible = false
-                    successorBufferedRomaji = romajiKey
-                    let marked = candidates[0]
-                    client.setMarkedText(marked, selectionRange: NSRange(location: marked.count, length: 0))
-                    return (true, .show(
-                        candidates: candidates, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0
-                    ))
-                }
-            }
-            if successorEligible {
-                successorEligible = false
-            }
-        }
-
         if let r = handleZSequence(base: base, client: client) { return r }
         if let r = handleBracketChar(chars: chars, base: base, modifiers: modifiers, client: client) { return r }
         if let r = handleShiftChar(chars: chars, isNonAscii: isNonAscii, modifiers: modifiers,
