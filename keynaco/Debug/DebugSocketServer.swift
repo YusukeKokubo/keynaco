@@ -25,6 +25,7 @@ final class DebugSocketServer: @unchecked Sendable {
     var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
     /// 本番 InputController の POS キューと競合しないよう Debug 専用インスタンスを使う。
     let posClassifier = LLMPOSClassifier()
+    let posClassifierV2 = DebugPOSClassifierV2()
     let mockClient = SocketMockClient()
     var candidateWindow = DebugCandidateWindow()
 
@@ -109,8 +110,16 @@ final class DebugSocketServer: @unchecked Sendable {
                 guard !lineData.isEmpty else { continue }
 
                 // Data（Sendable）を MainActor に渡し、String（Sendable）を受け取る
-                let responseJSON = await MainActor.run { [self] in
-                    self.processAndSerialize(lineData)
+                // 非同期コマンド（poc_classify_v2 等）は async パスで処理する
+                let isAsync = (try? JSONSerialization.jsonObject(with: lineData) as? [String: Any])
+                    .map { $0["poc_classify_v2"] != nil || $0["poc_generable_smoke"] != nil || $0["poc_tool_calling"] != nil } ?? false
+                let responseJSON: String
+                if isAsync {
+                    responseJSON = await self.processAndSerializeAsync(lineData)
+                } else {
+                    responseJSON = await MainActor.run { [self] in
+                        self.processAndSerialize(lineData)
+                    }
                 }
 
                 await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
@@ -126,6 +135,22 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     // MARK: - コマンド処理（MainActor 上で実行）
+
+    /// 非同期コマンド（LLM を待つ系）用の async パス。
+    func processAndSerializeAsync(_ lineData: Data) async -> String {
+        let cmd = (try? JSONSerialization.jsonObject(with: lineData) as? [String: Any]) ?? [:]
+        let dict = Self.withProtocolMetadata(await processCommandAsync(cmd))
+        guard let data = try? JSONSerialization.data(withJSONObject: dict),
+              let str = String(data: data, encoding: .utf8) else { return #"{"error":"serialization"}"# }
+        return str
+    }
+
+    func processCommandAsync(_ cmd: [String: Any]) async -> [String: Any] {
+        if cmd["poc_classify_v2"] != nil { return await handlePocClassifyV2(cmd: cmd) }
+        if cmd["poc_generable_smoke"] != nil { return await handlePocGenerableSmoke(cmd: cmd) }
+        if cmd["poc_tool_calling"] != nil { return await handlePocToolCalling(cmd: cmd) }
+        return ["error": "unknown async command"]
+    }
 
     private func processAndSerialize(_ lineData: Data) -> String {
         let cmd = (try? JSONSerialization.jsonObject(with: lineData) as? [String: Any]) ?? [:]

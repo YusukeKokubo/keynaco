@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C24D0073941540F51238C4 /* DebugSocketServer.swift */; };
 		D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */; };
+		A1B2C3D4E5F6071829ABCD01 /* DebugPOSClassifierV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */; };
 		D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */; };
 		D0A1B2C3D4E5F60718293A05 /* SocketMockClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */; };
 		D0A1B2C3D4E5F60718293A07 /* DebugCandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */; };
@@ -68,6 +69,7 @@
 		443A77590841CE5845242FCF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		65C24D0073941540F51238C4 /* DebugSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSocketServer.swift; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+Commands.swift"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugPOSClassifierV2.swift; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+Snapshot.swift"; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketMockClient.swift; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugCandidateWindow.swift; sourceTree = "<group>"; };
@@ -211,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */,
+				A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */,
 				D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */,
 				D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */,
 				65C24D0073941540F51238C4 /* DebugSocketServer.swift */,
@@ -340,6 +343,7 @@
 				57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */,
 					8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
 				1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */,
+				A1B2C3D4E5F6071829ABCD01 /* DebugPOSClassifierV2.swift in Sources */,
 				D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */,
 				D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */,
 				D0A1B2C3D4E5F60718293A07 /* DebugCandidateWindow.swift in Sources */,
