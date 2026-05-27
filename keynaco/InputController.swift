@@ -111,6 +111,7 @@ class InputController: IMKInputController, @unchecked Sendable {
     }
 
     override func deactivateServer(_ sender: Any!) {
+        handler.flushDiaryBuffer()
         commitComposition(sender)
         super.deactivateServer(sender)
     }

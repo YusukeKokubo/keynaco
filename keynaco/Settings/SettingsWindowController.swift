@@ -33,11 +33,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let syncVC = SyncViewController()
         let syncItem = NSTabViewItem(viewController: syncVC)
         syncItem.label = "同期"
+        let diaryVC = DiaryViewController()
+        let diaryItem = NSTabViewItem(viewController: diaryVC)
+        diaryItem.label = "日記"
         tabVC.addTabViewItem(userDictItem)
         tabVC.addTabViewItem(hiraganaPreferredItem)
         tabVC.addTabViewItem(historyItem)
         tabVC.addTabViewItem(zenzaiItem)
         tabVC.addTabViewItem(syncItem)
+        tabVC.addTabViewItem(diaryItem)
 
         window.contentViewController = tabVC
         super.init(window: window)

@@ -135,7 +135,7 @@ extension DatabaseManager {
     }
 
     /// LIMIT 句の有無で SQL が変わるため stmt キャッシュを使わない。
-    private func prepareUncachedStmt(_ sql: String) -> OpaquePointer? {
+    func prepareUncachedStmt(_ sql: String) -> OpaquePointer? {
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         return stmt

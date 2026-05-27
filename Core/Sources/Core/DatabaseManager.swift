@@ -130,6 +130,18 @@ public final class DatabaseManager: @unchecked Sendable {
         CREATE TABLE IF NOT EXISTS hiragana_preferred (
             word TEXT NOT NULL PRIMARY KEY
         );
+        CREATE TABLE IF NOT EXISTS daily_log (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            date         TEXT    NOT NULL,
+            committed_text TEXT  NOT NULL,
+            created_at   INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_daily_log_date ON daily_log(date);
+        CREATE TABLE IF NOT EXISTS diary (
+            date         TEXT NOT NULL PRIMARY KEY,
+            content      TEXT NOT NULL,
+            generated_at INTEGER NOT NULL
+        );
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }

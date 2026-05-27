@@ -114,6 +114,8 @@ public struct InputHandler {
         committedHistory.last
     }
     public var segmentCandidateCache: [String: Segment] = [:]
+    /// 日記用バッファ: 句点（。！？）で区切られた文を蓄積し、文末でまとめて daily_log へ記録する。
+    public var diaryBuffer: String = ""
     public mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
             committedHistory.removeAll()
@@ -241,6 +243,16 @@ public struct InputHandler {
             output: text,
             fullReading: fullReading
         )
+        if !text.isEmpty {
+            if InputHandler.sentenceTerminators.contains(text) {
+                if !diaryBuffer.isEmpty {
+                    db.recordDailyLog(output: diaryBuffer + text)
+                    diaryBuffer = ""
+                }
+            } else {
+                diaryBuffer += text
+            }
+        }
         pushCommitted(text)
         appendToSessionBuffer(text)
         client.insertText(text)
@@ -269,6 +281,13 @@ public struct InputHandler {
         db.recordPrefixes(reading: hiragana, output: text)
         commitText(text: text, client: client)
         return true
+    }
+
+    /// アプリ切り替え時など、文末記号なしに入力が途切れた際にバッファを flush する。
+    public mutating func flushDiaryBuffer() {
+        guard !diaryBuffer.isEmpty else { return }
+        db.recordDailyLog(output: diaryBuffer)
+        diaryBuffer = ""
     }
 
     public func applyMarkedText(candidateText: String?, client: TextInputClient) {
