@@ -15,7 +15,11 @@ public struct CandidateContext: Sendable {
     public var isVisible: Bool
     public var selectedRow: Int
     public var selectedText: String?
-    /// ユーザーが ↑↓ で明示的に候補を動かしたか（初期表示のまま = false）
+    /// ユーザーが ↑↓ で明示的に候補を動かしたか（初期表示のまま = false）。
+    ///
+    /// 役割: `true` のとき、文字キー入力で選択候補をまず確定してから新しい文字を処理する。
+    /// `false` のときは文字入力しても候補を確定せず組成に追加する。
+    /// Enter は `isExplicitlySelected` に関係なく `selectedText`（現在の視覚的選択）をそのまま確定する。
     public var isExplicitlySelected: Bool
     /// 履歴セクションの末尾インデックス（これ未満の行が履歴）
     public var historyEnd: Int
@@ -81,7 +85,10 @@ public struct InputHandler {
     // 全InputControllerインスタンスで共有するモード（アプリ切替後も保持）
     public nonisolated(unsafe) static var isAsciiMode = false
 
-    /// ひらがな優先語彙セット。DB から読み込み、設定変更時に再取得する。
+    /// ひらがな優先語彙セット（DB `hiragana_preferred` テーブルから読み込み、設定変更時に再取得）。
+    ///
+    /// 役割: この集合に含まれる読みのとき、履歴スコア・予測候補の有無に関わらず
+    /// `initialRow` をひらがな行にする（`assembleCandidateList`）。
     public var hiraganaPreferredSet: Set<String> = []
     public static let sentenceTerminators: Set<String> = ["。", "！", "？"]
     /// 文脈をリセットせず、かつ N-gram・履歴にも記録しない句読点。
@@ -92,6 +99,8 @@ public struct InputHandler {
     public var ignoreNextModeSwitch = false
     public var bracketCandidates: [String]? = nil
     public var isBracketMode: Bool { bracketCandidates != nil }
+    /// 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。
+    /// 不変条件: Backspace 以外のキー入力・ペナルティ実行後は `nil`。
     public var lastConfirmedContext: LastConfirmedContext? = nil
     /// 直前の確定の読み（`commitText` 時の `finalizedText`）。
     public var lastCommittedReading: String? = nil

@@ -2,19 +2,16 @@
 
 macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
-## ドメイン知識
+## ドキュメント
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [`docs/domain/glossary.md`](docs/domain/glossary.md) | 用語定義・不変条件 |
-| [`docs/domain/states.md`](docs/domain/states.md) | 状態遷移図・状態別キー動作 |
-| [`docs/domain/scenarios.md`](docs/domain/scenarios.md) | 具体的な入力トレース例 |
+| [`docs/domain/states.md`](docs/domain/states.md) | 状態遷移図（コードから引き出せない俯瞰） |
+| [`docs/rejected.md`](docs/rejected.md) | 不採用機能の記録（同じ失敗を繰り返さないため） |
+| [`docs/principles.md`](docs/principles.md) | 設計判断の原則（個別失敗から抽出） |
 | [`docs/apple-intelligence.md`](docs/apple-intelligence.md) | FoundationModels の制約・実験結果・使いどころ |
 
-**更新ルール**: キー入力の挙動・状態遷移・候補表示ロジックに影響する変更を加えたとき、コードと同じコミットで該当箇所を更新する。
-- 用語の定義・不変条件が変わった → `glossary.md`
-- 状態遷移・キー動作が変わった → `states.md`
-- 入力トレースの具体例が変わった → `scenarios.md`
+**ドキュメント方針**: docs/ にはコードから引き出せない情報（理由・哲学・経験的失敗・俯瞰図）のみ置く。用語定義・behavior spec・入力シナリオは該当変数/関数の `///` ドキュメントコメントとテストが正本。**コード = 真実、ドキュメント = 真実から引き出せないもの限定**。
 
 ## ディレクトリ構成
 
@@ -103,13 +100,7 @@ cd Core && swift test
 
 アプリ層（`keynaco/`）が `InputMethodKit` を通じてキーイベントを受け取り、`KeynacoCore`（`Core/`）の `InputHandler` struct（Swift 6 strict concurrency）でロジックを処理。変換は AzooKey API（`AzooKeyConverter`）+ Zenzai 経由、履歴は SQLite（`DatabaseManager`）、候補ウィンドウは自作 `NSWindow`（`CandidateWindow.swift`）。
 
-- `InputController` = IMK ブリッジ（NSEvent 展開 → InputHandler 委譲）。`CandidateWindow` を所有
-- `InputHandler` = 入力ロジック本体。機能別 extension 分割（`+NormalInput` / `+Candidates` / `+DateTime` / `+Numbers` / `+SegmentMode` / `+BracketMode`）。`isAsciiMode` は `static` で全インスタンス共有（テストの `setUp` でリセット必須）
-- `CompositionState` = `composedHiragana + pendingRomaji`。`hiddenPendingN` で `nn`→`ん` 後の pending `n` を不可視化（Backspace は `ん`+hidden n をまとめて1操作で削除）
-- `AzooKeyConverter` = ひらがな→漢字変換のラッパー。`buildCandidateList` は `composedHiragana` 不変ならキャッシュ返却（LRU 50 件）
-- `DatabaseManager` = `history` / `user_dict` / `hiragana_preferred` / `daily_log` / `diary` の 5 テーブル。時間減衰スコア `count / (1 + age_days / 30)` でソート（`user_dict` のみ time-decay なし）。詳細不変条件はコード側コメント参照
-- `sessionTextBuffer` = Zenzai 左文脈バッファ（上限 50 字）。`readingPunctuations` はスキップ、`sentenceTerminators` 確定でも `committedHistory` のみクリアしバッファは維持
-- `CandidateWindow` = `NSPanel(.borderless, level: .popUpMenu)` + `NSTableView`。`IMKCandidates` は macOS 26 で不安定なため自作
+各クラス・関数・主要変数の振る舞いと不変条件は `///` ドキュメントコメントが正本（`fetchHistoryScoredMerged` の SUM 集計禁止、`recordPrefixes` のフル読みのみ記録、`isExplicitlySelected` の意味、`hiddenPendingN` の不可視化規則、`doConfirmSegments` の二重記録ルールなど）。
 
 ### 候補表示の優先順位（`buildCandidateList`）
 
@@ -117,26 +108,15 @@ cd Core && swift test
 2. ユーザー辞書（完全一致）
 3. Zenzai top-1（`isZenzaiEnabled` かつ左文脈ありのみ）
 4. 履歴（`fetchHistoryScoredMerged`: `LIKE 'reading%'` で SUM 集計、時間減衰スコア閾値以上）
-5. 数字候補（`generateNumberCandidates`）
-6. 日時候補（`generateDateTimeCandidates`）
-7. AzooKey 辞書候補（Zenzai プロモート済みは除外）
+5. 数字候補 / 日時候補
+6. AzooKey 辞書候補（Zenzai プロモート済みは除外）
 
 `fixedEnd <= row < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能（ユーザー辞書・Zenzai プロモート行は保護）。
-
-### handler フィールドのライフサイクル
-
-`InputController` が `handler.handle()` の前後でセットするフィールドは 2 種類:
-- **pre**（`handle` の前）: `leftSideContext` 等、`handle` 内から読まれる
-- **post**（`applyPostKeyDownEffects`）: `cachedSurroundingContext` 等、次キー以降のための準備
-
-判定基準: 現在のキー処理中に参照されるなら pre、次以降のキー処理 or 非同期コールバックでのみ参照されるなら post。post に置くと「1 キーストローク遅延」バグになる。
-
-組成判定の軸は `composedHiragana` ではなく `composingText`（= `composedHiragana + pendingRomaji`）。
 
 ## テスト方針
 
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
-- `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト。`docs/domain/scenarios.md` と対応
+- `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト（worked example の正本）
 - **E2E 動作確認**: 状態（Segment・Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）。sandbox で通常文字を送るには `{"type_string": "k"}` を使う（`{"key": "k"}` は特殊キーのみ有効）
 
 ## キー入力の挙動（特殊ケース）
