@@ -10,6 +10,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | [`docs/domain/states.md`](docs/domain/states.md) | 状態遷移図・状態別キー動作 |
 | [`docs/domain/scenarios.md`](docs/domain/scenarios.md) | 具体的な入力トレース例 |
 | [`docs/domain/architecture.md`](docs/domain/architecture.md) | コンポーネント詳細・候補優先順位 |
+| [`docs/apple-intelligence.md`](docs/apple-intelligence.md) | FoundationModels の制約・実験結果・使いどころ |
 
 **更新ルール**: キー入力の挙動・状態遷移・候補表示ロジックに影響する変更を加えたとき、コードと同じコミットで該当箇所を更新する。
 - 用語の定義・不変条件が変わった → `glossary.md`
