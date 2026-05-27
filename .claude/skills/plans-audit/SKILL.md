@@ -31,13 +31,18 @@ plan は書いた瞬間に時間が止まり、3 ヶ月後には「これは今�
 | Step | スクリプト | 何を見るか |
 |---|---|---|
 | 1 | `extract_status.sh` | 各 plan の status を frontmatter / legacy 記法から抽出して集計 |
-| 2 | `find_stale.sh` | draft / in-progress / unknown のまま長期間更新がない plan を検出（既定 30 日） |
-| 3 | `verify_references.sh` | `related_commit` / `related_rejected` / `superseded_by` の実在を確認 |
+| 2 | `find_stale.sh` | draft / in-progress / unknown のまま長期間更新がない plan を検出（既定 30 日、古い順にソート） |
+| 3 | `verify_references.sh` | status と frontmatter の不変条件チェック + `related_commit` / `related_rejected` / `superseded_by` の実在確認 |
 
-stale 判定の閾値を変えるには環境変数:
+共通ロジック（frontmatter パース、legacy 記法 → canonical status マッピング）は `scripts/lib.sh` に集約。新しい Step を追加する場合もこの lib を `source` する。
+
+**環境変数オプション**:
 ```bash
-PLANS_AUDIT_STALE_DAYS=90 ./scripts/audit_all.sh
+PLANS_AUDIT_STALE_DAYS=90 ./scripts/audit_all.sh         # stale 判定の閾値（既定 30 日）
+PLANS_AUDIT_FULL_LIST=1   ./scripts/audit_all.sh         # Step 1 の unknown 一覧を全件表示
 ```
+
+**Step 2 の判定基準**: `plan ファイル自体への git commit 最終日` のみを見る。機能を実装したけれど plan ファイル自体は update し忘れたケースは意図的に stale 扱いとなる（plan を maintain する責任を促す設計）。
 
 ## triage の進め方
 
@@ -45,7 +50,7 @@ PLANS_AUDIT_STALE_DAYS=90 ./scripts/audit_all.sh
 
 ### 1. status が unknown の plan（legacy）
 
-72 件以上の legacy 状態があるので **一気には片付けない**。優先順位:
+数十件規模の legacy 状態があることが多いので **一気には片付けない**。優先順位:
 
 1. **最近触った（直近 30 日以内）** unknown → frontmatter を追加して `status: in-progress` or `draft`
 2. **古い（30 日以上前）unknown** → ファイル内容を読み、以下のいずれか:
@@ -82,15 +87,23 @@ backfill は 1 回のセッションで 5-10 件ずつが現実的。
 
 ## 不変条件
 
-- `status: implemented` を付けるなら `related_commit` を必ず書く（Step 3 が検出する）
-- `status: abandoned` を付けるなら `rejected.md` にエントリを作成し `related_rejected` で結ぶ
+frontmatter の status と関連フィールドの組み合わせに対する不変条件は **すべて `verify_references.sh` で機械的に検出する**。SKILL.md と実装が drift しないよう、不変条件を追加するときは Step 3 のスクリプトも同時に拡張する:
+
+| status | 必須フィールド | 検出方法 |
+|---|---|---|
+| `implemented` | `related_commit`（git history に実在） | Step 3 |
+| `abandoned` | `related_rejected`（rejected.md にエントリ実在） | Step 3 |
+| `superseded` | `superseded_by`（plans/ に実在） | Step 3 |
+
 - スクリプトは **read-only**。書き換えは人間が判断する
+- 新しい不変条件を増やす場合は `verify_references.sh` を拡張し、この表にも追記する
 
 ## TODO（将来）
 
 - [ ] frontmatter なしの新規 plan を作成しようとした場合に警告する pre-commit hook
 - [ ] `status: abandoned` の plan が rejected.md にエントリ化されているかの逆方向チェック
 - [ ] git log と `related_commit` の妥当性確認（コミットが本当に plan の内容を実装しているか）— 現状は cat-file で存在チェックのみ
+- [ ] Step 1 で unknown を age 別に層別表示（最近 30 日 / 30-90 日 / 90+ 日）— triage 優先順位の即座把握
 
 ## 関連
 

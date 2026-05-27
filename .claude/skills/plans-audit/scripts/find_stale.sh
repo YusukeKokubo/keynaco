@@ -2,10 +2,16 @@
 # Step 2: 長期間更新されていない draft / in-progress / unknown plan を検出する。
 #
 # WHY: 「あとでやる」つもりで書かれた plan が忘れ去られて滞留する問題を可視化する。
-# git の最終更新日を基準にすることで、frontmatter が古くてもファイル自体は更新されている
-# ケース（活きてる plan）を誤検出しないようにする。
+# 終端状態（implemented / abandoned / superseded）の plan はスキップ対象。
+#
+# 判定基準は「plan ファイル自体への git commit の最終日」のみ。機能を実装したけど
+# plan ファイルを update し忘れたケースは意図的に stale 扱いになる（plan を
+# maintain する責任を促す設計）。
 
 set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 PLANS_DIR="$REPO_ROOT/plans"
@@ -22,26 +28,18 @@ fi
 NOW=$(date +%s)
 THRESHOLD_SEC=$((THRESHOLD_DAYS * 86400))
 
-stale_count=0
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
 for f in "$PLANS_DIR"/*.md; do
   [ ! -f "$f" ] && continue
   name=$(basename "$f")
 
-  # status が implemented / abandoned / superseded なら終端なのでスキップ
-  status=$(awk '
-    NR==1 && /^---$/ {in_fm=1; next}
-    in_fm && /^---$/ {exit}
-    in_fm && /^status:/ {sub(/^status:[[:space:]]*/,""); print; exit}
-  ' "$f")
-  case "$status" in
-    implemented|abandoned|superseded) continue ;;
-  esac
-
-  # markdown の状態記法も同じく
-  md_status=$(grep -E '^\*?\*?状態\*?\*?:' "$f" 2>/dev/null | head -1)
-  case "$md_status" in
-    *完了*|*実装完了*|*採用*|*失敗*|*不採用*|*破棄*|*中断*) continue ;;
-  esac
+  # 終端状態ならスキップ
+  status=$(get_plan_status "$f")
+  if is_terminal_status "$status"; then
+    continue
+  fi
 
   # git の最終更新日（ファイルが追跡されていなければファイル mtime）
   last_commit_epoch=$(git -C "$REPO_ROOT" log -1 --format=%ct -- "plans/$name" 2>/dev/null || echo "")
@@ -53,10 +51,20 @@ for f in "$PLANS_DIR"/*.md; do
   if [ "$age_sec" -ge "$THRESHOLD_SEC" ]; then
     age_days=$((age_sec / 86400))
     last_date=$(date -r "$last_commit_epoch" "+%Y-%m-%d" 2>/dev/null || echo "?")
-    echo "  $name (最終更新 $last_date / $age_days 日前)"
-    stale_count=$((stale_count + 1))
+    # age_days をプレフィックスにして後でソートできるようにする
+    printf "%06d|%s|%s\n" "$age_days" "$name" "$last_date" >> "$TMP/stale.txt"
   fi
 done
+
+stale_count=0
+if [ -f "$TMP/stale.txt" ]; then
+  stale_count=$(wc -l < "$TMP/stale.txt" | tr -d ' ')
+  # 古い順（age_days 降順）に並べる
+  sort -rn "$TMP/stale.txt" | while IFS='|' read -r age_pad name last_date; do
+    age=$((10#$age_pad))  # ゼロパディング除去
+    echo "  $name (最終更新 $last_date / $age 日前)"
+  done
+fi
 
 echo
 if [ "$stale_count" -eq 0 ]; then
