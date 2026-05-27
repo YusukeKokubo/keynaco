@@ -46,6 +46,7 @@ grep -vE '^\s*(#|$)' "$SKIP_FILE" | sed 's/[[:space:]]*$//' > "$TMP/skip.txt"
 grep -vxFf "$TMP/skip.txt" "$TMP/all-ids.txt" \
   | grep -vE '/$' \
   | grep -vE '^[0-9a-f]{7,40}$' \
+  | grep -vE '^(NS|IMK|TIS|CF|CG|CA|AV|WK|SK|MK|NW|SW)[A-Z][A-Za-z0-9]*\.' \
   > "$TMP/targets.txt" || true
 
 # 3. それぞれの識別子をコードベースに照合

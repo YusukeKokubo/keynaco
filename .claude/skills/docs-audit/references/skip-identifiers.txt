@@ -243,6 +243,16 @@ nyuuryoku
 TISCreateInputSourceList
 TISRegisterInputSource
 
+# plans-audit YAML フロントマターキー（Swift シンボルではない）
+draft
+abandoned
+superseded
+superseded_by
+related_commit
+related_rejected
+implemented
+in_progress
+
 # IMK メソッド（docs で「使うな」という反面教師として言及）
 inputText
 
@@ -251,6 +261,9 @@ keynaco.InputController
 
 # Apple SDK シンボル（プロジェクトコードに含まれない）
 NSEvent.ModifierFlags.capsLock
+
+# private プロパティの qualified path 表記（grep で直接ヒットしない）
+AzooKeyConverter.converter
 
 # その他、文章中に出る固有名詞（識別子じゃない）
 SNS

@@ -34,7 +34,8 @@ check_count() {
   echo "  ドキュメント側:"
 
   local matches
-  matches=$(grep -rnoE "[0-9]+ ?$doc_pattern" "${DOC_PATHS[@]}" 2>/dev/null \
+  matches=$(grep -rnoE "[0-9]+ ?$doc_pattern" "${DOC_PATHS[@]}" \
+            --include="*.md" 2>/dev/null \
             | sed "s|$REPO_ROOT/||g" || true)
 
   if [ -z "$matches" ]; then
@@ -42,9 +43,10 @@ check_count() {
   else
     echo "$matches" | sed 's|^|    |'
     # 実数値と異なる主張があれば mismatch
+    local safe_count="${code_count:-0}"
     if echo "$matches" | grep -qE "[^0-9]([0-9]+) ?$doc_pattern" \
-       && echo "$matches" | grep -vqE "[^0-9]${code_count} ?$doc_pattern"; then
-      echo "  ⚠️  実装の数値（$code_count）と食い違うドキュメント記述あり"
+       && echo "$matches" | grep -vqE "[^0-9]${safe_count} ?$doc_pattern"; then
+      echo "  ⚠️  実装の数値（$safe_count）と食い違うドキュメント記述あり"
       mismatch=$((mismatch + 1))
     fi
   fi

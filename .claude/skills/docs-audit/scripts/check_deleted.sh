@@ -77,7 +77,8 @@ while IFS= read -r id; do
             | grep -v "/plans/" \
             | grep -v "/principles.md" \
             | grep -v ".build/" \
-            | grep -v "checkouts/" || true)
+            | grep -v "checkouts/" \
+            | grep -vE "削除済み|廃止済み|removed|deleted|不採用" || true)
   if [ -n "$results" ]; then
     count_for_id=$(echo "$results" | wc -l | tr -d ' ')
     echo "  [$id] 残存 $count_for_id 箇所:"

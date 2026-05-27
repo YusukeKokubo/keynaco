@@ -52,8 +52,16 @@ for f in "$MEMORY_DIR"/*.md; do
     continue
   fi
 
+  # memory 本文に削除キーワードが含まれているか（INFO 格下げ判定用）
+  has_deletion_context=false
+  if grep -qE "削除済み|廃止済み|removed|deleted|不採用|廃止" "$f" 2>/dev/null; then
+    has_deletion_context=true
+  fi
+
   missing_list=""
   missing_count=0
+  info_list=""
+  info_count=0
   while IFS= read -r id; do
     [ -z "$id" ] && continue
     if [[ "$id" =~ \.(swift|md|py|json|sh)$ ]]; then
@@ -65,16 +73,29 @@ for f in "$MEMORY_DIR"/*.md; do
           2>/dev/null | head -1)
       fi
       if [ -z "$exists" ]; then
-        missing_list+="      - $id (file)"$'\n'
-        missing_count=$((missing_count + 1))
+        # 識別子が含まれる行が削除キーワードを含む場合は INFO に格下げ
+        id_line=$(grep -m1 "\`$id\`" "$f" 2>/dev/null || true)
+        if $has_deletion_context && echo "$id_line" | grep -qE "削除済み|廃止済み|removed|deleted|不採用|廃止"; then
+          info_list+="      - $id (file)"$'\n'
+          info_count=$((info_count + 1))
+        else
+          missing_list+="      - $id (file)"$'\n'
+          missing_count=$((missing_count + 1))
+        fi
       fi
     else
       escaped=$(echo "$id" | sed 's/[+]/\\+/g; s/[.]/\\./g')
       if ! grep -rqE "(^|[^A-Za-z0-9_])${escaped}([^A-Za-z0-9_]|$)" \
           "$REPO_ROOT/Core/Sources" "$REPO_ROOT/keynaco" "$REPO_ROOT/keynacoTests" \
           --include="*.swift" 2>/dev/null; then
-        missing_list+="      - $id (symbol)"$'\n'
-        missing_count=$((missing_count + 1))
+        id_line=$(grep -m1 "\`$id\`" "$f" 2>/dev/null || true)
+        if $has_deletion_context && echo "$id_line" | grep -qE "削除済み|廃止済み|removed|deleted|不採用|廃止"; then
+          info_list+="      - $id (symbol)"$'\n'
+          info_count=$((info_count + 1))
+        else
+          missing_list+="      - $id (symbol)"$'\n'
+          missing_count=$((missing_count + 1))
+        fi
       fi
     fi
   done < "$TMP/targets.txt"
@@ -83,6 +104,10 @@ for f in "$MEMORY_DIR"/*.md; do
     echo "  ⚠️  $(basename "$f"): 欠落識別子 $missing_count 件"
     printf '%s' "$missing_list"
     stale_files=$((stale_files + 1))
+  fi
+  if [ "$info_count" -gt 0 ]; then
+    echo "  ℹ️  $(basename "$f"): 削除済み記録として言及 $info_count 件（正常）"
+    printf '%s' "$info_list"
   fi
 done
 

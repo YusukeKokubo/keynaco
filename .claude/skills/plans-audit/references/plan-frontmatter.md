@@ -56,7 +56,7 @@ related_rejected: E-1
 
 ## なぜ必要か
 
-76 個ある plan の **状態が外から見えない** ため、`plans/PLAN260525c.md` のようにリンク切れが発生しても気付けなかった。Frontmatter で機械的にライフサイクルを管理することで、`plans-audit` skill が:
+多数の plan の **状態が外から見えない** ため、リンク切れが発生しても気付けなかった。Frontmatter で機械的にライフサイクルを管理することで、`plans-audit` skill が:
 
 1. **status 別の俯瞰**: 各状態に何件あるか即座に分かる
 2. **stale draft の検出**: 30 日以上 draft のままの plan を可視化
