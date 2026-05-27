@@ -243,6 +243,15 @@ nyuuryoku
 TISCreateInputSourceList
 TISRegisterInputSource
 
+# IMK メソッド（docs で「使うな」という反面教師として言及）
+inputText
+
+# Info.plist NG 例として言及（プロジェクト識別子ではない）
+keynaco.InputController
+
+# Apple SDK シンボル（プロジェクトコードに含まれない）
+NSEvent.ModifierFlags.capsLock
+
 # その他、文章中に出る固有名詞（識別子じゃない）
 SNS
 

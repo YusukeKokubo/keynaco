@@ -63,7 +63,7 @@ xcodebuild build -scheme keynaco -destination "platform=macOS"
   git -C keynaco/Resources/zenz-v3.1-small-gguf lfs pull
   ```
   モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る
-- POS 分類（`AzooKeyPOSClassifier`）は AzooKey 辞書の `lcid` + 接続詞/感動詞辞書によるルールベース実装。Apple Intelligence 不要。起動時に `AzooKeyPOSBackfill` で未分類エントリを一括再分類する。以前の `LLMPOSClassifier`（FoundationModels）は精度壊滅（77% が `other`）のため削除済み（`plans/PLAN260525c.md` 参照）。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
+- POS 分類（`AzooKeyPOSClassifier`）は AzooKey 辞書の `lcid` + 接続詞/感動詞辞書によるルールベース実装。Apple Intelligence 不要。起動時に `AzooKeyPOSBackfill` で未分類エントリを一括再分類する。以前の `LLMPOSClassifier`（FoundationModels）は精度壊滅（77% が `other`）のため削除済み。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
 
 ### Zenzai 制御パラメータ（zenz-v3 の条件付き変換）
 
