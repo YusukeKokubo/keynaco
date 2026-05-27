@@ -10,8 +10,8 @@ IME Extension（Input Method Extension）は通常アプリより厳しいサン
 
 | API | IME Extension | Settings / 本体アプリ |
 |-----|:---:|:---:|
-| `respond(to:)` プレーンテキスト | ✅ 動作確認済み | ✅ おそらく可 |
-| `respond(generating:)`（Guided Generation） | ❌ ハング（Error 159） | ⚠️ 未確認 |
+| `respond(to:)` プレーンテキスト | ✅ 動作確認済み | ✅ 動作確認済み |
+| `respond(generating:)`（Guided Generation） | ❌ ハング（Error 159） | ✅ 動作確認済み |
 | Tool Calling（`struct: Tool`） | ❌ ハング（Error 159） | ⚠️ 未確認 |
 
 **根本原因**: Guided Generation と Tool Calling は `generatived` / `com.apple.modelcatalog.catalog` への XPC 通信を経由する。IME サンドボックスがこの XPC を拒否する。エラーも例外も返さずデッドロックするため原因特定が困難（`plans/PLAN260525c.md` に詳細）。
@@ -99,6 +99,8 @@ Apple Intelligence は対応デバイス・言語設定が必要。使えない�
 
 ## 関連ドキュメント
 
-- `docs/rejected.md` — H-1: `@Generable` 構造化出力の不採用理由（IME サンドボックムによるハング）
+- `docs/rejected.md` — H-1: `@Generable` 構造化出力の不採用理由（IME サンドボックスによるハング）
 - `plans/PLAN260525c.md` — FoundationModels 構造化出力 POC の詳細調査結果
+- `plans/PLAN260527.md` — Apple Intelligence を使った日記自動生成の実装計画
 - `scripts/poc_proper_noun_ai.swift` — 固有名詞検出 POC スクリプト（2026-05-27）
+- `keynaco/Debug/DebugGuidedGenerationTest.swift` — 本体アプリでの Guided Generation 動作確認ツール（2026-05-27）
