@@ -39,6 +39,10 @@ extension DatabaseManager {
 
     /// 読みが現在の入力で始まる全エントリを output 単位で SUM 集計して返す。
     /// exact 一致と前方一致（より長い読み）を統合し、異なる読みで確定した回数を正しく合算する。
+    ///
+    /// **設計不変条件**: `LIKE 'reading%'` で exact + 前方一致を一括取得し `GROUP BY output` の
+    /// `SUM` で集計する。exact / prefix を別クエリに分割し `MAX` で合計する設計に書き換えると、
+    /// 異なる読み長で確定した回数が合算されなくなり履歴ランキングが壊れる。
     func fetchHistoryScoredMerged(reading: String) -> [(output: String, score: Double)] {
         return dbQueue.sync {
             let now = self.nowEpoch()

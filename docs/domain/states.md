@@ -1,5 +1,7 @@
 # keynaco 状態遷移
 
+状態の定義と遷移条件のみ。各状態のキー動作詳細は `InputHandler+*.swift` と対応するテスト（`Tests/InputHandler*.swift`）が正本。
+
 ## 状態一覧
 
 | 状態 | 条件 |
@@ -10,8 +12,6 @@
 | **候補選択中** | 組成中 + `isExplicitlySelected = true`（↑↓ 操作済み）|
 | **括弧モード** | `bracketCandidates != nil`（組成空で `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを入力） |
 | **セグメントモード** | `isSegmentMode = true` |
-
----
 
 ## 状態遷移図
 
@@ -47,71 +47,9 @@ stateDiagram-v2
     セグメントモード --> セグメントモード : Shift+←/→（境界を1文字調整）
     セグメントモード --> 待機 : Enter（確定）
     セグメントモード --> 組成中 : Escape（組成に戻す）
-
 ```
 
----
+## 注意点
 
-## 状態ごとの主要キー動作
-
-### 組成中
-
-| キー | 動作 |
-|------|------|
-| かな系文字 | composedHiragana / pendingRomaji に蓄積 |
-| `. / ,`（Shift なし） | `。`/`、` として composedHiragana に追加し候補ウィンドウを更新 |
-| Space | `composedHiragana` 非空ならセグメントモードへ遷移。`composedHiragana` が空で `pendingRomaji` のみのときはキーを消費してマークドテキストを維持（本文へスペースは入れない） |
-| ↑↓ | 候補選択中へ遷移 |
-| Enter | 組成テキストをそのまま確定 |
-| Escape | 組成クリア → 待機 |
-| → | 組成テキストを確定（Enter と同じ） |
-| 英数キー | 組成を確定してから ASCII モードへ |
-| F6–F10 | ひらがな/カタカナ/ASCII 各形式で即時確定 |
-
-*Tests: `Tests/InputHandlerCompositionTests.swift`*
-
-### 候補選択中
-
-| キー | 動作 |
-|------|------|
-| ↑↓ | 候補を移動 |
-| Tab / Shift+Tab | 次候補 / 前候補へ移動 |
-| Space | 次候補へ（ページ送り） |
-| Enter | 選択候補を確定 → 待機 |
-| → | 組成テキストをひらがなのまま確定 → 待機（選択候補は無視） |
-| Escape | 組成クリア → 待機 |
-| Backspace | 組成を1文字削除。1文字になった → `.dismiss`、2文字以上残る → `.show`（候補リフレッシュ） |
-| Shift+Delete | 選択中の候補を履歴 DB から削除（`fixedEnd <= index < historyEnd` のときのみ有効。ユーザー辞書行・Zenzai プロモート行は `fixedEnd` 未満のため削除不可） |
-| `. / ,`（Shift なし） | 選択候補を確定**せず**、`。`/`、` を組成に追加して候補をリフレッシュ |
-
-*Tests: `Tests/InputHandlerCandidatesTests.swift`*
-
-### 括弧モード
-
-| キー | 動作 |
-|------|------|
-| ↑ / Shift+Tab | 前候補へ |
-| ↓ / Space / Tab | 次候補へ |
-| Enter | 選択候補を確定 → 待機 |
-| Escape / Backspace | キャンセル（何も挿入しない）→ 待機 |
-| その他キー | 選択候補を確定してから、そのキーを通常入力として処理 |
-
-### セグメントモード
-
-| キー | 動作 |
-|------|------|
-| ←/→ | フォーカス文節を前/次へ移動（候補ウィンドウが移動先文節の候補に切り替わる） |
-| Space / Tab / ↓ | フォーカス文節の次候補へ |
-| ↑ | フォーカス文節の前候補へ |
-| Shift+→ | フォーカス文節を右に1文字拡張（次文節の先頭1文字を奪う） |
-| Shift+← | フォーカス文節を左に1文字縮小（末尾1文字を次文節の先頭に渡す） |
-| Enter | 全文節の選択候補を連結確定 → 待機 |
-| Escape / Backspace | セグメントモード解除 → 組成に戻す |
-
-セグメント突入時、AzooKey の `segmentize` で初期分割を表示する。手動境界調整（Shift+矢印）時は `isManuallyAdjusted` を立て、確定時に history へ二重記録する。
-
-*Tests: `Tests/InputHandlerSegmentTests.swift`*
-
-## 補足
-
-- **isAsciiMode は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
+- **`isAsciiMode` は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
+- **キー動作詳細**: 各状態の細かいキー動作（Backspace の挙動・候補選択中の `.` `,` での組成追加など）は `InputHandler+*.swift` および対応テストを参照。ここに書くと drift する
