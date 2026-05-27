@@ -49,7 +49,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
     func testConversionHistoryBoostsNextConversion() {
         typeRomaji("toukyou")
         press(keyCode: 36, candidateVisible: true, selectedText: "東京")
-        press(keyCode: 53)  // Escape でSuccessor モードを解除
+        press(keyCode: 53)  // Escape で候補ウィンドウを閉じる
         typeRomaji("toukyou")
         let (_, action) = press(keyCode: 49)
         guard case .show(let candidates, let historyEnd, _, _, _) = action else {
@@ -159,7 +159,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         // 単語を確定して history を積む
         typeRomaji("kyou")
         press(keyCode: 36, candidateVisible: true, selectedText: "今日")
-        press(keyCode: 53)  // Escape でSuccessor モード解除
+        press(keyCode: 53)  // Escape で候補ウィンドウを閉じる
         XCTAssertFalse(handler.committedHistory.isEmpty, "確定後は committedHistory に積まれているはず")
 
         // 組成なしで Enter（改行）→ クリアされる

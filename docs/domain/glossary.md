@@ -109,8 +109,8 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 **不変条件**: Backspace 以外のキー入力・ペナルティ実行後は `nil`。
 
 ### DatabaseManager
-変換履歴（`history`）・noun-bigram（`noun_bigram`）・ユーザー辞書（`user_dict`）・ひらがな優先語彙（`hiragana_preferred`）の **4 テーブル**を持つ SQLite ストア。  
-`InputHandler` のイニシャライザで DI。テストは `inMemory: true`。起動時に廃止した `bigram` / `trigram` / `skip_bigram` を DROP する。  
+変換履歴（`history`）・ユーザー辞書（`user_dict`）・ひらがな優先語彙（`hiragana_preferred`）・日次確定ログ（`daily_log`）・生成済み日記キャッシュ（`diary`）の **5 テーブル**を持つ SQLite ストア。  
+`InputHandler` のイニシャライザで DI。テストは `inMemory: true`。起動時に廃止した `bigram` / `trigram` / `skip_bigram` / `boundary_pref` / `noun_bigram` / `content_bigram` を DROP する（マイグレーション用）。  
 全 fetch/record で時間減衰スコア `count / (1 + age_days / τ)`（τ=30日）を使用。`user_dict` のみ time-decay なし。
 
 #### recordPrefixes
@@ -118,18 +118,10 @@ Shift+矢印でセグメント境界を 1 文字単位で調整できる。
 「おはよう」を確定すると「おはよ」「おは」でも履歴候補に出るようになる。  
 ひらがなパススルー確定・句読点確定はスキップ。
 
-#### noun-bigram
-名詞→名詞のペアのみを `noun_bigram` に記録する。`prev` は直前に確定した名詞（助詞・動詞が間にあってよい）。  
-確定時に `lastConfirmedNounOutput` をキャプチャし、LLM 品詞分類（`LLMPOSClassifier`）完了後 `pos == "noun"` のとき `recordNounBigram` する。  
-Apple Intelligence 必須前提。無効時は noun-bigram は蓄積されず予測候補も出ない。
-
-#### lastConfirmedNounOutput
-LLM 品詞分類で最後に名詞と判定された確定語の表層。noun-bigram の `prev` キー。セッションをまたいでリセットしない。
-
 #### penalizeAll（訂正シグナル）
 確定直後 Backspace 時に呼ばれ、history の該当行を count -1（0以下で削除）する。
 
-*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`, `Tests/NounBigramTests.swift`*
+*Tests: `Tests/InputHandlerHistoryTests.swift`, `Tests/DatabaseManagerTests.swift`*
 
 ---
 

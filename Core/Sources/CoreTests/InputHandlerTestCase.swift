@@ -137,20 +137,6 @@ class InputHandlerTestCase: XCTestCase {
         XCTAssertEqual(client.inserted.last, expected, msg, file: file, line: line)
     }
 
-    func assertSuccessorCandidateActive(
-        _ candidateVisible: Bool,
-        _ expected: Bool,
-        _ msg: String = "",
-        file: StaticString = #file,
-        line: UInt = #line
-    ) {
-        let active = candidateVisible
-            && handler.state.composedHiragana.isEmpty
-            && !handler.isBracketMode
-            && !handler.state.isSegmentMode
-        XCTAssertEqual(active, expected, msg, file: file, line: line)
-    }
-
     func assertSegmentMode(
         _ expected: Bool, _ msg: String = "",
         file: StaticString = #file, line: UInt = #line

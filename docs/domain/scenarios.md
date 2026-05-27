@@ -67,18 +67,6 @@
 
 ---
 
-## S-05: 予測候補の表示（noun-bigram）
-
-**前提**: `lastCommittedOutput = "東京"`、`lastConfirmedNounOutput = "東京"` とする。
-
-**入力**: `ni` (「に」組成中)
-
-- `noun_bigram` を `lastConfirmedNounOutput × 読み` で検索（例: prev=`東京`, reading=`に*`）
-- ヒット例: `に` → 候補: `に` / `は` / `の`
-- 候補リスト優先順位: ひらがな・カタカナ固定 → ユーザー辞書 →（Zenzai ON かつ左文脈ありなら）**辞書先頭 1 行** → **予測（noun-bigram）** → 履歴 → 残りの辞書
-
----
-
 ## S-06: Shift+Delete で履歴削除
 
 **状態**: 候補選択中、履歴セクションの候補（index < `historyEnd`）を選択中
@@ -124,22 +112,6 @@
 **制約**: 1 セグメントのみ確定の場合は合成エントリは記録しない（`segments.count >= 2` ガード）。
 
 *Tests: `Tests/InputHandlerSegmentTests.swift`*
-
----
-
-## S-10: noun-bigram 経由で助詞をまたぐ予測
-
-**前提**: `今日 → を → 行く` の順で確定済み。`今日` と `行く` が LLM 品詞分類で名詞と判定されている。
-
-- `今日` 確定 → POS 分類完了後 `lastConfirmedNounOutput = "今日"`
-- `を` 確定（助詞）→ noun-bigram は記録されない（助詞は `lastConfirmedNounOutput` を更新しない）
-- `行く` 確定 → POS 分類で名詞と判定 → noun-bigram `(prev="今日", input=読み, output="行く")` を記録 → `lastConfirmedNounOutput = "行く"`
-
-**次回**: `を` の直後に `い` を打つと、`lastConfirmedNounOutput == "今日"` により noun-bigram `(今日, い*, ...)` から `行く` が予測候補の先頭付近に追加される。
-
-**制約**: 文頭の最初の名詞は `prevNoun == nil` のため noun-bigram は記録されない。Apple Intelligence 無効時は noun-bigram は蓄積・参照されない。
-
-*Tests: `Tests/NounBigramTests.swift`*
 
 ---
 

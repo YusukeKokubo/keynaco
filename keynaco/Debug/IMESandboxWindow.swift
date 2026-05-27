@@ -841,7 +841,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("")
         lines.append("【モード】")
         lines.append("isAsciiMode           : \(bool("isAsciiMode"))")
-        lines.append("isSuccessorCandidateActive: \(bool("isSuccessorCandidateActive"))")
         lines.append("isSegmentMode         : \(bool("isSegmentMode"))")
         lines.append("isBracketMode         : \(bool("isBracketMode"))")
         lines.append("isExplicitlySelected  : \(bool("isExplicitlySelected"))")

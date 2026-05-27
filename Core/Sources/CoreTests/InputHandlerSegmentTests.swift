@@ -95,7 +95,6 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         XCTAssertTrue(consumed)
         XCTAssertFalse(handler.state.isSegmentMode)
         XCTAssertFalse(client.inserted.isEmpty, "確定でテキストが挿入されるはず")
-        // successor mode display depends on AzooKey conversion; tested in testSuccessorMode* tests
     }
 
     func testSegmentModeEscapeRestoresComposing() {

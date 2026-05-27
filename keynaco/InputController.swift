@@ -316,7 +316,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         let adapter = IMKTextInputAdapter(sender)
         let ic = self
         MainActor.assumeIsolated {
-            // Successor 候補表示中で組成がない場合は system-triggered commit をスキップ
+            // 候補表示中で組成がない場合は system-triggered commit をスキップ
             // (insertText の副作用で system が commitComposition を呼ぶことがある)
             guard !(
                 ic.candidateWindow.isVisible

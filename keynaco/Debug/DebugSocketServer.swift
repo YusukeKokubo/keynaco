@@ -167,7 +167,6 @@ final class DebugSocketServer: @unchecked Sendable {
         "pendingRomaji": "string",
         "composingText": "string",
         "isAsciiMode": "bool",
-        "isSuccessorCandidateActive": "bool",
         "isSegmentMode": "bool",
         "isBracketMode": "bool",
         "isExplicitlySelected": "bool",
@@ -586,7 +585,6 @@ final class DebugSocketServer: @unchecked Sendable {
 
         let modeFlags: [(String, String)] = [
             ("isAsciiMode", "ascii"),
-            ("isSuccessorCandidateActive", "successor"),
             ("isSegmentMode", "segment"),
             ("isBracketMode", "bracket"),
         ]
@@ -757,7 +755,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let knownAssertionFields: Set<String> = [
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
-        "isAsciiMode", "isSuccessorCandidateActive", "isSegmentMode", "isBracketMode",
+        "isAsciiMode", "isSegmentMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
         "segmentTexts", "focusedSegmentIndex",
@@ -1120,7 +1118,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let changedFieldTargets: [String] = [
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
-        "isAsciiMode", "isSuccessorCandidateActive", "isSegmentMode", "isBracketMode",
+        "isAsciiMode", "isSegmentMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
         "segmentTexts", "focusedSegmentIndex",

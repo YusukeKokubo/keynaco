@@ -396,9 +396,9 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         }
     }
 
-    // MARK: - Shift+句読点確定後の Successor モード非起動
+    // MARK: - Shift+句読点確定後は候補ウィンドウを残さない
 
-    func testShiftAngleBracketConfirmedNotNounLikeNoSuccessor() {
+    func testShiftAngleBracketConfirmedDismissesCandidates() {
         type(chars: "<", base: ",", modifiers: .shift)
         let result = press(keyCode: KeyCode.enter)
         XCTAssertEqual(client.inserted.last, "＜")
