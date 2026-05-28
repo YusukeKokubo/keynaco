@@ -2,7 +2,7 @@
 # Step 2: rejected.md で削除済みと記録された機能が、コード・他ドキュメントに残骸として残っていないか確認。
 #
 # WHY: 削除済み機能名がデバッグスナップショット・テスト・SKILL.md などに散在すると、
-# 「呼び出し箇所がなくなったコードはその場で消す」原則（principles.md）に違反する。
+# 「呼び出し箇所がなくなったコードはその場で消す」原則（retrospectives.md）に違反する。
 # 機能削除後の掃除漏れを機械的に検出する。
 
 set -uo pipefail
@@ -75,7 +75,7 @@ while IFS= read -r id; do
             "$id" "${SEARCH_PATHS[@]}" 2>/dev/null \
             | grep -v "rejected.md" \
             | grep -v "/plans/" \
-            | grep -v "/principles.md" \
+            | grep -v "/retrospectives.md" \
             | grep -v ".build/" \
             | grep -v "checkouts/" \
             | grep -vE "削除済み|廃止済み|removed|deleted|不採用" || true)
@@ -92,5 +92,5 @@ echo
 if [ "$residual_total" -eq 0 ]; then
   echo "結果: 削除済み機能の残骸なし ✓"
 else
-  echo "結果: $residual_total 箇所に残骸あり（rejected.md / plans/ / principles.md 以外）"
+  echo "結果: $residual_total 箇所に残骸あり（rejected.md / plans/ / retrospectives.md 以外）"
 fi

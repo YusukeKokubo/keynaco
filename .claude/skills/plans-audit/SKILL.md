@@ -14,7 +14,7 @@ description: |
 
 ## 原則
 
-plan は書いた瞬間に時間が止まり、3 ヶ月後には「これは今でも生きているのか」を本人ですら判断できなくなる。`docs/principles.md` の「ドキュメントはコードから引き出せない情報限定」の延長で、**plan に明示的なライフサイクル状態を持たせることで、ドキュメント自体の腐敗を防ぐ**。
+plan は書いた瞬間に時間が止まり、3 ヶ月後には「これは今でも生きているのか」を本人ですら判断できなくなる。`docs/retrospectives.md` の「ドキュメントはコードから引き出せない情報限定」の延長で、**plan に明示的なライフサイクル状態を持たせることで、ドキュメント自体の腐敗を防ぐ**。
 
 詳しい frontmatter 規約は [`references/plan-frontmatter.md`](references/plan-frontmatter.md) を参照。
 
@@ -83,7 +83,7 @@ backfill は 1 回のセッションで 5-10 件ずつが現実的。
 
 - **legacy plan を全件一気に backfill**: 72 件もあるので、丁寧にやろうとして頓挫するパターン。1 セッション 5-10 件ずつ
 - **status を勝手に推測して付ける**: 「implemented っぽい」だけで `implemented` を付けるのは禁止。`related_commit` で確証を取れない場合は `unknown` のままにする
-- **`abandoned` を付けるだけで rejected.md にエントリを作らない**: `principles.md` の「『記録』と『照会』は疎結合にしておく」原則で、捨てた理由を別途残す価値がある。`related_rejected` 付け忘れは Step 3 で検出される
+- **`abandoned` を付けるだけで rejected.md にエントリを作らない**: `retrospectives.md` の「『記録』と『照会』は疎結合にしておく」原則で、捨てた理由を別途残す価値がある。`related_rejected` 付け忘れは Step 3 で検出される
 
 ## 不変条件
 
@@ -108,6 +108,6 @@ frontmatter の status と関連フィールドの組み合わせに対する不
 ## 関連
 
 - [`references/plan-frontmatter.md`](references/plan-frontmatter.md): frontmatter スキーマと書き方
-- `docs/principles.md`「ドキュメントはコードから引き出せない情報限定」
+- `docs/retrospectives.md`「ドキュメントはコードから引き出せない情報限定」
 - `docs/rejected.md`（abandoned plan の行き先）
 - `.claude/skills/docs-audit/SKILL.md`（姉妹スキル: ドキュメント全般の drift 検出）

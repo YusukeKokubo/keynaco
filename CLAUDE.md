@@ -7,8 +7,9 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | ドキュメント | 内容 |
 |-------------|------|
 | [`docs/domain/states.md`](docs/domain/states.md) | 状態遷移図（コードから引き出せない俯瞰） |
+| [`docs/concept.md`](docs/concept.md) | プロダクトの差別化軸・設計の指針（何のために存在するか） |
 | [`docs/rejected.md`](docs/rejected.md) | 不採用機能の記録（同じ失敗を繰り返さないため） |
-| [`docs/principles.md`](docs/principles.md) | 設計判断の原則（個別失敗から抽出） |
+| [`docs/retrospectives.md`](docs/retrospectives.md) | 個別失敗から抽出した開発判断・運用のメタルール |
 | [`docs/apple-intelligence.md`](docs/apple-intelligence.md) | FoundationModels の制約・実験結果・使いどころ |
 | [`docs/observation.md`](docs/observation.md) | 経過観察中の機能（実装済みだが価値未確定。卒業/廃止を判断するためのリスト） |
 
@@ -27,7 +28,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `Core/Sources/CoreTests/` | `KeynacoCore` のユニットテスト（XCTest） |
 | `keynacoTests/` | アプリ専用テスト（`SurroundingIMKContext` 等） |
 | `keynaco.xcodeproj` | Xcode プロジェクト（リポジトリ管理。ローカル SPM で `Core/` を参照） |
-| `docs/` | `principles.md`（設計原則）・`rejected.md`（不採用機能）・`domain/`（用語・状態遷移・シナリオ） |
+| `docs/` | `concept.md`（差別化軸）・`retrospectives.md`（メタルール）・`rejected.md`（不採用機能）・`domain/`（用語・状態遷移・シナリオ） |
 | `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` / `POC<YYMMDD>.md` 形式） |
 | `scripts/` | 開発用スクリプト（下記参照） |
 | `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
@@ -166,6 +167,10 @@ Caps Lock トグルは未実装。実装時は `handle(event:client:)` で `.fla
 
 [`docs/rejected.md`](docs/rejected.md) を参照。
 
-## 設計判断の原則
+## プロダクトの差別化軸
 
-[`docs/principles.md`](docs/principles.md) を参照。新機能の実装前・大きなリファクタリング前に読み返す。
+[`docs/concept.md`](docs/concept.md) を参照。新機能の検討時に「ポジショニングに合致するか」のチェック基準として読む。
+
+## 開発判断・運用のメタルール
+
+[`docs/retrospectives.md`](docs/retrospectives.md) を参照。新機能の実装前・大きなリファクタリング前に読み返す。

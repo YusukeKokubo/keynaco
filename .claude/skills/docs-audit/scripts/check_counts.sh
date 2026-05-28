@@ -67,7 +67,7 @@ tabs=$(grep -c "addTabViewItem(" \
 check_count "Settings タブ数" "$tabs" "タブ"
 
 # Settings ファイル数（.swift のみ）
-# CLAUDE.md 限定で検索: docs/principles.md の「2 ファイル目」「3 ファイル目」(DRY 原則の説明) との誤検出回避
+# CLAUDE.md 限定で検索: docs/retrospectives.md の「2 ファイル目」「3 ファイル目」(DRY 原則の説明) との誤検出回避
 files=$(find "$REPO_ROOT/keynaco/Settings/" -maxdepth 1 -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')
 check_count "Settings ファイル数" "$files" "ファイル" "$REPO_ROOT/CLAUDE.md"
 
