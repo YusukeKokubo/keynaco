@@ -41,7 +41,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
 | `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
-| `poc_proper_noun_ai.swift` | 固有名詞 AI 変換の PoC スクリプト |
 
 ### 起動チェーン（IMK ブートストラップ）
 
