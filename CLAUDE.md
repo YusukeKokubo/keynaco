@@ -10,6 +10,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | [`docs/rejected.md`](docs/rejected.md) | 不採用機能の記録（同じ失敗を繰り返さないため） |
 | [`docs/principles.md`](docs/principles.md) | 設計判断の原則（個別失敗から抽出） |
 | [`docs/apple-intelligence.md`](docs/apple-intelligence.md) | FoundationModels の制約・実験結果・使いどころ |
+| [`docs/observation.md`](docs/observation.md) | 経過観察中の機能（実装済みだが価値未確定。卒業/廃止を判断するためのリスト） |
 
 **ドキュメント方針**: docs/ にはコードから引き出せない情報（理由・哲学・経験的失敗・俯瞰図）のみ置く。用語定義・behavior spec・入力シナリオは該当変数/関数の `///` ドキュメントコメントとテストが正本。**コード = 真実、ドキュメント = 真実から引き出せないもの限定**。
 
