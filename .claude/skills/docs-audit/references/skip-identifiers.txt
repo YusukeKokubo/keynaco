@@ -268,3 +268,10 @@ AzooKeyConverter.converter
 # その他、文章中に出る固有名詞（識別子じゃない）
 SNS
 
+# 削除済み機能（CLAUDE.md で「削除済み」と明記した上で言及。誤検出を防ぐ）
+LLMPOSClassifier
+LLMSegmentConverter
+
+# スキルディレクトリ内の相対パス（リポジトリルート相対ではないため誤検出）
+scripts/lib.sh
+

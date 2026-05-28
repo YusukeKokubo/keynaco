@@ -8,7 +8,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-PROJECT_KEY=$(echo "$REPO_ROOT" | sed 's|/|-|g')
+PROJECT_KEY=$(echo "$REPO_ROOT" | sed 's|[/.]|-|g')
 MEMORY_DIR="$HOME/.claude/projects/${PROJECT_KEY}/memory"
 
 echo "=== Step 4: memory の verify ==="

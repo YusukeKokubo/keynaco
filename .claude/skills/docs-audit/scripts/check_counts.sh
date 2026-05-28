@@ -28,13 +28,16 @@ check_count() {
   local label="$1"
   local code_count="$2"
   local doc_pattern="$3"
+  # 第4引数が指定されたときはそのファイル群のみ検索（誤検出回避用）
+  local -a search_paths=("${@:4}")
+  [ "${#search_paths[@]}" -eq 0 ] && search_paths=("${DOC_PATHS[@]}")
 
   echo "[$label]"
   echo "  実装側: $code_count"
   echo "  ドキュメント側:"
 
   local matches
-  matches=$(grep -rnoE "[0-9]+ ?$doc_pattern" "${DOC_PATHS[@]}" \
+  matches=$(grep -rnoE "[0-9]+ ?$doc_pattern" "${search_paths[@]}" \
             --include="*.md" 2>/dev/null \
             | sed "s|$REPO_ROOT/||g" || true)
 
@@ -46,7 +49,7 @@ check_count() {
     local safe_count="${code_count:-0}"
     if echo "$matches" | grep -qE "[^0-9]([0-9]+) ?$doc_pattern" \
        && echo "$matches" | grep -vqE "[^0-9]${safe_count} ?$doc_pattern"; then
-      echo "  ⚠️  実装の数値（$safe_count）と食い違うドキュメント記述あり"
+      echo "  ⚠️  実装の数値（${safe_count}）と食い違うドキュメント記述あり"
       mismatch=$((mismatch + 1))
     fi
   fi
@@ -64,8 +67,9 @@ tabs=$(grep -c "addTabViewItem(" \
 check_count "Settings タブ数" "$tabs" "タブ"
 
 # Settings ファイル数（.swift のみ）
+# CLAUDE.md 限定で検索: docs/principles.md の「2 ファイル目」「3 ファイル目」(DRY 原則の説明) との誤検出回避
 files=$(find "$REPO_ROOT/keynaco/Settings/" -maxdepth 1 -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')
-check_count "Settings ファイル数" "$files" "ファイル"
+check_count "Settings ファイル数" "$files" "ファイル" "$REPO_ROOT/CLAUDE.md"
 
 if [ "$mismatch" -eq 0 ]; then
   echo "結果: 数値主張に矛盾なし ✓"
