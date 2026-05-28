@@ -273,9 +273,6 @@ public extension InputHandler {
     /// セグメントモードからの確定。学習ルール:
     /// 1. 各セグメントを個別に `recordPrefixes`（通常の文節学習）
     /// 2. 手動で境界調整した文節は `recordPrefixes` を 1 回追加（計 2 回 = ブースト）
-    /// 3. 2 セグメント以上なら合成読み × 合成出力 を 1 エントリとして追加記録
-    ///    （例: `きょうはよいてんきです` × `今日は良い天気です` を 1 行追加。
-    ///    次回「きょうは」と打つだけでフレーズ全体が履歴候補に出る）
     mutating func doConfirmSegments(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         syncFocusedSegmentSelection(from: candidate)
         guard let segmentState = state.segmentState else { return .none }
@@ -291,9 +288,6 @@ public extension InputHandler {
             }
             confirmed += seg.selectedText
             fullReading += seg.reading
-        }
-        if segmentState.segments.count >= 2 {
-            db.recordPrefixes(reading: fullReading, output: confirmed)
         }
         commitText(text: confirmed, fullReading: fullReading, client: client)
         return .dismiss

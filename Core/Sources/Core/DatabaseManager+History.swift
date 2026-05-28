@@ -213,10 +213,27 @@ extension DatabaseManager {
         return output.unicodeScalars.allSatisfy { $0.value >= 0x3041 && $0.value <= 0x3096 }
     }
 
+    /// output / reading の末尾に連続するひらがな（U+3041–U+3096）を除去する。
+    /// 「東京が」→「東京」のように助詞付きで記録されたエントリを文節単位に正規化するために使う。
+    static func trimTrailingHiragana(_ s: String) -> String {
+        var scalars = s.unicodeScalars
+        while let last = scalars.last, last.value >= 0x3041 && last.value <= 0x3096 {
+            scalars.removeLast()
+        }
+        return String(scalars)
+    }
+
     /// フル読みのみ記録する。前方一致検索は `fetchHistoryScoredMerged` の LIKE クエリが担うため
     /// プレフィックスを個別に記録する必要はない。
+    /// output の末尾がひらがなの場合（例: 「東京が」）、そのひらがなを除いた文節単位（「東京」）で記録する。
+    /// ただし trimmed 後の reading が空になる場合（reading が全ひらがな）はトリムしない。
     func recordPrefixes(reading: String, output: String) {
-        guard !Self.isHiraganaPassthrough(reading: reading, output: output) else { return }
+        let trimmedOutput = Self.trimTrailingHiragana(output)
+        let trimmedReading = Self.trimTrailingHiragana(reading)
+        let (r, o) = (!trimmedOutput.isEmpty && trimmedOutput != output && !trimmedReading.isEmpty)
+            ? (trimmedReading, trimmedOutput)
+            : (reading, output)
+        guard !Self.isHiraganaPassthrough(reading: r, output: o) else { return }
         dispatchWrite {
             let t = self.nowEpoch()
             self.executeOnQueue("""
@@ -226,7 +243,7 @@ extension DatabaseManager {
                 count   = count + 1,
                 used_at = excluded.used_at;
             """) {
-                self.bindText($0, 1, reading); self.bindText($0, 2, output)
+                self.bindText($0, 1, r); self.bindText($0, 2, o)
                 sqlite3_bind_int64($0, 3, t)
             }
         }
