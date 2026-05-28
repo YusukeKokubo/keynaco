@@ -41,6 +41,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
 | `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
+| `poc_proper_noun_ai.swift` | 固有名詞 AI 変換の PoC スクリプト |
 
 ### 起動チェーン（IMK ブートストラップ）
 
@@ -52,7 +53,10 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 `/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。手動でビルドのみ行う場合:
 
 ```bash
-xcodebuild build -scheme keynaco -destination "platform=macOS"
+xcodebuild build -scheme keynaco -destination "platform=macOS" \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY="-" \
+  CODE_SIGNING_REQUIRED=NO
 ```
 
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
@@ -122,6 +126,7 @@ cd Core && swift test
 
 ## キー入力の挙動（特殊ケース）
 
+- **`InputController` での `handler` フィールド書き換えのタイミング**: `handle()` 内で同一ターン中に読む値は書き換え前の値（pre）を変数に退避してから使うこと。書き換え後の値が次キー以降のみ参照される場合は post 書きでよいが、混在するとサイレントに1キー遅延バグになる（実績あり）。
 - **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始（`GitHub` 等の混在ケース用）。`InputHandlerAsciiTests.swift` 参照。
 - **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。Shift+`,`/`.` は `characters` が `<`/`>` となり Bracket モード（`＜`/`＞` 候補）に入る
