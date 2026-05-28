@@ -268,6 +268,29 @@ public extension InputHandler {
         let h = sources.h
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
+
+        // POC（2026-05-28, observation.md）: 1 文字サジェストの信頼度ゲート。
+        // h が 1 ひらがな（count == 1）の autoShow では、直近 10 分以内に確定した語の
+        // 前方一致のみを表示する。AzooKey 辞書・通常履歴・予測は出さない。
+        // 数字/日時候補があるときは通常パスに任せる。
+        // 「きょ」のような count == 2 の youon は現状ゲート対象外（observation.md 参照）。
+        let isSingleHiragana = h.count == 1 && !h.allSatisfy({ $0.isASCII })
+        if autoShow, isSingleHiragana, numberCandidates.isEmpty, dateTimeCandidates.isEmpty {
+            let recents = recentCommitsMatching(prefix: h)
+            guard !recents.isEmpty else { return .dismiss }
+            // 第一候補が機能語なら（「は」→「は」のような自己一致など）抑制
+            if HiraganaPreferredBuiltins.words[recents[0]] != nil {
+                return .dismiss
+            }
+            return .show(
+                candidates: recents,
+                historyEnd: recents.count,
+                initialRow: 0,
+                predictionEnd: recents.count,
+                fixedEnd: 0
+            )
+        }
+
         if autoShow && sources.totalHistoryCount == 0 && sources.azooKeyCandidates.isEmpty && sources.predictCount == 0
             && sources.userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
             return .dismiss

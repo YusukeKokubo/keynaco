@@ -55,6 +55,19 @@ public struct LastConfirmedContext: Equatable {
     public let fullReading: String?
 }
 
+/// 直近確定 1 エントリ。1 文字サジェスト POC（2026-05-28, observation.md）。
+/// メモリ常駐・10 分 TTL。確定時に `appendRecentCommit` で記録、`recentCommitsMatching` で検索する。
+public struct RecentCommit: Sendable, Equatable {
+    public let reading: String
+    public let output: String
+    public let at: Date
+    public init(reading: String, output: String, at: Date) {
+        self.reading = reading
+        self.output = output
+        self.at = at
+    }
+}
+
 public enum KeyCode {
     public static let eisu:      UInt16 = 102
     public static let kana:      UInt16 = 104
@@ -123,6 +136,11 @@ public struct InputHandler {
         committedHistory.last
     }
     public var segmentCandidateCache: [String: Segment] = [:]
+    /// 直近 `recentCommitTTL` 秒以内の確定リスト。1文字サジェスト POC（2026-05-28, observation.md）の根拠データ。
+    /// `composedHiragana.count <= 2` の autoShow 時、この前方一致のみを候補に出す（信頼度ゲート）。
+    public var recentCommits: [RecentCommit] = []
+    public static let recentCommitTTL: TimeInterval = 600  // 10 分
+    public static let recentCommitCap: Int = 100
     /// 日記用バッファ: 句点（。！？）で区切られた文を蓄積し、文末でまとめて daily_log へ記録する。
     public var diaryBuffer: String = ""
     /// daily_log に記録する際のアプリ bundle ID。InputController がキーイベント処理前に設定する。
@@ -144,6 +162,32 @@ public struct InputHandler {
         if sessionTextBuffer.count > 50 {
             sessionTextBuffer = String(sessionTextBuffer.suffix(50))
         }
+    }
+
+    /// 直近確定リストに `(reading, output)` を追加し、TTL 経過分を prune する。
+    /// 1 文字サジェスト POC（observation.md）の信頼度ゲート用。`commitText` からのみ呼ばれる想定。
+    public mutating func appendRecentCommit(reading: String, output: String) {
+        guard !reading.isEmpty, !output.isEmpty else { return }
+        let now = Date()
+        recentCommits.removeAll { now.timeIntervalSince($0.at) > Self.recentCommitTTL }
+        recentCommits.append(RecentCommit(reading: reading, output: output, at: now))
+        if recentCommits.count > Self.recentCommitCap {
+            recentCommits.removeFirst(recentCommits.count - Self.recentCommitCap)
+        }
+    }
+
+    /// `prefix` で前方一致する直近確定の output を「最近 → 古い」順・重複排除で返す。TTL 経過分は除外。
+    public func recentCommitsMatching(prefix: String) -> [String] {
+        guard !prefix.isEmpty else { return [] }
+        let now = Date()
+        var seen = Set<String>()
+        var results: [String] = []
+        for entry in recentCommits.reversed() {
+            guard now.timeIntervalSince(entry.at) <= Self.recentCommitTTL else { continue }
+            guard entry.reading.hasPrefix(prefix) else { continue }
+            if seen.insert(entry.output).inserted { results.append(entry.output) }
+        }
+        return results
     }
 
     public let db: DatabaseManager
@@ -248,6 +292,14 @@ public struct InputHandler {
         if !state.composingText.isEmpty && !skipHistory && !isPunctuation,
            committedHistory.last != nil {
             lastCommittedReading = state.finalizedText
+        }
+        // 1 文字サジェスト POC（observation.md）: 確定時に直近 10 分の確定リストへ追加。
+        // 確定パスは複数あるが、すべて最終的に commitText を通るので 1 箇所フックで十分。
+        if !skipHistory && !isPunctuation && !text.isEmpty {
+            let reading = fullReading ?? state.finalizedText
+            if !reading.isEmpty {
+                appendRecentCommit(reading: reading, output: text)
+            }
         }
         lastConfirmedContext = LastConfirmedContext(
             input: state.finalizedText,
