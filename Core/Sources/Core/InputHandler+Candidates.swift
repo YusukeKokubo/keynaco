@@ -269,13 +269,14 @@ public extension InputHandler {
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
-        // POC（2026-05-28, observation.md）: 1 文字サジェストの信頼度ゲート。
-        // h が 1 ひらがな（count == 1）の autoShow では、直近 10 分以内に確定した語の
-        // 前方一致のみを表示する。AzooKey 辞書・通常履歴・予測は出さない。
+        // POC（2026-05-28, observation.md）: 1 モーラサジェストの信頼度ゲート。
+        // 拗音（ゃゅょ等の小書き仮名）は独立モーラではないので、`じょ`/`きょ`/`しゃ` も
+        // 1 モーラ扱いでゲート対象。`あい`（2 モーラ）等は対象外で通常パスへ。
         // 数字/日時候補があるときは通常パスに任せる。
-        // 「きょ」のような count == 2 の youon は現状ゲート対象外（observation.md 参照）。
-        let isSingleHiragana = h.count == 1 && !h.allSatisfy({ $0.isASCII })
-        if autoShow, isSingleHiragana, numberCandidates.isEmpty, dateTimeCandidates.isEmpty {
+        let smallKana: Set<Character> = ["ゃ", "ゅ", "ょ", "ゎ", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
+        let primaryKanaCount = h.filter { !smallKana.contains($0) }.count
+        let isSingleMora = !h.isEmpty && primaryKanaCount == 1 && !h.allSatisfy({ $0.isASCII })
+        if autoShow, isSingleMora, numberCandidates.isEmpty, dateTimeCandidates.isEmpty {
             let recents = recentCommitsMatching(prefix: h)
             guard !recents.isEmpty else { return .dismiss }
             // 第一候補が機能語なら（「は」→「は」のような自己一致など）抑制

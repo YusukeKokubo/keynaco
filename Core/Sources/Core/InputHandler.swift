@@ -136,8 +136,8 @@ public struct InputHandler {
         committedHistory.last
     }
     public var segmentCandidateCache: [String: Segment] = [:]
-    /// 直近 `recentCommitTTL` 秒以内の確定リスト。1文字サジェスト POC（2026-05-28, observation.md）の根拠データ。
-    /// `composedHiragana.count <= 2` の autoShow 時、この前方一致のみを候補に出す（信頼度ゲート）。
+    /// 直近 `recentCommitTTL` 秒以内の確定リスト。1モーラサジェスト POC（2026-05-28, observation.md）の根拠データ。
+    /// `composedHiragana` が 1 モーラ（小書き仮名を除いた主仮名 1 文字）の autoShow 時、この前方一致のみを候補に出す（信頼度ゲート）。
     public var recentCommits: [RecentCommit] = []
     public static let recentCommitTTL: TimeInterval = 600  // 10 分
     public static let recentCommitCap: Int = 100
