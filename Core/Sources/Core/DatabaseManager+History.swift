@@ -213,14 +213,12 @@ extension DatabaseManager {
         return output.unicodeScalars.allSatisfy { $0.value >= 0x3041 && $0.value <= 0x3096 }
     }
 
-    /// 格助詞（HiraganaPreferredBuiltins.stopWords の "格助詞" タグのみ）を長い順に並べたリスト。
-    /// 「より」のような複数文字助詞を「よ」より先にマッチさせるために長い順にソートする。
+    /// 格助詞のリスト。長い順にソートし「より」を「よ」より先にマッチさせる。
     /// 格助詞は体言（名詞）に後置されるだけで本体の意味に乗っかっていないため、
     /// 「東京が」→「東京」のようにトリムしても再利用可能な単位が残る。
     /// 助動詞・終助詞は活用語尾として語幹と一体なので対象外（「でき」等の中途半端な語幹になる）。
-    static let trailingParticles: [String] = HiraganaPreferredBuiltins.stopWords
-        .filter { $0.value == "格助詞" }
-        .map(\.key)
+    /// HiraganaPreferredBuiltins.words とは独立した定義。格助詞トリムのみが目的。
+    static let trailingParticles: [String] = ["より", "の", "を", "が", "は", "に", "で", "と", "も", "へ"]
         .sorted { $0.count > $1.count }
 
     /// output 末尾が格助詞で終わっている場合、助詞を除いた文字列を返す。

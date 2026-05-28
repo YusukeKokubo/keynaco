@@ -526,7 +526,7 @@ extension DebugSocketServer {
 
     /// InputController.schedulePOSClassification と同経路で POS 分類を行う。
     func schedulePOSClassification(output: String, reading: String) {
-        guard HiraganaPreferredBuiltins.stopWords[output] == nil else { return }
+        guard HiraganaPreferredBuiltins.words[output] == nil else { return }
         guard let c = AzooKeyPOSClassifier.classify(
             output: output, reading: reading, converter: posLookupConverter
         ) else { return }

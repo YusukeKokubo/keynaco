@@ -2,7 +2,8 @@ import Foundation
 
 /// ひらがな優先の組み込み固定語（助詞・助動詞等）。LLM 品詞分類の対象外。
 public enum HiraganaPreferredBuiltins {
-    public static let stopWords: [String: String] = [
+    /// 語 → 品詞カテゴリ の辞書。設定画面の表示・ひらがな優先判定・LLM出力フィルタに使用。
+    public static let words: [String: String] = [
         // 格助詞
         "の": "格助詞", "を": "格助詞", "が": "格助詞", "は": "格助詞",
         "に": "格助詞", "で": "格助詞", "と": "格助詞", "も": "格助詞",

@@ -16,7 +16,7 @@ final class HiraganaPreferredViewController: NSViewController {
     private var rows: [RowItem] = []
 
     private func buildRows() {
-        let builtins = HiraganaPreferredBuiltins.stopWords
+        let builtins = HiraganaPreferredBuiltins.words
             .sorted { $0.key < $1.key }
         rows = [.header("ユーザー追加語")]
             + userData.map { .user($0) }

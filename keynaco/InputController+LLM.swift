@@ -33,7 +33,7 @@ extension InputController {
 
     /// 確定語の品詞を AzooKey 辞書で判定し、DB の pos を更新する。
     func schedulePOSClassification(output: String, reading: String) {
-        guard HiraganaPreferredBuiltins.stopWords[output] == nil else { return }
+        guard HiraganaPreferredBuiltins.words[output] == nil else { return }
         guard DatabaseManager.shared.posForOutput(output) == nil else { return }
         let converter = handler.azooKeyConverter
         Task { @MainActor in
