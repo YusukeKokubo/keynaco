@@ -213,17 +213,17 @@ extension DatabaseManager {
         return output.unicodeScalars.allSatisfy { $0.value >= 0x3041 && $0.value <= 0x3096 }
     }
 
-    /// 末尾助詞のリスト。長い順にソートし「より」を「よ」より先にマッチさせる。
-    /// 格助詞（を・が・に・で・と・へ・より・の）および係助詞（は・も）を含む。
+    /// 格助詞・係助詞のリスト。長い順にソートし「より」を「よ」より先にマッチさせる。
+    /// 格助詞（を・が・に・で・と・へ・より・の）と係助詞（は・も）は
     /// いずれも体言に後置されるだけで本体の意味に乗っかっていないため、
     /// 「東京が」→「東京」のようにトリムしても再利用可能な単位が残る。
     /// 助動詞・終助詞は活用語尾として語幹と一体なので対象外（「でき」等の中途半端な語幹になる）。
-    /// HiraganaPreferredBuiltins.words とは独立した定義。末尾助詞トリムのみが目的。
+    /// HiraganaPreferredBuiltins.words とは独立した定義。助詞トリムのみが目的。
     static let trailingParticles: [String] = ["より", "の", "を", "が", "は", "に", "で", "と", "も", "へ"]
         .sorted { $0.count > $1.count }
 
-    /// output 末尾が末尾助詞で終わっている場合、助詞を除いた文字列を返す。
-    /// 「東京が」→「東京」、「何時に」→「何時」。末尾助詞でなければ nil。
+    /// output 末尾が格助詞・係助詞で終わっている場合、助詞を除いた文字列を返す。
+    /// 「東京が」→「東京」、「何時に」→「何時」。対象助詞でなければ nil。
     static func trimTrailingParticle(_ s: String) -> String? {
         for p in trailingParticles where s.hasSuffix(p) {
             let trimmed = String(s.dropLast(p.count))
@@ -234,7 +234,7 @@ extension DatabaseManager {
 
     /// フル読みのみ記録する。前方一致検索は `fetchHistoryScoredMerged` の LIKE クエリが担うため
     /// プレフィックスを個別に記録する必要はない。
-    /// output 末尾が末尾助詞の場合（例: 「東京が」）、助詞を除いた文節単位（「東京」）で記録する。
+    /// output 末尾が格助詞・係助詞の場合（例: 「東京が」）、助詞を除いた文節単位（「東京」）で記録する。
     /// reading も同じ助詞文字列分だけ末尾を除去する（全ひらがな reading の場合は維持）。
     func recordPrefixes(reading: String, output: String) {
         let (r, o): (String, String)
