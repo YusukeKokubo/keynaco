@@ -11,8 +11,9 @@ final class DiaryViewController: NSViewController, NSSplitViewDelegate {
     private let statusLabel = NSTextField(labelWithString: "")
 
     // 左ペイン（生ログ）
-    private let rawLogView = NSTextView(frame: .zero)
     private let rawLogLabel = NSTextField(labelWithString: "入力ログ（素材）")
+    private let rawLogTableView = NSTableView()
+    private var logEntries: [DatabaseManager.DailyLogEntry] = []
 
     // 右ペイン（生成日記）
     private let diaryView = NSTextView(frame: .zero)
@@ -126,6 +127,43 @@ final class DiaryViewController: NSViewController, NSSplitViewDelegate {
         return bar
     }
 
+    private func makeLogTableView() -> NSScrollView {
+        let timeCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("time"))
+        timeCol.title = "時刻"
+        timeCol.width = 48
+        timeCol.minWidth = 48
+        timeCol.maxWidth = 48
+        timeCol.resizingMask = []
+
+        let appCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("app"))
+        appCol.title = "アプリ"
+        appCol.width = 96
+        appCol.minWidth = 60
+
+        let textCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("text"))
+        textCol.title = "テキスト"
+        textCol.minWidth = 80
+        textCol.resizingMask = .autoresizingMask
+
+        rawLogTableView.addTableColumn(timeCol)
+        rawLogTableView.addTableColumn(appCol)
+        rawLogTableView.addTableColumn(textCol)
+
+        rawLogTableView.dataSource = self
+        rawLogTableView.delegate = self
+        rawLogTableView.rowHeight = 20
+        rawLogTableView.usesAlternatingRowBackgroundColors = true
+        rawLogTableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        rawLogTableView.selectionHighlightStyle = .none
+        rawLogTableView.focusRingType = .none
+
+        let sv = NSScrollView()
+        sv.hasVerticalScroller = true
+        sv.borderType = .bezelBorder
+        sv.documentView = rawLogTableView
+        return sv
+    }
+
     private func makeScrolledTextView(_ tv: NSTextView) -> NSScrollView {
         let sv = NSScrollView()
         sv.hasVerticalScroller = true
@@ -151,7 +189,7 @@ final class DiaryViewController: NSViewController, NSSplitViewDelegate {
         rawLogLabel.translatesAutoresizingMaskIntoConstraints = false
         rawLogLabel.font = .systemFont(ofSize: 11, weight: .medium)
         rawLogLabel.textColor = .secondaryLabelColor
-        let leftScroll = makeScrolledTextView(rawLogView)
+        let leftScroll = makeLogTableView()
         leftScroll.translatesAutoresizingMaskIntoConstraints = false
         leftPane.addSubview(rawLogLabel)
         leftPane.addSubview(leftScroll)
@@ -249,11 +287,9 @@ final class DiaryViewController: NSViewController, NSSplitViewDelegate {
 
     private func refreshRawLog() {
         let dateStr = DatabaseManager.dateString(from: datePicker.dateValue)
-        let entries = DatabaseManager.shared.fetchDailyLog(for: dateStr)
-        entryCountLabel.stringValue = entries.isEmpty ? "（入力ログなし）" : "（\(entries.count) 件）"
-        rawLogView.string = entries.isEmpty
-            ? "（まだ入力ログがありません）"
-            : entries.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
+        logEntries = DatabaseManager.shared.fetchDailyLog(for: dateStr)
+        entryCountLabel.stringValue = logEntries.isEmpty ? "（入力ログなし）" : "（\(logEntries.count) 件）"
+        rawLogTableView.reloadData()
     }
 
     private func loadSavedDiary() {
@@ -300,11 +336,9 @@ final class DiaryViewController: NSViewController, NSSplitViewDelegate {
             }
             do {
                 let entries = DatabaseManager.shared.fetchDailyLog(for: dateStr)
-                // 生成前に左ペインを最新ログで更新
+                logEntries = entries
                 entryCountLabel.stringValue = entries.isEmpty ? "（入力ログなし）" : "（\(entries.count) 件）"
-                rawLogView.string = entries.isEmpty
-                    ? "（まだ入力ログがありません）"
-                    : entries.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
+                rawLogTableView.reloadData()
 
                 let result = try await DiaryGenerator.generate(for: dateStr, from: entries)
                 diaryView.string = result
@@ -331,4 +365,62 @@ final class DiaryViewController: NSViewController, NSSplitViewDelegate {
         saveButton.isEnabled = false
         statusLabel.stringValue = "保存しました"
     }
+
+    private static func formattedTime(epoch: Int64) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(epoch))
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        f.locale = Locale(identifier: "ja_JP")
+        return f.string(from: date)
+    }
+
+    private static func appDisplayName(bundleID: String) -> String? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+        return Bundle(url: url)?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? Bundle(url: url)?.object(forInfoDictionaryKey: "CFBundleName") as? String
+    }
+}
+
+// MARK: - NSTableViewDataSource / Delegate
+
+extension DiaryViewController: NSTableViewDataSource, NSTableViewDelegate {
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        logEntries.isEmpty ? 1 : logEntries.count
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        let cell = NSTextField(labelWithString: "")
+        cell.font = .systemFont(ofSize: 12)
+        cell.lineBreakMode = .byTruncatingTail
+
+        if logEntries.isEmpty {
+            if tableColumn?.identifier.rawValue == "text" {
+                cell.stringValue = "（まだ入力ログがありません）"
+                cell.textColor = .secondaryLabelColor
+            }
+            return cell
+        }
+
+        let entry = logEntries[row]
+        switch tableColumn?.identifier.rawValue {
+        case "time":
+            cell.stringValue = Self.formattedTime(epoch: entry.createdAt)
+            cell.textColor = .secondaryLabelColor
+            cell.alignment = .right
+        case "app":
+            let name = entry.appBundleID.flatMap { Self.appDisplayName(bundleID: $0) }
+                ?? entry.appBundleID.map { String($0.split(separator: ".").last ?? "") }
+                ?? ""
+            cell.stringValue = name
+            cell.textColor = .secondaryLabelColor
+        case "text":
+            cell.stringValue = entry.text
+            cell.textColor = .labelColor
+        default:
+            break
+        }
+        return cell
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { false }
 }

@@ -125,6 +125,8 @@ public struct InputHandler {
     public var segmentCandidateCache: [String: Segment] = [:]
     /// 日記用バッファ: 句点（。！？）で区切られた文を蓄積し、文末でまとめて daily_log へ記録する。
     public var diaryBuffer: String = ""
+    /// daily_log に記録する際のアプリ bundle ID。InputController がキーイベント処理前に設定する。
+    public var currentAppBundleID: String?
     public mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
             committedHistory.removeAll()
@@ -255,7 +257,7 @@ public struct InputHandler {
         if !text.isEmpty {
             if InputHandler.sentenceTerminators.contains(text) {
                 if !diaryBuffer.isEmpty {
-                    db.recordDailyLog(output: diaryBuffer + text)
+                    db.recordDailyLog(output: diaryBuffer + text, appBundleID: currentAppBundleID)
                     diaryBuffer = ""
                 }
             } else {
@@ -295,7 +297,7 @@ public struct InputHandler {
     /// アプリ切り替え時など、文末記号なしに入力が途切れた際にバッファを flush する。
     public mutating func flushDiaryBuffer() {
         guard !diaryBuffer.isEmpty else { return }
-        db.recordDailyLog(output: diaryBuffer)
+        db.recordDailyLog(output: diaryBuffer, appBundleID: currentAppBundleID)
         diaryBuffer = ""
     }
 

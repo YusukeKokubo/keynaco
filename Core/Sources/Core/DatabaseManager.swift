@@ -26,6 +26,7 @@ public final class DatabaseManager: @unchecked Sendable {
         dropDeprecatedNgramTables()
         ensureHistoryPOSColumn()
         dropDeprecatedHistoryColumns()
+        ensureDailyLogAppColumn()
         seedHiraganaPreferredIfNeeded()
     }
 
@@ -190,6 +191,10 @@ public final class DatabaseManager: @unchecked Sendable {
             for (_, stmt) in stmtCache { sqlite3_finalize(stmt) }
             stmtCache = [:]
         }
+    }
+
+    func ensureDailyLogAppColumn() {
+        sqlite3_exec(db, "ALTER TABLE daily_log ADD COLUMN app_bundle_id TEXT DEFAULT NULL", nil, nil, nil)
     }
 
     private func historyHasColumn(_ name: String) -> Bool {

@@ -223,12 +223,14 @@ class InputController: IMKInputController, @unchecked Sendable {
         // @MainActor アクセス（candidateWindow・handler）を assumeIsolated に集約。ステータス通知は島から値を返し DispatchQueue.main.async で投稿する。
         #if DEBUG
         let (consumed, imeStateSnapshot) = MainActor.assumeIsolated {
+            let frontBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             EventViewerWindow.shared.addEvent(
                 keyCode: keyCode, chars: characters ?? "",
                 baseChars: baseCharacters ?? "",
                 mods: modifiers,
-                bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                bundleID: frontBundleID
             )
+            ic.handler.currentAppBundleID = frontBundleID
             let ctx = CandidateContext(
                 isVisible: ic.candidateWindow.isVisible,
                 selectedRow: ic.candidateWindow.selectedRow,
@@ -277,6 +279,7 @@ class InputController: IMKInputController, @unchecked Sendable {
                 historyEnd: ic.candidateWindow.historySectionEnd,
                 fixedEnd: ic.candidateWindow.fixedRowCount
             )
+            ic.handler.currentAppBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
             let composingWasEmpty = ic.handler.state.composingText.isEmpty
             let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
