@@ -60,6 +60,34 @@ extension DatabaseManager {
         }
     }
 
+    /// 全 history を時間減衰スコアで集計して上位 N 件の (reading, output) を返す。
+    /// 1 モーラサジェスト POC（observation.md）の `frequentCommits` warmload 用。
+    /// 接続詞・感動詞は除外。末尾助詞は `recordPrefixes` 側でトリム済みなので追加フィルタは不要。
+    public func fetchTopFrequentEntries(limit: Int) -> [(reading: String, output: String)] {
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            let sql = """
+            SELECT input, output FROM history
+            WHERE (pos IS NULL OR pos NOT IN ('other/conjunction', 'other/interjection'))
+              AND input IS NOT NULL AND input != ''
+              AND output IS NOT NULL AND output != ''
+            GROUP BY input, output
+            ORDER BY SUM((\(Self.recencyExpr))) DESC, MAX(used_at) DESC
+            LIMIT ?
+            """
+            guard let stmt = self.cachedStmt(for: sql) else { return [] }
+            self.bindRecency(stmt, at: 1, now: now)
+            sqlite3_bind_int(stmt, 3, Int32(limit))
+            var results: [(reading: String, output: String)] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                guard let rPtr = sqlite3_column_text(stmt, 0),
+                      let oPtr = sqlite3_column_text(stmt, 1) else { continue }
+                results.append((String(cString: rPtr), String(cString: oPtr)))
+            }
+            return results
+        }
+    }
+
     /// `output` がすでに分類済みなら pos を返す。未分類または未登録なら nil。
     public func posForOutput(_ output: String) -> String? {
         dbQueue.sync {
