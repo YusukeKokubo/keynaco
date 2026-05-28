@@ -215,6 +215,9 @@ extension DatabaseManager {
 
     /// 格助詞（HiraganaPreferredBuiltins.stopWords の "格助詞" タグのみ）を長い順に並べたリスト。
     /// 「より」のような複数文字助詞を「よ」より先にマッチさせるために長い順にソートする。
+    /// 格助詞は体言（名詞）に後置されるだけで本体の意味に乗っかっていないため、
+    /// 「東京が」→「東京」のようにトリムしても再利用可能な単位が残る。
+    /// 助動詞・終助詞は活用語尾として語幹と一体なので対象外（「でき」等の中途半端な語幹になる）。
     static let trailingParticles: [String] = HiraganaPreferredBuiltins.stopWords
         .filter { $0.value == "格助詞" }
         .map(\.key)
