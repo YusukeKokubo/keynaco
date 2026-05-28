@@ -253,13 +253,14 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
     }
 
     func testHistoryPrefixAppearsInSegmentCandidates() {
-        handler.db.recordPrefixes(reading: "わたしたち", output: "私たち")
+        // 末尾が漢字で終わる語（trim の影響を受けない）で前方一致を確認
+        handler.db.recordPrefixes(reading: "にほんごかんきょう", output: "日本語環境")
         let seg = handler.buildSegmentCandidates(
-            reading: "わたし",
+            reading: "にほんご",
             dictCandidates: [],
             prev: nil
         )
-        XCTAssertTrue(seg.candidates.contains("私たち"),
+        XCTAssertTrue(seg.candidates.contains("日本語環境"),
                       "読み前方一致の履歴がセグメント候補に含まれるはず")
     }
 

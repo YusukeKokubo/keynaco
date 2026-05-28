@@ -213,26 +213,37 @@ extension DatabaseManager {
         return output.unicodeScalars.allSatisfy { $0.value >= 0x3041 && $0.value <= 0x3096 }
     }
 
-    /// output / reading の末尾に連続するひらがな（U+3041–U+3096）を除去する。
-    /// 「東京が」→「東京」のように助詞付きで記録されたエントリを文節単位に正規化するために使う。
-    static func trimTrailingHiragana(_ s: String) -> String {
-        var scalars = s.unicodeScalars
-        while let last = scalars.last, last.value >= 0x3041 && last.value <= 0x3096 {
-            scalars.removeLast()
+    /// 格助詞（HiraganaPreferredBuiltins.stopWords の "格助詞" タグのみ）を長い順に並べたリスト。
+    /// 「より」のような複数文字助詞を「よ」より先にマッチさせるために長い順にソートする。
+    static let trailingParticles: [String] = HiraganaPreferredBuiltins.stopWords
+        .filter { $0.value == "格助詞" }
+        .map(\.key)
+        .sorted { $0.count > $1.count }
+
+    /// output 末尾が格助詞で終わっている場合、助詞を除いた文字列を返す。
+    /// 「東京が」→「東京」、「何時に」→「何時」。格助詞でなければ nil。
+    static func trimTrailingParticle(_ s: String) -> String? {
+        for p in trailingParticles where s.hasSuffix(p) {
+            let trimmed = String(s.dropLast(p.count))
+            return trimmed.isEmpty ? nil : trimmed
         }
-        return String(scalars)
+        return nil
     }
 
     /// フル読みのみ記録する。前方一致検索は `fetchHistoryScoredMerged` の LIKE クエリが担うため
     /// プレフィックスを個別に記録する必要はない。
-    /// output の末尾がひらがなの場合（例: 「東京が」）、そのひらがなを除いた文節単位（「東京」）で記録する。
-    /// ただし trimmed 後の reading が空になる場合（reading が全ひらがな）はトリムしない。
+    /// output 末尾が格助詞の場合（例: 「東京が」）、助詞を除いた文節単位（「東京」）で記録する。
+    /// reading も同じ助詞文字列分だけ末尾を除去する（全ひらがな reading の場合は維持）。
     func recordPrefixes(reading: String, output: String) {
-        let trimmedOutput = Self.trimTrailingHiragana(output)
-        let trimmedReading = Self.trimTrailingHiragana(reading)
-        let (r, o) = (!trimmedOutput.isEmpty && trimmedOutput != output && !trimmedReading.isEmpty)
-            ? (trimmedReading, trimmedOutput)
-            : (reading, output)
+        let (r, o): (String, String)
+        if let trimmedOutput = Self.trimTrailingParticle(output) {
+            let particle = String(output.dropFirst(trimmedOutput.count))
+            let trimmedReading = reading.hasSuffix(particle) ? String(reading.dropLast(particle.count)) : ""
+            r = trimmedReading.isEmpty ? reading : trimmedReading
+            o = trimmedOutput
+        } else {
+            r = reading; o = output
+        }
         guard !Self.isHiraganaPassthrough(reading: r, output: o) else { return }
         dispatchWrite {
             let t = self.nowEpoch()

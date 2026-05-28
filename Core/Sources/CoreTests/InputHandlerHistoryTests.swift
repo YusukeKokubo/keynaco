@@ -29,6 +29,47 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(handler.db.fetchHistoryExact(reading: "して").isEmpty, "複数文字ひらがなパススルーも記録しない")
     }
 
+    // MARK: - 格助詞トリム記録
+
+    func testTrailingParticleTrimmedOnRecord() {
+        // 格助詞「が」は trim される。reading も対応部分を除去
+        handler.db.recordPrefixes(reading: "とうきょうが", output: "東京が")
+        let exact = handler.db.fetchHistoryExact(reading: "とうきょう")
+        XCTAssertTrue(exact.contains("東京"), "「とうきょう」→「東京」で記録されるはず")
+        let withGa = handler.db.fetchHistoryExact(reading: "とうきょうが")
+        XCTAssertTrue(withGa.isEmpty, "「とうきょうが」は記録されない")
+    }
+
+    func testNonParticleSuffixNotTrimmed() {
+        // 活用語尾「る」「て」は格助詞でないので trim しない
+        handler.db.recordPrefixes(reading: "でる", output: "出る")
+        handler.db.recordPrefixes(reading: "おしえて", output: "教えて")
+        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "でる").isEmpty, "「出る」はそのまま記録")
+        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "おしえて").isEmpty, "「教えて」はそのまま記録")
+    }
+
+    func testTrimTrailingParticleHelper() {
+        XCTAssertEqual(DatabaseManager.trimTrailingParticle("東京が"), "東京")
+        XCTAssertEqual(DatabaseManager.trimTrailingParticle("何時に"), "何時")
+        XCTAssertEqual(DatabaseManager.trimTrailingParticle("東京より"), "東京")
+        XCTAssertNil(DatabaseManager.trimTrailingParticle("出る"))
+        XCTAssertNil(DatabaseManager.trimTrailingParticle("教えて"))
+        XCTAssertNil(DatabaseManager.trimTrailingParticle("東京"))
+    }
+
+    func testPrefixSearchHitsAfterParticleTrim() {
+        handler.db.recordPrefixes(reading: "とうきょうが", output: "東京が")
+        let results = handler.db.fetchHistoryScoredMerged(reading: "とうきょう")
+        XCTAssertTrue(results.map(\.output).contains("東京"), "前方一致で「東京」がヒットするはず")
+    }
+
+    func testNonParticleEndingPreserved() {
+        // 非格助詞末尾の output はそのまま記録
+        handler.db.recordPrefixes(reading: "わたしたち", output: "私たち")
+        let r = handler.db.fetchHistoryExact(reading: "わたしたち")
+        XCTAssertTrue(r.contains("私たち"), "格助詞以外の末尾はそのまま記録")
+    }
+
     func testHiraganaToKanjiIsRecorded() {
         handler.db.recordPrefixes(reading: "は", output: "葉")
         XCTAssertFalse(handler.db.fetchHistoryExact(reading: "は").isEmpty, "「は」→「葉」は変換なので記録する")
