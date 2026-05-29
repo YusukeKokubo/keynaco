@@ -134,12 +134,14 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
         let inputLength = hiragana.count
         let fullCoverage = result.mainResults.filter { composingCountValue($0) == inputLength }
-        // 末尾 data エントリが1文字のひらがな/カタカナである複合変換候補を除外する
-        // （例: 「蛇あ」= 蛇(じゃ)+あ → "あ"が1文字ひらがなで残余とみなす）
         // 末尾 data エントリが1文字のひらがな/カタカナである複合変換候補を除外する。
+        // （例: 「蛇あ」= 蛇(じゃ)+あ → "あ"が1文字ひらがなで残余とみなす）
         // ただし末尾が助詞(lcid 147...368)または助動詞(lcid 369...554)として変換済みの場合は除外しない。
         // 残余判定: 末尾が1文字かな かつ 助詞/助動詞でない → 未変換の残余（例: 「蛇あ」の"あ"）
         // 変換済み判定: 末尾が助詞/助動詞 → 正当な変換（例: 「学んだか」の"か"、「学んだ」の"だ"）
+        // ※ buildCandidateList の isScriptMixed（平仮名+片仮名の混在のみ検出）とは相補的。
+        //   こちらは「漢字+残余1文字かな」（蛇あ・角煮ん 等、isScriptMixed が見ない）を担当する。
+        //   「学んだか」(残す) と「蛇あ」(消す) は表層同型なので、区別には lcid（文法情報）が必須＝単純化不可。
         let validCoverage = fullCoverage.filter { c in
             guard c.data.count > 1, let last = c.data.last else { return true }
             guard last.word.count == 1, let scalar = last.word.unicodeScalars.first else { return true }
