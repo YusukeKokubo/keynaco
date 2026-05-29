@@ -88,10 +88,11 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
         baseOptions = ConvertRequestOptions(
             N_best: 10,
-            // 組成中の予測補完。完成形・活用形（ありがとう/おはよう/考える等）を候補に追加する。
-            // 予測候補は composingCount==inputLength でカバレッジフィルタ（requestCandidates）を通り、
-            // dictionary セクション（固定枠・履歴の下）に流れ込むため候補順序を壊さない。
-            // 価値はコールドスタート補完（履歴のない語の穴埋め）。履歴の代替ではなく補完。
+            // 組成中の予測補完。漢字を伸ばす内容語補完（内閣→内閣府/総理大臣）だけを候補に追加する。
+            // AzooKey の予測は機能語尾ひれ（気がする+ん/の/し、わからない+の）や かな語完成
+            // （考える/おはよう/ありがとう）も大量に吐くが、物理キーボードでは価値が薄くノイズ源になるため
+            // requestCandidates 側で「ruby 長 > 入力長（=予測）かつ末尾表層が非漢字」を落とす（POC260529b'）。
+            // 残った予測候補は composingCount==inputLength でカバレッジフィルタを通り dictionary セクションへ。
             // E2E 検証・経過観察: POC260529b / docs/observation.md。
             requireJapanesePrediction: true,
             requireEnglishPrediction: false,
@@ -134,6 +135,22 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
         let inputLength = hiragana.count
         let fullCoverage = result.mainResults.filter { composingCountValue($0) == inputLength }
+        // 予測補完（requireJapanesePrediction）の「かな尾ひれ」を落とす。POC260529b'。
+        // 予測候補は入力読みを超えて表層を伸ばす（例: 読み「きがする」→「気がするん/の/し」、「考える」、「おはよう」）。
+        // このうち付加部が漢字でないもの（機能語尾ひれ・かな語完成）は物理キーボードで価値が薄くノイズ源。
+        // 漢字を伸ばす補完（内閣→内閣府/総理大臣）だけ残す。
+        // 尾ひれは単一辞書エントリ（例: 気がするん(キガスルン/l1310)）で内部の形態素境界も lcid も
+        // 内容語/機能語を分けてくれないため、品詞では判別できない（学んだこと の こと と わからないの の の が同 rcid）。
+        // 唯一壊れない判別子が「ruby 長 > 入力長（=予測である）かつ末尾表層が非漢字」。E2E: docs/observation.md / plans/POC260529b.md。
+        let predictionFiltered = fullCoverage.filter { c in
+            let rubySum = c.data.reduce(0) { $0 + $1.ruby.count }
+            guard rubySum > inputLength else { return true }  // 予測でない（入力読みに収まる変換）→ 残す
+            guard let last = c.text.unicodeScalars.last else { return true }
+            let isKanji = (0x4E00...0x9FFF).contains(last.value)   // CJK 統合漢字
+                || (0x3400...0x4DBF).contains(last.value)          // 拡張A
+                || last.value == 0x3005                            // 々（同の字点）
+            return isKanji  // 末尾が漢字の予測（内容語伸長）のみ残す
+        }
         // 末尾 data エントリが1文字のひらがな/カタカナである複合変換候補を除外する。
         // （例: 「蛇あ」= 蛇(じゃ)+あ → "あ"が1文字ひらがなで残余とみなす）
         // ただし末尾が助詞(lcid 147...368)または助動詞(lcid 369...554)として変換済みの場合は除外しない。
@@ -142,7 +159,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
         // ※ buildCandidateList の isScriptMixed（平仮名+片仮名の混在のみ検出）とは相補的。
         //   こちらは「漢字+残余1文字かな」（蛇あ・角煮ん 等、isScriptMixed が見ない）を担当する。
         //   「学んだか」(残す) と「蛇あ」(消す) は表層同型なので、区別には lcid（文法情報）が必須＝単純化不可。
-        let validCoverage = fullCoverage.filter { c in
+        let validCoverage = predictionFiltered.filter { c in
             guard c.data.count > 1, let last = c.data.last else { return true }
             guard last.word.count == 1, let scalar = last.word.unicodeScalars.first else { return true }
             let isHiragana = (0x3041...0x3096).contains(scalar.value)
@@ -150,7 +167,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
             guard isHiragana || isKatakana else { return true }
             return (147...554).contains(last.lcid)
         }
-        let preferred = validCoverage.isEmpty ? fullCoverage : validCoverage
+        let preferred = validCoverage.isEmpty ? predictionFiltered : validCoverage
         return (preferred.isEmpty ? result.mainResults : preferred).map { $0.text }
     }
 

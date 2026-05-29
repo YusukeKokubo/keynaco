@@ -110,4 +110,50 @@ final class AzooKeyConverterTests: XCTestCase {
         XCTAssertTrue(candidates.contains("学んだ"),
             "「まなんだ」→「学んだ」が候補に含まれるはず: \(candidates)")
     }
+
+    // MARK: - 予測補完のかな尾ひれを落とす（POC260529b'）
+
+    /// 予測補完が付ける「機能語尾ひれ」（読みを超えて かな を足した候補）を候補から除外する。
+    /// 例: 読み「きがする」→「気がするん/の/し」、「わからない」→「わからないの/ん」。
+    func testPredictionKanaTailsAreFiltered() {
+        let converter = AzooKeyConverter()
+        let kigasuru = converter.requestCandidates(hiragana: "きがする")
+        for tail in ["気がするん", "気がするの", "気がするし"] {
+            XCTAssertFalse(kigasuru.contains(tail),
+                "かな尾ひれ「\(tail)」は除外されるはず: \(kigasuru)")
+        }
+        // 読みそのものの変換（予測でない）は残る
+        XCTAssertTrue(kigasuru.contains("気がする"),
+            "「気がする」（予測でない変換）は残るはず: \(kigasuru)")
+
+        let wakaranai = converter.requestCandidates(hiragana: "わからない")
+        for tail in ["わからないの", "わからないん", "分からないん"] {
+            XCTAssertFalse(wakaranai.contains(tail),
+                "かな尾ひれ「\(tail)」は除外されるはず: \(wakaranai)")
+        }
+        XCTAssertTrue(wakaranai.contains("わからない") || wakaranai.contains("分からない"),
+            "「わからない」の素の変換は残るはず: \(wakaranai)")
+    }
+
+    /// 漢字を伸ばす予測補完（内容語伸長）は残す。
+    func testKanjiExtendingPredictionsAreKept() {
+        let converter = AzooKeyConverter()
+        let naikaku = converter.requestCandidates(hiragana: "ないかく")
+        XCTAssertTrue(naikaku.contains("内閣"),
+            "「内閣」は残るはず: \(naikaku)")
+        XCTAssertTrue(naikaku.contains("内閣府"),
+            "漢字伸長の予測「内閣府」は残るはず: \(naikaku)")
+    }
+
+    /// 読みに収まる（予測でない）助詞・助動詞付き変換は誤爆させない。
+    /// 「学んだか」（か=助詞だが読み まなんだか == 入力長）・「分からない」（ない=助動詞）は残す。
+    func testFullCoverageInflectionsAreNotDropped() {
+        let converter = AzooKeyConverter()
+        let manandaka = converter.requestCandidates(hiragana: "まなんだか", leftSideContext: nil, richCandidates: true)
+        XCTAssertTrue(manandaka.contains("学んだか"),
+            "予測でない「学んだか」は残るはず: \(manandaka)")
+        let wakaranai = converter.requestCandidates(hiragana: "わからない")
+        XCTAssertTrue(wakaranai.contains("分からない") || wakaranai.contains("わからない"),
+            "予測でない「分からない」は残るはず: \(wakaranai)")
+    }
 }
