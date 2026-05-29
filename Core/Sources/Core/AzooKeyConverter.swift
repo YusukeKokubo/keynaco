@@ -88,7 +88,10 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
         baseOptions = ConvertRequestOptions(
             N_best: 10,
-            requireJapanesePrediction: false,
+            // POC260529b: 組成中の予測補完を実機 E2E で評価するため一時的に true。
+            // 予測候補（ありがとう/おはよう/考える等）は composingCount==inputLength で
+            // カバレッジフィルタを通り azooKeyCandidates に流れ込む。
+            requireJapanesePrediction: true,
             requireEnglishPrediction: false,
             keyboardLanguage: .ja_JP,
             learningType: .inputAndOutput,
