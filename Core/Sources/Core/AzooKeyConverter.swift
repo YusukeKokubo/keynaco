@@ -1,10 +1,28 @@
 import Foundation
 import KanaKanjiConverterModuleWithDefaultDictionary
 
-public final class AzooKeyConverter: @unchecked Sendable {
+/// `KanaKanjiConverter`（内部に Zenzai の `llama_context` を持つ）を NSLock で包み、
+/// **ロック保持中だけクロージャに貸し出す**ラッパー。
+///
+/// `llama_context` は非スレッドセーフ（推論ごとに内部状態を mutate する）ため、全アクセスを
+/// 直列化しなければならない。このラッパーは `converter` をフィールドとして公開せず `withLock`
+/// 経由でしか触れないようにすることで、「ロック貼り忘れ」を**コンパイルエラー**に変える
+/// （素の `converter.xxx()` を書く手段が存在しない）。
+///
+/// 不変条件: `converter` の参照を `withLock` のクロージャ外へ持ち出さないこと（唯一残る抜け穴。
+/// ただし貼り忘れと違い一目で分かるレビュー可能なミスに局所化される）。
+private struct LockedConverter {
     private let converter = KanaKanjiConverter.withDefaultDictionary()
-    // llama_context (Zenzai) は非スレッドセーフ。全 converter.* 呼び出しをこのロックで直列化する
-    private let converterLock = NSLock()
+    private let lock = NSLock()
+
+    func withLock<T>(_ body: (KanaKanjiConverter) -> T) -> T {
+        lock.withLock { body(converter) }
+    }
+}
+
+public final class AzooKeyConverter: @unchecked Sendable {
+    // llama_context (Zenzai) は非スレッドセーフ。LockedConverter が全 converter.* 呼び出しを直列化する。
+    private let locked = LockedConverter()
     private var candidateCache: [String: [Candidate]] = [:]
     private var candidateCacheKeys: [String] = []
     private let candidateCacheLimit = 50
@@ -39,7 +57,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return u
     }
 
-    // converterLock 保持中に呼ぶこと
+    // LockedConverter.withLock のクロージャ内（ロック保持中）から呼ぶこと
     private func insertCache(key: String, value: [Candidate]) {
         if candidateCache[key] != nil {
             candidateCacheKeys.removeAll { $0 == key }
@@ -104,8 +122,8 @@ public final class AzooKeyConverter: @unchecked Sendable {
         let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext)
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        let result = converterLock.withLock {
-            let r = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates))
+        let result = locked.withLock { c in
+            let r = c.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates))
             insertCache(key: key, value: r.mainResults)
             return r
         }
@@ -133,20 +151,20 @@ public final class AzooKeyConverter: @unchecked Sendable {
         let key = Self.cacheKey(segment: reading, leftSideContext: leftSideContext)
         var text = ComposingText()
         text.insertAtCursorPosition(reading, inputStyle: .direct)
-        return converterLock.withLock {
-            let result = converter.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
+        return locked.withLock { c in
+            let result = c.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
             insertCache(key: key, value: result.mainResults)
             return result.mainResults.map { $0.text }
         }
     }
 
     public func commit(reading: String, text: String) {
-        converterLock.withLock {
+        locked.withLock { c in
             for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
                 if let candidate = candidates.first(where: { $0.text == text }) {
                     FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
-                    converter.updateLearningData(candidate)
-                    converter.commitUpdateLearningData()
+                    c.updateLearningData(candidate)
+                    c.commitUpdateLearningData()
                     try? FileManager.default.removeItem(at: commitLockURL)
                     return
                 }
@@ -167,8 +185,8 @@ public final class AzooKeyConverter: @unchecked Sendable {
         while !remaining.isEmpty {
             var text = ComposingText()
             text.insertAtCursorPosition(remaining, inputStyle: .direct)
-            let (reading, segmentCandidates, consumed) = converterLock.withLock { () -> (String, [Candidate], Int) in
-                let result = converter.requestCandidates(text, options: opts)
+            let (reading, segmentCandidates, consumed) = locked.withLock { c -> (String, [Candidate], Int) in
+                let result = c.requestCandidates(text, options: opts)
                 let clauseCandidates = result.firstClauseResults.isEmpty
                     ? result.mainResults : result.firstClauseResults
                 let totalLen = remaining.count
@@ -213,8 +231,8 @@ public final class AzooKeyConverter: @unchecked Sendable {
         guard !reading.isEmpty else { return nil }
         var text = ComposingText()
         text.insertAtCursorPosition(reading, inputStyle: .direct)
-        return converterLock.withLock {
-            let result = converter.requestCandidates(text, options: baseOptions)
+        return locked.withLock { c in
+            let result = c.requestCandidates(text, options: baseOptions)
             guard let match = result.mainResults.first(where: { $0.text == output }) else { return nil }
             return Self.primaryLcid(from: match.data)
         }

@@ -60,7 +60,7 @@ xcodebuild build -scheme keynaco -destination "platform=macOS" \
 ```
 
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
-- **`@unchecked Sendable` + `Task.detached` の注意**: `@unchecked Sendable` はコンパイラの並行性チェックをバイパスするため、内部の非スレッドセーフな状態を `Task.detached` から触ると無音でデータ競合になる。`AzooKeyConverter.converter`（`KanaKanjiConverter` / Zenzai の `llama_context`）は非スレッドセーフ。`converter.*` を呼ぶメソッドはすべて `converterLock.withLock` を通すこと（過去に SIGABRT クラッシュを引き起こした実績あり）。
+- **`@unchecked Sendable` + `Task.detached` の注意**: `@unchecked Sendable` はコンパイラの並行性チェックをバイパスするため、内部の非スレッドセーフな状態を `Task.detached` から触ると無音でデータ競合になる。`KanaKanjiConverter` / Zenzai の `llama_context` は非スレッドセーフ（過去に SIGABRT クラッシュを引き起こした実績あり）。`AzooKeyConverter` ではこの converter を `LockedConverter`（NSLock でロック保持中のみクロージャに貸し出す private 型）に封じ込めてあり、素の `converter.*` を書く手段が存在しない＝ロック貼り忘れがコンパイルエラーになる。新メソッドを追加するときも必ず `locked.withLock { c in c.xxx() }` を通すこと（`converter` 参照をクロージャ外へ持ち出さないのが唯一の不変条件）。
 - **Zenzai モデルのセットアップ**: `keynaco/Resources/zenz-v3.1-small-gguf/` は HuggingFace の git submodule（LFS 管理）。初回 clone 後に以下が必要:
   ```bash
   brew install git-lfs && git lfs install
