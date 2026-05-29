@@ -88,7 +88,12 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
         baseOptions = ConvertRequestOptions(
             N_best: 10,
-            requireJapanesePrediction: false,
+            // 組成中の予測補完。完成形・活用形（ありがとう/おはよう/考える等）を候補に追加する。
+            // 予測候補は composingCount==inputLength でカバレッジフィルタ（requestCandidates）を通り、
+            // dictionary セクション（固定枠・履歴の下）に流れ込むため候補順序を壊さない。
+            // 価値はコールドスタート補完（履歴のない語の穴埋め）。履歴の代替ではなく補完。
+            // E2E 検証・経過観察: POC260529b / docs/observation.md。
+            requireJapanesePrediction: true,
             requireEnglishPrediction: false,
             keyboardLanguage: .ja_JP,
             learningType: .inputAndOutput,
