@@ -21,7 +21,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 |------|------|
 | `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
 | `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 9 ファイル。ユーザー辞書・ひらがな優先・変換履歴・Zenzai・NAS 同期・日記の 6 タブ） |
-| `keynaco/Resources/` | バンドルリソース（`zenz-v3.1-small-gguf/` = Zenzai モデル git submodule） |
+| `keynaco/Resources/` | バンドルリソース（`zenz-v3.2-small-gguf/` = Zenzai モデル git submodule） |
 | `keynaco/Debug/` | デバッグ用ツール（`DebugSocketServer`・`DebugCandidateWindow`・`EventViewerWindow`・`IMESandboxWindow`・`SocketMockClient` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
 | `Core/Sources/Core/` | `KeynacoCore` の実装（`InputHandler` 等） |
@@ -61,11 +61,11 @@ xcodebuild build -scheme keynaco -destination "platform=macOS" \
 
 - `SWIFT_VERSION: "6.0"`（strict concurrency モード）。新しいクラス・struct を追加する際は `@MainActor`、`Sendable`、または `@unchecked Sendable` のいずれかが必要
 - **`@unchecked Sendable` + `Task.detached` の注意**: `@unchecked Sendable` はコンパイラの並行性チェックをバイパスするため、内部の非スレッドセーフな状態を `Task.detached` から触ると無音でデータ競合になる。`KanaKanjiConverter` / Zenzai の `llama_context` は非スレッドセーフ（過去に SIGABRT クラッシュを引き起こした実績あり）。`AzooKeyConverter` ではこの converter を `LockedConverter`（NSLock でロック保持中のみクロージャに貸し出す private 型）に封じ込めてあり、素の `converter.*` を書く手段が存在しない＝ロック貼り忘れがコンパイルエラーになる。新メソッドを追加するときも必ず `locked.withLock { c in c.xxx() }` を通すこと（`converter` 参照をクロージャ外へ持ち出さないのが唯一の不変条件）。
-- **Zenzai モデルのセットアップ**: `keynaco/Resources/zenz-v3.1-small-gguf/` は HuggingFace の git submodule（LFS 管理）。初回 clone 後に以下が必要:
+- **Zenzai モデルのセットアップ**: `keynaco/Resources/zenz-v3.2-small-gguf/` は HuggingFace の git submodule（LFS 管理）。初回 clone 後に以下が必要:
   ```bash
   brew install git-lfs && git lfs install
   git submodule update --init
-  git -C keynaco/Resources/zenz-v3.1-small-gguf lfs pull
+  git -C keynaco/Resources/zenz-v3.2-small-gguf lfs pull
   ```
   モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る
 - POS 分類（`AzooKeyPOSClassifier`）は AzooKey 辞書の `lcid` + 接続詞/感動詞辞書によるルールベース実装。Apple Intelligence 不要。起動時に `AzooKeyPOSBackfill` で未分類エントリを一括再分類する。以前の `LLMPOSClassifier`（FoundationModels）は精度壊滅（77% が `other`）のため削除済み。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
