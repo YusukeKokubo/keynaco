@@ -96,34 +96,25 @@ public extension InputHandler {
         )
     }
 
-    // MARK: - Fixed slot（hiraganaPreferred / foreignMarker 排他）
+    // MARK: - Fixed slot（hiraganaPreferred）
 
     /// これ未満の履歴スコアは候補に載せない（DB の `recencyExpr` と同じ尺度）。
     private static let historyRecencyScoreCutoff = 0.5
     /// 候補ヘッドの過剰膨張を抑える前方一致履歴の上限件数。
     private static let maxHighHistoryCount = 3
 
-    /// 先頭固定枠の種別。`hiraganaPreferred` は `foreignMarker` より強い（排他）。
+    /// 先頭固定枠の種別。
     private enum FixedSlot {
         case none
         case hiragana
-        case katakana
     }
-
-    private static let foreignMarkers: Set<Character> = ["ー", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
 
     private func resolveFixedSlot(
         reading: String,
-        hiragana: String,
-        katakana: String,
-        hiraganaInHistory: Bool,
-        katakanaInHistory: Bool
+        hiraganaInHistory: Bool
     ) -> FixedSlot {
         if isHiraganaPreferred(reading) {
             return hiraganaInHistory ? .none : .hiragana
-        }
-        if reading.contains(where: { Self.foreignMarkers.contains($0) }) {
-            return katakanaInHistory ? .none : .katakana
         }
         return .none
     }
@@ -137,8 +128,6 @@ public extension InputHandler {
         switch fixedSlot {
         case .hiragana:
             return .firstMatching(state.composedHiragana)
-        case .katakana:
-            return .atZero
         case .none:
             if addsDefaultFixedHiragana {
                 // Zenzai が先頭に来る場合は row 0 を初期選択にする
@@ -207,10 +196,6 @@ public extension InputHandler {
             if allCandidatesSeen.contains(hiragana) { insertedSet.remove(hiragana) }
             sections.append(CandidateSection(kind: .fixedHiragana, items: [hiragana]))
             insertedSet.insert(hiragana)
-        case .katakana:
-            if allCandidatesSeen.contains(katakana) { insertedSet.remove(katakana) }
-            sections.append(CandidateSection(kind: .fixedKatakana, items: [katakana]))
-            insertedSet.insert(katakana)
         case .none:
             if addsDefaultFixedHiragana {
                 if allCandidatesSeen.contains(hiragana) { insertedSet.remove(hiragana) }
@@ -244,12 +229,11 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .dateTime, items: uniqueDateTimeCandidates))
         }
 
-        let readingKatakana = KanaUtils.hiraganaToKatakana(hiragana)
         let azooKeyItems = sources.azooKeyUniq.filter { candidate in
-            guard addsDefaultFixedHiragana && candidate == readingKatakana else { return true }
+            guard addsDefaultFixedHiragana && candidate == katakana else { return true }
             // カタカナ・ひらがな以外の実質的な変換候補がない（未知語）場合のみ
             // insertedSet からも外して末尾のカタカナセクションに表示させる
-            let hasRealCandidates = sources.azooKeyCandidates.contains { $0 != readingKatakana && $0 != hiragana }
+            let hasRealCandidates = sources.azooKeyCandidates.contains { $0 != katakana && $0 != hiragana }
             if !hasRealCandidates { insertedSet.remove(candidate) }
             return false
         }
@@ -298,19 +282,11 @@ public extension InputHandler {
         }
 
         let hiragana = state.composedHiragana
-        let katakana = KanaUtils.hiraganaToKatakana(hiragana)
         let predictCount = sources.predictCount
         let highHistoryCount = sources.highHistoryCount
         let basePool = sources.uniquePredictions + sources.highHistory + sources.azooKeyUniq
         let hiraganaInHistory = basePool.prefix(predictCount + highHistoryCount).contains(hiragana)
-        let katakanaInHistory = basePool.prefix(predictCount + highHistoryCount).contains(katakana)
-        let fixedSlot = resolveFixedSlot(
-            reading: h,
-            hiragana: hiragana,
-            katakana: katakana,
-            hiraganaInHistory: hiraganaInHistory,
-            katakanaInHistory: katakanaInHistory
-        )
+        let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
 
         let addsDefaultFixedHiragana = shouldAddDefaultFixedHiragana(
             autoShow: autoShow,

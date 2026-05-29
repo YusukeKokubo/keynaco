@@ -3,7 +3,6 @@
 public struct CandidateSection: Sendable {
     public enum Kind: Hashable, Sendable {
         case fixedHiragana  // ひらがな先頭固定（hiraganaPreferred 時）
-        case fixedKatakana  // カタカナ先頭固定（foreign marker 時）
         case userDict       // ユーザー辞書
         case zenzaiTop1     // Zenzai top-1 プロモート
         case prediction     // n-gram 予測
@@ -28,7 +27,7 @@ public struct CandidateSection: Sendable {
 public enum InitialRowPolicy: Sendable {
     /// 該当文字列の最初の出現位置（hiraganaPreferred 用）。見つからなければ afterFixed にフォールバック
     case firstMatching(String)
-    /// 強制的に 0 行目（foreign marker + 固定セクションあり）
+    /// 強制的に 0 行目（Zenzai top-1 を初期選択にする場合等）
     case atZero
     /// 固定セクション直後（既定）
     case afterFixed
@@ -41,7 +40,7 @@ public enum InitialRowPolicy: Sendable {
 public struct CandidateLayout: Sendable {
 
     public let candidates: [String]
-    /// .fixedHiragana / .fixedKatakana / .userDict / .zenzaiTop1 の末尾インデックス
+    /// .fixedHiragana / .userDict / .zenzaiTop1 の末尾インデックス
     public let fixedEnd: Int
     /// fixedEnd + .prediction の末尾
     public let predictionEnd: Int
@@ -75,7 +74,7 @@ public struct CandidateLayout: Sendable {
     // 現行の assembleCandidateList と一致する順序。
     // .number / .dateTime を .azooKeyDict より前に置くことで historyEnd への挿入と同じ効果を再現する。
     public static let defaultSectionOrder: [CandidateSection.Kind] = [
-        .fixedHiragana, .fixedKatakana,
+        .fixedHiragana,
         .userDict,
         .zenzaiTop1,
         .prediction,
@@ -87,7 +86,6 @@ public struct CandidateLayout: Sendable {
 
     /// Zenzai top-1 をひらがな固定より前に置く順序（履歴・予測なしでZenzai提案ありの場合に使用）
     public static let zenzaiFirstSectionOrder: [CandidateSection.Kind] = [
-        .fixedKatakana,
         .userDict,
         .zenzaiTop1,
         .fixedHiragana,
@@ -99,7 +97,7 @@ public struct CandidateLayout: Sendable {
     ]
 
     private static let fixedSectionKinds: Set<CandidateSection.Kind> = [
-        .fixedHiragana, .fixedKatakana, .userDict, .zenzaiTop1,
+        .fixedHiragana, .userDict, .zenzaiTop1,
     ]
 
     public init(

@@ -125,9 +125,13 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
                      historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 
-    // MARK: - D: foreignMarker（長音符・小母音）
+    // MARK: - D: 長音符・小母音を含む読み（カタカナ先頭固定の特別扱いはしない）
+    //
+    // 以前は `foreignMarkers` ヒューリスティックで「ー」「ぁぃぅぇぉ」を含む読みを
+    // カタカナ先頭固定にしていたが、Zenzai/履歴ベースで十分なため削除。カタカナは
+    // 末尾の `.katakana` セクションで拾える（履歴ヒット時は履歴経路で先頭に来る）。
 
-    func testSnap_D1_ForeignMarkerNoHistory() {
+    func testSnap_D1_LongVowelNoHistory() {
         useStub(SnapStub(["辞書A", "辞書B"]))
         type(chars: "t", base: "t"); type(chars: "o", base: "o")
         type(chars: "-", base: "-")
@@ -135,11 +139,11 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         type(chars: "r", base: "r"); type(chars: "u", base: "u")
         XCTAssertEqual(handler.state.composedHiragana, "とーたる")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["トータル", "辞書A", "辞書B"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
+                     candidates: ["辞書A", "辞書B", "トータル"],
+                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
-    func testSnap_D2_ForeignMarkerKatakanaInHistory() {
+    func testSnap_D2_LongVowelKatakanaInHistory() {
         useStub(SnapStub(["辞書A", "辞書B"]))
         handler.db.record(input: "とーたる", output: "トータル")
         type(chars: "t", base: "t"); type(chars: "o", base: "o")
@@ -151,15 +155,15 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
                      historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
-    func testSnap_D3_SmallVowelForeignMarker() {
+    func testSnap_D3_SmallVowelNoHistory() {
         useStub(SnapStub(["辞書A", "辞書B"]))
         type(chars: "n", base: "n"); type(chars: "e", base: "e"); type(chars: "i", base: "i")
         type(chars: "t", base: "t"); type(chars: "h", base: "h"); type(chars: "i", base: "i")
         type(chars: "b", base: "b"); type(chars: "u", base: "u")
         XCTAssertEqual(handler.state.composedHiragana, "ねいてぃぶ")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["ネイティブ", "辞書A", "辞書B"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
+                     candidates: ["辞書A", "辞書B", "ネイティブ"],
+                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     // MARK: - E: ユーザー辞書
