@@ -468,6 +468,47 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
     }
 
+    // MARK: - 1 モーラサジェスト（助詞読みのひらがな先頭固定）
+    // See: docs/observation.md 1モーラサジェスト（2026-05-29 調整）
+
+    /// 読みが助詞（てにをはが等）の 1 モーラ autoShow では、ひらがなを row 0 に固定し
+    /// 前方一致の過去語をその下に並べる（ひらがな優先と過去語サジェストの両立）。
+    func testSingleMoraParticleFixesHiraganaAndKeepsRecents() {
+        handler.appendRecentCommit(reading: "はっぴょう", output: "発表")
+        typeRomaji("ha")
+        XCTAssertEqual(handler.state.composedHiragana, "は")
+        let action = handler.buildCandidateList(autoShow: true)
+        guard case .show(let candidates, let historyEnd, let initialRow, _, let fixedEnd) = action else {
+            XCTFail("助詞読みの 1 モーラ autoShow は .show を返すはず: \(action)"); return
+        }
+        XCTAssertEqual(candidates.first, "は", "ひらがなが row 0 に来るはず: \(candidates)")
+        XCTAssertTrue(candidates.contains("発表"), "前方一致の過去語が残るはず: \(candidates)")
+        XCTAssertEqual(initialRow, 0, "初期選択はひらがな行")
+        XCTAssertEqual(fixedEnd, 1, "ひらがな 1 行が固定セクション（Shift+Delete 保護）")
+        XCTAssertEqual(historyEnd, candidates.count)
+    }
+
+    /// 助詞読みでも前方一致の過去語が無ければ単独ひらがなの窓は出さない（組成のまま継続）。
+    func testSingleMoraParticleWithoutRecentsDismisses() {
+        typeRomaji("ha")
+        XCTAssertEqual(handler.state.composedHiragana, "は")
+        assertDismiss(handler.buildCandidateList(autoShow: true),
+                      "過去語が無い助詞読みの 1 モーラ autoShow は窓を出さない")
+    }
+
+    /// 助詞でない 1 モーラ読みは従来通り過去語のみ（ひらがな固定なし）。
+    func testSingleMoraNonParticleKeepsRecentsOnly() {
+        handler.appendRecentCommit(reading: "じょうほう", output: "情報")
+        typeRomaji("jo")
+        XCTAssertEqual(handler.state.composedHiragana, "じょ")
+        let action = handler.buildCandidateList(autoShow: true)
+        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+            XCTFail("非助詞読みの 1 モーラ autoShow は .show を返すはず: \(action)"); return
+        }
+        XCTAssertEqual(candidates.first, "情報", "非助詞では過去語が先頭: \(candidates)")
+        XCTAssertEqual(fixedEnd, 0, "非助詞では固定セクションなし")
+    }
+
     // MARK: - 日時候補
 
     func testKyouIncludesDateCandidates() {

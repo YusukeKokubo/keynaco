@@ -262,6 +262,22 @@ public extension InputHandler {
         let isSingleMora = !h.isEmpty && primaryKanaCount == 1 && !h.allSatisfy({ $0.isASCII })
         if autoShow, isSingleMora, numberCandidates.isEmpty, dateTimeCandidates.isEmpty {
             let recents = recentCommitsMatching(prefix: h)
+            // 読みが助詞・ひらがな固定語（てにをはが 等）のとき: ひらがなを row 0 に固定し、
+            // その下に前方一致の過去語を並べる（observation.md 1モーラサジェスト・2026-05-29 調整）。
+            // ひらがな優先なので Space/Enter ではまず h が確定し、過去語は矢印で選べる。両立させる狙い。
+            if isHiraganaPreferred(h) {
+                let rest = recents.filter { $0 != h }
+                // 並べる過去語がなければ単独ひらがなの窓は無意味なので出さない（組成のまま継続）。
+                guard !rest.isEmpty else { return .dismiss }
+                let candidates = [h] + rest
+                return .show(
+                    candidates: candidates,
+                    historyEnd: candidates.count,
+                    initialRow: 0,
+                    predictionEnd: candidates.count,
+                    fixedEnd: 1
+                )
+            }
             guard !recents.isEmpty else { return .dismiss }
             // 第一候補が機能語なら（「は」→「は」のような自己一致など）抑制
             if HiraganaPreferredBuiltins.words[recents[0]] != nil {
