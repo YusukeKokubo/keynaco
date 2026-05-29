@@ -4,6 +4,32 @@
 
 ---
 
+## G-2 Tuner（AX スクレイピング型 personalization 基盤）の追加（2026-05-29）
+
+**概要**: Zenzai の `personalizationMode`（base/personal n-gram LM の補間）に渡す personal モデルを
+生成・データ蓄積する手段として、azooKey の **Tuner**（github.com/azooKey/Tuner, MIT）を keynaco に
+足すか検討した。Zenzai personalization 自体の効果検証は [POC260529](../plans/POC260529.md) で実施。
+
+**調査した内容**: Tuner は SwiftPM ライブラリではなく**独立した macOS メニューバーアプリ**（`.xcodeproj`）。
+2層に分かれる:
+- **取得層**: アクセシビリティ API で**全アプリの画面テキストを常時スクレイピング**。`app-sandbox: false`、`NSAccessibilityUsageDescription` 必須。
+- **学習パイプライン層**: MinHash＋前方一致で重複除去（`MinHashUtils` / `TextModel+Purification`）→ EfficientNGram で n-gram 逐次学習（`TextModel+NGram`）。App Group 経由で IME にモデルを渡す。
+
+**不採用の理由**:
+
+- **取得層がポジショニングと衝突**: keynaco は `app-sandbox: true`／concept.md「ローカル完結」「学習データはローカル SQLite に閉じる」。Tuner の取得層はサンドボックス解除＋Accessibility 権限＋閲覧内容の全収集を要求し、「入力を学習」から「画面で見た全テキストを収集」へ信頼契約が質的に変わる
+- **取得層がそもそも不要**: keynaco は IME なので `daily_log`（打鍵＋app_bundle_id）が privacy を守ったまま育つドメインコーパスになる。azooKey が AX スクレイピングをする理由（入力だけだとデータが貯まるのが遅い）は本 POC のデータ量律速の解決策だが、keynaco にとっては最も避けるべき取り方
+- **時期尚早**: personalization 自体が [POC260529](../plans/POC260529.md) でデータ量律速（2日で2470字）と判明し status=tested で保持中。Tuner を今組んでもデータが貯まるのを待つだけ
+
+**判断**: Tuner アプリの追加（特に取得層）は不採用。**ただし personalization 機構そのものは棄却ではない**
+（POC260529 で「データ待ちで保持」）。将来 personalization を本採用するなら、Tuner 一式ではなく
+**dedup ロジックだけ MIT 流用**（MinHash／前方一致は実装の質が高い）し、`daily_log` からの増分学習に
+組み込む。取得層は捨てる。
+
+> 関連: [POC260529](../plans/POC260529.md)、[G-1 Zenzai 制御パラメーター](#g-1-zenzai-制御パラメーターtopic--style--preference-の-ui-公開2026-05-24)
+
+---
+
 ## H-1 FoundationModels @Generable 構造化出力による品詞分類（2026-05-25）
 
 **概要**: `LLMPOSClassifier` のプレーンテキストパース方式を廃止し、`@Generable` + Guided Generation（`respond(generating:)`）で品詞ラベルを構造化出力させる。スキーマ違反トークンを生成できなくなるためガベージ出力問題を根本解決できると想定した。Tool Calling（`struct POSTagTool: Tool`）も代替アプローチとして検証した。
