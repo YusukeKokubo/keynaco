@@ -4,6 +4,7 @@ import KeynacoCore
 final class HistoryViewController: NSViewController {
     private let tableView = DeletableTableView()
     private let deleteButton = NSButton(title: "選択を削除", target: nil, action: nil)
+    private let cleanupButton = NSButton(title: "低頻度を削除", target: nil, action: nil)
     private var data: [DatabaseManager.HistoryEntry] = []
 
     private struct ColumnDef {
@@ -76,11 +77,18 @@ final class HistoryViewController: NSViewController {
         deleteButton.isEnabled = false
         bar.addSubview(deleteButton)
 
+        cleanupButton.translatesAutoresizingMaskIntoConstraints = false
+        cleanupButton.target = self
+        cleanupButton.action = #selector(cleanupLowScore)
+        bar.addSubview(cleanupButton)
+
         let refreshButton = NSButton(title: "更新", target: self, action: #selector(reload))
         refreshButton.translatesAutoresizingMaskIntoConstraints = false
         bar.addSubview(refreshButton)
 
         NSLayoutConstraint.activate([
+            cleanupButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            cleanupButton.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 12),
             deleteButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             deleteButton.trailingAnchor.constraint(equalTo: refreshButton.leadingAnchor, constant: -8),
             refreshButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
@@ -129,6 +137,44 @@ final class HistoryViewController: NSViewController {
         data.remove(at: row)
         tableView.removeRows(at: IndexSet(integer: row), withAnimation: .effectFade)
         deleteButton.isEnabled = tableView.selectedRow >= 0
+    }
+
+    @objc private func cleanupLowScore() {
+        cleanupButton.isEnabled = false
+        Task.detached(priority: .background) {
+            let count = DatabaseManager.shared.countLowScoreHistory()
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.cleanupButton.isEnabled = true
+
+                let alert = NSAlert()
+                alert.messageText = "低頻度の履歴を削除"
+                if count == 0 {
+                    alert.informativeText = "削除対象のエントリはありません。"
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
+                    return
+                }
+                alert.informativeText = "\(count) 件を削除します。この操作は取り消せません。"
+                alert.addButton(withTitle: "削除")
+                alert.addButton(withTitle: "キャンセル")
+                alert.alertStyle = .warning
+                guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+                self.cleanupButton.isEnabled = false
+                Task.detached(priority: .background) {
+                    let deleted = DatabaseManager.shared.cleanupLowScoreHistory()
+                    await MainActor.run { [weak self] in
+                        guard let self else { return }
+                        self.cleanupButton.isEnabled = true
+                        self.reload()
+                        let done = NSAlert()
+                        done.messageText = "\(deleted) 件を削除しました"
+                        done.runModal()
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -334,12 +334,7 @@ public final class DatabaseManager: @unchecked Sendable {
            now - lastEpoch < 7 * 86400 { return }
 
         dispatchWrite {
-            let cutoff = self.nowEpoch() - 180 * 86400
-            for table in ["history"] {
-                self.executeOnQueue("DELETE FROM \(table) WHERE count = 1 AND used_at < ?") { stmt in
-                    sqlite3_bind_int64(stmt, 1, cutoff)
-                }
-            }
+            _ = self.cleanupLowScoreHistoryOnQueue(threshold: 0.1)
             sqlite3_exec(self.db, "VACUUM;", nil, nil, nil)
             defaults.set(self.nowEpoch(), forKey: key)
             #if DEBUG
