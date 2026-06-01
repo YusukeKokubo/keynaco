@@ -21,6 +21,7 @@ final class HistoryViewController: NSViewController {
         ColumnDef(id: "pos",       title: "品詞",         minWidth: 60,  defaultWidth: 90,  sortKey: "pos"),
         ColumnDef(id: "count",     title: "回数",         minWidth: 40,  defaultWidth: 60,  sortKey: "count"),
         ColumnDef(id: "used_at",   title: "最終変換",     minWidth: 80,  defaultWidth: 110, sortKey: "used_at"),
+        ColumnDef(id: "score",     title: "スコア",       minWidth: 50,  defaultWidth: 70,  sortKey: "score"),
     ]
 
     override func loadView() {
@@ -124,6 +125,7 @@ final class HistoryViewController: NSViewController {
         case "pos":       data.sort { asc ? Self.posLabel($0.pos) < Self.posLabel($1.pos) : Self.posLabel($0.pos) > Self.posLabel($1.pos) }
         case "count":     data.sort { asc ? $0.count < $1.count : $0.count > $1.count }
         case "used_at":   data.sort { asc ? $0.usedAt < $1.usedAt : $0.usedAt > $1.usedAt }
+        case "score":     data.sort { asc ? $0.score() < $1.score() : $0.score() > $1.score() }
         default:          break
         }
         tableView.reloadData()
@@ -193,6 +195,7 @@ extension HistoryViewController: NSTableViewDelegate {
         case "pos":       text = Self.posLabel(entry.pos)
         case "count":     text = "\(entry.count)"
         case "used_at":   text = Self.formatDate(entry.usedAt)
+        case "score":     text = String(format: "%.2f", entry.score())
         default: return nil
         }
         let tf = tableView.makeView(withIdentifier: id, owner: nil) as? NSTextField ?? {

@@ -298,6 +298,10 @@ public final class DatabaseManager: @unchecked Sendable {
         public let count: Int
         public let pos: String?
         public let usedAt: Int64
+
+        public func score(now: Int64 = Int64(Date().timeIntervalSince1970)) -> Double {
+            Double(count) / (1.0 + Double(now - usedAt) / DatabaseManager.recencyTauSeconds)
+        }
     }
 
     public struct UserDictEntry: Sendable {
