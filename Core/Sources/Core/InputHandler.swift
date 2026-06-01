@@ -250,22 +250,8 @@ public struct InputHandler {
     /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
     public mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
         // セグメントモード中の強制確定（アプリ切り替えなど）
-        if let segmentState = state.segmentState {
-            let selectedText = candidate.selectedText ?? segmentState.focusedSegment.selectedText
-            var confirmed = ""
-            var fullReading = ""
-            for (i, seg) in segmentState.segments.enumerated() {
-                let text = (i == segmentState.focusedIndex) ? selectedText : seg.selectedText
-                db.recordPrefixes(reading: seg.reading, output: text)
-                let conv = azooKeyConverter; let r = seg.reading; let t = text
-                Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
-                confirmed += text
-                fullReading += seg.reading
-            }
-            if segmentState.segments.count >= 2 {
-                db.recordPrefixes(reading: fullReading, output: confirmed)
-            }
-            commitText(text: confirmed, fullReading: fullReading, client: client)
+        if state.segmentState != nil {
+            flushSegmentModeComposition(candidate: candidate, client: client)
             return
         }
         guard !state.composingText.isEmpty else { return }
@@ -332,7 +318,7 @@ public struct InputHandler {
     /// F6–F10 の変換確定。composingText が空なら false を返す。
     public mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
         if state.isSegmentMode, let segmentState = state.segmentState {
-            state.composedHiragana = segmentState.segments.map(\.reading).joined()
+            state.composedHiragana = segmentState.pendingReading
             state.segmentState = nil
             segmentCandidateCache.removeAll()
         }
@@ -361,13 +347,46 @@ public struct InputHandler {
     }
 
     public func applyMarkedText(candidateText: String?, client: TextInputClient) {
-        let text: String
         if let selected = candidateText {
-            text = selected + state.pendingRomaji
-        } else {
-            text = state.composingText
+            let text = selected + state.pendingRomaji
+            client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            return
         }
+        // POC: 組成中（候補非選択）の見込みセグメント分割を背景色で可視化する。
+        // 変換エンジンが内部でどう文節を割ろうとしているかをライブで観察するための実験。
+        if let attr = previewSegmentMarkedText() {
+            client.setMarkedText(attr, selectionRange: NSRange(location: attr.length, length: 0))
+            return
+        }
+        let text = state.composingText
         client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+    }
+
+    /// 組成中ひらがなを `segmentize` で見込み分割し、文節ごとに交互背景色を付けた marked text を返す。
+    /// 分割不能（短すぎる / 連結が組成文字列に一致しない）場合は nil を返し、呼び出し側が従来描画へフォールバックする。
+    private func previewSegmentMarkedText() -> NSAttributedString? {
+        let hira = state.composedHiragana
+        guard hira.count >= 2 else { return nil }
+        let segs = azooKeyConverter.segmentize(hira, leftSideContext: azooKeyLeftContext)
+        guard segs.count >= 1, segs.map(\.reading).joined() == hira else { return nil }
+
+        // marked text では背景色・下線色は環境に無視/丸められるが、下線スタイル（太細）は範囲ごとに効く。
+        // 文節ごとに太線／細線を交互にして見込み分割の境界を可視化する。
+        let underlines: [Int] = [
+            NSUnderlineStyle.thick.rawValue,
+            NSUnderlineStyle.single.rawValue,
+        ]
+        let attr = NSMutableAttributedString()
+        for (i, seg) in segs.enumerated() {
+            attr.append(NSAttributedString(string: seg.reading, attributes: [
+                .underlineStyle: underlines[i % underlines.count],
+            ]))
+        }
+        // ローマ字途中入力（"k" 等）は分割対象外。背景なしで末尾に付ける。
+        if !state.hiddenPendingN, !state.pendingRomaji.isEmpty {
+            attr.append(NSAttributedString(string: state.pendingRomaji))
+        }
+        return attr
     }
 
     public mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {

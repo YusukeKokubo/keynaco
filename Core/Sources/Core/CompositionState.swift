@@ -129,29 +129,57 @@ public struct Segment {
     }
 }
 
+/// AzooKey 準拠の逐次セグメント確定状態。
+/// 左端の `current` だけを候補選択し、Enter で確定 → 残りを再 segmentize する。
 public struct SegmentState {
-    public var segments: [Segment]
-    public var focusedIndex: Int
+    /// 現在選択中の左端文節
+    public var current: Segment
+    /// 現在文節の右側に残っている未確定読み（ひらがな）
+    public var remainingReading: String
+    /// この入力セッションで逐次確定済みの文節
+    public var confirmedSegments: [(reading: String, text: String)] = []
+
+    public init(current: Segment, remainingReading: String, confirmedSegments: [(reading: String, text: String)] = []) {
+        self.current = current
+        self.remainingReading = remainingReading
+        self.confirmedSegments = confirmedSegments
+    }
+
+    /// 逐次確定では常に左端のみフォーカス（互換用）
+    public var focusedIndex: Int { 0 }
 
     public var focusedSegment: Segment {
-        get { segments[focusedIndex] }
-        set { segments[focusedIndex] = newValue }
+        get { current }
+        set { current = newValue }
+    }
+
+    /// 未確定部分の全読み
+    public var pendingReading: String {
+        current.reading + remainingReading
     }
 
     public var allSelectedText: String {
-        segments.map(\.selectedText).joined()
+        confirmedSegments.map(\.text).joined() + current.selectedText
+    }
+
+    /// デバッグスナップショット用
+    public var snapshotSegmentTexts: [String] {
+        var texts = confirmedSegments.map(\.text)
+        texts.append(current.selectedText)
+        if !remainingReading.isEmpty { texts.append(remainingReading) }
+        return texts
     }
 
     public func attributedString(overrideFocusedText: String? = nil) -> NSAttributedString {
         let result = NSMutableAttributedString()
-        for (i, seg) in segments.enumerated() {
-            let text = (i == focusedIndex)
-                ? (overrideFocusedText ?? seg.selectedText)
-                : seg.selectedText
-            let style: Int = (i == focusedIndex)
-                ? NSUnderlineStyle.thick.rawValue
-                : NSUnderlineStyle.single.rawValue
-            result.append(NSAttributedString(string: text, attributes: [.underlineStyle: style]))
+        let currentText = overrideFocusedText ?? current.selectedText
+        result.append(NSAttributedString(string: currentText, attributes: [
+            .underlineStyle: NSUnderlineStyle.thick.rawValue,
+        ]))
+        if !remainingReading.isEmpty {
+            result.append(NSAttributedString(string: remainingReading, attributes: [
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+            ]))
         }
         return result
     }

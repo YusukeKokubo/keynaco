@@ -155,9 +155,13 @@ class InputHandlerTestCase: XCTestCase {
     }
 
     @discardableResult
-    func requireSegmentMode(minSegments: Int = 2, file: StaticString = #file, line: UInt = #line) -> SegmentState? {
-        guard handler.state.isSegmentMode, let ss = handler.state.segmentState, ss.segments.count >= minSegments else {
-            XCTFail("セグメントモードかつ文節数 >= \(minSegments) を期待", file: file, line: line)
+    func requireSegmentMode(hasRemaining: Bool = true, file: StaticString = #file, line: UInt = #line) -> SegmentState? {
+        guard handler.state.isSegmentMode, let ss = handler.state.segmentState else {
+            XCTFail("セグメントモードを期待", file: file, line: line)
+            return nil
+        }
+        if hasRemaining && ss.remainingReading.isEmpty {
+            XCTFail("残り読みありのセグメントモードを期待", file: file, line: line)
             return nil
         }
         return ss

@@ -26,13 +26,17 @@ private final class ScenarioS01KanjiMockConverter: AzooKeyConverting {
 
     func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
         _ = leftSideContext
-        guard hiragana == "かんじ" else {
+        switch hiragana {
+        case "かんじ":
+            return [
+                (reading: "かん", candidates: ["漢"]),
+                (reading: "じ", candidates: ["字"]),
+            ]
+        case "じ":
+            return [(reading: "じ", candidates: ["字"])]
+        default:
             return [(reading: hiragana, candidates: ["□"])]
         }
-        return [
-            (reading: "かん", candidates: ["漢"]),
-            (reading: "じ", candidates: ["字"]),
-        ]
     }
 }
 
@@ -80,8 +84,19 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
             candidate: .hidden,
             client: c
         )
+        // 逐次確定: 1 文節目
+        if h.state.isSegmentMode {
+            _ = h.handle(
+                keyCode: KeyCode.enter,
+                characters: nil,
+                baseCharacters: nil,
+                modifiers: [],
+                candidate: .hidden,
+                client: c
+            )
+        }
         XCTAssertFalse(h.state.isSegmentMode)
-        XCTAssertEqual(c.inserted.last, "漢字")
+        XCTAssertEqual(c.inserted.joined(), "漢字")
         _ = enterAction
     }
 

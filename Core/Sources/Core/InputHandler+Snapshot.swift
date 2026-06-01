@@ -8,8 +8,8 @@ public extension InputHandler {
         let segTexts: [String]
         let segFocus: Int
         if let ss = state.segmentState {
-            segTexts = ss.segments.map(\.selectedText)
-            segFocus = ss.focusedIndex
+            segTexts = ss.snapshotSegmentTexts
+            segFocus = 0
         } else {
             segTexts = []
             segFocus = 0

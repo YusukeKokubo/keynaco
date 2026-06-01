@@ -2,8 +2,9 @@ import AppKit
 
 // MARK: - セグメントモード
 //
-// Space 押下時に AzooKey の変換結果を文節分割してセグメント調整モードへ。
-// Shift+矢印で境界を 1 文字単位で動かせる。
+// Space 押下時に AzooKey の segmentize で左端文節を切り出し、
+// Enter で 1 文節ずつ確定 → 残りを再 segmentize する（AzooKey 準拠の逐次フロー）。
+// Shift+矢印で現在文節と残り読みの境界を 1 文字単位で調整できる。
 
 public extension InputHandler {
 
@@ -11,47 +12,77 @@ public extension InputHandler {
         state.absorbPendingIntoComposed()
         let fullReading = state.composedHiragana
 
-        // 全 ASCII（数字・英単語）はセグメント変換しない。
-        // ASCII 読みを segmentize すると履歴の断片が誤結合して "23456" → "2345656六" のような
-        // 不正な確定になる。buildCandidateList の ASCII ガードとここで一貫させる。
         if fullReading.allSatisfy({ $0.isASCII }) {
             return buildCandidateList()
         }
 
-        let rawSegments = azooKeyConverter.segmentize(fullReading, leftSideContext: azooKeyLeftContext)
-        guard rawSegments.count >= 2 else {
+        guard let initial = makeInitialSegmentState(fullReading: fullReading) else {
             let listAction = buildCandidateList()
-            // 辞書候補がある場合はそのまま返す（「楽しい」等の既知単語）
             if case .show(let candidates, let historyEnd, _, _, _) = listAction,
                candidates.count > historyEnd {
                 return listAction
             }
-            // 辞書候補なし（未知複合語等）のみ手動2分割を試みる
-            if let manualSegs = tryManualBisection(fullReading: fullReading) {
-                state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
-                return makeCandidateActionForFocusedSegment()
-            }
             return listAction
         }
-        var built: [Segment] = []
-        var prevText: String? = lastCommittedOutput
-        for raw in rawSegments {
-            let seg = buildSegmentCandidates(reading: raw.reading, dictCandidates: raw.candidates, prev: prevText)
-            built.append(seg)
-            prevText = seg.selectedText
-        }
-        // 先頭セグメントが促音(っ)終わりの2分割は誤分割の可能性が高い（例:「せっ」+「ていがめんの」）。
-        // 手動2分割でより長い前半が得られれば優先する。
-        if rawSegments.count == 2, rawSegments[0].reading.last == "っ",
-           let manualSegs = tryManualBisection(fullReading: fullReading),
-           manualSegs[0].reading.count > rawSegments[0].reading.count {
-            state.segmentState = SegmentState(segments: manualSegs, focusedIndex: 0)
-            return makeCandidateActionForFocusedSegment()
-        }
-        let segments = built
 
-        state.segmentState = SegmentState(segments: segments, focusedIndex: 0)
+        state.segmentState = initial
+        state.composedHiragana = initial.pendingReading
         return makeCandidateActionForFocusedSegment()
+    }
+
+    /// 読み全体から左端 1 文節 + 残りを構築する。分割不能なら nil。
+    private mutating func makeInitialSegmentState(fullReading: String) -> SegmentState? {
+        let rawSegments = azooKeyConverter.segmentize(fullReading, leftSideContext: azooKeyLeftContext)
+        if rawSegments.count >= 2 {
+            let first = rawSegments[0]
+            var remaining = String(fullReading.dropFirst(first.reading.count))
+            var current = buildSegmentCandidates(
+                reading: first.reading,
+                dictCandidates: first.candidates,
+                prev: lastCommittedOutput
+            )
+            // 促音終わり誤分割の修正（2 分割時のみ）
+            if rawSegments.count == 2, rawSegments[0].reading.last == "っ",
+               let manualSegs = tryManualBisection(fullReading: fullReading),
+               manualSegs[0].reading.count > rawSegments[0].reading.count {
+                current = manualSegs[0]
+                remaining = manualSegs[1].reading
+            }
+            return SegmentState(current: current, remainingReading: remaining)
+        }
+        if let manualSegs = tryManualBisection(fullReading: fullReading) {
+            return SegmentState(current: manualSegs[0], remainingReading: manualSegs[1].reading)
+        }
+        return nil
+    }
+
+    /// 残り読みから左端 1 文節 + 残りを構築する（逐次確定後の再分割）。
+    private mutating func makeNextSegmentState(
+        remainingReading: String,
+        prevText: String,
+        confirmedSegments: [(reading: String, text: String)]
+    ) -> SegmentState {
+        let raw = azooKeyConverter.segmentize(remainingReading, leftSideContext: azooKeyLeftContext)
+        let firstReading: String
+        let dictCandidates: [String]
+        if let first = raw.first {
+            firstReading = first.reading
+            dictCandidates = first.candidates
+        } else {
+            firstReading = remainingReading
+            dictCandidates = []
+        }
+        let tail = String(remainingReading.dropFirst(firstReading.count))
+        let current = buildSegmentCandidates(
+            reading: firstReading,
+            dictCandidates: dictCandidates,
+            prev: prevText
+        )
+        return SegmentState(
+            current: current,
+            remainingReading: tail,
+            confirmedSegments: confirmedSegments
+        )
     }
 
     func buildSegmentCandidates(reading: String, dictCandidates: [String], prev: String? = nil) -> Segment {
@@ -70,7 +101,6 @@ public extension InputHandler {
         if !katakanaInHistory {
             candidates.insert(katakana, at: 0); seen.insert(katakana); fixedCount += 1
         }
-        // hiragana == katakana（非ひらがな文字）の場合は重複挿入しない
         if !hiraganaInHistory && hiragana != katakana {
             candidates.insert(hiragana, at: 0); seen.insert(hiragana); fixedCount += 1
         }
@@ -94,7 +124,7 @@ public extension InputHandler {
 
     func makeCandidateActionForFocusedSegment() -> CandidateAction {
         guard let segmentState = state.segmentState else { return .none }
-        let seg = segmentState.focusedSegment
+        let seg = segmentState.current
         guard !seg.candidates.isEmpty else { return .dismiss }
         return .show(candidates: seg.candidates, historyEnd: seg.historyEnd, initialRow: seg.selectedIndex, predictionEnd: seg.historyEnd, fixedEnd: 0)
     }
@@ -105,41 +135,20 @@ public extension InputHandler {
         candidate: CandidateContext,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        guard let segmentState = state.segmentState else { return (false, .none) }
+        guard state.segmentState != nil else { return (false, .none) }
 
         switch keyCode {
         case KeyCode.leftArrow:
             if modifiers.contains(.shift) {
-                return resizeFocusedSegment(expand: false, candidate: candidate, client: client)
+                return resizeCurrentSegment(expand: false, candidate: candidate, client: client)
             }
-            guard segmentState.focusedIndex > 0 else { return (true, .none) }
-            syncFocusedSegmentSelection(from: candidate)
-            state.segmentState!.focusedIndex -= 1
-            applySegmentMarkedText(client: client)
-            return (true, makeCandidateActionForFocusedSegment())
+            return (true, .none)
 
         case KeyCode.rightArrow:
             if modifiers.contains(.shift) {
-                return resizeFocusedSegment(expand: true, candidate: candidate, client: client)
+                return resizeCurrentSegment(expand: true, candidate: candidate, client: client)
             }
-            guard segmentState.focusedIndex < segmentState.segments.count - 1 else { return (true, .none) }
-            syncFocusedSegmentSelection(from: candidate)
-            let newIndex = segmentState.focusedIndex + 1
-            let prevText = state.segmentState!.segments[segmentState.focusedIndex].selectedText
-            let nextSeg = segmentState.segments[newIndex]
-            let preserved = nextSeg.selectedText
-            var rebuilt = buildSegmentCandidates(
-                reading: nextSeg.reading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: nextSeg.reading, leftSideContext: azooKeyLeftContext),
-                prev: prevText
-            )
-            if let idx = rebuilt.candidates.firstIndex(of: preserved) {
-                rebuilt.selectedIndex = idx
-            }
-            state.segmentState!.segments[newIndex] = rebuilt
-            state.segmentState!.focusedIndex = newIndex
-            applySegmentMarkedText(client: client)
-            return (true, makeCandidateActionForFocusedSegment())
+            return (true, .none)
 
         case KeyCode.space, KeyCode.tab, KeyCode.downArrow:
             return (true, .selectNext)
@@ -148,153 +157,178 @@ public extension InputHandler {
             return (true, .selectPrev)
 
         case KeyCode.enter:
-            return (true, doConfirmSegments(candidate: candidate, client: client))
+            return (true, confirmCurrentSegmentAndAdvance(candidate: candidate, client: client))
 
         case KeyCode.escape:
-            state.segmentState = nil
+            restoreComposingFromSegmentState()
             segmentCandidateCache.removeAll()
             applyMarkedText(candidateText: nil, client: client)
             return (true, .dismiss)
 
         default:
             if keyCode == KeyCode.backspace {
-                state.segmentState = nil
+                restoreComposingFromSegmentState()
                 segmentCandidateCache.removeAll()
                 applyMarkedText(candidateText: nil, client: client)
                 return (true, .dismiss)
             }
-            // その他のキー → セグメントモード解除してそのキーをスルー
             state.segmentState = nil
             segmentCandidateCache.removeAll()
             return (false, .dismiss)
         }
     }
 
-    /// Shift+右/左矢印でセグメント境界を1文字単位で調整する。
-    /// expand=true: フォーカスセグメントを右に1文字拡張（次セグメントの先頭1文字を奪う）
-    /// expand=false: フォーカスセグメントを左に1文字縮小（末尾1文字を次セグメントの先頭に渡す）
-    mutating func resizeFocusedSegment(
+    /// Escape / Backspace 時: 確定済みテキストはそのまま、未確定読みだけ組成中へ戻す。
+    private mutating func restoreComposingFromSegmentState() {
+        guard let ss = state.segmentState else { return }
+        state.composedHiragana = ss.pendingReading
+        state.segmentState = nil
+    }
+
+    /// Shift+右/左矢印で現在文節と残り読みの境界を 1 文字調整する。
+    mutating func resizeCurrentSegment(
         expand: Bool,
         candidate: CandidateContext,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        guard var segmentState = state.segmentState else { return (false, .none) }
+        guard var ss = state.segmentState else { return (false, .none) }
         syncFocusedSegmentSelection(from: candidate)
-        let i = segmentState.focusedIndex
-        let focusedPrev: String? = i > 0 ? segmentState.segments[i - 1].selectedText : lastCommittedOutput
+        let prevText = ss.confirmedSegments.last?.text ?? lastCommittedOutput
 
         if expand {
-            guard expandFocusedSegment(segmentState: &segmentState, focusedIndex: i, focusedPrev: focusedPrev) else {
-                return (true, .none)
-            }
+            guard !ss.remainingReading.isEmpty else { return (true, .none) }
+            let nextChar = ss.remainingReading.first!
+            ss.remainingReading = String(ss.remainingReading.dropFirst())
+            let newReading = ss.current.reading + String(nextChar)
+            var rebuilt = buildSegmentCandidatesCached(
+                reading: newReading,
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newReading, leftSideContext: azooKeyLeftContext),
+                prev: prevText
+            )
+            rebuilt.isManuallyAdjusted = true
+            ss.current = rebuilt
         } else {
-            guard shrinkFocusedSegment(segmentState: &segmentState, focusedIndex: i, focusedPrev: focusedPrev) else {
-                return (true, .none)
-            }
+            guard ss.current.reading.count >= 2 else { return (true, .none) }
+            let removedChar = ss.current.reading.last!
+            let newReading = String(ss.current.reading.dropLast())
+            var rebuilt = buildSegmentCandidatesCached(
+                reading: newReading,
+                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newReading, leftSideContext: azooKeyLeftContext),
+                prev: prevText
+            )
+            rebuilt.isManuallyAdjusted = true
+            ss.current = rebuilt
+            ss.remainingReading = String(removedChar) + ss.remainingReading
         }
 
-        state.segmentState = segmentState
+        state.segmentState = ss
+        state.composedHiragana = ss.pendingReading
         applySegmentMarkedText(client: client)
         return (true, makeCandidateActionForFocusedSegment())
     }
 
-    private mutating func expandFocusedSegment(
-        segmentState: inout SegmentState,
-        focusedIndex i: Int,
-        focusedPrev: String?
-    ) -> Bool {
-        guard i + 1 < segmentState.segments.count else { return false }
-        let nextReading = segmentState.segments[i + 1].reading
-        guard !nextReading.isEmpty else { return false }
-        let newFocusedReading = segmentState.segments[i].reading + String(nextReading.first!)
-        let newNextReading = String(nextReading.dropFirst())
-        var rebuilt = buildSegmentCandidatesCached(
-            reading: newFocusedReading,
-            dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading, leftSideContext: azooKeyLeftContext),
-            prev: focusedPrev
-        )
-        rebuilt.isManuallyAdjusted = true
-        segmentState.segments[i] = rebuilt
-        if newNextReading.isEmpty {
-            segmentState.segments.remove(at: i + 1)
-        } else {
-            segmentState.segments[i + 1] = buildSegmentCandidatesCached(
-                reading: newNextReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading, leftSideContext: azooKeyLeftContext),
-                prev: rebuilt.selectedText
-            )
-        }
-        return true
-    }
-
-    private mutating func shrinkFocusedSegment(
-        segmentState: inout SegmentState,
-        focusedIndex i: Int,
-        focusedPrev: String?
-    ) -> Bool {
-        let focusedReading = segmentState.segments[i].reading
-        guard focusedReading.count >= 2 else { return false }
-        let newFocusedReading = String(focusedReading.dropLast())
-        let removedChar = String(focusedReading.last!)
-        var rebuilt = buildSegmentCandidatesCached(
-            reading: newFocusedReading,
-            dictCandidates: azooKeyConverter.candidatesForSegment(reading: newFocusedReading, leftSideContext: azooKeyLeftContext),
-            prev: focusedPrev
-        )
-        rebuilt.isManuallyAdjusted = true
-        segmentState.segments[i] = rebuilt
-        if i + 1 < segmentState.segments.count {
-            let newNextReading = removedChar + segmentState.segments[i + 1].reading
-            segmentState.segments[i + 1] = buildSegmentCandidatesCached(
-                reading: newNextReading,
-                dictCandidates: azooKeyConverter.candidatesForSegment(reading: newNextReading, leftSideContext: azooKeyLeftContext),
-                prev: rebuilt.selectedText
-            )
-        } else {
-            segmentState.segments.insert(
-                buildSegmentCandidatesCached(
-                    reading: removedChar,
-                    dictCandidates: azooKeyConverter.candidatesForSegment(reading: removedChar, leftSideContext: azooKeyLeftContext),
-                    prev: rebuilt.selectedText
-                ),
-                at: i + 1
-            )
-        }
-        return true
-    }
-
     mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {
         guard let segmentState = state.segmentState, let selectedText = candidate.selectedText else { return }
-        if let idx = segmentState.focusedSegment.candidates.firstIndex(of: selectedText) {
-            state.segmentState!.segments[segmentState.focusedIndex].selectedIndex = idx
+        if let idx = segmentState.current.candidates.firstIndex(of: selectedText) {
+            state.segmentState!.current.selectedIndex = idx
         }
     }
 
-    /// セグメントモードからの確定。学習ルール:
-    /// 1. 各セグメントを個別に `recordPrefixes`（通常の文節学習）
-    /// 2. 手動で境界調整した文節は `recordPrefixes` を 1 回追加（計 2 回 = ブースト）
-    /// 3. 2セグメント以上の確定はフレーズ全体も `recordPrefixes`（「田中」+「太郎」→「田中太郎」）
-    mutating func doConfirmSegments(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
+    /// 左端文節を確定して insert し、残りがあれば再 segmentize して続行する。
+    mutating func confirmCurrentSegmentAndAdvance(
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) -> CandidateAction {
         syncFocusedSegmentSelection(from: candidate)
-        guard let segmentState = state.segmentState else { return .none }
+        guard var ss = state.segmentState else { return .none }
 
-        var confirmed = ""
-        var fullReading = ""
-        for seg in segmentState.segments {
+        let seg = ss.current
+        recordSegmentLearning(seg)
+        insertPartialSegment(text: seg.selectedText, reading: seg.reading, client: client)
+        ss.confirmedSegments.append((seg.reading, seg.selectedText))
+        segmentCandidateCache.removeAll()
+
+        let remaining = ss.remainingReading
+        if remaining.isEmpty {
+            finishSequentialSegmentSession(confirmedSegments: ss.confirmedSegments)
+            return .dismiss
+        }
+
+        let next = makeNextSegmentState(
+            remainingReading: remaining,
+            prevText: seg.selectedText,
+            confirmedSegments: ss.confirmedSegments
+        )
+        state.segmentState = next
+        state.composedHiragana = next.pendingReading
+        applySegmentMarkedText(client: client)
+        return makeCandidateActionForFocusedSegment()
+    }
+
+    /// 逐次確定の最後: フレーズ学習してセグメントモードを終了する。
+    mutating func finishSequentialSegmentSession(confirmedSegments: [(reading: String, text: String)]) {
+        if confirmedSegments.count >= 2 {
+            let fullReading = confirmedSegments.map(\.reading).joined()
+            let fullText = confirmedSegments.map(\.text).joined()
+            db.recordPrefixes(reading: fullReading, output: fullText)
+        }
+        state.segmentState = nil
+        state.composedHiragana = ""
+        state.pendingRomaji = ""
+        state.hiddenPendingN = false
+    }
+
+    private mutating func recordSegmentLearning(_ seg: Segment) {
+        db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
+        let conv = azooKeyConverter
+        let r = seg.reading
+        let t = seg.selectedText
+        Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
+        if seg.isManuallyAdjusted {
             db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
-            let conv = azooKeyConverter; let r = seg.reading; let t = seg.selectedText
-            Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
-            if seg.isManuallyAdjusted {
-                db.recordPrefixes(reading: seg.reading, output: seg.selectedText)
+        }
+    }
+
+    /// 1 文節分だけ insert する（CompositionState は維持）。
+    private mutating func insertPartialSegment(text: String, reading: String, client: TextInputClient) {
+        let isPunctuation = InputHandler.readingPunctuations.contains(text)
+            || InputHandler.sentenceTerminators.contains(text)
+        if !isPunctuation && !text.isEmpty {
+            appendRecentCommit(reading: reading, output: text)
+        }
+        if !text.isEmpty {
+            if InputHandler.sentenceTerminators.contains(text) {
+                if !diaryBuffer.isEmpty {
+                    db.recordDailyLog(output: diaryBuffer + text, appBundleID: currentAppBundleID)
+                    diaryBuffer = ""
+                }
+            } else {
+                diaryBuffer += text
             }
-            confirmed += seg.selectedText
-            fullReading += seg.reading
         }
-        if segmentState.segments.count >= 2 {
-            db.recordPrefixes(reading: fullReading, output: confirmed)
+        pushCommitted(text)
+        appendToSessionBuffer(text)
+        client.insertText(text)
+    }
+
+    /// 強制確定（deactivateServer 等）: 現在文節 + 残り読みをまとめて確定する。
+    mutating func flushSegmentModeComposition(
+        candidate: CandidateContext,
+        client: TextInputClient
+    ) {
+        guard var ss = state.segmentState else { return }
+        syncFocusedSegmentSelection(from: candidate)
+
+        recordSegmentLearning(ss.current)
+        insertPartialSegment(text: ss.current.selectedText, reading: ss.current.reading, client: client)
+        ss.confirmedSegments.append((ss.current.reading, ss.current.selectedText))
+
+        if !ss.remainingReading.isEmpty {
+            insertPartialSegment(text: ss.remainingReading, reading: ss.remainingReading, client: client)
+            ss.confirmedSegments.append((ss.remainingReading, ss.remainingReading))
         }
-        commitText(text: confirmed, fullReading: fullReading, client: client)
-        return .dismiss
+
+        finishSequentialSegmentSession(confirmedSegments: ss.confirmedSegments)
     }
 
     func applySegmentMarkedText(client: TextInputClient) {
@@ -303,9 +337,6 @@ public extension InputHandler {
         client.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
     }
 
-    /// AzooKey が1セグメントのみ返す場合・促音終わり誤分割の場合に前から順に2分割を試みる。
-    /// requestCandidates の先頭候補が「先頭が非かな・末尾が小文字以外」= 辞書変換確度高とみなす。
-    /// 「迫っ」のように末尾が促音の候補は単語途中の可能性が高いため除外する。
     func tryManualBisection(fullReading: String) -> [Segment]? {
         let chars = Array(fullReading)
         guard chars.count >= 4 else { return nil }
