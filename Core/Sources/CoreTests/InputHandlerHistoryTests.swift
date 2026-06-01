@@ -14,7 +14,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         type(chars: "i", base: "i")
         press(keyCode: 36)  // Enter → 確定
         let hist = handler.db.fetchHistoryExact(reading: "あい")
-        XCTAssertFalse(hist.contains("あい"), "ひらがなパススルー確定は履歴に記録しない")
+        XCTAssertTrue(hist.contains("あい"), "HiraganaPreferred 外のひらがな確定は履歴に記録する")
     }
 
     // MARK: - ひらがなパススルーの history 記録除外
@@ -24,9 +24,10 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(handler.db.fetchHistoryExact(reading: "は").isEmpty, "助詞パススルーは記録しない")
     }
 
-    func testLongHiraganaPassthroughNotRecorded() {
+    func testNonParticleHiraganaPassthroughIsRecorded() {
+        // HiraganaPreferredBuiltins に含まれないひらがな語は記録する（「さん」「して」等）
         handler.db.recordPrefixes(reading: "して", output: "して")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "して").isEmpty, "複数文字ひらがなパススルーも記録しない")
+        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "して").isEmpty, "助詞以外のひらがなは記録する")
     }
 
     // MARK: - 格助詞トリム記録
