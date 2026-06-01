@@ -7,21 +7,40 @@ final class HiraganaPreferredViewController: NSViewController {
     private let deleteButton = NSButton(title: "選択を削除", target: nil, action: nil)
     private let wordField = NSTextField()
     private var userData: [String] = []
+    private var suggestData: [String] = []
 
     private enum RowItem {
         case header(String)
         case builtin(word: String, category: String)
         case user(String)
+        case suggest(String)
     }
     private var rows: [RowItem] = []
 
     private func buildRows() {
         let builtins = HiraganaPreferredBuiltins.words
             .sorted { $0.key < $1.key }
-        rows = [.header("ユーザー追加語")]
-            + userData.map { .user($0) }
-            + [.header("組み込み固定語")]
-            + builtins.map { .builtin(word: $0.key, category: $0.value) }
+        var result: [RowItem] = []
+        if !suggestData.isEmpty {
+            result.append(.header("サジェスト候補"))
+            result += suggestData.map { .suggest($0) }
+        }
+        result.append(.header("ユーザー追加語"))
+        result += userData.map { .user($0) }
+        result.append(.header("組み込み固定語"))
+        result += builtins.map { .builtin(word: $0.key, category: $0.value) }
+        rows = result
+    }
+
+    private func buildSuggestions() {
+        let excluded = Set(userData).union(Set(HiraganaPreferredBuiltins.words.keys))
+        let top = DatabaseManager.shared.fetchTopFrequentEntries(limit: 50)
+        suggestData = Array(top
+            .filter { $0.reading == $0.output }
+            .filter { $0.output.unicodeScalars.allSatisfy { $0.value >= 0x3041 && $0.value <= 0x3096 } }
+            .filter { !excluded.contains($0.output) }
+            .map { $0.output }
+            .prefix(10))
     }
 
     override func loadView() {
@@ -151,6 +170,7 @@ final class HiraganaPreferredViewController: NSViewController {
 
     @objc private func reload() {
         userData = DatabaseManager.shared.fetchAllHiraganaPreferred()
+        buildSuggestions()
         buildRows()
         tableView.reloadData()
         deleteButton.isEnabled = false
@@ -173,6 +193,16 @@ final class HiraganaPreferredViewController: NSViewController {
             NotificationCenter.default.post(name: .keynacoHiraganaPreferredDidChange, object: nil)
         } else {
             showAlert("重複エントリ", detail: "「\(word)」はすでに登録されています。")
+        }
+    }
+
+    @objc private func addSuggestion(_ sender: NSButton) {
+        let row = tableView.row(for: sender)
+        guard row >= 0, case .suggest(let word) = rows[row] else { return }
+        let inserted = DatabaseManager.shared.addHiraganaPreferred(word: word)
+        if inserted {
+            reload()
+            NotificationCenter.default.post(name: .keynacoHiraganaPreferredDidChange, object: nil)
         }
     }
 
@@ -214,7 +244,7 @@ extension HiraganaPreferredViewController: NSTableViewDelegate {
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
         switch rows[row] {
-        case .header, .builtin: return false
+        case .header, .builtin, .suggest: return false
         case .user: return true
         }
     }
@@ -232,6 +262,17 @@ extension HiraganaPreferredViewController: NSTableViewDelegate {
         case .user(let word):
             let text = id == "word" ? word : ""
             return makeCell(id: id ?? "", text: text)
+        case .suggest(let word):
+            if id == "word" {
+                return makeCell(id: "suggest_word", text: word)
+            } else {
+                let btn = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("suggest_btn"), owner: nil) as? NSButton ?? NSButton(title: "追加", target: nil, action: nil)
+                btn.identifier = NSUserInterfaceItemIdentifier("suggest_btn")
+                btn.title = "追加"
+                btn.target = self
+                btn.action = #selector(addSuggestion(_:))
+                return btn
+            }
         }
     }
 
