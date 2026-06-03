@@ -7,6 +7,32 @@ private final class SegmentRebuildDictMismatchMockAzoo: AzooKeyConverting, @unch
         _ = (hiragana, leftSideContext, richCandidates)
         return []
     }
+    func requestConversionResult(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool
+    ) -> AzooKeyConversionResult {
+        _ = (leftSideContext, richCandidates)
+        switch hiragana {
+        case "わたしはがくせい":
+            return AzooKeyConversionResult(
+                mainResults: [AzooKeyClauseCandidate(text: "わたしはがくせい", inputLength: 10)],
+                firstClauseResults: [AzooKeyClauseCandidate(text: "わたし", inputLength: 3)]
+            )
+        case "はがくせい":
+            return AzooKeyConversionResult(
+                mainResults: [AzooKeyClauseCandidate(text: "はがくせい", inputLength: 7)],
+                firstClauseResults: [AzooKeyClauseCandidate(text: "は", inputLength: 1)]
+            )
+        case "がくせい":
+            return AzooKeyConversionResult(
+                mainResults: [AzooKeyClauseCandidate(text: "がくせい", inputLength: 5)],
+                firstClauseResults: [AzooKeyClauseCandidate(text: "がくせい", inputLength: 5)]
+            )
+        default:
+            return AzooKeyConversionResult(mainResults: [], firstClauseResults: [])
+        }
+    }
     func commit(reading: String, text: String) {}
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
         _ = leftSideContext
@@ -36,6 +62,32 @@ private final class SegmentRebuildPreservedMissingMockAzoo: AzooKeyConverting, @
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
         _ = (hiragana, leftSideContext, richCandidates)
         return []
+    }
+    func requestConversionResult(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool
+    ) -> AzooKeyConversionResult {
+        _ = (leftSideContext, richCandidates)
+        switch hiragana {
+        case "わたしはがくせい":
+            return AzooKeyConversionResult(
+                mainResults: [AzooKeyClauseCandidate(text: "わたしはがくせい", inputLength: 10)],
+                firstClauseResults: [AzooKeyClauseCandidate(text: "わたし", inputLength: 3)]
+            )
+        case "はがくせい":
+            return AzooKeyConversionResult(
+                mainResults: [AzooKeyClauseCandidate(text: "はがくせい", inputLength: 7)],
+                firstClauseResults: [AzooKeyClauseCandidate(text: "は", inputLength: 1)]
+            )
+        case "がくせい":
+            return AzooKeyConversionResult(
+                mainResults: [AzooKeyClauseCandidate(text: "ONLY_INITIAL_SURFACE", inputLength: 5)],
+                firstClauseResults: [AzooKeyClauseCandidate(text: "ONLY_INITIAL_SURFACE", inputLength: 5)]
+            )
+        default:
+            return AzooKeyConversionResult(mainResults: [], firstClauseResults: [])
+        }
     }
     func commit(reading: String, text: String) {}
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
@@ -132,16 +184,18 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         }
     }
 
-    func testSegmentModePlainArrowsDoNotChangeFocus() {
+    func testSegmentModeRightArrowConfirmsClauseLikeAzooKey() {
         typeRomaji("watashihagakusei")
         press(keyCode: 49)
         guard handler.state.isSegmentMode else { return }
 
         let readingBefore = handler.state.segmentState?.current.reading
-        press(keyCode: 124)
-        press(keyCode: 123)
-        XCTAssertEqual(handler.state.segmentState?.current.reading, readingBefore,
-                       "逐次確定では ←/→ 単体は文節を移動しない")
+        press(keyCode: 123) // ← は部分確定しない
+        XCTAssertEqual(handler.state.segmentState?.current.reading, readingBefore)
+
+        press(keyCode: 124) // → は AzooKey `.selecting` と同様に部分確定
+        XCTAssertFalse(client.inserted.isEmpty, "→ で左端文節が insert されるはず")
+        XCTAssertTrue(handler.state.isSegmentMode, "残りがあれば文節選択を継続")
     }
 
     func testSegmentModeHistoryRecordedPerSegment() {

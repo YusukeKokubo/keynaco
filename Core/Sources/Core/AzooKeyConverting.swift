@@ -2,6 +2,11 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
     /// ユーザー設定の Zenzai 有効フラグ。モデルの実ロード状態は反映しない（ベストエフォート）。
     var isZenzaiEnabled: Bool { get }
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String]
+    func requestConversionResult(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool
+    ) -> AzooKeyConversionResult
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String]
     func commit(reading: String, text: String)
     func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])]
@@ -18,6 +23,21 @@ public extension AzooKeyConverting {
 
     func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
         requestCandidates(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: false)
+    }
+
+    func requestConversionResult(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool
+    ) -> AzooKeyConversionResult {
+        let texts = requestCandidates(
+            hiragana: hiragana,
+            leftSideContext: leftSideContext,
+            richCandidates: richCandidates
+        )
+        let len = max(1, hiragana.count)
+        let rows = texts.map { AzooKeyClauseCandidate(text: $0, inputLength: len) }
+        return AzooKeyConversionResult(mainResults: rows, firstClauseResults: [])
     }
 
     func candidatesForSegment(reading: String) -> [String] {

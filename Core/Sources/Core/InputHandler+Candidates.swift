@@ -12,7 +12,32 @@ public extension InputHandler {
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
-        let sources = collectCandidateSources(autoShow: autoShow)
+        buildCandidateListInternal(forReading: nil, azooKeyEngineTexts: nil, autoShow: autoShow)
+    }
+
+    /// 文節選択モード: 左端文節の読みとエンジン候補（`firstClause` マージ結果）でリストを構築する。
+    mutating func buildCandidateList(
+        forReading reading: String,
+        azooKeyEngineTexts: [String],
+        autoShow: Bool = false
+    ) -> CandidateAction {
+        buildCandidateListInternal(
+            forReading: reading,
+            azooKeyEngineTexts: azooKeyEngineTexts,
+            autoShow: autoShow
+        )
+    }
+
+    private mutating func buildCandidateListInternal(
+        forReading reading: String?,
+        azooKeyEngineTexts: [String]?,
+        autoShow: Bool
+    ) -> CandidateAction {
+        let sources = collectCandidateSources(
+            autoShow: autoShow,
+            readingOverride: reading,
+            azooKeyOverride: azooKeyEngineTexts
+        )
         let action = assembleCandidateList(from: sources, autoShow: autoShow)
         lastZenzaiRow = resolveZenzaiRow(action: action, zenzaiPromoted: sources.zenzaiPromoted)
         return action
@@ -41,17 +66,29 @@ public extension InputHandler {
         let historySeen: Set<String>
     }
 
-    private mutating func collectCandidateSources(autoShow: Bool) -> CandidateListSources {
-        let h = state.composedHiragana
+    private mutating func collectCandidateSources(
+        autoShow: Bool,
+        readingOverride: String? = nil,
+        azooKeyOverride: [String]? = nil
+    ) -> CandidateListSources {
+        let h = readingOverride ?? state.composedHiragana
         let azooKeyCandidates: [String]
         let ctxFingerprint = leftSideContext
         if h.allSatisfy({ $0.isASCII }) {
             azooKeyCandidates = []
-            lastAzooKeyInput = ""; lastAzooKeyContext = ""; lastAzooKeyResults = []
+            if readingOverride == nil {
+                lastAzooKeyInput = ""; lastAzooKeyContext = ""; lastAzooKeyResults = []
+            }
+        } else if let azooKeyOverride {
+            azooKeyCandidates = azooKeyOverride.filter { !Self.isScriptMixed($0) }
         } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, autoShow {
             azooKeyCandidates = lastAzooKeyResults
         } else {
-            let raw = azooKeyConverter.requestCandidates(hiragana: h, leftSideContext: azooKeyLeftContext, richCandidates: !autoShow)
+            let raw = azooKeyConverter.requestCandidates(
+                hiragana: h,
+                leftSideContext: azooKeyLeftContext,
+                richCandidates: !autoShow
+            )
             azooKeyCandidates = raw.filter { !Self.isScriptMixed($0) }
             lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
         }
@@ -127,12 +164,12 @@ public extension InputHandler {
     ) -> InitialRowPolicy {
         switch fixedSlot {
         case .hiragana:
-            return .firstMatching(state.composedHiragana)
+            return .firstMatching(sources.h)
         case .none:
             if addsDefaultFixedHiragana {
                 // Zenzai が先頭に来る場合は row 0 を初期選択にする
                 if sources.zenzaiPromoted != nil { return .atZero }
-                return .firstMatching(state.composedHiragana)
+                return .firstMatching(sources.h)
             }
             // 履歴があっても Zenzai がプロモートされとれば row 0 を初期選択にする
             if sources.zenzaiPromoted != nil { return .atZero }

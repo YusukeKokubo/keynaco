@@ -13,6 +13,28 @@ private final class ScenarioS01KanjiMockConverter: AzooKeyConverting {
         return hiragana == "かんじ" ? ["漢字"] : ["□"]
     }
 
+    func requestConversionResult(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool
+    ) -> AzooKeyConversionResult {
+        _ = (leftSideContext, richCandidates)
+        switch hiragana {
+        case "かんじ":
+            return AzooKeyConversionResult(
+                mainResults: [AzooKeyClauseCandidate(text: "漢字", inputLength: 3)],
+                firstClauseResults: [AzooKeyClauseCandidate(text: "漢", inputLength: 2)]
+            )
+        case "じ":
+            return AzooKeyConversionResult(
+                mainResults: [AzooKeyClauseCandidate(text: "字", inputLength: 1)],
+                firstClauseResults: [AzooKeyClauseCandidate(text: "字", inputLength: 1)]
+            )
+        default:
+            return AzooKeyConversionResult(mainResults: [], firstClauseResults: [])
+        }
+    }
+
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
         _ = leftSideContext
         switch reading {

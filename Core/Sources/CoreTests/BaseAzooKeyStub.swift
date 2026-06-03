@@ -14,6 +14,21 @@ class BaseAzooKeyStub: AzooKeyConverting, @unchecked Sendable {
         return []
     }
 
+    func requestConversionResult(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool
+    ) -> AzooKeyConversionResult {
+        let texts = requestCandidates(
+            hiragana: hiragana,
+            leftSideContext: leftSideContext,
+            richCandidates: richCandidates
+        )
+        let len = max(1, hiragana.count)
+        let rows = texts.map { AzooKeyClauseCandidate(text: $0, inputLength: len) }
+        return AzooKeyConversionResult(mainResults: rows, firstClauseResults: [])
+    }
+
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
         _ = (reading, leftSideContext)
         return []

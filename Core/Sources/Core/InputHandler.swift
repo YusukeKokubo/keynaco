@@ -89,7 +89,7 @@ public enum KeyCode {
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
 ///
 /// 機能ごとの実装は extension で別ファイルに分散している：
-/// - `InputHandler+SegmentMode.swift`  ：文節分割と境界調整
+/// - `InputHandler+SegmentMode.swift`  ：文節選択（AzooKey Desktop `.selecting` 相当）
 /// - `InputHandler+Candidates.swift`   ：候補リスト構築・候補表示中・通常入力
 public struct InputHandler {
 
@@ -318,7 +318,7 @@ public struct InputHandler {
     /// F6–F10 の変換確定。composingText が空なら false を返す。
     public mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
         if state.isSegmentMode, let segmentState = state.segmentState {
-            state.composedHiragana = segmentState.pendingReading
+            state.composedHiragana = segmentState.convertTarget
             state.segmentState = nil
             segmentCandidateCache.removeAll()
         }

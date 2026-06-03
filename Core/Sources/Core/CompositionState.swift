@@ -114,7 +114,7 @@ public struct CompositionState {
     }
 }
 
-// MARK: - セグメント変換
+// MARK: - 文節選択（AzooKey Desktop `.selecting` 相当）
 
 public struct Segment {
     public let reading: String
@@ -129,55 +129,93 @@ public struct Segment {
     }
 }
 
-/// AzooKey 準拠の逐次セグメント確定状態。
-/// 左端の `current` だけを候補選択し、Enter で確定 → 残りを再 segmentize する。
+/// azooKey-Desktop の `SegmentsManager` + `.selecting` に相当。
+/// `firstClauseResults` マージ候補を選び、`composingCount`（`inputLength`）で部分確定する。
 public struct SegmentState {
-    /// 現在選択中の左端文節
-    public var current: Segment
-    /// 現在文節の右側に残っている未確定読み（ひらがな）
-    public var remainingReading: String
-    /// この入力セッションで逐次確定済みの文節
+    /// 未確定の読み全体（`composedHiragana` と同期）
+    public var convertTarget: String
+    /// 表示・確定に使う行（エンジン候補 + 履歴等を `rows` に統合）
+    public var rows: [AzooKeyClauseCandidate]
+    public var selectedIndex: Int
+    /// Shift+矢印 / Ctrl+i,o で境界を動かしたあとは `mainResults` のみ再取得
+    public var didExperienceSegmentEdition: Bool = false
+    /// 手動境界（`convertTarget` 先頭からの文字数）。nil なら選択候補の `inputLength`。
+    public var manualClauseEnd: Int?
+    /// この Space セッションで確定済みの文節
     public var confirmedSegments: [(reading: String, text: String)] = []
+    /// 直近 `buildClauseCandidateAction` の履歴区切り（Shift+Delete 用）
+    public var displayHistoryEnd: Int = 0
 
-    public init(current: Segment, remainingReading: String, confirmedSegments: [(reading: String, text: String)] = []) {
-        self.current = current
-        self.remainingReading = remainingReading
+    public init(
+        convertTarget: String,
+        rows: [AzooKeyClauseCandidate],
+        selectedIndex: Int = 0,
+        confirmedSegments: [(reading: String, text: String)] = []
+    ) {
+        self.convertTarget = convertTarget
+        self.rows = rows
+        self.selectedIndex = selectedIndex
         self.confirmedSegments = confirmedSegments
     }
 
-    /// 逐次確定では常に左端のみフォーカス（互換用）
-    public var focusedIndex: Int { 0 }
+    public var effectiveClauseEnd: Int {
+        if let manualClauseEnd {
+            return max(1, min(manualClauseEnd, convertTarget.count))
+        }
+        guard rows.indices.contains(selectedIndex) else { return min(1, convertTarget.count) }
+        return max(1, min(rows[selectedIndex].inputLength, convertTarget.count))
+    }
+
+    public var clauseReading: String {
+        String(convertTarget.prefix(effectiveClauseEnd))
+    }
+
+    public var remainingReading: String {
+        String(convertTarget.dropFirst(effectiveClauseEnd))
+    }
+
+    public var pendingReading: String { convertTarget }
+
+    /// 候補ウィンドウ互換（`current` = 左端文節ビュー）
+    public var current: Segment {
+        let texts = rows.map(\.text)
+        let idx = texts.isEmpty ? 0 : min(selectedIndex, texts.count - 1)
+        return Segment(
+            reading: clauseReading,
+            candidates: texts,
+            selectedIndex: idx,
+            historyEnd: displayHistoryEnd,
+            isManuallyAdjusted: didExperienceSegmentEdition
+        )
+    }
 
     public var focusedSegment: Segment {
         get { current }
-        set { current = newValue }
     }
 
-    /// 未確定部分の全読み
-    public var pendingReading: String {
-        current.reading + remainingReading
-    }
+    public var focusedIndex: Int { 0 }
 
     public var allSelectedText: String {
-        confirmedSegments.map(\.text).joined() + current.selectedText
+        confirmedSegments.map(\.text).joined() + (rows.indices.contains(selectedIndex) ? rows[selectedIndex].text : clauseReading)
     }
 
-    /// デバッグスナップショット用
     public var snapshotSegmentTexts: [String] {
         var texts = confirmedSegments.map(\.text)
-        texts.append(current.selectedText)
+        if rows.indices.contains(selectedIndex) { texts.append(rows[selectedIndex].text) }
         if !remainingReading.isEmpty { texts.append(remainingReading) }
         return texts
     }
 
+    /// Desktop `getCurrentMarkedText` `.selecting`: focused 表層 + unfocused 残り読み
     public func attributedString(overrideFocusedText: String? = nil) -> NSAttributedString {
         let result = NSMutableAttributedString()
-        let currentText = overrideFocusedText ?? current.selectedText
-        result.append(NSAttributedString(string: currentText, attributes: [
+        let focused = overrideFocusedText ?? (rows.indices.contains(selectedIndex) ? rows[selectedIndex].text : clauseReading)
+        result.append(NSAttributedString(string: focused, attributes: [
             .underlineStyle: NSUnderlineStyle.thick.rawValue,
         ]))
-        if !remainingReading.isEmpty {
-            result.append(NSAttributedString(string: remainingReading, attributes: [
+        let remainder = remainingReading
+        if !remainder.isEmpty {
+            result.append(NSAttributedString(string: remainder, attributes: [
                 .underlineStyle: NSUnderlineStyle.single.rawValue,
             ]))
         }
