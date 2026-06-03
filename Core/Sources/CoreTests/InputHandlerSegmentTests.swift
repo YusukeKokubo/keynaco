@@ -115,6 +115,18 @@ private final class SegmentRebuildPreservedMissingMockAzoo: AzooKeyConverting, @
 
 final class InputHandlerSegmentTests: InputHandlerTestCase {
 
+    func testGakuseiDesuSpaceSplitsBeforeDesu() {
+        typeRomaji("gakuseidesu")
+        let (_, action) = press(keyCode: 49)
+        XCTAssertTrue(handler.state.isSegmentMode)
+        XCTAssertEqual(handler.state.segmentState?.effectiveClauseEnd, 4, "がくせい")
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail("候補 .show: \(action)"); return
+        }
+        XCTAssertFalse(candidates.isEmpty)
+        XCTAssertEqual(handler.state.segmentState?.remainingReading, "です")
+    }
+
     func testAnataWaSpaceShowsClauseScopedCandidates() {
         typeRomaji("anataha")
         let (_, action) = press(keyCode: 49)

@@ -27,16 +27,36 @@ public struct AzooKeyConversionResult: Sendable, Equatable {
 
 /// azooKey-Desktop `SegmentsManager.rawCandidatesList` と同じマージ規則。
 public enum AzooKeyCandidateMerge {
-    /// Space 直後の先頭文節で、残り読みに切り出す末尾 1 文字助詞（AzooKey が全文候補のみ返すときのフォールバック）。
+    /// 末尾の助動詞・丁寧語（長い順）。AzooKey が全文候補のみのときの境界フォールバック用。
+    private static let trailingSegmentSuffixes: [String] = [
+        "ませんでした",
+        "ません",
+        "でした",
+        "でしょう",
+        "だろう",
+        "ている",
+        "ました",
+        "です",
+        "ます",
+        "ない",
+        "かしら",
+    ]
+
+    /// Space 直後の先頭文節で、残り読みに切り出す末尾 1 文字助詞。
     private static let trailingSegmentParticles: Set<Character> = [
         "は", "が", "を", "に", "で", "と", "へ", "も", "の", "や", "て", "ね", "よ", "か", "さ", "な",
         "だ", "ぞ", "ぜ", "ば", "ぱ", "り", "し", "み", "く", "け", "れ", "ろ", "わ", "ん",
     ]
 
-    /// 末尾助詞 1 文字を除いた読み長。該当しないときは `nil`。
+    /// 末尾の助詞・助動詞を除いた読み長。該当しないときは `nil`。
     public static func clauseEndStrippingTrailingParticle(_ convertTarget: String) -> Int? {
-        guard convertTarget.count >= 2, let last = convertTarget.last,
-              trailingSegmentParticles.contains(last) else { return nil }
+        guard convertTarget.count >= 2 else { return nil }
+        for suffix in trailingSegmentSuffixes {
+            guard convertTarget.count > suffix.count, convertTarget.hasSuffix(suffix) else { continue }
+            let end = convertTarget.count - suffix.count
+            if end >= 1 { return end }
+        }
+        guard let last = convertTarget.last, trailingSegmentParticles.contains(last) else { return nil }
         let end = convertTarget.count - 1
         return end >= 1 ? end : nil
     }

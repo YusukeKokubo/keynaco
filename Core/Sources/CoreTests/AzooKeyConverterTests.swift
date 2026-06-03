@@ -66,6 +66,19 @@ final class AzooKeyConverterTests: XCTestCase {
         XCTAssertEqual(segments[1].reading, "は")
     }
 
+    func testGakuseiDesuSegmentizeSplitsBeforeCopula() {
+        let converter = AzooKeyConverter()
+        let segments = converter.segmentize("がくせいです", leftSideContext: nil)
+        XCTAssertGreaterThanOrEqual(segments.count, 2, "\(segments.map(\.reading))")
+        XCTAssertEqual(segments[0].reading, "がくせい")
+        XCTAssertEqual(segments[1].reading, "です")
+    }
+
+    func testGakuseiDesuDefaultClauseEndStripsDesu() {
+        let end = AzooKeyCandidateMerge.clauseEndStrippingTrailingParticle("がくせいです")
+        XCTAssertEqual(end, 4)
+    }
+
     func testSegmentizeFirstSegmentRetainsValidCandidates() {
         let converter = AzooKeyConverter()
         let segments = converter.segmentize("じゃあ")
