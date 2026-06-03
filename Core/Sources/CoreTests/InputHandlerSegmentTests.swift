@@ -115,6 +115,23 @@ private final class SegmentRebuildPreservedMissingMockAzoo: AzooKeyConverting, @
 
 final class InputHandlerSegmentTests: InputHandlerTestCase {
 
+    func testAnataWaSpaceShowsClauseScopedCandidates() {
+        typeRomaji("anataha")
+        let (_, action) = press(keyCode: 49)
+        XCTAssertTrue(handler.state.isSegmentMode, "Space で文節モードに入る")
+        XCTAssertEqual(handler.state.segmentState?.effectiveClauseEnd, 3)
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail("候補 .show を返すはず: \(action)"); return
+        }
+        XCTAssertFalse(candidates.isEmpty, "先頭文節の候補が空")
+        XCTAssertTrue(
+            candidates.contains("貴方") || candidates.contains("あなた"),
+            "先頭文節候補に貴方/あなたが含まれる: \(candidates.prefix(6))"
+        )
+        XCTAssertFalse(candidates.first?.hasSuffix("は") == true && (candidates.first?.count ?? 0) > 2,
+                       "先頭が助詞込み全文ではない: \(candidates.first ?? "")")
+    }
+
     func testSpaceEntersSegmentModeWhenMultipleSegments() {
         typeRomaji("watashihagakusei")
         let (consumed, action) = press(keyCode: 49)

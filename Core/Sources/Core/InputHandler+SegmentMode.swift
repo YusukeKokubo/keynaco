@@ -28,9 +28,10 @@ public extension InputHandler {
             convertTarget: fullReading,
             segmentizeFirstReading: segmentizeFirst
         )
-        let engineRows = AzooKeyCandidateMerge.mergedList(
-            result: raw,
+        let engineRows = clauseScopedEngineRows(
             convertTarget: fullReading,
+            clauseEnd: clauseEnd,
+            raw: raw,
             segmentEdition: false
         )
         guard !engineRows.isEmpty else {
@@ -55,9 +56,7 @@ public extension InputHandler {
     private mutating func refreshClauseCandidateAction() -> CandidateAction {
         guard var ss = state.segmentState else { return .dismiss }
         let reading = ss.clauseReading
-        let engineTexts = ss.rows
-            .filter { $0.inputLength <= ss.effectiveClauseEnd }
-            .map(\.text)
+        let engineTexts = ss.rows.map(\.text)
         let action = buildCandidateList(
             forReading: reading,
             azooKeyEngineTexts: engineTexts,
@@ -233,10 +232,41 @@ public extension InputHandler {
             leftSideContext: azooKeyLeftContext,
             richCandidates: true
         )
-        return AzooKeyCandidateMerge.mergedList(
-            result: raw,
+        let clauseEnd = ss.manualClauseEnd ?? ss.engineClauseEnd
+        return clauseScopedEngineRows(
             convertTarget: ss.convertTarget,
+            clauseEnd: clauseEnd,
+            raw: raw,
             segmentEdition: ss.didExperienceSegmentEdition
+        )
+    }
+
+    /// 先頭文節長でエンジン行を絞る。全文候補のみのときは prefix 読みで再取得（例: あなたは → あなた）。
+    private mutating func clauseScopedEngineRows(
+        convertTarget: String,
+        clauseEnd: Int,
+        raw: AzooKeyConversionResult,
+        segmentEdition: Bool
+    ) -> [AzooKeyClauseCandidate] {
+        let merged = AzooKeyCandidateMerge.mergedList(
+            result: raw,
+            convertTarget: convertTarget,
+            segmentEdition: segmentEdition
+        )
+        let scoped = merged.filter { $0.inputLength <= clauseEnd }
+        if !scoped.isEmpty { return scoped }
+        guard clauseEnd < convertTarget.count else { return merged }
+        let prefix = String(convertTarget.prefix(clauseEnd))
+        guard !prefix.isEmpty else { return merged }
+        let prefixRaw = azooKeyConverter.requestConversionResult(
+            hiragana: prefix,
+            leftSideContext: azooKeyLeftContext,
+            richCandidates: true
+        )
+        return AzooKeyCandidateMerge.mergedList(
+            result: prefixRaw,
+            convertTarget: prefix,
+            segmentEdition: segmentEdition
         )
     }
 
@@ -283,16 +313,17 @@ public extension InputHandler {
             leftSideContext: azooKeyLeftContext,
             richCandidates: true
         )
-        let engineRows = AzooKeyCandidateMerge.mergedList(
-            result: raw,
-            convertTarget: remaining,
-            segmentEdition: false
-        )
         let segmentizeFirst = azooKeyConverter.segmentize(remaining, leftSideContext: azooKeyLeftContext).first?.reading
         let nextClauseEnd = AzooKeyCandidateMerge.defaultClauseEnd(
             result: raw,
             convertTarget: remaining,
             segmentizeFirstReading: segmentizeFirst
+        )
+        let engineRows = clauseScopedEngineRows(
+            convertTarget: remaining,
+            clauseEnd: nextClauseEnd,
+            raw: raw,
+            segmentEdition: false
         )
         ss.convertTarget = remaining
         ss.rows = engineRows.isEmpty
