@@ -58,17 +58,20 @@ final class AzooKeyConverterTests: XCTestCase {
             "「じゃ」候補に残余ひらがな付きの候補が含まれてはいけない: \(dangling)")
     }
 
-    func testAnataWaSegmentizeWithoutSuffixFallbackIsSingleSegmentWhenNoPartial() {
+    func testAnataWaSegmentizeUsesEnginePartialBoundaries() {
         let converter = AzooKeyConverter()
         let segments = converter.segmentize("あなたは", leftSideContext: nil)
-        // Phase 1: suffix フォールバック削除。部分候補が無いときは 1 文節（文節モード境界には未使用）。
-        XCTAssertEqual(segments.map(\.reading), ["あなたは"])
+        XCTAssertGreaterThanOrEqual(segments.count, 2)
+        XCTAssertEqual(segments.map(\.reading).joined(), "あなたは")
+        XCTAssertEqual(segments[0].reading, "あなた")
     }
 
-    func testGakuseiDesuSegmentizeWithoutSuffixFallbackIsSingleSegmentWhenNoPartial() {
+    func testGakuseiDesuSegmentizeUsesEnginePartialBoundaries() {
         let converter = AzooKeyConverter()
         let segments = converter.segmentize("がくせいです", leftSideContext: nil)
-        XCTAssertEqual(segments.map(\.reading), ["がくせいです"])
+        XCTAssertGreaterThanOrEqual(segments.count, 2)
+        XCTAssertEqual(segments.map(\.reading).joined(), "がくせいです")
+        XCTAssertEqual(segments[0].reading, "がくせい")
     }
 
     func testGakuseiDesuDefaultClauseEndStripsDesu() {

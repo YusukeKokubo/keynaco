@@ -48,6 +48,12 @@ public enum AzooKeyCandidateMerge {
         "だ", "ぞ", "ぜ", "ば", "ぱ", "り", "し", "み", "く", "け", "れ", "ろ", "わ", "ん",
     ]
 
+    /// 残り読みが助詞 1 文字だけか（文節モード継続の目安）。
+    public static func isTrailingParticleOnlyRemainder(_ remainder: String) -> Bool {
+        guard remainder.count == 1, let last = remainder.last else { return false }
+        return trailingSegmentParticles.contains(last)
+    }
+
     /// 末尾の助詞・助動詞を除いた読み長。該当しないときは `nil`。
     public static func clauseEndStrippingTrailingParticle(_ convertTarget: String) -> Int? {
         guard convertTarget.count >= 2 else { return nil }
@@ -89,9 +95,15 @@ public enum AzooKeyCandidateMerge {
         // Desktop: 最長の部分候補。短い語（がくせい+学:2）や助詞直前（あなた:3）を区別する。
         if let longest = partialFirst.max(by: { $0.inputLength < $1.inputLength }) {
             let n = longest.inputLength
-            let minUseful = max(2, total - 2)
-            if n >= minUseful, !(total <= 5 && n < total - 1) {
-                return max(1, min(n, total))
+            if n < total {
+                // 長い読み・1 文字助詞文節（は|がくせい）は firstClause を優先
+                if total > 5 || n == 1 {
+                    return max(1, n)
+                }
+                let minUseful = max(2, total - 2)
+                if n >= minUseful, !(total <= 5 && n < total - 1) {
+                    return max(1, n)
+                }
             }
         }
         if let partialMain = result.mainResults.filter({

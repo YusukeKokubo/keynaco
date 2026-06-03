@@ -338,25 +338,35 @@ public final class AzooKeyConverter: @unchecked Sendable {
             text.insertAtCursorPosition(remaining, inputStyle: .direct)
             let (reading, segmentCandidates, consumed) = locked.withLock { c -> (String, [Candidate], Int) in
                 let result = c.requestCandidates(text, options: opts)
-                let clauseCandidates = result.firstClauseResults.isEmpty
-                    ? result.mainResults : result.firstClauseResults
                 let totalLen = remaining.count
-                let partialBest = clauseCandidates
-                    .filter { composingCountValue($0) < totalLen }
-                    .max(by: { $0.value < $1.value })
-                let count: Int
-                if let best = partialBest {
-                    count = composingCountValue(best)
-                } else {
-                    count = clauseCandidates.first.map { composingCountValue($0) } ?? 1
-                }
-                let safeCount = max(1, min(count, totalLen))
+                let mainResults = Self.clauseCandidatesForMain(result.mainResults, inputLength: totalLen)
+                let firstClauseResults = Self.mergedFirstClauseResults(
+                    firstClause: result.firstClauseResults,
+                    main: result.mainResults,
+                    totalInputLength: totalLen
+                )
+                let conversion = AzooKeyConversionResult(
+                    mainResults: mainResults,
+                    firstClauseResults: firstClauseResults
+                )
+                let safeCount = AzooKeyCandidateMerge.defaultClauseEnd(
+                    result: conversion,
+                    convertTarget: remaining
+                )
                 let seg = String(remaining.prefix(safeCount))
                 let ck = Self.cacheKey(segment: seg, leftSideContext: leftSideContext)
-                let exactCoverage = clauseCandidates.filter { composingCountValue($0) == safeCount }
-                let segCandidates = exactCoverage.isEmpty ? clauseCandidates : exactCoverage
-                insertCache(key: ck, value: segCandidates)
-                return (seg, segCandidates, safeCount)
+                let merged = AzooKeyCandidateMerge.mergedList(
+                    result: conversion,
+                    convertTarget: remaining,
+                    segmentEdition: false
+                )
+                let exactCoverage = merged.filter { $0.inputLength == safeCount }
+                let segRows = exactCoverage.isEmpty ? merged : exactCoverage
+                let segTexts = Set(segRows.map(\.text))
+                let segCandidates = result.mainResults.filter { segTexts.contains($0.text) }
+                let cached = segCandidates.isEmpty ? result.mainResults : segCandidates
+                insertCache(key: ck, value: cached)
+                return (seg, cached, safeCount)
             }
             segments.append((reading: reading, candidates: segmentCandidates.map { $0.text }))
             remaining = String(remaining.dropFirst(consumed))

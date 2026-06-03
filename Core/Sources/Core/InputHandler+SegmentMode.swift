@@ -17,6 +17,11 @@ public extension InputHandler {
         }
         guard !fullReading.isEmpty else { return .dismiss }
 
+        // ひらがな優先語・2 文字以下は従来の候補窓（では/とか/あい+カタカナ行など）
+        if fullReading.count <= 2 || isHiraganaPreferred(fullReading) {
+            return buildCandidateList()
+        }
+
         let raw = azooKeyConverter.requestConversionResult(
             hiragana: fullReading,
             leftSideContext: azooKeyLeftContext,
@@ -27,6 +32,17 @@ public extension InputHandler {
             result: raw,
             convertTarget: fullReading
         )
+        let (userDictExact, _) = db.fetchUserDictCombined(reading: fullReading)
+        let remainder = String(fullReading.dropFirst(clauseEnd))
+        let shortNonParticleTail = remainder.count < 2
+            && !AzooKeyCandidateMerge.isTrailingParticleOnlyRemainder(remainder)
+        // 残り 1 文字が助詞以外かつ先頭文節がほぼ全文（例: たのしい→い）・日時語・ユーザー辞書は通常窓
+        if clauseEnd >= fullReading.count
+            || (shortNonParticleTail && clauseEnd >= fullReading.count - 1 && clauseEnd >= 3)
+            || !InputHandler.generateDateTimeCandidates(for: fullReading).isEmpty
+            || !userDictExact.isEmpty {
+            return buildCandidateList()
+        }
         let engineRows = clauseScopedEngineRows(
             convertTarget: fullReading,
             clauseEnd: clauseEnd,

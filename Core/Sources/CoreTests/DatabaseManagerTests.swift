@@ -156,9 +156,10 @@ final class DatabaseManagerTests: XCTestCase {
         let base: Int64 = 1_700_000_000
         db.clock = { base }
         db.record(input: "あ", output: "古い")
-        db.clock = { base + 181 * 86400 }
+        // performGC は recency スコア < 0.1 を削除（count=1 だと約 9 ヶ月超相当）
+        db.clock = { base + 280 * 86400 }
         db.performGCIfNeeded()
-        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").isEmpty, "count=1 かつ 180日超は削除")
+        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").isEmpty, "count=1 かつ低スコアは GC で削除")
     }
 
     func testGCKeepsHighCountEntries() {
