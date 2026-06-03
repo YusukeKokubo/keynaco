@@ -5,7 +5,8 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
     func requestConversionResult(
         hiragana: String,
         leftSideContext: String?,
-        richCandidates: Bool
+        richCandidates: Bool,
+        resetEngineSession: Bool
     ) -> AzooKeyConversionResult
     func candidatesForSegment(reading: String, leftSideContext: String?) -> [String]
     func commit(reading: String, text: String)
@@ -28,7 +29,8 @@ public extension AzooKeyConverting {
     func requestConversionResult(
         hiragana: String,
         leftSideContext: String?,
-        richCandidates: Bool
+        richCandidates: Bool,
+        resetEngineSession: Bool
     ) -> AzooKeyConversionResult {
         let texts = requestCandidates(
             hiragana: hiragana,

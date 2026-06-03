@@ -21,8 +21,10 @@ private final class ZenzaiEnabledMockConverter: AzooKeyConverting, @unchecked Se
     func requestConversionResult(
         hiragana: String,
         leftSideContext: String?,
-        richCandidates: Bool
+        richCandidates: Bool,
+        resetEngineSession: Bool
     ) -> AzooKeyConversionResult {
+        _ = resetEngineSession
         let texts = requestCandidates(
             hiragana: hiragana,
             leftSideContext: leftSideContext,

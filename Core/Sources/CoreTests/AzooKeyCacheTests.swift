@@ -18,8 +18,10 @@ final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
     func requestConversionResult(
         hiragana: String,
         leftSideContext: String?,
-        richCandidates: Bool
+        richCandidates: Bool,
+        resetEngineSession: Bool
     ) -> AzooKeyConversionResult {
+        _ = resetEngineSession
         let texts = requestCandidates(
             hiragana: hiragana,
             leftSideContext: leftSideContext,

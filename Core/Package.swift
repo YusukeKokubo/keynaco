@@ -19,7 +19,7 @@ let package = Package(
         .package(url: "https://github.com/ensan-hcl/SwiftyMarisa", from: "0.0.1"),
         .package(
             url: "https://github.com/azooKey/AzooKeyKanaKanjiConverter",
-            from: "0.11.1",
+            revision: "bbef9d2d99a2e9e69ac3f7e2e07b08474de59a81",
             traits: azooKeyTraits
         )
     ],

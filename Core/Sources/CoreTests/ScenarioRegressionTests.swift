@@ -16,9 +16,10 @@ private final class ScenarioS01KanjiMockConverter: AzooKeyConverting {
     func requestConversionResult(
         hiragana: String,
         leftSideContext: String?,
-        richCandidates: Bool
+        richCandidates: Bool,
+        resetEngineSession: Bool
     ) -> AzooKeyConversionResult {
-        _ = (leftSideContext, richCandidates)
+        _ = (leftSideContext, richCandidates, resetEngineSession)
         switch hiragana {
         case "かんじ":
             return AzooKeyConversionResult(

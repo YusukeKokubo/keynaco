@@ -80,7 +80,8 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
 
     func testKonnitihaFirstClausePartialLengths() {
         let reading = "こんにちは"
-        let raw = engine.requestConversionResult(
+        let fresh = AzooKeyConverter()
+        let raw = fresh.requestConversionResult(
             hiragana: reading,
             leftSideContext: nil,
             richCandidates: true
@@ -88,8 +89,29 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
         let partials = raw.firstClauseResults
             .filter { !AzooKeyCandidateMerge.consumesWholeTarget($0.inputLength, convertTarget: reading) }
             .map { "\($0.text):\($0.inputLength)" }
+        let mainPartials = raw.mainResults
+            .filter { !AzooKeyCandidateMerge.consumesWholeTarget($0.inputLength, convertTarget: reading) }
+            .map { "\($0.text):\($0.inputLength)" }
         print("KONNICHIHA|firstClausePartials=\(partials)")
-        print("KONNICHIHA|mainHead=\(raw.mainResults.prefix(5).map { "\($0.text):\($0.inputLength)" })")
+        print("KONNICHIHA|mainPartials=\(mainPartials)")
+        print("KONNICHIHA|mainHead=\(raw.mainResults.prefix(8).map { "\($0.text):\($0.inputLength)" })")
+    }
+
+    func testAnatahaMainResultsPartialLengths() {
+        let reading = "あなたは"
+        let raw = AzooKeyConverter().requestConversionResult(
+            hiragana: reading,
+            leftSideContext: nil,
+            richCandidates: true
+        )
+        let mainPartials = raw.mainResults
+            .filter { !AzooKeyCandidateMerge.consumesWholeTarget($0.inputLength, convertTarget: reading) }
+            .map { "\($0.text):\($0.inputLength)" }
+        let firstPartials = raw.firstClauseResults
+            .filter { !AzooKeyCandidateMerge.consumesWholeTarget($0.inputLength, convertTarget: reading) }
+            .map { "\($0.text):\($0.inputLength)" }
+        fputs("ANATAHA|mainPartials=\(mainPartials)\n", stderr)
+        fputs("ANATAHA|firstPartials=\(firstPartials)\n", stderr)
     }
 
     /// Phase 1 POC: suffix 除去後は `こんにち|は` 分割（「今一」系）が起きないこと。
@@ -101,12 +123,18 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
             XCTFail("文節モードに入るはず")
             return
         }
-        XCTAssertNotEqual(ss.remainingReading, "は", "suffix 剥がし廃止後は残り「は」単独にならない")
+        XCTAssertEqual(ss.effectiveClauseEnd, 4, "こんにち|は（最長部分 4）")
+        XCTAssertEqual(ss.remainingReading, "は")
         let firstCand = ss.current.selectedText ?? ""
         XCTAssertFalse(firstCand.hasPrefix("今一"), "先頭が今一系にならない: \(firstCand)")
     }
 
-    func testAnatahaEnterLeavesHa() throws {
-        throw XCTSkip("Phase 2: firstClause 部分候補が出るまで suffix なしでは あなた|は 分割不可")
+    func testAnatahaEnterLeavesHa() {
+        setUp()
+        typeRomaji("anataha")
+        press(keyCode: 49)
+        press(keyCode: 36)
+        XCTAssertEqual(handler.state.composedHiragana, "は")
+        XCTAssertTrue(handler.state.isSegmentMode)
     }
 }

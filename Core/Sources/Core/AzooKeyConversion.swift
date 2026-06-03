@@ -86,12 +86,17 @@ public enum AzooKeyCandidateMerge {
         let partialFirst = result.firstClauseResults.filter {
             !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
         }
-        if let first = partialFirst.first {
-            return max(1, min(first.inputLength, total))
+        // Desktop: 最長の部分候補。短い語（がくせい+学:2）や助詞直前（あなた:3）を区別する。
+        if let longest = partialFirst.max(by: { $0.inputLength < $1.inputLength }) {
+            let n = longest.inputLength
+            let minUseful = max(2, total - 2)
+            if n >= minUseful, !(total <= 5 && n < total - 1) {
+                return max(1, min(n, total))
+            }
         }
-        if let partialMain = result.mainResults.first(where: {
+        if let partialMain = result.mainResults.filter({
             !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
-        }) {
+        }).max(by: { $0.inputLength < $1.inputLength }) {
             return max(1, min(partialMain.inputLength, total))
         }
         return total

@@ -94,8 +94,8 @@ public final class AzooKeyConverter: @unchecked Sendable {
             // requestCandidates 側で「ruby 長 > 入力長（=予測）かつ末尾表層が非漢字」を落とす（POC260529b'）。
             // 残った予測候補は composingCount==inputLength でカバレッジフィルタを通り dictionary セクションへ。
             // E2E 検証・経過観察: POC260529b / docs/observation.md。
-            requireJapanesePrediction: true,
-            requireEnglishPrediction: false,
+            requireJapanesePrediction: .autoMix,
+            requireEnglishPrediction: .disabled,
             keyboardLanguage: .ja_JP,
             learningType: .inputAndOutput,
             memoryDirectoryURL: memoryURL,
@@ -104,6 +104,28 @@ public final class AzooKeyConverter: @unchecked Sendable {
             specialCandidateProviders: nil,
             metadata: nil
         )
+    }
+
+    /// 文節選択（Desktop `.selecting`）向け。予測変換を切り firstClause をエンジンから得る。
+    private func makeOptionsForSegmentSelection(leftSideContext: String?) -> ConvertRequestOptions {
+        var opts = baseOptions
+        opts.requireJapanesePrediction = .disabled
+        opts.requireEnglishPrediction = .disabled
+        guard zenzaiEnabled, let modelURL = zenzaiModelURL else { return opts }
+        opts.zenzaiMode = .on(
+            weight: modelURL,
+            inferenceLimit: zenzaiInferenceLimit,
+            requestRichCandidates: true,
+            personalizationMode: nil,
+            versionDependentMode: .v3(
+                .init(
+                    profile: zenzaiProfile.isEmpty ? nil : zenzaiProfile,
+                    leftSideContext: leftSideContext,
+                    enableAlignmentSeparator: true
+                )
+            )
+        )
+        return opts
     }
 
     private func makeOptions(leftSideContext: String?, richCandidates: Bool = false) -> ConvertRequestOptions {
@@ -128,33 +150,78 @@ public final class AzooKeyConverter: @unchecked Sendable {
         let result = requestConversionResult(
             hiragana: hiragana,
             leftSideContext: leftSideContext,
-            richCandidates: richCandidates
+            richCandidates: richCandidates,
+            resetEngineSession: false
         )
         return result.mainResults.map(\.text)
+    }
+
+    /// Desktop `enterCandidateSelectionMode` 相当: 末尾に composition separator を置いてから rich 変換する。
+    private static func composingTextForSegmentSelection(hiragana: String) -> ComposingText {
+        var text = ComposingText()
+        guard !hiragana.isEmpty else { return text }
+        text.insertAtCursorPosition(hiragana, inputStyle: .direct)
+        if text.input.last?.piece != .compositionSeparator {
+            text.insertAtCursorPosition([.init(piece: .compositionSeparator, inputStyle: .direct)])
+        }
+        return text
     }
 
     /// azooKey-Desktop `SegmentsManager.updateRawCandidate` 相当の生結果。
     public func requestConversionResult(
         hiragana: String,
         leftSideContext: String?,
-        richCandidates: Bool = false
+        richCandidates: Bool = false,
+        resetEngineSession: Bool = false
     ) -> AzooKeyConversionResult {
+        // resetEngineSession: Space 文節モード初回のみ true（Desktop の fresh update 相当）
         let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext)
-        var text = ComposingText()
-        text.insertAtCursorPosition(hiragana, inputStyle: .direct)
+        let text = richCandidates
+            ? Self.composingTextForSegmentSelection(hiragana: hiragana)
+            : {
+                var t = ComposingText()
+                t.insertAtCursorPosition(hiragana, inputStyle: .direct)
+                return t
+            }()
+        let options = richCandidates
+            ? makeOptionsForSegmentSelection(leftSideContext: leftSideContext)
+            : makeOptions(leftSideContext: leftSideContext, richCandidates: false)
         let raw = locked.withLock { c -> (main: [Candidate], first: [Candidate]) in
-            let r = c.requestCandidates(
-                text,
-                options: makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates)
-            )
+            if resetEngineSession { c.stopComposition() }
+            let r = c.requestCandidates(text, options: options)
             insertCache(key: key, value: r.mainResults)
             return (r.mainResults, r.firstClauseResults)
         }
         let inputLength = hiragana.count
-        return AzooKeyConversionResult(
-            mainResults: Self.clauseCandidatesForMain(raw.main, inputLength: inputLength),
-            firstClauseResults: Self.clauseCandidatesForFirstClause(raw.first, totalInputLength: inputLength)
+        let mainResults = Self.clauseCandidatesForMain(raw.main, inputLength: inputLength)
+        let firstClauseResults = Self.mergedFirstClauseResults(
+            firstClause: raw.first,
+            main: raw.main,
+            totalInputLength: inputLength
         )
+        return AzooKeyConversionResult(
+            mainResults: mainResults,
+            firstClauseResults: firstClauseResults
+        )
+    }
+
+    /// Desktop `rawCandidatesList`: firstClause に全文相当が無いとき main から部分候補を足す。
+    private static func mergedFirstClauseResults(
+        firstClause: [Candidate],
+        main: [Candidate],
+        totalInputLength: Int
+    ) -> [AzooKeyClauseCandidate] {
+        let partialOnly: ([AzooKeyClauseCandidate]) -> [AzooKeyClauseCandidate] = { rows in
+            rows.filter { $0.inputLength > 0 && $0.inputLength < totalInputLength }
+        }
+        let fromFirst = partialOnly(clauseCandidatesForFirstClause(firstClause, totalInputLength: totalInputLength))
+        if fromFirst.isEmpty {
+            return partialOnly(clauseCandidatesForFirstClause(main, totalInputLength: totalInputLength))
+        }
+        let seen = Set(fromFirst.map(\.text))
+        let fromMain = partialOnly(clauseCandidatesForFirstClause(main, totalInputLength: totalInputLength))
+            .filter { !seen.contains($0.text) }
+        return fromFirst + fromMain
     }
 
     /// 全文候補リスト（`requestCandidates`）用。入力長ぴったりの候補のみ。

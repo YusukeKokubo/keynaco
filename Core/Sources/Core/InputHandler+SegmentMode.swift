@@ -20,7 +20,8 @@ public extension InputHandler {
         let raw = azooKeyConverter.requestConversionResult(
             hiragana: fullReading,
             leftSideContext: azooKeyLeftContext,
-            richCandidates: true
+            richCandidates: true,
+            resetEngineSession: true
         )
         let clauseEnd = AzooKeyCandidateMerge.defaultClauseEnd(
             result: raw,
@@ -228,7 +229,8 @@ public extension InputHandler {
         let raw = azooKeyConverter.requestConversionResult(
             hiragana: ss.convertTarget,
             leftSideContext: azooKeyLeftContext,
-            richCandidates: true
+            richCandidates: true,
+            resetEngineSession: false
         )
         let clauseEnd = ss.manualClauseEnd ?? ss.engineClauseEnd
         return clauseScopedEngineRows(
@@ -259,7 +261,8 @@ public extension InputHandler {
         let prefixRaw = azooKeyConverter.requestConversionResult(
             hiragana: prefix,
             leftSideContext: azooKeyLeftContext,
-            richCandidates: true
+            richCandidates: true,
+            resetEngineSession: false
         )
         return AzooKeyCandidateMerge.mergedList(
             result: prefixRaw,
@@ -309,7 +312,8 @@ public extension InputHandler {
         let raw = azooKeyConverter.requestConversionResult(
             hiragana: remaining,
             leftSideContext: azooKeyLeftContext,
-            richCandidates: true
+            richCandidates: true,
+            resetEngineSession: false
         )
         let nextClauseEnd = AzooKeyCandidateMerge.defaultClauseEnd(
             result: raw,

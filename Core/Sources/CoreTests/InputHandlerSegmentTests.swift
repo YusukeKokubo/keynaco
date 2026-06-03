@@ -10,9 +10,10 @@ private final class SegmentRebuildDictMismatchMockAzoo: AzooKeyConverting, @unch
     func requestConversionResult(
         hiragana: String,
         leftSideContext: String?,
-        richCandidates: Bool
+        richCandidates: Bool,
+        resetEngineSession: Bool
     ) -> AzooKeyConversionResult {
-        _ = (leftSideContext, richCandidates)
+        _ = (leftSideContext, richCandidates, resetEngineSession)
         switch hiragana {
         case "わたしはがくせい":
             return AzooKeyConversionResult(
@@ -66,9 +67,10 @@ private final class SegmentRebuildPreservedMissingMockAzoo: AzooKeyConverting, @
     func requestConversionResult(
         hiragana: String,
         leftSideContext: String?,
-        richCandidates: Bool
+        richCandidates: Bool,
+        resetEngineSession: Bool
     ) -> AzooKeyConversionResult {
-        _ = (leftSideContext, richCandidates)
+        _ = (leftSideContext, richCandidates, resetEngineSession)
         switch hiragana {
         case "わたしはがくせい":
             return AzooKeyConversionResult(
@@ -115,20 +117,31 @@ private final class SegmentRebuildPreservedMissingMockAzoo: AzooKeyConverting, @
 
 final class InputHandlerSegmentTests: InputHandlerTestCase {
 
-    func testGakuseiDesuSpaceSplitsBeforeDesu() throws {
-        throw XCTSkip("Phase 2: suffix/segmentize 除去後は firstClause 部分候補なしでは がくせい|です にならない")
+    func testGakuseiDesuSpaceSplitsBeforeDesu() {
+        typeRomaji("gakuseidesu")
+        let (_, action) = press(keyCode: 49)
+        XCTAssertTrue(handler.state.isSegmentMode)
+        XCTAssertEqual(handler.state.segmentState?.effectiveClauseEnd, 4, "がくせい")
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail("候補 .show: \(action)"); return
+        }
+        XCTAssertFalse(candidates.isEmpty)
+        XCTAssertEqual(handler.state.segmentState?.remainingReading, "です")
     }
 
     func testAnataWaSpaceShowsClauseScopedCandidates() {
         typeRomaji("anataha")
         let (_, action) = press(keyCode: 49)
         XCTAssertTrue(handler.state.isSegmentMode, "Space で文節モードに入る")
-        // Phase 1: composingCount のみ → 部分候補なし時は全文 (4)
-        XCTAssertEqual(handler.state.segmentState?.effectiveClauseEnd, 4)
+        XCTAssertEqual(handler.state.segmentState?.effectiveClauseEnd, 3)
         guard case .show(let candidates, _, _, _, _) = action else {
             XCTFail("候補 .show を返すはず: \(action)"); return
         }
         XCTAssertFalse(candidates.isEmpty, "先頭文節の候補が空")
+        XCTAssertTrue(
+            candidates.contains("貴方") || candidates.contains("あなた"),
+            "先頭文節候補に貴方/あなた: \(candidates.prefix(6))"
+        )
     }
 
     func testSpaceEntersSegmentModeWhenMultipleSegments() {
