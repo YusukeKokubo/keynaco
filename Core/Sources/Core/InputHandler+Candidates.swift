@@ -64,6 +64,8 @@ public extension InputHandler {
         let zenzaiPromoted: String?
         let azooKeyUniq: [String]
         let historySeen: Set<String>
+        /// 文節モードでエンジン候補を注入している（読みカタカナ固定行を出さない）。
+        let segmentEngineOverride: Bool
     }
 
     private mutating func collectCandidateSources(
@@ -129,7 +131,8 @@ public extension InputHandler {
             predictCount: predictCount,
             zenzaiPromoted: zenzaiPromoted,
             azooKeyUniq: azooKeyUniq,
-            historySeen: historySeen
+            historySeen: historySeen,
+            segmentEngineOverride: azooKeyOverride != nil
         )
     }
 
@@ -278,7 +281,9 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
         }
 
-        if !hiragana.allSatisfy({ $0.isASCII }), insertedSet.insert(katakana).inserted {
+        if !sources.segmentEngineOverride,
+           !hiragana.allSatisfy({ $0.isASCII }),
+           insertedSet.insert(katakana).inserted {
             sections.append(CandidateSection(kind: .katakana, items: [katakana]))
         }
 

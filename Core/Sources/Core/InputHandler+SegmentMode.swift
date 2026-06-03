@@ -22,6 +22,12 @@ public extension InputHandler {
             leftSideContext: azooKeyLeftContext,
             richCandidates: true
         )
+        let segmentizeFirst = azooKeyConverter.segmentize(fullReading, leftSideContext: azooKeyLeftContext).first?.reading
+        let clauseEnd = AzooKeyCandidateMerge.defaultClauseEnd(
+            result: raw,
+            convertTarget: fullReading,
+            segmentizeFirstReading: segmentizeFirst
+        )
         let engineRows = AzooKeyCandidateMerge.mergedList(
             result: raw,
             convertTarget: fullReading,
@@ -31,10 +37,16 @@ public extension InputHandler {
             return buildCandidateList()
         }
 
+        let initialEngineIndex = Self.initialEngineRowIndex(
+            rows: engineRows,
+            convertTarget: fullReading,
+            clauseEnd: clauseEnd
+        )
         state.segmentState = SegmentState(
             convertTarget: fullReading,
             rows: engineRows,
-            selectedIndex: 0
+            engineClauseEnd: clauseEnd,
+            selectedIndex: initialEngineIndex
         )
         state.composedHiragana = fullReading
         return refreshClauseCandidateAction()
@@ -43,15 +55,24 @@ public extension InputHandler {
     private mutating func refreshClauseCandidateAction() -> CandidateAction {
         guard var ss = state.segmentState else { return .dismiss }
         let reading = ss.clauseReading
-        let engineTexts = ss.rows.map(\.text)
+        let engineTexts = ss.rows
+            .filter { $0.inputLength <= ss.effectiveClauseEnd }
+            .map(\.text)
         let action = buildCandidateList(
             forReading: reading,
             azooKeyEngineTexts: engineTexts,
             autoShow: false
         )
-        if case .show(let candidates, let historyEnd, let initialRow, _, let fixedEnd) = action {
+        if case .show(let candidates, let historyEnd, _, _, let fixedEnd) = action {
             ss.displayHistoryEnd = historyEnd
-            ss.selectedIndex = min(initialRow, max(0, candidates.count - 1))
+            let preferred = Self.displayIndex(
+                candidates: candidates,
+                rows: ss.rows,
+                engineRowIndex: ss.selectedIndex,
+                clauseEnd: ss.effectiveClauseEnd,
+                clauseReading: reading
+            )
+            ss.selectedIndex = preferred
             ss.rows = syncRowsWithDisplayCandidates(
                 displayCandidates: candidates,
                 previousRows: ss.rows,
@@ -68,6 +89,40 @@ public extension InputHandler {
         }
         state.segmentState = ss
         return action
+    }
+
+    /// `firstClause` 先頭の部分候補行（例: あなたは → あなた）。
+    private static func initialEngineRowIndex(
+        rows: [AzooKeyClauseCandidate],
+        convertTarget: String,
+        clauseEnd: Int
+    ) -> Int {
+        if let i = rows.firstIndex(where: { $0.inputLength == clauseEnd }) { return i }
+        if let i = rows.firstIndex(where: {
+            !AzooKeyCandidateMerge.consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
+        }) { return i }
+        return 0
+    }
+
+    /// 表示リスト上でエンジン行と同じ表層・部分文節長の行を選ぶ。
+    private static func displayIndex(
+        candidates: [String],
+        rows: [AzooKeyClauseCandidate],
+        engineRowIndex: Int,
+        clauseEnd: Int,
+        clauseReading: String
+    ) -> Int {
+        if rows.indices.contains(engineRowIndex) {
+            let target = rows[engineRowIndex].text
+            if let i = candidates.firstIndex(of: target) { return i }
+        }
+        if let i = candidates.firstIndex(of: clauseReading) { return i }
+        if let i = candidates.firstIndex(where: { text in
+            rows.contains { $0.text == text && $0.inputLength == clauseEnd }
+        }) {
+            return i
+        }
+        return rows.indices.contains(engineRowIndex) ? engineRowIndex : 0
     }
 
     /// 表示リストとエンジン行の `inputLength` を対応付ける（履歴行は文節読み全体長）。
@@ -163,6 +218,7 @@ public extension InputHandler {
         guard next != base else { return (true, .none) }
 
         ss.manualClauseEnd = next
+        ss.engineClauseEnd = next
         ss.didExperienceSegmentEdition = true
         ss.rows = refetchEngineRows(for: ss)
         state.segmentState = ss
@@ -199,7 +255,7 @@ public extension InputHandler {
         syncFocusedSegmentSelection(from: candidate)
         guard var ss = state.segmentState else { return .none }
 
-        let clauseEnd = ss.effectiveClauseEnd
+        let clauseEnd = ss.previewClauseEnd
         let reading = String(ss.convertTarget.prefix(clauseEnd))
         let text: String
         if let selectedText = candidate.selectedText {
@@ -232,11 +288,22 @@ public extension InputHandler {
             convertTarget: remaining,
             segmentEdition: false
         )
+        let segmentizeFirst = azooKeyConverter.segmentize(remaining, leftSideContext: azooKeyLeftContext).first?.reading
+        let nextClauseEnd = AzooKeyCandidateMerge.defaultClauseEnd(
+            result: raw,
+            convertTarget: remaining,
+            segmentizeFirstReading: segmentizeFirst
+        )
         ss.convertTarget = remaining
         ss.rows = engineRows.isEmpty
             ? [AzooKeyClauseCandidate(text: remaining, inputLength: remaining.count)]
             : engineRows
-        ss.selectedIndex = 0
+        ss.engineClauseEnd = nextClauseEnd
+        ss.selectedIndex = Self.initialEngineRowIndex(
+            rows: ss.rows,
+            convertTarget: remaining,
+            clauseEnd: nextClauseEnd
+        )
         ss.manualClauseEnd = nil
         ss.didExperienceSegmentEdition = false
         state.segmentState = ss
@@ -294,7 +361,7 @@ public extension InputHandler {
         guard var ss = state.segmentState else { return }
         syncFocusedSegmentSelection(from: candidate)
 
-        let clauseEnd = ss.effectiveClauseEnd
+        let clauseEnd = ss.previewClauseEnd
         let reading = String(ss.convertTarget.prefix(clauseEnd))
         let text = candidate.selectedText
             ?? (ss.rows.indices.contains(ss.selectedIndex) ? ss.rows[ss.selectedIndex].text : reading)

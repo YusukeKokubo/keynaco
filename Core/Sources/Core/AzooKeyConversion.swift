@@ -27,6 +27,64 @@ public struct AzooKeyConversionResult: Sendable, Equatable {
 
 /// azooKey-Desktop `SegmentsManager.rawCandidatesList` と同じマージ規則。
 public enum AzooKeyCandidateMerge {
+    /// Space 直後の先頭文節で、残り読みに切り出す末尾 1 文字助詞（AzooKey が全文候補のみ返すときのフォールバック）。
+    private static let trailingSegmentParticles: Set<Character> = [
+        "は", "が", "を", "に", "で", "と", "へ", "も", "の", "や", "て", "ね", "よ", "か", "さ", "な",
+        "だ", "ぞ", "ぜ", "ば", "ぱ", "り", "し", "み", "く", "け", "れ", "ろ", "わ", "ん",
+    ]
+
+    /// 末尾助詞 1 文字を除いた読み長。該当しないときは `nil`。
+    public static func clauseEndStrippingTrailingParticle(_ convertTarget: String) -> Int? {
+        guard convertTarget.count >= 2, let last = convertTarget.last,
+              trailingSegmentParticles.contains(last) else { return nil }
+        let end = convertTarget.count - 1
+        return end >= 1 ? end : nil
+    }
+
+    /// 読み全体を消費する候補か（Desktop `isWholeComposingText` の文字列版）。
+    public static func consumesWholeTarget(_ inputLength: Int, convertTarget: String) -> Bool {
+        inputLength >= convertTarget.count
+    }
+
+    /// Space 直後の変換範囲（先頭文節の読み長）。
+    /// `segmentize` 先頭文節を優先（エンジン `firstClauseResults` が全文のみのときのフォールバック）。
+    public static func defaultClauseEnd(
+        result: AzooKeyConversionResult,
+        convertTarget: String,
+        segmentizeFirstReading: String? = nil
+    ) -> Int {
+        if let segmentizeFirstReading, !segmentizeFirstReading.isEmpty,
+           segmentizeFirstReading.count < convertTarget.count {
+            return segmentizeFirstReading.count
+        }
+        return defaultClauseEndFromConversion(result: result, convertTarget: convertTarget)
+    }
+
+    private static func defaultClauseEndFromConversion(
+        result: AzooKeyConversionResult?,
+        convertTarget: String
+    ) -> Int {
+        let total = convertTarget.count
+        guard total > 0 else { return 1 }
+        guard let result else { return total }
+        // Desktop は firstClause の先頭部分候補を使う（エンジン返却順を信頼）。
+        let partialFirst = result.firstClauseResults.filter {
+            !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
+        }
+        if let first = partialFirst.first {
+            return max(1, min(first.inputLength, total))
+        }
+        if let partialMain = result.mainResults.first(where: {
+            !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
+        }) {
+            return max(1, min(partialMain.inputLength, total))
+        }
+        if let particleEnd = clauseEndStrippingTrailingParticle(convertTarget) {
+            return particleEnd
+        }
+        return total
+    }
+
     /// 文節境界を手動編集したあとは `mainResults` のみ。
     public static func mergedList(
         result: AzooKeyConversionResult,
@@ -36,10 +94,21 @@ public enum AzooKeyCandidateMerge {
         if segmentEdition {
             return result.mainResults
         }
-        if result.firstClauseResults.contains(where: { $0.inputLength >= convertTarget.count }) {
+        if result.firstClauseResults.contains(where: { consumesWholeTarget($0.inputLength, convertTarget: convertTarget) }) {
             return result.mainResults
         }
         let seen = Set(result.firstClauseResults.map(\.text))
         return result.firstClauseResults + result.mainResults.filter { !seen.contains($0.text) }
+    }
+
+    /// 先頭文節用のエンジン候補（全文候補を除く）。
+    public static func clauseScopedEngineRows(
+        result: AzooKeyConversionResult,
+        convertTarget: String,
+        clauseEnd: Int,
+        segmentEdition: Bool
+    ) -> [AzooKeyClauseCandidate] {
+        let merged = mergedList(result: result, convertTarget: convertTarget, segmentEdition: segmentEdition)
+        return merged.filter { $0.inputLength <= clauseEnd }
     }
 }

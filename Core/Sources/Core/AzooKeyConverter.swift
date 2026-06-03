@@ -152,20 +152,47 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
         let inputLength = hiragana.count
         return AzooKeyConversionResult(
-            mainResults: Self.clauseCandidates(from: raw.main, inputLength: inputLength),
-            firstClauseResults: Self.clauseCandidates(from: raw.first, inputLength: inputLength)
+            mainResults: Self.clauseCandidatesForMain(raw.main, inputLength: inputLength),
+            firstClauseResults: Self.clauseCandidatesForFirstClause(raw.first, totalInputLength: inputLength)
         )
     }
 
-    private static func clauseCandidates(from candidates: [Candidate], inputLength: Int) -> [AzooKeyClauseCandidate] {
+    /// 全文候補リスト（`requestCandidates`）用。入力長ぴったりの候補のみ。
+    private static func clauseCandidatesForMain(_ candidates: [Candidate], inputLength: Int) -> [AzooKeyClauseCandidate] {
         let filtered = filterCandidatesForDisplay(candidates, inputLength: inputLength)
         let source = filtered.isEmpty ? candidates : filtered
         return source.map {
-            AzooKeyClauseCandidate(
-                text: $0.text,
-                inputLength: composingCountValueStatic($0)
-            )
+            AzooKeyClauseCandidate(text: $0.text, inputLength: composingCountValueStatic($0))
         }
+    }
+
+    /// 先頭文節候補（`firstClauseResults`）。部分カバー候補を残す（Desktop `.selecting` 用）。
+    private static func clauseCandidatesForFirstClause(
+        _ candidates: [Candidate],
+        totalInputLength: Int
+    ) -> [AzooKeyClauseCandidate] {
+        candidates.compactMap { c in
+            let consumed = composingCountValueStatic(c)
+            guard consumed > 0, consumed <= totalInputLength else { return nil }
+            guard !isDanglingTrailingKanaResidual(c, consumed: consumed, totalInputLength: totalInputLength) else {
+                return nil
+            }
+            return AzooKeyClauseCandidate(text: c.text, inputLength: consumed)
+        }
+    }
+
+    /// 末尾 1 文字かな残余（「蛇あ」等）。`filterCandidatesForDisplay` と同じ判定。
+    private static func isDanglingTrailingKanaResidual(
+        _ c: Candidate,
+        consumed: Int,
+        totalInputLength: Int
+    ) -> Bool {
+        guard consumed < totalInputLength, c.data.count > 1, let last = c.data.last else { return false }
+        guard last.word.count == 1, let scalar = last.word.unicodeScalars.first else { return false }
+        let isHiragana = (0x3041...0x3096).contains(scalar.value)
+        let isKatakana = (0x30A1...0x30F6).contains(scalar.value)
+        guard isHiragana || isKatakana else { return false }
+        return !(147...554).contains(last.lcid)
     }
 
     private static func composingCountValueStatic(_ candidate: Candidate) -> Int {
@@ -253,6 +280,8 @@ public final class AzooKeyConverter: @unchecked Sendable {
                 let count: Int
                 if let best = partialBest {
                     count = composingCountValue(best)
+                } else if let particleEnd = AzooKeyCandidateMerge.clauseEndStrippingTrailingParticle(remaining) {
+                    count = particleEnd
                 } else {
                     count = clauseCandidates.first.map { composingCountValue($0) } ?? 1
                 }

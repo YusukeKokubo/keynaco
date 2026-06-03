@@ -58,6 +58,14 @@ final class AzooKeyConverterTests: XCTestCase {
             "「じゃ」候補に残余ひらがな付きの候補が含まれてはいけない: \(dangling)")
     }
 
+    func testAnataWaSegmentizeSplitsBeforeParticle() {
+        let converter = AzooKeyConverter()
+        let segments = converter.segmentize("あなたは", leftSideContext: nil)
+        XCTAssertGreaterThanOrEqual(segments.count, 2, "\(segments.map(\.reading))")
+        XCTAssertEqual(segments[0].reading, "あなた")
+        XCTAssertEqual(segments[1].reading, "は")
+    }
+
     func testSegmentizeFirstSegmentRetainsValidCandidates() {
         let converter = AzooKeyConverter()
         let segments = converter.segmentize("じゃあ")

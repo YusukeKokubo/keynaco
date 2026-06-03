@@ -139,7 +139,9 @@ public struct SegmentState {
     public var selectedIndex: Int
     /// Shift+矢印 / Ctrl+i,o で境界を動かしたあとは `mainResults` のみ再取得
     public var didExperienceSegmentEdition: Bool = false
-    /// 手動境界（`convertTarget` 先頭からの文字数）。nil なら選択候補の `inputLength`。
+    /// Space 直後のエンジン既定境界（`firstClauseResults` 先頭の部分候補）。Shift+矢印で上書き。
+    public var engineClauseEnd: Int
+    /// 手動境界（`convertTarget` 先頭からの文字数）。nil なら下記ルール。
     public var manualClauseEnd: Int?
     /// この Space セッションで確定済みの文節
     public var confirmedSegments: [(reading: String, text: String)] = []
@@ -149,20 +151,28 @@ public struct SegmentState {
     public init(
         convertTarget: String,
         rows: [AzooKeyClauseCandidate],
+        engineClauseEnd: Int,
         selectedIndex: Int = 0,
         confirmedSegments: [(reading: String, text: String)] = []
     ) {
         self.convertTarget = convertTarget
         self.rows = rows
+        self.engineClauseEnd = max(1, min(engineClauseEnd, convertTarget.count))
         self.selectedIndex = selectedIndex
         self.confirmedSegments = confirmedSegments
     }
 
+    /// 履歴・辞書クエリ用の読み長（エンジン既定 or 手動境界）。
     public var effectiveClauseEnd: Int {
         if let manualClauseEnd {
             return max(1, min(manualClauseEnd, convertTarget.count))
         }
-        guard rows.indices.contains(selectedIndex) else { return min(1, convertTarget.count) }
+        return max(1, min(engineClauseEnd, convertTarget.count))
+    }
+
+    /// marked text / 確定プレビュー（Desktop: 選択候補の `composingCount`）。
+    public var previewClauseEnd: Int {
+        guard rows.indices.contains(selectedIndex) else { return effectiveClauseEnd }
         return max(1, min(rows[selectedIndex].inputLength, convertTarget.count))
     }
 
@@ -171,7 +181,7 @@ public struct SegmentState {
     }
 
     public var remainingReading: String {
-        String(convertTarget.dropFirst(effectiveClauseEnd))
+        String(convertTarget.dropFirst(previewClauseEnd))
     }
 
     public var pendingReading: String { convertTarget }
