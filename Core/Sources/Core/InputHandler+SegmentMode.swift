@@ -22,11 +22,9 @@ public extension InputHandler {
             leftSideContext: azooKeyLeftContext,
             richCandidates: true
         )
-        let segmentizeFirst = azooKeyConverter.segmentize(fullReading, leftSideContext: azooKeyLeftContext).first?.reading
         let clauseEnd = AzooKeyCandidateMerge.defaultClauseEnd(
             result: raw,
-            convertTarget: fullReading,
-            segmentizeFirstReading: segmentizeFirst
+            convertTarget: fullReading
         )
         let engineRows = clauseScopedEngineRows(
             convertTarget: fullReading,
@@ -313,11 +311,9 @@ public extension InputHandler {
             leftSideContext: azooKeyLeftContext,
             richCandidates: true
         )
-        let segmentizeFirst = azooKeyConverter.segmentize(remaining, leftSideContext: azooKeyLeftContext).first?.reading
         let nextClauseEnd = AzooKeyCandidateMerge.defaultClauseEnd(
             result: raw,
-            convertTarget: remaining,
-            segmentizeFirstReading: segmentizeFirst
+            convertTarget: remaining
         )
         let engineRows = clauseScopedEngineRows(
             convertTarget: remaining,

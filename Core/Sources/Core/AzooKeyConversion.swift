@@ -67,17 +67,12 @@ public enum AzooKeyCandidateMerge {
     }
 
     /// Space 直後の変換範囲（先頭文節の読み長）。
-    /// `segmentize` 先頭文節を優先（エンジン `firstClauseResults` が全文のみのときのフォールバック）。
+    /// Desktop `.selecting` 準拠: `firstClauseResults`（手動編集後は `mainResults`）の部分候補 `inputLength` のみ。
     public static func defaultClauseEnd(
         result: AzooKeyConversionResult,
-        convertTarget: String,
-        segmentizeFirstReading: String? = nil
+        convertTarget: String
     ) -> Int {
-        if let segmentizeFirstReading, !segmentizeFirstReading.isEmpty,
-           segmentizeFirstReading.count < convertTarget.count {
-            return segmentizeFirstReading.count
-        }
-        return defaultClauseEndFromConversion(result: result, convertTarget: convertTarget)
+        defaultClauseEndFromConversion(result: result, convertTarget: convertTarget)
     }
 
     private static func defaultClauseEndFromConversion(
@@ -98,9 +93,6 @@ public enum AzooKeyCandidateMerge {
             !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
         }) {
             return max(1, min(partialMain.inputLength, total))
-        }
-        if let particleEnd = clauseEndStrippingTrailingParticle(convertTarget) {
-            return particleEnd
         }
         return total
     }

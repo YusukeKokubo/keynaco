@@ -280,8 +280,6 @@ public final class AzooKeyConverter: @unchecked Sendable {
                 let count: Int
                 if let best = partialBest {
                     count = composingCountValue(best)
-                } else if let particleEnd = AzooKeyCandidateMerge.clauseEndStrippingTrailingParticle(remaining) {
-                    count = particleEnd
                 } else {
                     count = clauseCandidates.first.map { composingCountValue($0) } ?? 1
                 }
