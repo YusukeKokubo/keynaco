@@ -253,6 +253,26 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .zenzaiTop1, items: [top1]))
         }
 
+        let azooKeyItems = sources.azooKeyUniq.filter { candidate in
+            guard addsDefaultFixedHiragana && candidate == katakana else { return true }
+            let hasRealCandidates = sources.azooKeyCandidates.contains { $0 != katakana && $0 != hiragana }
+            if !hasRealCandidates { insertedSet.remove(candidate) }
+            return false
+        }
+        if !azooKeyItems.isEmpty {
+            sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
+        }
+
+        if sources.segmentEngineOverride {
+            if !sources.highHistory.isEmpty {
+                let historyItems = sources.highHistory.filter { insertedSet.insert($0).inserted }
+                if !historyItems.isEmpty {
+                    sections.append(CandidateSection(kind: .highHistory, items: historyItems))
+                }
+            }
+            return sections
+        }
+
         if !sources.uniquePredictions.isEmpty {
             sections.append(CandidateSection(kind: .prediction, items: sources.uniquePredictions))
         }
@@ -267,18 +287,6 @@ public extension InputHandler {
         let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
         if !uniqueDateTimeCandidates.isEmpty {
             sections.append(CandidateSection(kind: .dateTime, items: uniqueDateTimeCandidates))
-        }
-
-        let azooKeyItems = sources.azooKeyUniq.filter { candidate in
-            guard addsDefaultFixedHiragana && candidate == katakana else { return true }
-            // カタカナ・ひらがな以外の実質的な変換候補がない（未知語）場合のみ
-            // insertedSet からも外して末尾のカタカナセクションに表示させる
-            let hasRealCandidates = sources.azooKeyCandidates.contains { $0 != katakana && $0 != hiragana }
-            if !hasRealCandidates { insertedSet.remove(candidate) }
-            return false
-        }
-        if !azooKeyItems.isEmpty {
-            sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
         }
 
         if !sources.segmentEngineOverride,

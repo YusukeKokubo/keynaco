@@ -34,7 +34,11 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
         )
     }
 
-    private func imeAfterSpace(romaji: String) -> (
+    private func setComposedReading(_ reading: String) {
+        handler.state.composedHiragana = reading
+    }
+
+    private func imeAfterSpace(romaji: String? = nil, reading: String? = nil) -> (
         segMode: Bool,
         clauseEnd: Int?,
         selected: String?,
@@ -42,7 +46,11 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
         cands: [String],
         remaining: String?
     ) {
-        typeRomaji(romaji)
+        if let reading {
+            setComposedReading(reading)
+        } else if let romaji {
+            typeRomaji(romaji)
+        }
         let (_, action) = press(keyCode: 49)
         let cands: [String]
         if case .show(let list, _, _, _, _) = action { cands = Array(list.prefix(8)) }
@@ -70,7 +78,7 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
         for c in cases {
             setUp()
             let e = engineRow(for: c.reading)
-            let i = imeAfterSpace(romaji: c.romaji)
+            let i = imeAfterSpace(romaji: c.romaji, reading: c.id == "4_konnitiha" ? c.reading : nil)
             let row =
                 "ROW|\(c.id)|enginePartial=\(e.partial ?? "—")|engineEnd=\(e.defaultEnd)|engineSeg=\(e.segmentize)|engineStrip=\(e.strip.map(String.init) ?? "—")|imeSegMode=\(i.segMode)|imeEnd=\(i.clauseEnd.map(String.init) ?? "—")|imeSelected=\(i.selected ?? "—")|imeSegTexts=\(i.segments)|imeRemain=\(i.remaining ?? "—")|imeCands=\(i.cands)\n"
             fputs(row, stderr)
@@ -117,7 +125,7 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
     /// Phase 1 POC: suffix 除去後は `こんにち|は` 分割（「今一」系）が起きないこと。
     func testKonnitihaSpaceDoesNotSplitHaOnlyRemainder() {
         setUp()
-        typeRomaji("konnitiha")
+        setComposedReading("こんにちは")
         press(keyCode: 49)
         guard handler.state.isSegmentMode, let ss = handler.state.segmentState else {
             XCTFail("文節モードに入るはず")
@@ -127,6 +135,42 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
         XCTAssertEqual(ss.remainingReading, "は")
         let firstCand = ss.current.selectedText ?? ""
         XCTAssertFalse(firstCand.hasPrefix("今一"), "先頭が今一系にならない: \(firstCand)")
+        XCTAssertFalse(firstCand.hasPrefix("艮"), "艮一系を選ばない: \(firstCand)")
+        XCTAssertTrue(
+            firstCand == "こんにち" || firstCand == "今日",
+            "先頭表層はこんにち/今日: \(firstCand)"
+        )
+    }
+
+    func testWatashihagakuseiSpaceSplitsBeforeHa() {
+        setUp()
+        typeRomaji("watashihagakusei")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode, let ss = handler.state.segmentState else {
+            XCTFail("文節モードに入るはず")
+            return
+        }
+        XCTAssertEqual(ss.effectiveClauseEnd, 3, "わたし|はがくせい")
+        XCTAssertEqual(ss.current.reading, "わたし")
+        XCTAssertEqual(ss.remainingReading, "はがくせい")
+        XCTAssertEqual(ss.current.selectedText, "わたし")
+    }
+
+    func testKonnitihaSpaceSelectsKonnichiNotKonichi() {
+        setUp()
+        setComposedReading("こんにちは")
+        press(keyCode: 49)
+        guard handler.state.isSegmentMode, let ss = handler.state.segmentState else {
+            XCTFail("文節モードに入るはず")
+            return
+        }
+        let selected = ss.current.selectedText ?? ""
+        XCTAssertTrue(
+            selected == "こんにち" || selected == "今日",
+            "先頭表層はこんにち/今日のいずれか: \(selected)"
+        )
+        XCTAssertFalse(selected.hasPrefix("今一"), "今一系を選ばない: \(selected)")
+        XCTAssertFalse(selected.hasPrefix("艮"), "艮一系を選ばない: \(selected)")
     }
 
     func testAnatahaEnterLeavesHa() {

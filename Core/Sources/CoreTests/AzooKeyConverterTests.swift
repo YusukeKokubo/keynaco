@@ -79,6 +79,27 @@ final class AzooKeyConverterTests: XCTestCase {
         XCTAssertEqual(end, 4)
     }
 
+    func testWatashihagakuseiDefaultClauseEndBeforeHa() {
+        let converter = AzooKeyConverter()
+        let raw = converter.requestConversionResult(
+            hiragana: "わたしはがくせい",
+            leftSideContext: nil,
+            richCandidates: true
+        )
+        let end = AzooKeyCandidateMerge.defaultClauseEnd(
+            result: raw,
+            convertTarget: "わたしはがくせい"
+        )
+        XCTAssertEqual(end, 3, "私は:4 より助詞直前の わたし:3")
+    }
+
+    func testWatashihagakuseiSegmentizeUsesThreeCharFirstClause() {
+        let converter = AzooKeyConverter()
+        let segments = converter.segmentize("わたしはがくせい", leftSideContext: nil)
+        XCTAssertGreaterThanOrEqual(segments.count, 2)
+        XCTAssertEqual(segments[0].reading, "わたし")
+    }
+
     func testSegmentizeFirstSegmentRetainsValidCandidates() {
         let converter = AzooKeyConverter()
         let segments = converter.segmentize("じゃあ")

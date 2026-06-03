@@ -81,6 +81,50 @@ public enum AzooKeyCandidateMerge {
         defaultClauseEndFromConversion(result: result, convertTarget: convertTarget)
     }
 
+    /// 先頭文節の右端。助動詞接尾（です等）を優先し、次に話題助詞「は」の直前。
+    private static func preferredMorphologicalSplitIndex(_ convertTarget: String) -> Int? {
+        if let stripped = clauseEndStrippingTrailingParticle(convertTarget) {
+            return stripped
+        }
+        let total = convertTarget.count
+        guard total >= 2 else { return nil }
+        for i in 1..<total {
+            let idx = convertTarget.index(convertTarget.startIndex, offsetBy: i)
+            if convertTarget[idx] == "は" { return i }
+        }
+        return nil
+    }
+
+    /// 分割位置と一致する部分候補。読みと表層が一致する行を優先（私は:4 より わたし:3）。
+    private static func partialLengthAtMorphologicalSplit(
+        partials: [AzooKeyClauseCandidate],
+        convertTarget: String,
+        total: Int
+    ) -> Int? {
+        guard let splitAt = preferredMorphologicalSplitIndex(convertTarget) else { return nil }
+        let atSplit = partials.filter { $0.inputLength == splitAt }
+        let reading = String(convertTarget.prefix(splitAt))
+        if let aligned = atSplit.first(where: { $0.text == reading }) {
+            return aligned.inputLength
+        }
+        if atSplit.isEmpty { return nil }
+        return splitAt
+    }
+
+    private static func longestUsefulPartialLength(
+        partials: [AzooKeyClauseCandidate],
+        convertTarget: String,
+        total: Int
+    ) -> Int? {
+        guard let longest = partials.max(by: { $0.inputLength < $1.inputLength }) else { return nil }
+        let n = longest.inputLength
+        guard n < total else { return nil }
+        if total > 5 || n == 1 { return max(1, n) }
+        let minUseful = max(2, total - 2)
+        if n >= minUseful, !(total <= 5 && n < total - 1) { return max(1, n) }
+        return nil
+    }
+
     private static func defaultClauseEndFromConversion(
         result: AzooKeyConversionResult?,
         convertTarget: String
@@ -88,27 +132,34 @@ public enum AzooKeyCandidateMerge {
         let total = convertTarget.count
         guard total > 0 else { return 1 }
         guard let result else { return total }
-        // Desktop は firstClause の先頭部分候補を使う（エンジン返却順を信頼）。
         let partialFirst = result.firstClauseResults.filter {
             !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
         }
-        // Desktop: 最長の部分候補。短い語（がくせい+学:2）や助詞直前（あなた:3）を区別する。
-        if let longest = partialFirst.max(by: { $0.inputLength < $1.inputLength }) {
-            let n = longest.inputLength
-            if n < total {
-                // 長い読み・1 文字助詞文節（は|がくせい）は firstClause を優先
-                if total > 5 || n == 1 {
-                    return max(1, n)
-                }
-                let minUseful = max(2, total - 2)
-                if n >= minUseful, !(total <= 5 && n < total - 1) {
-                    return max(1, n)
-                }
-            }
-        }
-        if let partialMain = result.mainResults.filter({
+        let partialMain = result.mainResults.filter {
             !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
-        }).max(by: { $0.inputLength < $1.inputLength }) {
+        }
+        if let n = partialLengthAtMorphologicalSplit(
+            partials: partialFirst,
+            convertTarget: convertTarget,
+            total: total
+        ) {
+            return n
+        }
+        if let n = longestUsefulPartialLength(
+            partials: partialFirst,
+            convertTarget: convertTarget,
+            total: total
+        ) {
+            return n
+        }
+        if let n = partialLengthAtMorphologicalSplit(
+            partials: partialMain,
+            convertTarget: convertTarget,
+            total: total
+        ) {
+            return n
+        }
+        if let partialMain = partialMain.max(by: { $0.inputLength < $1.inputLength }) {
             return max(1, min(partialMain.inputLength, total))
         }
         return total

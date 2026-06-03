@@ -111,6 +111,10 @@ public extension InputHandler {
         convertTarget: String,
         clauseEnd: Int
     ) -> Int {
+        let clauseReading = String(convertTarget.prefix(clauseEnd))
+        if let i = rows.firstIndex(where: { $0.inputLength == clauseEnd && $0.text == clauseReading }) {
+            return i
+        }
         if let i = rows.firstIndex(where: { $0.inputLength == clauseEnd }) { return i }
         if let i = rows.firstIndex(where: {
             !AzooKeyCandidateMerge.consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
@@ -126,17 +130,15 @@ public extension InputHandler {
         clauseEnd: Int,
         clauseReading: String
     ) -> Int {
+        if let i = candidates.firstIndex(of: clauseReading) { return i }
         if rows.indices.contains(engineRowIndex) {
             let target = rows[engineRowIndex].text
             if let i = candidates.firstIndex(of: target) { return i }
         }
-        if let i = candidates.firstIndex(of: clauseReading) { return i }
-        if let i = candidates.firstIndex(where: { text in
-            rows.contains { $0.text == text && $0.inputLength == clauseEnd }
-        }) {
-            return i
+        for row in rows where row.inputLength == clauseEnd {
+            if let i = candidates.firstIndex(of: row.text) { return i }
         }
-        return rows.indices.contains(engineRowIndex) ? engineRowIndex : 0
+        return 0
     }
 
     /// 表示リストとエンジン行の `inputLength` を対応付ける（履歴行は文節読み全体長）。
@@ -269,8 +271,25 @@ public extension InputHandler {
             convertTarget: convertTarget,
             segmentEdition: segmentEdition
         )
-        let scoped = merged.filter { $0.inputLength <= clauseEnd }
-        if !scoped.isEmpty { return scoped }
+        var scoped = merged.filter { $0.inputLength == clauseEnd }
+        let firstAtEnd = raw.firstClauseResults.filter { $0.inputLength == clauseEnd }
+        if !firstAtEnd.isEmpty {
+            let allowed = Set(firstAtEnd.map(\.text))
+            scoped = scoped.filter { allowed.contains($0.text) }
+        }
+        if scoped.isEmpty {
+            scoped = merged.filter { $0.inputLength <= clauseEnd }
+        }
+        if !scoped.isEmpty {
+            let firstOrder = raw.firstClauseResults.map(\.text)
+            scoped.sort { lhs, rhs in
+                let li = firstOrder.firstIndex(of: lhs.text) ?? Int.max
+                let ri = firstOrder.firstIndex(of: rhs.text) ?? Int.max
+                if li != ri { return li < ri }
+                return false
+            }
+            return scoped
+        }
         guard clauseEnd < convertTarget.count else { return merged }
         let prefix = String(convertTarget.prefix(clauseEnd))
         guard !prefix.isEmpty else { return merged }
