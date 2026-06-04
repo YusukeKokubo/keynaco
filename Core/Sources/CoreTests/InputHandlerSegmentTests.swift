@@ -319,6 +319,29 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         }
     }
 
+    /// 履歴は候補に出るが、Space 直後の文節境界（engineClauseEnd）はエンジンのみ。
+    /// `boundary_pref` 廃止後も、前方一致履歴が境界長を上書きしないこと。
+    func testHistoryDoesNotOverrideSegmentClauseEnd() {
+        for _ in 0..<8 {
+            handler.db.recordPrefixes(reading: "あなたは", output: "貴方は")
+        }
+        typeRomaji("anataha")
+        let (_, action) = press(keyCode: 49)
+        guard let ss = handler.state.segmentState else {
+            XCTFail("文節モードに入るはず"); return
+        }
+        XCTAssertEqual(ss.engineClauseEnd, 3, "履歴があっても engine 境界は 3")
+        XCTAssertEqual(ss.effectiveClauseEnd, 3)
+        XCTAssertEqual(ss.remainingReading, "は")
+        XCTAssertTrue(
+            handler.db.fetchHistoryExact(reading: "あなた").contains("貴方"),
+            "確定履歴は文節読みに紐づく（助詞は recordPrefixes でトリム）"
+        )
+        guard case .show = action else {
+            XCTFail("候補 .show: \(action)"); return
+        }
+    }
+
     func testHistoryPrefixAppearsInSegmentCandidates() {
         handler.db.recordPrefixes(reading: "にほんごかんきょう", output: "日本語環境")
         let seg = handler.buildSegmentCandidates(
