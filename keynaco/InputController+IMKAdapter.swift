@@ -24,7 +24,6 @@ final class IMKTextInputAdapter: TextInputClient, @unchecked Sendable {
         // insertText は常に @MainActor の InputController 経由で呼ばれる
         #if DEBUG
         MainActor.assumeIsolated {
-            EventViewerWindow.shared.addCommit(text)
             NotificationCenter.default.post(
                 name: .imeSandboxInsertText,
                 object: nil,

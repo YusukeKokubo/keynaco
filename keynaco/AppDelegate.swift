@@ -67,18 +67,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        let viewerItem = NSMenuItem(title: "イベントビューアー", action: #selector(openEventViewer), keyEquivalent: "")
-        viewerItem.isEnabled = true
-        menu.addItem(viewerItem)
-
         #if DEBUG
         let sandboxItem = NSMenuItem(title: "サンドボックス…", action: #selector(openIMESandbox), keyEquivalent: "")
         sandboxItem.isEnabled = true
         menu.addItem(sandboxItem)
-
-        let ggTestItem = NSMenuItem(title: "Guided Generation テスト…", action: #selector(openGGTest), keyEquivalent: "")
-        ggTestItem.isEnabled = true
-        menu.addItem(ggTestItem)
         #endif
 
         let userDictItem = NSMenuItem(title: "ユーザー辞書...", action: #selector(openUserDict), keyEquivalent: "")
@@ -100,17 +92,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         NSMenu.popUpContextMenu(menu, with: event, for: button)
     }
 
-    @objc private func openEventViewer() {
-        EventViewerWindow.shared.show()
-    }
-
     #if DEBUG
     @objc private func openIMESandbox() {
         IMESandboxWindow.shared.show()
-    }
-
-    @objc private func openGGTest() {
-        DebugGuidedGenerationTestWindow.shared.show()
     }
     #endif
 

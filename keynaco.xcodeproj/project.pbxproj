@@ -10,7 +10,6 @@
 		1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C24D0073941540F51238C4 /* DebugSocketServer.swift */; };
 		D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */; };
 		A1B2C3D4E5F6071829ABCD01 /* DebugPOSClassifierV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */; };
-		F1A2B3C4D5E6F70819ABCE01 /* DebugGuidedGenerationTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F70819ABCE02 /* DebugGuidedGenerationTest.swift */; };
 		D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */; };
 		D0A1B2C3D4E5F60718293A05 /* SocketMockClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */; };
 		D0A1B2C3D4E5F60718293A07 /* DebugCandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */; };
@@ -33,7 +32,6 @@
 		9F5BA854FBF7AFBCE8215977 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF84CE1FD39376C1BC2A710C /* NSManualApplication.swift */; };
 		B1F3B8643749DE7DAA9B3E40 /* InputSource@2x.tiff in Resources */ = {isa = PBXBuildFile; fileRef = AED425059C465687B7765B08 /* InputSource@2x.tiff */; };
 		B2ABABD46456BA4A8BC0BDA8 /* SurroundingIMKContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */; };
-		BECB3D246AF08901817AFD4E /* EventViewerWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96925E03EBB4612285CA9FF /* EventViewerWindow.swift */; };
 		CC81B691B4422E5779491EE0 /* UserDictViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */; };
 		CF5D2357CC1B6C7209F9918F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC83CA0F9C13530D08702297 /* main.swift */; };
 		E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A755C9097E561BF05FF3D11 /* InputController.swift */; };
@@ -66,7 +64,6 @@
 		65C24D0073941540F51238C4 /* DebugSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSocketServer.swift; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+Commands.swift"; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugPOSClassifierV2.swift; sourceTree = "<group>"; };
-		F1A2B3C4D5E6F70819ABCE02 /* DebugGuidedGenerationTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugGuidedGenerationTest.swift; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+Snapshot.swift"; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketMockClient.swift; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugCandidateWindow.swift; sourceTree = "<group>"; };
@@ -79,7 +76,6 @@
 		832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		8EB7EDA4E75C67B6FFD6F9B6 /* ggml-model-Q5_K_M.gguf */ = {isa = PBXFileReference; path = "ggml-model-Q5_K_M.gguf"; sourceTree = "<group>"; };
 		A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundingIMKContextTests.swift; sourceTree = "<group>"; };
-		A96925E03EBB4612285CA9FF /* EventViewerWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventViewerWindow.swift; sourceTree = "<group>"; };
 		AC5B60092B9315A5731AEF44 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		AED425059C465687B7765B08 /* InputSource@2x.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = "InputSource@2x.tiff"; sourceTree = "<group>"; };
 		AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
@@ -206,11 +202,9 @@
 			children = (
 				D0A1B2C3D4E5F60718293A08 /* DebugCandidateWindow.swift */,
 				A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */,
-				F1A2B3C4D5E6F70819ABCE02 /* DebugGuidedGenerationTest.swift */,
 				D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */,
 				D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */,
 				65C24D0073941540F51238C4 /* DebugSocketServer.swift */,
-				A96925E03EBB4612285CA9FF /* EventViewerWindow.swift */,
 				C9289632F6594D9EE9A07926 /* IMESandboxWindow.swift */,
 				D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */,
 			);
@@ -337,12 +331,10 @@
 					8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
 				1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */,
 				A1B2C3D4E5F6071829ABCD01 /* DebugPOSClassifierV2.swift in Sources */,
-				F1A2B3C4D5E6F70819ABCE01 /* DebugGuidedGenerationTest.swift in Sources */,
 				D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */,
 				D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */,
 				D0A1B2C3D4E5F60718293A07 /* DebugCandidateWindow.swift in Sources */,
 				D0A1B2C3D4E5F60718293A05 /* SocketMockClient.swift in Sources */,
-				BECB3D246AF08901817AFD4E /* EventViewerWindow.swift in Sources */,
 				1FEE62AC67AF46B79608E006 /* HiraganaPreferredViewController.swift in Sources */,
 				26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */,
 				9D8C79D665B585F63D5695FF /* IMESandboxWindow.swift in Sources */,

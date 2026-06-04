@@ -4,6 +4,42 @@
 
 ---
 
+## D-3 イベントビューアー（2026-06-05 削除）
+
+**概要**: メニューバー ⌨ から開くキーイベント・確定テキスト・候補リストのリアルタイム表示ウィンドウ。`InputController` / `IMKTextInputAdapter` から `#if DEBUG` 経由でログを受け取る。JSONL エクスポート対応。
+
+**削除の理由**:
+
+- **利用場面がない**: 開発初期のデバッグ用途で導入したが、IME サンドボックス（デバッグソケット）に置き換わり、日常的に開く機会がなくなった
+- **機能重複**: キー入力の再現・内部状態の観察は `DebugSocketServer` + `/keynaco-ime-sandbox` スキルで十分。EventViewer は事後ログ閲覧に特化しており ROI が低い
+- **本番コードへの侵入**: `addCommit` だけ `#if DEBUG` なしで残っていた経緯があり（[PLAN260501c](../plans/PLAN260501c.md)）、デバッグ UI を維持するコストに見合わない
+
+**削除した周辺**: `EventViewerWindow.swift`、`InputController` / `InputController+IMKAdapter` 内の呼び出し、AppDelegate メニュー項目。
+
+**再検討するなら**: バグ報告用のセッション録画が必要になった場合。`DebugSocketServer` の JSONL 出力や `scripts/debug_ime.py` から派生させる方が、再現手順と一体化しやすい。
+
+> 関連: [PLAN260504c](../plans/PLAN260504c.md)、[PLAN260501](../plans/PLAN260501.md)
+
+---
+
+## D-4 Guided Generation テストウィンドウ（2026-06-05 削除）
+
+**概要**: DEBUG メニュー「Guided Generation テスト…」から開く、`@Generable` + `respond(generating:)` の動作確認ウィンドウ。IME Extension ではなく**本体アプリ**（InputMethod ホスト）で Foundation Models が使えることを検証するためのツール（2026-05-27 追加）。
+
+**削除の理由**:
+
+- **利用場面がない**: 日記生成 POC（[PLAN260527](../plans/PLAN260527.md)）完了後、一度動作確認すれば十分なツールで、以降メニューから開く機会がなかった
+- **本番機能ではない**: IME サンドボックス内では Guided Generation は IME サンドボックス制約でハングする（[H-1](#h-1-foundationmodels-generable-構造化出力による品詞分類2026-05-25)）。本体アプリでの動作確認は POC 記録に残っており、常設 UI の必要がない
+- **日記タブも削除済み**: Guided Generation の唯一の本番利用先だった日記生成 UI（[J-1](#j-1-日記自動生成settings-タブ2026-06-05-削除)）を削除したため、テストウィンドウの存在意義も消えた
+
+**削除した周辺**: `DebugGuidedGenerationTest.swift`、AppDelegate DEBUG メニュー項目。
+
+**再検討するなら**: IME 本体で `@Generable` を本採用する機能が再浮上したとき。OS が IME Extension の XPC 制約を緩和する前は、Settings 等のサンドボックス外プロセスでの POC 用スクリプトで十分。
+
+> 関連: [H-1](#h-1-foundationmodels-generable-構造化出力による品詞分類2026-05-25)、[PLAN260527](../plans/PLAN260527.md)、[apple-intelligence.md](./apple-intelligence.md)
+
+---
+
 ## S-1 NAS DB 同期（Settings タブ）（2026-06-05 削除）
 
 **概要**: Settings の「同期」タブで NAS 上の `history.db` パスを指定し、rsync でローカル DB と手動／終了時自動で同期する機能。`SyncSettings` + `SyncViewController` + `AppDelegate.applicationWillTerminate` の書き出し。

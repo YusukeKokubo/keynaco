@@ -129,9 +129,6 @@ class InputController: IMKInputController, @unchecked Sendable {
         case .none:
             break
         case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
-            #if DEBUG
-            EventViewerWindow.shared.addCandidates(candidates, selectedIndex: initialRow)
-            #endif
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
         case .dismiss:
             candidateWindow.dismiss()
@@ -164,9 +161,6 @@ class InputController: IMKInputController, @unchecked Sendable {
                 candidateWindow.removeCandidate(at: row)
             }
         case .replaceCandidates(let candidates):
-            #if DEBUG
-            EventViewerWindow.shared.addCandidates(candidates, selectedIndex: 0)
-            #endif
             candidateWindow.replaceCandidates(candidates)
         }
 
@@ -224,12 +218,6 @@ class InputController: IMKInputController, @unchecked Sendable {
         #if DEBUG
         let (consumed, imeStateSnapshot) = MainActor.assumeIsolated {
             let frontBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            EventViewerWindow.shared.addEvent(
-                keyCode: keyCode, chars: characters ?? "",
-                baseChars: baseCharacters ?? "",
-                mods: modifiers,
-                bundleID: frontBundleID
-            )
             ic.handler.currentAppBundleID = frontBundleID
             let ctx = CandidateContext(
                 isVisible: ic.candidateWindow.isVisible,
@@ -250,8 +238,6 @@ class InputController: IMKInputController, @unchecked Sendable {
                 candidate: ctx,
                 client: adapter
             )
-            let actionName = "\(action)".split(separator: "(").first.map(String.init) ?? "\(action)"
-            EventViewerWindow.shared.updateResult(consumed: consumed, action: actionName)
             ic.applyPostKeyDownEffects(
                 action: action,
                 adapter: adapter,
