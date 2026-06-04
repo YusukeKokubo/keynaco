@@ -26,9 +26,13 @@ public struct AzooKeyConversionResult: Sendable, Equatable {
 }
 
 /// azooKey-Desktop `SegmentsManager.rawCandidatesList` と同じマージ規則。
+///
+/// 文節境界（`defaultClauseEnd`）は **エンジン部分候補の `inputLength` のみ** から決める。
+/// 全文候補しか無いときだけ、読み末尾の助動詞・丁寧語接尾（です・ます等）を剥がすフォールバックを使う。
+/// 語中の「は」スキャンや語尾「し」の単独除去などの形態素ヒューリスティックは使わない。
 public enum AzooKeyCandidateMerge {
-    /// 末尾の助動詞・丁寧語（長い順）。AzooKey が全文候補のみのときの境界フォールバック用。
-    private static let trailingSegmentSuffixes: [String] = [
+    /// 読み末尾の助動詞・丁寧語（長い順）。`defaultClauseEnd` のフォールバック専用。
+    private static let trailingPoliteSuffixes: [String] = [
         "ませんでした",
         "ません",
         "でした",
@@ -42,15 +46,13 @@ public enum AzooKeyCandidateMerge {
         "かしら",
     ]
 
-    /// Space 直後の先頭文節で、残り読みに切り出す末尾 1 文字助詞。
-    /// 助動詞・語尾（し/だ/ん 等）も含む。`clauseEndStrippingTrailingParticle` 用。
+    /// Space 直後の先頭文節で、残り読みに切り出す末尾 1 文字助詞（助動詞・語尾含む広い集合）。
     private static let trailingSegmentParticles: Set<Character> = [
         "は", "が", "を", "に", "で", "と", "へ", "も", "の", "や", "て", "ね", "よ", "か", "さ", "な",
         "だ", "ぞ", "ぜ", "ば", "ぱ", "り", "し", "み", "く", "け", "れ", "ろ", "わ", "ん",
     ]
 
-    /// 文節境界として切り出す意味がある格助詞・接続助詞のみ。
-    /// 語尾の「し」「ん」等は含めない（`わたし→し` を助詞と誤認しないため）。
+    /// 文節境界として切り出す格助詞・接続助詞のみ（`shouldUseNormalCandidateWindowInsteadOfSegment` 用）。
     private static let clauseSplitTrailingParticles: Set<Character> = [
         "は", "が", "を", "に", "で", "と", "へ", "も", "の", "や", "て", "ね", "よ", "か",
     ]
@@ -80,17 +82,15 @@ public enum AzooKeyCandidateMerge {
             && clauseEnd >= convertTarget.count - 1
     }
 
-    /// 末尾の助詞・助動詞を除いた読み長。該当しないときは `nil`。
+    /// 末尾の助動詞・丁寧語接尾を除いた読み長（フォールバック・診断用）。単一助詞は剥がさない。
     public static func clauseEndStrippingTrailingParticle(_ convertTarget: String) -> Int? {
         guard convertTarget.count >= 2 else { return nil }
-        for suffix in trailingSegmentSuffixes {
+        for suffix in trailingPoliteSuffixes {
             guard convertTarget.count > suffix.count, convertTarget.hasSuffix(suffix) else { continue }
             let end = convertTarget.count - suffix.count
             if end >= 1 { return end }
         }
-        guard let last = convertTarget.last, trailingSegmentParticles.contains(last) else { return nil }
-        let end = convertTarget.count - 1
-        return end >= 1 ? end : nil
+        return nil
     }
 
     /// 読み全体を消費する候補か（Desktop `isWholeComposingText` の文字列版）。
@@ -99,7 +99,7 @@ public enum AzooKeyCandidateMerge {
     }
 
     /// Space 直後の変換範囲（先頭文節の読み長）。
-    /// Desktop `.selecting` 準拠: `firstClauseResults`（手動編集後は `mainResults`）の部分候補 `inputLength` のみ。
+    /// Desktop `.selecting` 準拠: `firstClauseResults`（手動編集後は `mainResults`）の部分候補 `inputLength`。
     public static func defaultClauseEnd(
         result: AzooKeyConversionResult,
         convertTarget: String
@@ -107,48 +107,85 @@ public enum AzooKeyCandidateMerge {
         defaultClauseEndFromConversion(result: result, convertTarget: convertTarget)
     }
 
-    /// 先頭文節の右端。助動詞接尾（です等）を優先し、次に話題助詞「は」の直前。
-    private static func preferredMorphologicalSplitIndex(_ convertTarget: String) -> Int? {
-        if let stripped = clauseEndStrippingTrailingParticle(convertTarget) {
-            return stripped
-        }
-        let total = convertTarget.count
-        guard total >= 2 else { return nil }
-        for i in 1..<total {
-            let idx = convertTarget.index(convertTarget.startIndex, offsetBy: i)
-            if convertTarget[idx] == "は" { return i }
-        }
-        return nil
+    private static func partialRows(
+        _ rows: [AzooKeyClauseCandidate],
+        convertTarget: String
+    ) -> [AzooKeyClauseCandidate] {
+        rows.filter { !consumesWholeTarget($0.inputLength, convertTarget: convertTarget) }
     }
 
-    /// 分割位置と一致する部分候補。読みと表層が一致する行を優先（私は:4 より わたし:3）。
-    private static func partialLengthAtMorphologicalSplit(
-        partials: [AzooKeyClauseCandidate],
+    /// 信頼できる部分候補から文節右端（読み一致・格助詞境界）。
+    private static func clauseEndFromStrongPartials(
+        _ partials: [AzooKeyClauseCandidate],
         convertTarget: String,
         total: Int
     ) -> Int? {
-        guard let splitAt = preferredMorphologicalSplitIndex(convertTarget) else { return nil }
-        let atSplit = partials.filter { $0.inputLength == splitAt }
-        let reading = String(convertTarget.prefix(splitAt))
-        if let aligned = atSplit.first(where: { $0.text == reading }) {
-            return aligned.inputLength
+        guard !partials.isEmpty else { return nil }
+
+        let readingAligned = partials.filter {
+            String(convertTarget.prefix($0.inputLength)) == $0.text
         }
-        if atSplit.isEmpty { return nil }
-        return splitAt
+
+        // 残りが格助詞 1 文字だけ → 最長の読み一致部分（こんにち|は、あなた|は）
+        let beforeSingleParticle = readingAligned.filter {
+            let remainder = String(convertTarget.dropFirst($0.inputLength))
+            return isClauseSplitTrailingParticleOnlyRemainder(remainder)
+        }
+        if let n = longestPartialLength(in: beforeSingleParticle, total: total) {
+            return n
+        }
+
+        // 残りが「は…」で続く複合（わたし|はがくせい）。「こん|には」のように語中の に では切らない。
+        let beforeWaTopic = readingAligned.filter {
+            let remainder = String(convertTarget.dropFirst($0.inputLength))
+            return remainder.first == "は"
+        }
+        if let n = shortestPartialLength(in: beforeWaTopic, total: total) {
+            return n
+        }
+
+        // です・ます付きは語中の短い読み一致（がく:2 等）より接尾フォールバックを優先する
+        if clauseEndStrippingTrailingParticle(convertTarget) != nil {
+            return nil
+        }
+
+        return longestPartialLength(in: readingAligned, total: total)
     }
 
-    private static func longestUsefulPartialLength(
-        partials: [AzooKeyClauseCandidate],
-        convertTarget: String,
+    /// 弱いヒューリスティック（ひらがな表層優先）。`です` 接尾フォールバックより後に試す。
+    private static func clauseEndFromWeakPartials(
+        _ partials: [AzooKeyClauseCandidate],
         total: Int
     ) -> Int? {
-        guard let longest = partials.max(by: { $0.inputLength < $1.inputLength }) else { return nil }
-        let n = longest.inputLength
-        guard n < total else { return nil }
-        if total > 5 || n == 1 { return max(1, n) }
-        let minUseful = max(2, total - 2)
-        if n >= minUseful, !(total <= 5 && n < total - 1) { return max(1, n) }
-        return nil
+        guard !partials.isEmpty else { return nil }
+        let hiraganaOnly = partials.filter { isAllHiragana($0.text) }
+        if let n = longestPartialLength(in: hiraganaOnly, total: total) {
+            return n
+        }
+        return longestPartialLength(in: partials, total: total)
+    }
+
+    private static func shortestPartialLength(
+        in partials: [AzooKeyClauseCandidate],
+        total: Int
+    ) -> Int? {
+        guard let best = partials.min(by: { $0.inputLength < $1.inputLength }),
+              best.inputLength < total else { return nil }
+        return best.inputLength
+    }
+
+    private static func longestPartialLength(
+        in partials: [AzooKeyClauseCandidate],
+        total: Int
+    ) -> Int? {
+        guard let best = partials.max(by: { $0.inputLength < $1.inputLength }),
+              best.inputLength < total else { return nil }
+        return best.inputLength
+    }
+
+    private static func isAllHiragana(_ text: String) -> Bool {
+        guard !text.isEmpty else { return false }
+        return text.unicodeScalars.allSatisfy { (0x3041...0x3096).contains($0.value) }
     }
 
     private static func defaultClauseEndFromConversion(
@@ -158,35 +195,24 @@ public enum AzooKeyCandidateMerge {
         let total = convertTarget.count
         guard total > 0 else { return 1 }
         guard let result else { return total }
-        let partialFirst = result.firstClauseResults.filter {
-            !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
-        }
-        let partialMain = result.mainResults.filter {
-            !consumesWholeTarget($0.inputLength, convertTarget: convertTarget)
-        }
-        if let n = partialLengthAtMorphologicalSplit(
-            partials: partialFirst,
-            convertTarget: convertTarget,
-            total: total
-        ) {
+
+        let partialFirst = partialRows(result.firstClauseResults, convertTarget: convertTarget)
+        let partialMain = partialRows(result.mainResults, convertTarget: convertTarget)
+
+        if let n = clauseEndFromStrongPartials(partialFirst, convertTarget: convertTarget, total: total) {
             return n
         }
-        if let n = longestUsefulPartialLength(
-            partials: partialFirst,
-            convertTarget: convertTarget,
-            total: total
-        ) {
+        if let n = clauseEndFromStrongPartials(partialMain, convertTarget: convertTarget, total: total) {
             return n
         }
-        if let n = partialLengthAtMorphologicalSplit(
-            partials: partialMain,
-            convertTarget: convertTarget,
-            total: total
-        ) {
+        if let stripped = clauseEndStrippingTrailingParticle(convertTarget), stripped < total {
+            return stripped
+        }
+        if let n = clauseEndFromWeakPartials(partialFirst, total: total) {
             return n
         }
-        if let partialMain = partialMain.max(by: { $0.inputLength < $1.inputLength }) {
-            return max(1, min(partialMain.inputLength, total))
+        if let n = clauseEndFromWeakPartials(partialMain, total: total) {
+            return n
         }
         return total
     }
