@@ -94,151 +94,18 @@ public struct CompositionState {
         return (true, composedHiragana.count >= 2)
     }
 
-    public var segmentState: SegmentState? = nil
-    public var isSegmentMode: Bool { segmentState != nil }
-
     /// 全状態をリセットする。
-    /// - Returns: リセット前に未確定文字列またはセグメント状態があったか
+    /// - Returns: リセット前に未確定文字列があったか
     public mutating func reset() -> Bool {
-        guard !composingText.isEmpty || segmentState != nil else { return false }
+        guard !composingText.isEmpty else { return false }
         composedHiragana = ""
         pendingRomaji = ""
         hiddenPendingN = false
-        segmentState = nil
         return true
     }
 
     /// Shift 入力の検出
     public static func isShiftInput(characters: String, baseCharacters: String) -> Bool {
         characters != baseCharacters
-    }
-}
-
-// MARK: - 文節選択（AzooKey Desktop `.selecting` 相当）
-
-public struct Segment {
-    public let reading: String
-    public var candidates: [String]
-    public var selectedIndex: Int
-    public var historyEnd: Int
-    public var isManuallyAdjusted: Bool = false
-
-    public var selectedText: String {
-        guard !candidates.isEmpty else { return reading }
-        return candidates[selectedIndex]
-    }
-}
-
-/// azooKey-Desktop の `SegmentsManager` + `.selecting` に相当。
-/// `firstClauseResults` マージ候補を選び、`composingCount`（`inputLength`）で部分確定する。
-public struct SegmentState {
-    /// 未確定の読み全体（`composedHiragana` と同期）
-    public var convertTarget: String
-    /// 表示・確定に使う行（エンジン候補 + 履歴等を `rows` に統合）
-    public var rows: [AzooKeyClauseCandidate]
-    public var selectedIndex: Int
-    /// Shift+←/→ で `manualClauseEnd` を ±1 調整したあとは `mainResults` のみ再取得
-    /// （AzooKey Desktop の `editSegment` 相当。keynaco は 1 文字刻みのみ）。
-    public var didExperienceSegmentEdition: Bool = false
-    /// Space 直後のエンジン既定境界（部分候補の `inputLength`）。Shift+矢印で `manualClauseEnd` に上書き。
-    public var engineClauseEnd: Int
-    /// 手動境界（`convertTarget` 先頭からの文字数）。nil なら `engineClauseEnd`。
-    public var manualClauseEnd: Int?
-    /// この Space セッションで確定済みの文節
-    public var confirmedSegments: [(reading: String, text: String)] = []
-    /// 直近 `buildClauseCandidateAction` の履歴区切り（Shift+Delete 用）
-    public var displayHistoryEnd: Int = 0
-
-    public init(
-        convertTarget: String,
-        rows: [AzooKeyClauseCandidate],
-        engineClauseEnd: Int,
-        selectedIndex: Int = 0,
-        confirmedSegments: [(reading: String, text: String)] = []
-    ) {
-        self.convertTarget = convertTarget
-        self.rows = rows
-        self.engineClauseEnd = max(1, min(engineClauseEnd, convertTarget.count))
-        self.selectedIndex = selectedIndex
-        self.confirmedSegments = confirmedSegments
-    }
-
-    /// 履歴・辞書クエリ用の読み長（エンジン既定 or 手動境界）。
-    public var effectiveClauseEnd: Int {
-        if let manualClauseEnd {
-            return max(1, min(manualClauseEnd, convertTarget.count))
-        }
-        return max(1, min(engineClauseEnd, convertTarget.count))
-    }
-
-    /// marked text / 確定プレビュー（Desktop: 選択候補の `composingCount`）。
-    public var previewClauseEnd: Int {
-        guard rows.indices.contains(selectedIndex) else { return effectiveClauseEnd }
-        return max(1, min(rows[selectedIndex].inputLength, convertTarget.count))
-    }
-
-    public var clauseReading: String {
-        String(convertTarget.prefix(effectiveClauseEnd))
-    }
-
-    public var remainingReading: String {
-        String(convertTarget.dropFirst(previewClauseEnd))
-    }
-
-    public var pendingReading: String { convertTarget }
-
-    /// 候補ウィンドウ互換（`current` = 左端文節ビュー）
-    public var current: Segment {
-        let texts = rows.map(\.text)
-        let idx = texts.isEmpty ? 0 : min(selectedIndex, texts.count - 1)
-        return Segment(
-            reading: clauseReading,
-            candidates: texts,
-            selectedIndex: idx,
-            historyEnd: displayHistoryEnd,
-            isManuallyAdjusted: didExperienceSegmentEdition
-        )
-    }
-
-    public var focusedSegment: Segment {
-        get { current }
-    }
-
-    public var focusedIndex: Int { 0 }
-
-    public var allSelectedText: String {
-        confirmedSegments.map(\.text).joined() + (rows.indices.contains(selectedIndex) ? rows[selectedIndex].text : clauseReading)
-    }
-
-    public var snapshotSegmentTexts: [String] {
-        var texts = confirmedSegments.map(\.text)
-        if rows.indices.contains(selectedIndex) { texts.append(rows[selectedIndex].text) }
-        if !remainingReading.isEmpty { texts.append(remainingReading) }
-        return texts
-    }
-
-    /// 候補ウィンドウで選択中の表層に対応する文節末尾（`inputLength`）。未一致時は `previewClauseEnd`。
-    func clauseEndForMarkedText(overrideFocusedText: String?) -> Int {
-        if let override = overrideFocusedText,
-           let row = rows.first(where: { $0.text == override }) {
-            return max(1, min(row.inputLength, convertTarget.count))
-        }
-        return previewClauseEnd
-    }
-
-    /// Desktop `getCurrentMarkedText` `.selecting`: focused 表層 + unfocused 残り読み
-    public func attributedString(overrideFocusedText: String? = nil) -> NSAttributedString {
-        let result = NSMutableAttributedString()
-        let focused = overrideFocusedText ?? (rows.indices.contains(selectedIndex) ? rows[selectedIndex].text : clauseReading)
-        result.append(NSAttributedString(string: focused, attributes: [
-            .underlineStyle: NSUnderlineStyle.thick.rawValue,
-        ]))
-        let remainder = String(convertTarget.dropFirst(clauseEndForMarkedText(overrideFocusedText: overrideFocusedText)))
-        if !remainder.isEmpty {
-            result.append(NSAttributedString(string: remainder, attributes: [
-                .underlineStyle: NSUnderlineStyle.single.rawValue,
-            ]))
-        }
-        return result
     }
 }

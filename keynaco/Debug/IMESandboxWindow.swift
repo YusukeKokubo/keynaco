@@ -751,7 +751,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             "composingText":       s.composingText,
             "markedText":          s.markedText,
             "isAsciiMode":         s.isAsciiMode,
-            "isSegmentMode":       s.isSegmentMode,
             "isBracketMode":       s.isBracketMode,
             "isExplicitlySelected": s.isExplicitlySelected,
             "candidateVisible":    s.candidateVisible,
@@ -761,8 +760,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             "candidates":          s.candidates,
             "committedHistory":    s.committedHistory,
             "sessionTextBuffer":   s.sessionTextBuffer,
-            "segmentTexts":        s.segmentTexts,
-            "focusedSegmentIndex": s.focusedSegmentIndex,
         ]
         if let st = s.selectedText { dict["selectedText"] = st }
         return dict
@@ -771,7 +768,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
     private nonisolated static func formatSummaryFromSnapshot(_ s: InputHandlerSnapshot) -> String {
         let modeFlags = [
             s.isAsciiMode          ? "ASCII"   : nil,
-            s.isSegmentMode        ? "Seg"     : nil,
             s.isBracketMode        ? "Brkt"    : nil,
             s.isExplicitlySelected ? "ExplSel" : nil,
         ].compactMap { $0 }.joined(separator: ",")
@@ -790,7 +786,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("")
         lines.append("【モード】")
         lines.append("isAsciiMode           : \(s.isAsciiMode)")
-        lines.append("isSegmentMode         : \(s.isSegmentMode)")
         lines.append("isBracketMode         : \(s.isBracketMode)")
         lines.append("isExplicitlySelected  : \(s.isExplicitlySelected)")
         lines.append("")
@@ -806,12 +801,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("")
         lines.append("【確定履歴】")
         lines.append("committedHistory     : \(s.committedHistory)")
-        if s.isSegmentMode {
-            lines.append("")
-            lines.append("【セグメント】")
-            lines.append("segments     : \(s.segmentTexts.joined(separator: " | "))")
-            lines.append("focusedIndex : \(s.focusedSegmentIndex)")
-        }
         lines.append("")
         lines.append("更新: \(timestamp)  source: IME")
         return lines.joined(separator: "\n")
@@ -841,7 +830,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("")
         lines.append("【モード】")
         lines.append("isAsciiMode           : \(bool("isAsciiMode"))")
-        lines.append("isSegmentMode         : \(bool("isSegmentMode"))")
         lines.append("isBracketMode         : \(bool("isBracketMode"))")
         lines.append("isExplicitlySelected  : \(bool("isExplicitlySelected"))")
         lines.append("")

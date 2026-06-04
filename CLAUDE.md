@@ -122,7 +122,7 @@ fast + slow 両方（CI・リリース前）:
 
 アプリ層（`keynaco/`）が `InputMethodKit` を通じてキーイベントを受け取り、`KeynacoCore`（`Core/`）の `InputHandler` struct（Swift 6 strict concurrency）でロジックを処理。変換は AzooKey API（`AzooKeyConverter`）+ Zenzai 経由、履歴は SQLite（`DatabaseManager`）、候補ウィンドウは自作 `NSWindow`（`CandidateWindow.swift`）。
 
-各クラス・関数・主要変数の振る舞いと不変条件は `///` ドキュメントコメントが正本（`fetchHistoryScoredMerged` の SUM 集計禁止、`recordPrefixes` のフル読みのみ記録、`isExplicitlySelected` の意味、`hiddenPendingN` の不可視化規則、`doConfirmSegments` の二重記録ルールなど）。
+各クラス・関数・主要変数の振る舞いと不変条件は `///` ドキュメントコメントが正本（`fetchHistoryScoredMerged` の SUM 集計禁止、`recordPrefixes` のフル読みのみ記録、`isExplicitlySelected` の意味、`hiddenPendingN` の不可視化規則など）。
 
 ### 候補表示の優先順位（`buildCandidateList`）
 
@@ -139,7 +139,7 @@ fast + slow 両方（CI・リリース前）:
 
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
 - `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト（worked example の正本）
-- **E2E 動作確認**: 状態（Segment・Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）。sandbox で通常文字を送るには `{"type_string": "k"}` を使う（`{"key": "k"}` は特殊キーのみ有効）
+- **E2E 動作確認**: 状態（Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）。sandbox で通常文字を送るには `{"type_string": "k"}` を使う（`{"key": "k"}` は特殊キーのみ有効）
 
 ## キー入力の挙動（特殊ケース）
 
@@ -149,7 +149,7 @@ fast + slow 両方（CI・リリース前）:
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。Shift+`,`/`.` は `characters` が `<`/`>` となり Bracket モード（`＜`/`＞` 候補）に入る
 - **z シーケンス**: `z` + 記号/矢印キーで特殊文字を挿入（`zCharMap` / `zArrowMap` 定義）。`InputHandlerZSequenceTests.swift` 参照。
 - **Bracket モード（`?` / `(` / `[` / `{` / `「` / `,` / `.` 等）**: 組成なし・ASCII モードでない状態でトリガー。`bracketOptions` マップで対応文字ペアを定義。US キーボードの `?` は `Shift+/`（`baseCharacters="/"`）なのでキーボード判定が必要（`InputHandler+Candidates.swift` 参照）。
-- **文節モード（Space 後）**: 境界はエンジン部分候補の `inputLength`（suffix / `segmentize` は使わない）。IME 実機で `こんにちは` を打つときはローマ字 `konnnichiha`（`konnitiha` は読み不一致になり得る）。回帰は `SegmentBoundaryComparisonTests` / `InputHandlerSegmentTests`。
+- **Space（keyCode 49）**: 組成中なら候補窓表示（`buildCandidateList(autoShow: false)`）。候補表示中なら次候補。
 
 ## macOS 26 IME の罠
 

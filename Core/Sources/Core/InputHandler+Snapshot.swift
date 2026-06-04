@@ -5,22 +5,12 @@ import Foundation
 public extension InputHandler {
     /// 候補ウィンドウの状態は `InputController` が上書きする（ここではダミーで埋める）。
     func snapshot(markedText: String) -> InputHandlerSnapshot {
-        let segTexts: [String]
-        let segFocus: Int
-        if let ss = state.segmentState {
-            segTexts = ss.snapshotSegmentTexts
-            segFocus = 0
-        } else {
-            segTexts = []
-            segFocus = 0
-        }
-        return InputHandlerSnapshot(
+        InputHandlerSnapshot(
             composedHiragana: state.composedHiragana,
             pendingRomaji: state.pendingRomaji,
             composingText: state.composingText,
             markedText: markedText,
             isAsciiMode: Self.isAsciiMode,
-            isSegmentMode: state.isSegmentMode,
             isBracketMode: isBracketMode,
             isExplicitlySelected: false,
             candidateVisible: false,
@@ -30,9 +20,7 @@ public extension InputHandler {
             fixedEnd: 0,
             candidates: [],
             committedHistory: Array(committedHistory.suffix(5)),
-            sessionTextBuffer: sessionTextBuffer,
-            segmentTexts: segTexts,
-            focusedSegmentIndex: segFocus
+            sessionTextBuffer: sessionTextBuffer
         )
     }
 }

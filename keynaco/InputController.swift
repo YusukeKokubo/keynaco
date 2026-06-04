@@ -140,7 +140,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             if handler.isBracketMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            } else if candidateWindow.isVisible && handler.state.composedHiragana.isEmpty && !handler.state.isSegmentMode && !handler.isBracketMode {
+            } else if candidateWindow.isVisible && handler.state.composedHiragana.isEmpty && !handler.isBracketMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
             } else {
@@ -151,7 +151,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             if handler.isBracketMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            } else if candidateWindow.isVisible && handler.state.composedHiragana.isEmpty && !handler.state.isSegmentMode && !handler.isBracketMode {
+            } else if candidateWindow.isVisible && handler.state.composedHiragana.isEmpty && !handler.isBracketMode {
                 let text = candidateWindow.selectedText() ?? ""
                 adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
             } else {
@@ -325,7 +325,6 @@ class InputController: IMKInputController, @unchecked Sendable {
                 ic.candidateWindow.isVisible
                     && ic.handler.state.composedHiragana.isEmpty
                     && !ic.handler.isBracketMode
-                    && !ic.handler.state.isSegmentMode
             ) else { return }
             let ctx = CandidateContext(
                 isVisible: ic.candidateWindow.isVisible,
@@ -346,26 +345,13 @@ class InputController: IMKInputController, @unchecked Sendable {
     // MARK: - プライベートヘルパー
 
     private func updateMarkedText(client: TextInputClient) {
-        if handler.state.isSegmentMode {
-            let ctx = CandidateContext(
-                isVisible: candidateWindow.isVisible,
-                selectedRow: candidateWindow.selectedRow,
-                selectedText: candidateWindow.selectedText(),
-                isExplicitlySelected: candidateWindow.isExplicitlySelected,
-                historyEnd: candidateWindow.historySectionEnd,
-                fixedEnd: candidateWindow.fixedRowCount
-            )
-            handler.syncFocusedSegmentSelection(from: ctx)
-            handler.applySegmentMarkedText(client: client, overrideFocusedText: ctx.selectedText)
+        let text: String
+        if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
+            text = selected + handler.state.pendingRomaji
         } else {
-            let text: String
-            if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
-                text = selected + handler.state.pendingRomaji
-            } else {
-                text = handler.state.composingText
-            }
-            client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            text = handler.state.composingText
         }
+        client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
 
 }

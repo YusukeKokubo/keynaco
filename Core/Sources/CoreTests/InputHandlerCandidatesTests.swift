@@ -219,12 +219,12 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "あいk")
     }
 
-    func testSpaceDuringCandidatesFallsBackToShowForSingleSegment() {
+    func testSpaceDuringCandidatesShowsCandidateList() {
         type(chars: "a", base: "a")
         let result = press(keyCode: 49, candidateVisible: true, selectedRow: 0)
         XCTAssertTrue(result.consumed)
         guard case .show = result.candidateAction else {
-            XCTFail("単一セグメントのスペースは .show にフォールバックするはず: \(result.candidateAction)"); return
+            XCTFail("Space は .show を返すはず: \(result.candidateAction)"); return
         }
     }
 

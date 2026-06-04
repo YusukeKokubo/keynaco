@@ -12,31 +12,16 @@ public extension InputHandler {
     /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
     ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
     mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
-        buildCandidateListInternal(forReading: nil, azooKeyEngineTexts: nil, autoShow: autoShow)
-    }
-
-    /// 文節選択モード: 左端文節の読みとエンジン候補（`firstClause` マージ結果）でリストを構築する。
-    mutating func buildCandidateList(
-        forReading reading: String,
-        azooKeyEngineTexts: [String],
-        autoShow: Bool = false
-    ) -> CandidateAction {
-        buildCandidateListInternal(
-            forReading: reading,
-            azooKeyEngineTexts: azooKeyEngineTexts,
-            autoShow: autoShow
-        )
+        buildCandidateListInternal(forReading: nil, autoShow: autoShow)
     }
 
     private mutating func buildCandidateListInternal(
         forReading reading: String?,
-        azooKeyEngineTexts: [String]?,
         autoShow: Bool
     ) -> CandidateAction {
         let sources = collectCandidateSources(
             autoShow: autoShow,
-            readingOverride: reading,
-            azooKeyOverride: azooKeyEngineTexts
+            readingOverride: reading
         )
         let action = assembleCandidateList(from: sources, autoShow: autoShow)
         lastZenzaiRow = resolveZenzaiRow(action: action, zenzaiPromoted: sources.zenzaiPromoted)
@@ -64,14 +49,11 @@ public extension InputHandler {
         let zenzaiPromoted: String?
         let azooKeyUniq: [String]
         let historySeen: Set<String>
-        /// 文節モードでエンジン候補を注入している（読みカタカナ固定行を出さない）。
-        let segmentEngineOverride: Bool
     }
 
     private mutating func collectCandidateSources(
         autoShow: Bool,
-        readingOverride: String? = nil,
-        azooKeyOverride: [String]? = nil
+        readingOverride: String? = nil
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
         let azooKeyCandidates: [String]
@@ -81,8 +63,6 @@ public extension InputHandler {
             if readingOverride == nil {
                 lastAzooKeyInput = ""; lastAzooKeyContext = ""; lastAzooKeyResults = []
             }
-        } else if let azooKeyOverride {
-            azooKeyCandidates = azooKeyOverride.filter { !Self.isScriptMixed($0) }
         } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, autoShow {
             azooKeyCandidates = lastAzooKeyResults
         } else {
@@ -131,8 +111,7 @@ public extension InputHandler {
             predictCount: predictCount,
             zenzaiPromoted: zenzaiPromoted,
             azooKeyUniq: azooKeyUniq,
-            historySeen: historySeen,
-            segmentEngineOverride: azooKeyOverride != nil
+            historySeen: historySeen
         )
     }
 
@@ -263,16 +242,6 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
         }
 
-        if sources.segmentEngineOverride {
-            if !sources.highHistory.isEmpty {
-                let historyItems = sources.highHistory.filter { insertedSet.insert($0).inserted }
-                if !historyItems.isEmpty {
-                    sections.append(CandidateSection(kind: .highHistory, items: historyItems))
-                }
-            }
-            return sections
-        }
-
         if !sources.uniquePredictions.isEmpty {
             sections.append(CandidateSection(kind: .prediction, items: sources.uniquePredictions))
         }
@@ -289,8 +258,7 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .dateTime, items: uniqueDateTimeCandidates))
         }
 
-        if !sources.segmentEngineOverride,
-           !hiragana.allSatisfy({ $0.isASCII }),
+        if !hiragana.allSatisfy({ $0.isASCII }),
            insertedSet.insert(katakana).inserted {
             sections.append(CandidateSection(kind: .katakana, items: [katakana]))
         }

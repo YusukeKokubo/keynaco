@@ -106,26 +106,32 @@ public final class AzooKeyConverter: @unchecked Sendable {
         )
     }
 
-    /// 文節選択（Desktop `.selecting`）向け。予測変換を切り firstClause をエンジンから得る。
-    private func makeOptionsForSegmentSelection(leftSideContext: String?) -> ConvertRequestOptions {
-        var opts = baseOptions
-        opts.requireJapanesePrediction = .disabled
-        opts.requireEnglishPrediction = .disabled
-        guard zenzaiEnabled, let modelURL = zenzaiModelURL else { return opts }
-        opts.zenzaiMode = .on(
-            weight: modelURL,
-            inferenceLimit: zenzaiInferenceLimit,
-            requestRichCandidates: true,
-            personalizationMode: nil,
-            versionDependentMode: .v3(
-                .init(
-                    profile: zenzaiProfile.isEmpty ? nil : zenzaiProfile,
-                    leftSideContext: leftSideContext,
-                    enableAlignmentSeparator: true
-                )
-            )
-        )
-        return opts
+    public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [String] {
+        let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext)
+        var text = ComposingText()
+        text.insertAtCursorPosition(hiragana, inputStyle: .direct)
+        let options = makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates)
+        return locked.withLock { c in
+            let result = c.requestCandidates(text, options: options)
+            insertCache(key: key, value: result.mainResults)
+            let inputLength = hiragana.count
+            let filtered = Self.filterCandidatesForDisplay(result.mainResults, inputLength: inputLength)
+            let source = filtered.isEmpty ? result.mainResults : filtered
+            return source.map(\.text)
+        }
+    }
+
+    private static func composingCountValueStatic(_ candidate: Candidate) -> Int {
+        inputLength(from: candidate.composingCount)
+    }
+
+    private static func inputLength(from count: ComposingCount) -> Int {
+        switch count {
+        case .inputCount(let n): return n
+        case .surfaceCount(let n): return n
+        case .composite(let lhs, let rhs): return inputLength(from: lhs) + inputLength(from: rhs)
+        @unknown default: return 1
+        }
     }
 
     private func makeOptions(leftSideContext: String?, richCandidates: Bool = false) -> ConvertRequestOptions {
@@ -144,135 +150,6 @@ public final class AzooKeyConverter: @unchecked Sendable {
             )
         )
         return opts
-    }
-
-    public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [String] {
-        let result = requestConversionResult(
-            hiragana: hiragana,
-            leftSideContext: leftSideContext,
-            richCandidates: richCandidates,
-            resetEngineSession: false
-        )
-        return result.mainResults.map(\.text)
-    }
-
-    /// Desktop `enterCandidateSelectionMode` 相当: 末尾に composition separator を置いてから rich 変換する。
-    private static func composingTextForSegmentSelection(hiragana: String) -> ComposingText {
-        var text = ComposingText()
-        guard !hiragana.isEmpty else { return text }
-        text.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        if text.input.last?.piece != .compositionSeparator {
-            text.insertAtCursorPosition([.init(piece: .compositionSeparator, inputStyle: .direct)])
-        }
-        return text
-    }
-
-    /// azooKey-Desktop `SegmentsManager.updateRawCandidate` 相当の生結果。
-    public func requestConversionResult(
-        hiragana: String,
-        leftSideContext: String?,
-        richCandidates: Bool = false,
-        resetEngineSession: Bool = false
-    ) -> AzooKeyConversionResult {
-        // resetEngineSession: Space 文節モード初回のみ true（Desktop の fresh update 相当）
-        let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext)
-        let text = richCandidates
-            ? Self.composingTextForSegmentSelection(hiragana: hiragana)
-            : {
-                var t = ComposingText()
-                t.insertAtCursorPosition(hiragana, inputStyle: .direct)
-                return t
-            }()
-        let options = richCandidates
-            ? makeOptionsForSegmentSelection(leftSideContext: leftSideContext)
-            : makeOptions(leftSideContext: leftSideContext, richCandidates: false)
-        let raw = locked.withLock { c -> (main: [Candidate], first: [Candidate]) in
-            if resetEngineSession { c.stopComposition() }
-            let r = c.requestCandidates(text, options: options)
-            insertCache(key: key, value: r.mainResults)
-            return (r.mainResults, r.firstClauseResults)
-        }
-        let inputLength = hiragana.count
-        let mainResults = Self.clauseCandidatesForMain(raw.main, inputLength: inputLength)
-        let firstClauseResults = Self.mergedFirstClauseResults(
-            firstClause: raw.first,
-            main: raw.main,
-            totalInputLength: inputLength
-        )
-        return AzooKeyConversionResult(
-            mainResults: mainResults,
-            firstClauseResults: firstClauseResults
-        )
-    }
-
-    /// Desktop `rawCandidatesList`: firstClause に全文相当が無いとき main から部分候補を足す。
-    private static func mergedFirstClauseResults(
-        firstClause: [Candidate],
-        main: [Candidate],
-        totalInputLength: Int
-    ) -> [AzooKeyClauseCandidate] {
-        let partialOnly: ([AzooKeyClauseCandidate]) -> [AzooKeyClauseCandidate] = { rows in
-            rows.filter { $0.inputLength > 0 && $0.inputLength < totalInputLength }
-        }
-        let fromFirst = partialOnly(clauseCandidatesForFirstClause(firstClause, totalInputLength: totalInputLength))
-        if fromFirst.isEmpty {
-            return partialOnly(clauseCandidatesForFirstClause(main, totalInputLength: totalInputLength))
-        }
-        let seen = Set(fromFirst.map(\.text))
-        let fromMain = partialOnly(clauseCandidatesForFirstClause(main, totalInputLength: totalInputLength))
-            .filter { !seen.contains($0.text) }
-        return fromFirst + fromMain
-    }
-
-    /// 全文候補リスト（`requestCandidates`）用。入力長ぴったりの候補のみ。
-    private static func clauseCandidatesForMain(_ candidates: [Candidate], inputLength: Int) -> [AzooKeyClauseCandidate] {
-        let filtered = filterCandidatesForDisplay(candidates, inputLength: inputLength)
-        let source = filtered.isEmpty ? candidates : filtered
-        return source.map {
-            AzooKeyClauseCandidate(text: $0.text, inputLength: composingCountValueStatic($0))
-        }
-    }
-
-    /// 先頭文節候補（`firstClauseResults`）。部分カバー候補を残す（Desktop `.selecting` 用）。
-    private static func clauseCandidatesForFirstClause(
-        _ candidates: [Candidate],
-        totalInputLength: Int
-    ) -> [AzooKeyClauseCandidate] {
-        candidates.compactMap { c in
-            let consumed = composingCountValueStatic(c)
-            guard consumed > 0, consumed <= totalInputLength else { return nil }
-            guard !isDanglingTrailingKanaResidual(c, consumed: consumed, totalInputLength: totalInputLength) else {
-                return nil
-            }
-            return AzooKeyClauseCandidate(text: c.text, inputLength: consumed)
-        }
-    }
-
-    /// 末尾 1 文字かな残余（「蛇あ」等）。`filterCandidatesForDisplay` と同じ判定。
-    private static func isDanglingTrailingKanaResidual(
-        _ c: Candidate,
-        consumed: Int,
-        totalInputLength: Int
-    ) -> Bool {
-        guard consumed < totalInputLength, c.data.count > 1, let last = c.data.last else { return false }
-        guard last.word.count == 1, let scalar = last.word.unicodeScalars.first else { return false }
-        let isHiragana = (0x3041...0x3096).contains(scalar.value)
-        let isKatakana = (0x30A1...0x30F6).contains(scalar.value)
-        guard isHiragana || isKatakana else { return false }
-        return !(147...554).contains(last.lcid)
-    }
-
-    private static func composingCountValueStatic(_ candidate: Candidate) -> Int {
-        inputLength(from: candidate.composingCount)
-    }
-
-    private static func inputLength(from count: ComposingCount) -> Int {
-        switch count {
-        case .inputCount(let n): return n
-        case .surfaceCount(let n): return n
-        case .composite(let lhs, let rhs): return inputLength(from: lhs) + inputLength(from: rhs)
-        @unknown default: return 1
-        }
     }
 
     /// `requestCandidates` と同じ残余・予測フィルタ（POC260529b'）。
@@ -298,17 +175,6 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return validCoverage.isEmpty ? predictionFiltered : validCoverage
     }
 
-    public func candidatesForSegment(reading: String, leftSideContext: String?) -> [String] {
-        let key = Self.cacheKey(segment: reading, leftSideContext: leftSideContext)
-        var text = ComposingText()
-        text.insertAtCursorPosition(reading, inputStyle: .direct)
-        return locked.withLock { c in
-            let result = c.requestCandidates(text, options: makeOptions(leftSideContext: leftSideContext))
-            insertCache(key: key, value: result.mainResults)
-            return result.mainResults.map { $0.text }
-        }
-    }
-
     public func commit(reading: String, text: String) {
         locked.withLock { c in
             for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
@@ -327,64 +193,6 @@ public final class AzooKeyConverter: @unchecked Sendable {
     private static func cacheSegment(fromCacheKey key: String) -> String {
         guard let idx = key.firstIndex(of: "|") else { return key }
         return String(key[..<idx])
-    }
-
-    public func segmentize(_ hiragana: String, leftSideContext: String?) -> [(reading: String, candidates: [String])] {
-        var segments: [(reading: String, candidates: [String])] = []
-        var remaining = hiragana
-        let opts = makeOptions(leftSideContext: leftSideContext)
-        while !remaining.isEmpty {
-            var text = ComposingText()
-            text.insertAtCursorPosition(remaining, inputStyle: .direct)
-            let (reading, segmentCandidates, consumed) = locked.withLock { c -> (String, [Candidate], Int) in
-                let result = c.requestCandidates(text, options: opts)
-                let totalLen = remaining.count
-                let mainResults = Self.clauseCandidatesForMain(result.mainResults, inputLength: totalLen)
-                let firstClauseResults = Self.mergedFirstClauseResults(
-                    firstClause: result.firstClauseResults,
-                    main: result.mainResults,
-                    totalInputLength: totalLen
-                )
-                let conversion = AzooKeyConversionResult(
-                    mainResults: mainResults,
-                    firstClauseResults: firstClauseResults
-                )
-                let safeCount = AzooKeyCandidateMerge.defaultClauseEnd(
-                    result: conversion,
-                    convertTarget: remaining
-                )
-                let seg = String(remaining.prefix(safeCount))
-                let ck = Self.cacheKey(segment: seg, leftSideContext: leftSideContext)
-                let merged = AzooKeyCandidateMerge.mergedList(
-                    result: conversion,
-                    convertTarget: remaining,
-                    segmentEdition: false
-                )
-                let exactCoverage = merged.filter { $0.inputLength == safeCount }
-                let segRows = exactCoverage.isEmpty ? merged : exactCoverage
-                let segTexts = Set(segRows.map(\.text))
-                let segCandidates = result.mainResults.filter { segTexts.contains($0.text) }
-                let cached = segCandidates.isEmpty ? result.mainResults : segCandidates
-                insertCache(key: ck, value: cached)
-                return (seg, cached, safeCount)
-            }
-            segments.append((reading: reading, candidates: segmentCandidates.map { $0.text }))
-            remaining = String(remaining.dropFirst(consumed))
-        }
-        return segments
-    }
-
-    private func composingCountValue(_ candidate: Candidate) -> Int {
-        countValue(candidate.composingCount)
-    }
-
-    private func countValue(_ count: ComposingCount) -> Int {
-        switch count {
-        case .inputCount(let n): return n
-        case .surfaceCount(let n): return n
-        case .composite(let lhs, let rhs): return countValue(lhs) + countValue(rhs)
-        @unknown default: return 1
-        }
     }
 
     /// 確定済み `(reading, output)` に対応する候補の代表 `lcid` を辞書ルックアップで返す（Zenzai 不使用）。

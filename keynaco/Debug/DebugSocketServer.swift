@@ -167,7 +167,6 @@ final class DebugSocketServer: @unchecked Sendable {
         "pendingRomaji": "string",
         "composingText": "string",
         "isAsciiMode": "bool",
-        "isSegmentMode": "bool",
         "isBracketMode": "bool",
         "isExplicitlySelected": "bool",
         "candidateVisible": "bool",
@@ -179,8 +178,6 @@ final class DebugSocketServer: @unchecked Sendable {
         "candidates": "array<string>",
         "committedHistory": "array<string>",
         "sessionTextBuffer": "string",
-        "segmentTexts": "array<string>",
-        "focusedSegmentIndex": "int",
         "isZenzaiEnabled": "bool",
         "leftSideContext": "string",
         "candidateEntries": "array<object>",
@@ -585,7 +582,6 @@ final class DebugSocketServer: @unchecked Sendable {
 
         let modeFlags: [(String, String)] = [
             ("isAsciiMode", "ascii"),
-            ("isSegmentMode", "segment"),
             ("isBracketMode", "bracket"),
         ]
         let activeModes = modeFlags.compactMap { key, label in
@@ -755,10 +751,9 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let knownAssertionFields: Set<String> = [
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
-        "isAsciiMode", "isSegmentMode", "isBracketMode",
+        "isAsciiMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
-        "segmentTexts", "focusedSegmentIndex",
         "candidateEntries", "changed", "explain",
         "ok", "matched", "timedOut", "waitField", "state", "steps", "last",
     ]
@@ -1050,7 +1045,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "pendingRomaji":      snap.pendingRomaji,
             "composingText":      snap.composingText,
             "isAsciiMode":        snap.isAsciiMode,
-            "isSegmentMode":      snap.isSegmentMode,
             "isBracketMode":      snap.isBracketMode,
             "isExplicitlySelected": snap.isExplicitlySelected,
             "candidateVisible":   snap.candidateVisible,
@@ -1061,8 +1055,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "candidates":         snap.candidates,
             "committedHistory":   snap.committedHistory,
             "sessionTextBuffer":  snap.sessionTextBuffer,
-            "segmentTexts":       snap.segmentTexts,
-            "focusedSegmentIndex": snap.focusedSegmentIndex,
             "isZenzaiEnabled":    handler.azooKeyConverter.isZenzaiEnabled,
             "leftSideContext":    handler.leftSideContext,
             "lastCommittedReading": handler.lastCommittedReading as Any,
@@ -1118,10 +1110,9 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let changedFieldTargets: [String] = [
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
-        "isAsciiMode", "isSegmentMode", "isBracketMode",
+        "isAsciiMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
-        "segmentTexts", "focusedSegmentIndex",
         "candidateEntries"
     ]
 
@@ -1151,19 +1142,13 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     private func updateMockMarkedText() {
-        if handler.state.isSegmentMode {
-            let ctx = candidateWindow.context
-            handler.syncFocusedSegmentSelection(from: ctx)
-            handler.applySegmentMarkedText(client: mockClient, overrideFocusedText: ctx.selectedText)
+        let text: String
+        if candidateWindow.isVisible, let selected = candidateWindow.selectedText {
+            text = selected + handler.state.pendingRomaji
         } else {
-            let text: String
-            if candidateWindow.isVisible, let selected = candidateWindow.selectedText {
-                text = selected + handler.state.pendingRomaji
-            } else {
-                text = handler.state.composingText
-            }
-            mockClient.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+            text = handler.state.composingText
         }
+        mockClient.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
 }
 

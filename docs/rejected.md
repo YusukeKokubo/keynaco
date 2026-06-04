@@ -4,6 +4,25 @@
 
 ---
 
+## I-1 セグメントモード（文節選択 / AzooKey Desktop `.selecting` 相当）（2026-06-04 削除）
+
+**概要**: Space で長文読みを文節単位に部分確定するモード。`SegmentState` + `AzooKeyCandidateMerge` + `firstClauseResults` マージ + Shift+←/→ 境界調整 + marked text 二重下線。azooKey-Desktop の `.selecting` を keynaco 向けに再実装したもの。
+
+**削除の理由**:
+
+- 境界ヒューリスティック（助詞リスト・「は」直前・です/ます剥がし等）の保守コストに対して体感がイマイチ。POC260603 で段階改善したが、エンジン部分候補 + keynaco 固有ルールの二重構造が残り続けた
+- 多くの入力（2 文字以下・ひらがな優先・日時/ユーザー辞書）は既に通常候補窓へフォールバックしており、Space の主役が中途半端
+- セグメント間 bigram 学習・LLMSegmentConverter・読み修正（C-1）は既に不採用/削除済みで、モード単体の価値が薄い
+- `concept.md` の打鍵最小化は履歴・Zenzai 文脈・予測変換で取りに行く方針。文節モードは差別化の核にならなかった
+
+**削除後の Space**: 組成中 Space → `buildCandidateList(autoShow: false)`（候補窓表示）。候補表示中 Space → 次候補（従来の ↑↓ 明示選択フローは維持）。
+
+**再検討するなら**: 使い込みで「長文を一気に打って Space 1 回で部分確定」が本当に必要か POC から。AzooKey Desktop 追従そのものを目的にしない。
+
+> 関連: [POC260603](../plans/POC260603.md)、[PLAN260603](../plans/PLAN260603.md)、[C-1 セグメントモード内の読み修正](#c-1-セグメントモード内の読み修正2026-04-30)
+
+---
+
 ## G-2 Tuner（AX スクレイピング型 personalization 基盤）の追加（2026-05-29）
 
 **概要**: Zenzai の `personalizationMode`（base/personal n-gram LM の補間）に渡す personal モデルを

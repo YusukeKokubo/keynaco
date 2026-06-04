@@ -89,7 +89,6 @@ public enum KeyCode {
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
 ///
 /// 機能ごとの実装は extension で別ファイルに分散している：
-/// - `InputHandler+SegmentMode.swift`  ：文節選択（AzooKey Desktop `.selecting` 相当）
 /// - `InputHandler+Candidates.swift`   ：候補リスト構築・候補表示中・通常入力
 public struct InputHandler {
 
@@ -133,7 +132,6 @@ public struct InputHandler {
     public var lastCommittedOutput: String? {
         committedHistory.last
     }
-    public var segmentCandidateCache: [String: Segment] = [:]
     /// 直近 `recentCommitCap` 件の確定リスト（FIFO リングバッファ相当）。1 モーラサジェスト POC（2026-05-28, observation.md）の根拠データ。
     /// `composedHiragana` が 1 モーラ（小書き仮名を除いた主仮名 1 文字）の autoShow 時、この前方一致のみを候補に出す（信頼度ゲート）。
     public var recentCommits: [RecentCommit] = []
@@ -228,10 +226,6 @@ public struct InputHandler {
         let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
 
         if let r = handleFunctionKeyIfNeeded(keyCode: keyCode, client: client) { return r }
-        if state.isSegmentMode {
-            return handleSegmentModeKey(
-                keyCode: keyCode, modifiers: modifiers, candidate: candidate, client: client)
-        }
         if let r = handleModeSwitchKey(keyCode: keyCode, client: client) { return r }
         ignoreNextModeSwitch = false
         if let r = handleAsciiModeKey(
@@ -249,11 +243,6 @@ public struct InputHandler {
     /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
     /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
     public mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
-        // セグメントモード中の強制確定（アプリ切り替えなど）
-        if state.segmentState != nil {
-            flushSegmentModeComposition(candidate: candidate, client: client)
-            return
-        }
         guard !state.composingText.isEmpty else { return }
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
@@ -317,11 +306,6 @@ public struct InputHandler {
 
     /// F6–F10 の変換確定。composingText が空なら false を返す。
     public mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
-        if state.isSegmentMode, let segmentState = state.segmentState {
-            state.composedHiragana = segmentState.convertTarget
-            state.segmentState = nil
-            segmentCandidateCache.removeAll()
-        }
         guard !state.composingText.isEmpty else { return false }
         state.absorbPendingIntoComposed()
         let hiragana = state.composedHiragana

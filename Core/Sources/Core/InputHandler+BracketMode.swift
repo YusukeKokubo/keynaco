@@ -114,19 +114,13 @@ public extension InputHandler {
         case KeyCode.tab where modifiers.contains(.shift):
             return (true, .selectPrev)
         case KeyCode.space:
-            // 候補選択中（↑↓操作済み）は再変換せず次候補へ
             if !candidate.isExplicitlySelected, !state.composedHiragana.isEmpty {
-                let action = enterSegmentMode()
-                if state.isSegmentMode {
-                    applySegmentMarkedText(client: client)
-                    return (true, action)
-                } else {
-                    applyMarkedText(candidateText: nil, client: client)
-                    if case .show(let candidates, let historyEnd, _, _, _) = action {
-                        // ひらがな優先語は辞書候補の有無によらず initialRow を維持
-                        if isHiraganaPreferred(state.composedHiragana) || candidates.count > historyEnd {
-                            return (true, action)
-                        }
+                state.absorbPendingIntoComposed()
+                let action = buildCandidateList(autoShow: false)
+                applyMarkedText(candidateText: nil, client: client)
+                if case .show(let candidates, let historyEnd, _, _, _) = action {
+                    if isHiraganaPreferred(state.composedHiragana) || candidates.count > historyEnd {
+                        return (true, action)
                     }
                 }
             }

@@ -92,13 +92,6 @@ class InputHandlerTestCase: XCTestCase {
         return press(keyCode: KeyCode.enter, candidateVisible: true, selectedText: selectedText)
     }
 
-    /// Space でセグメントモードに入った直後の `SegmentState`（入れなければ nil）。
-    func enterSegmentMode(with romaji: String) -> SegmentState? {
-        typeRomaji(romaji)
-        _ = press(keyCode: KeyCode.space)
-        return handler.state.segmentState
-    }
-
     // MARK: - アサーションヘルパー
 
     /// action が .show なら候補リストを返す。そうでなければテストを失敗させて nil を返す。
@@ -137,13 +130,6 @@ class InputHandlerTestCase: XCTestCase {
         XCTAssertEqual(client.inserted.last, expected, msg, file: file, line: line)
     }
 
-    func assertSegmentMode(
-        _ expected: Bool, _ msg: String = "",
-        file: StaticString = #file, line: UInt = #line
-    ) {
-        XCTAssertEqual(handler.state.isSegmentMode, expected, msg, file: file, line: line)
-    }
-
     func assertCandidatesContain(
         _ action: CandidateAction, _ expected: String...,
         file: StaticString = #file, line: UInt = #line
@@ -152,18 +138,5 @@ class InputHandlerTestCase: XCTestCase {
         for e in expected {
             XCTAssertTrue(list.contains(e), "候補に \(e) を含むはず。\(list)", file: file, line: line)
         }
-    }
-
-    @discardableResult
-    func requireSegmentMode(hasRemaining: Bool = true, file: StaticString = #file, line: UInt = #line) -> SegmentState? {
-        guard handler.state.isSegmentMode, let ss = handler.state.segmentState else {
-            XCTFail("セグメントモードを期待", file: file, line: line)
-            return nil
-        }
-        if hasRemaining && ss.remainingReading.isEmpty {
-            XCTFail("残り読みありのセグメントモードを期待", file: file, line: line)
-            return nil
-        }
-        return ss
     }
 }

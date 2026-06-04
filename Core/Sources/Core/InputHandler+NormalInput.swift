@@ -17,9 +17,9 @@ public extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         if keyCode == KeyCode.space {
             if !state.composedHiragana.isEmpty {
-                let action = enterSegmentMode()
-                if state.isSegmentMode { applySegmentMarkedText(client: client) }
-                else { applyMarkedText(candidateText: nil, client: client) }
+                state.absorbPendingIntoComposed()
+                let action = buildCandidateList(autoShow: false)
+                applyMarkedText(candidateText: nil, client: client)
                 return (true, action)
             }
             // composed のみ空で pending ローマ字だけあるとき Space をホストへ漏らすと未確定が消えることがあるため消費する
