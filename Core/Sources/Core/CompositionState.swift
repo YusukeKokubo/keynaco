@@ -217,6 +217,15 @@ public struct SegmentState {
         return texts
     }
 
+    /// 候補ウィンドウで選択中の表層に対応する文節末尾（`inputLength`）。未一致時は `previewClauseEnd`。
+    func clauseEndForMarkedText(overrideFocusedText: String?) -> Int {
+        if let override = overrideFocusedText,
+           let row = rows.first(where: { $0.text == override }) {
+            return max(1, min(row.inputLength, convertTarget.count))
+        }
+        return previewClauseEnd
+    }
+
     /// Desktop `getCurrentMarkedText` `.selecting`: focused 表層 + unfocused 残り読み
     public func attributedString(overrideFocusedText: String? = nil) -> NSAttributedString {
         let result = NSMutableAttributedString()
@@ -224,7 +233,7 @@ public struct SegmentState {
         result.append(NSAttributedString(string: focused, attributes: [
             .underlineStyle: NSUnderlineStyle.thick.rawValue,
         ]))
-        let remainder = remainingReading
+        let remainder = String(convertTarget.dropFirst(clauseEndForMarkedText(overrideFocusedText: overrideFocusedText)))
         if !remainder.isEmpty {
             result.append(NSAttributedString(string: remainder, attributes: [
                 .underlineStyle: NSUnderlineStyle.single.rawValue,

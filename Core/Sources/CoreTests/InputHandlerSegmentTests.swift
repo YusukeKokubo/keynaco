@@ -394,4 +394,19 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         press(keyCode: 36)
         XCTAssertEqual(client.inserted.joined(), "わたしはONLY_INITIAL_SURFACE")
     }
+
+    /// ↑↓ で候補が変わったとき、marked text の残り読みが消えないこと（`clauseEndForMarkedText`）。
+    func testSegmentAttributedStringRemainderFollowsOverrideCandidate() {
+        let rows = [
+            AzooKeyClauseCandidate(text: "私", inputLength: 2),
+            AzooKeyClauseCandidate(text: "わたし", inputLength: 3),
+        ]
+        let ss = SegmentState(
+            convertTarget: "わたしはがくせい",
+            rows: rows,
+            engineClauseEnd: 3,
+            selectedIndex: 0
+        )
+        XCTAssertEqual(ss.attributedString(overrideFocusedText: "わたし").string, "わたしはがくせい")
+    }
 }

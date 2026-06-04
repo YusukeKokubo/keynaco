@@ -1151,9 +1151,17 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     private func updateMockMarkedText() {
-        if let ss = handler.state.segmentState {
-            let str = ss.attributedString(overrideFocusedText: candidateWindow.selectedText)
-            mockClient.setMarkedText(str, selectionRange: NSRange(location: str.length, length: 0))
+        if handler.state.isSegmentMode {
+            let ctx = CandidateContext(
+                isVisible: candidateWindow.isVisible,
+                selectedRow: candidateWindow.selectedRow,
+                selectedText: candidateWindow.selectedText,
+                isExplicitlySelected: candidateWindow.isExplicitlySelected,
+                historyEnd: candidateWindow.historySectionEnd,
+                fixedEnd: candidateWindow.fixedRowCount
+            )
+            handler.syncFocusedSegmentSelection(from: ctx)
+            handler.applySegmentMarkedText(client: mockClient, overrideFocusedText: ctx.selectedText)
         } else {
             let text: String
             if candidateWindow.isVisible, let selected = candidateWindow.selectedText {

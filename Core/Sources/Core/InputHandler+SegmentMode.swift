@@ -432,13 +432,14 @@ public extension InputHandler {
         finishSequentialSegmentSession(confirmedSegments: ss.confirmedSegments)
     }
 
-    func applySegmentMarkedText(client: TextInputClient) {
+    func applySegmentMarkedText(client: TextInputClient, overrideFocusedText: String? = nil) {
         guard let segmentState = state.segmentState else { return }
-        let str = segmentState.attributedString(overrideFocusedText: nil)
-        let focusedLen = segmentState.rows.indices.contains(segmentState.selectedIndex)
-            ? segmentState.rows[segmentState.selectedIndex].text.count
-            : segmentState.clauseReading.count
-        client.setMarkedText(str, selectionRange: NSRange(location: focusedLen, length: 0))
+        let focused = overrideFocusedText
+            ?? (segmentState.rows.indices.contains(segmentState.selectedIndex)
+                ? segmentState.rows[segmentState.selectedIndex].text
+                : segmentState.clauseReading)
+        let str = segmentState.attributedString(overrideFocusedText: overrideFocusedText)
+        client.setMarkedText(str, selectionRange: NSRange(location: focused.count, length: 0))
     }
 
     /// 文節読みに対する履歴・カナ固定・辞書候補（テスト・デバッグ用）。
