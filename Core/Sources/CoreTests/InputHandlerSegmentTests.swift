@@ -169,6 +169,57 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
         }
     }
 
+    func testClauseSplitTrailingParticleRemainder() {
+        XCTAssertFalse(
+            AzooKeyCandidateMerge.isClauseSplitTrailingParticleOnlyRemainder("し"),
+            "語尾の「し」は文節境界助詞ではない"
+        )
+        XCTAssertTrue(
+            AzooKeyCandidateMerge.isClauseSplitTrailingParticleOnlyRemainder("は"),
+            "「は」は文節境界として切り出す"
+        )
+        XCTAssertTrue(
+            AzooKeyCandidateMerge.isTrailingParticleOnlyRemainder("し"),
+            "広い集合では「し」は助詞扱い"
+        )
+    }
+
+    func testShouldUseNormalWindowInsteadOfSegment() {
+        XCTAssertTrue(
+            AzooKeyCandidateMerge.shouldUseNormalCandidateWindowInsteadOfSegment(
+                clauseEnd: 2, convertTarget: "わたし"),
+            "わた|し は通常窓"
+        )
+        XCTAssertTrue(
+            AzooKeyCandidateMerge.shouldUseNormalCandidateWindowInsteadOfSegment(
+                clauseEnd: 3, convertTarget: "たのしい"),
+            "たのし|い は通常窓"
+        )
+        XCTAssertFalse(
+            AzooKeyCandidateMerge.shouldUseNormalCandidateWindowInsteadOfSegment(
+                clauseEnd: 3, convertTarget: "わたしは"),
+            "わたし|は は文節モード"
+        )
+        XCTAssertFalse(
+            AzooKeyCandidateMerge.shouldUseNormalCandidateWindowInsteadOfSegment(
+                clauseEnd: 3, convertTarget: "わたしはがくせい"),
+            "残りが 2 文字以上なら文節モード可"
+        )
+    }
+
+    /// 「わたし」単独 Space は わた|し に割らず通常窓のまま（私 が消えない）。
+    /// 残り 1 文字が格助詞でないときは文節モードに入らない（`shouldUseNormalCandidateWindowInsteadOfSegment`）。
+    func testWatashiAloneSpaceKeepsWatashiCandidates() {
+        typeRomaji("watashi")
+        let (consumed, action) = press(keyCode: 49)
+        XCTAssertTrue(consumed)
+        XCTAssertFalse(handler.state.isSegmentMode, "3 文字単語は末尾 1 モーラ分割を避け通常窓へ")
+        guard case .show(let candidates, _, _, _, _) = action else {
+            XCTFail("通常候補窓を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains("私"), "私 が候補に残る: \(candidates.prefix(8))")
+    }
+
     func testSequentialEnterConfirmsOneSegmentAtATime() {
         typeRomaji("watashihagakusei")
         press(keyCode: 49)

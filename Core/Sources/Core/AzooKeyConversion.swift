@@ -43,15 +43,41 @@ public enum AzooKeyCandidateMerge {
     ]
 
     /// Space 直後の先頭文節で、残り読みに切り出す末尾 1 文字助詞。
+    /// 助動詞・語尾（し/だ/ん 等）も含む。`clauseEndStrippingTrailingParticle` 用。
     private static let trailingSegmentParticles: Set<Character> = [
         "は", "が", "を", "に", "で", "と", "へ", "も", "の", "や", "て", "ね", "よ", "か", "さ", "な",
         "だ", "ぞ", "ぜ", "ば", "ぱ", "り", "し", "み", "く", "け", "れ", "ろ", "わ", "ん",
     ]
 
-    /// 残り読みが助詞 1 文字だけか（文節モード継続の目安）。
+    /// 文節境界として切り出す意味がある格助詞・接続助詞のみ。
+    /// 語尾の「し」「ん」等は含めない（`わたし→し` を助詞と誤認しないため）。
+    private static let clauseSplitTrailingParticles: Set<Character> = [
+        "は", "が", "を", "に", "で", "と", "へ", "も", "の", "や", "て", "ね", "よ", "か",
+    ]
+
+    /// 残り読みが助詞 1 文字だけか（助動詞・語尾含む広い集合）。
     public static func isTrailingParticleOnlyRemainder(_ remainder: String) -> Bool {
         guard remainder.count == 1, let last = remainder.last else { return false }
         return trailingSegmentParticles.contains(last)
+    }
+
+    /// 残り 1 文字が文節境界として切り出す助詞か（格助詞・接続助詞のみ）。
+    public static func isClauseSplitTrailingParticleOnlyRemainder(_ remainder: String) -> Bool {
+        guard remainder.count == 1, let last = remainder.last else { return false }
+        return clauseSplitTrailingParticles.contains(last)
+    }
+
+    /// 先頭文節分割で残り 1 文字が語の一部になるときは文節モードに入らず通常窓へ。
+    /// 例: わたし→わた|し（×）、たのしい→たのし|い（×）、わたしは→わたし|は（○）。
+    public static func shouldUseNormalCandidateWindowInsteadOfSegment(
+        clauseEnd: Int,
+        convertTarget: String
+    ) -> Bool {
+        guard clauseEnd < convertTarget.count else { return true }
+        let remainder = String(convertTarget.dropFirst(clauseEnd))
+        guard remainder.count < 2 else { return false }
+        return !isClauseSplitTrailingParticleOnlyRemainder(remainder)
+            && clauseEnd >= convertTarget.count - 1
     }
 
     /// 末尾の助詞・助動詞を除いた読み長。該当しないときは `nil`。

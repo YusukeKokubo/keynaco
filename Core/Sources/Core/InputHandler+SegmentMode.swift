@@ -33,12 +33,11 @@ public extension InputHandler {
             convertTarget: fullReading
         )
         let (userDictExact, _) = db.fetchUserDictCombined(reading: fullReading)
-        let remainder = String(fullReading.dropFirst(clauseEnd))
-        let shortNonParticleTail = remainder.count < 2
-            && !AzooKeyCandidateMerge.isTrailingParticleOnlyRemainder(remainder)
-        // 残り 1 文字が助詞以外かつ先頭文節がほぼ全文（例: たのしい→い）・日時語・ユーザー辞書は通常窓
         if clauseEnd >= fullReading.count
-            || (shortNonParticleTail && clauseEnd >= fullReading.count - 1 && clauseEnd >= 3)
+            || AzooKeyCandidateMerge.shouldUseNormalCandidateWindowInsteadOfSegment(
+                clauseEnd: clauseEnd,
+                convertTarget: fullReading
+            )
             || !InputHandler.generateDateTimeCandidates(for: fullReading).isEmpty
             || !userDictExact.isEmpty {
             return buildCandidateList()
