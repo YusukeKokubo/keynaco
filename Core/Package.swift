@@ -35,10 +35,22 @@ let package = Package(
                 .linkedLibrary("sqlite3")
             ]
         ),
+        .target(
+            name: "KeynacoTestSupport",
+            dependencies: ["KeynacoCore"],
+            path: "Sources/KeynacoTestSupport",
+            swiftSettings: [.interoperabilityMode(.Cxx)]
+        ),
         .testTarget(
             name: "KeynacoCoreTests",
-            dependencies: ["KeynacoCore"],
+            dependencies: ["KeynacoCore", "KeynacoTestSupport"],
             path: "Sources/CoreTests",
+            swiftSettings: [.interoperabilityMode(.Cxx)]
+        ),
+        .testTarget(
+            name: "KeynacoCoreSlowTests",
+            dependencies: ["KeynacoCore", "KeynacoTestSupport"],
+            path: "Sources/CoreSlowTests",
             swiftSettings: [.interoperabilityMode(.Cxx)]
         )
     ]

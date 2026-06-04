@@ -39,6 +39,9 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 | スクリプト | 用途 |
 |-----------|------|
+| `test_core.sh` | Core ユニットテスト（fast のみ、`KeynacoCoreTests`） |
+| `test_core_slow.sh` | Core 重いテストのみ（`KeynacoCoreSlowTests`、AzooKey 実機） |
+| `test_core_all.sh` | Core fast + slow 両方 |
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
 | `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
@@ -93,11 +96,25 @@ zenz-v3 は制御トークンを使って変換確率分布をバイアスする
 xcodebuild test -scheme keynaco -destination "platform=macOS"
 ```
 
-コアロジックのみ（`KeynacoCore` / SPM）:
+コアロジック（`KeynacoCore` / SPM）— **普段は fast のみ**（`InputHandler*` スタブ中心、約 10 秒台）:
 
 ```bash
-cd Core && swift test
+./scripts/test_core.sh
 ```
+
+AzooKey 実辞書・セグメント境界比較（`KeynacoCoreSlowTests`、約 8 秒台）:
+
+```bash
+./scripts/test_core_slow.sh
+```
+
+fast + slow 両方（CI・リリース前）:
+
+```bash
+./scripts/test_core_all.sh
+```
+
+`cd Core && swift test` も slow 含めて全部走る。slow のみ除外するなら `swift test --filter KeynacoCoreTests`。
 
 末尾に `✔ Test run with 0 tests in 0 suites passed` が出るが正常（Swift Testing framework のノイズ）。XCTest の結果は `Executed N tests` として別途出力される。
 

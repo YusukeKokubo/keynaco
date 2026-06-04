@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 // 句読点・括弧・F6–F10・括弧モード周り。docs/domain/glossary.md#組成テキストmarkedtext 等。
 

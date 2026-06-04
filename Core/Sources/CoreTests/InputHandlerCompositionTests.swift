@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 // See: docs/domain/states.md#組成中
 // See: docs/domain/scenarios.md#s-01-基本的なローマ字変換

@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 // Zenzai top-1 プロモートのふるまいを検証する。PLAN260506 参照。
 

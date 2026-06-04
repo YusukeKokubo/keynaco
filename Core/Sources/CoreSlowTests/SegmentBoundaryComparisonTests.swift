@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 /// AzooKey 寄せ検討用: エンジン単体と InputHandler（ソケットなし）の境界比較
 final class SegmentBoundaryComparisonTests: InputHandlerTestCase {

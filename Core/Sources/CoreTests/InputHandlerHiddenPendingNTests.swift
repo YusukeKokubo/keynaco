@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 /// `nn` 後の hidden pending `n` が Space / 句読点 / F6 / 括弧で二重「ん」にならないこと。
 final class InputHandlerHiddenPendingNTests: InputHandlerTestCase {

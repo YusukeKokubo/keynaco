@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 // assembleCandidateList のリファクタ前後で候補リスト構造が変わっていないことを保証する。
 // PLAN260519 参照。

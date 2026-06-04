@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 // See: docs/domain/states.md#候補選択中
 // See: docs/domain/glossary.md#fixedcount

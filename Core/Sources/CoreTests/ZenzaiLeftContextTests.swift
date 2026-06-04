@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 // Zenzai top-1 プロモートが leftSideContext の有無で変わることを検証する。
 // - 左文脈なし: azooKeyLeftContext == nil → Zenzai 未発火 → fixedEnd = kana×2

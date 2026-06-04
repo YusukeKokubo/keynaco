@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 // composedHiragana が変わらない場合に requestCandidates が再呼び出しされないことを確認するテスト
 

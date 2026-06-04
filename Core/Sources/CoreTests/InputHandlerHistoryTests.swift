@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 // See: docs/domain/glossary.md#databasemanager
 // See: docs/domain/glossary.md#lastcommittedoutput

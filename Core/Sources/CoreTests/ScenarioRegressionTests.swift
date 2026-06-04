@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 /// `docs/domain/scenarios.md` の入力トレースを回帰用に固定化したテスト。
 /// 辞書に依存しない箇所は `AzooKeyConverting` のモックで再現する。

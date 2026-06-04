@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 final class InputHandlerZSequenceTests: InputHandlerTestCase {
 

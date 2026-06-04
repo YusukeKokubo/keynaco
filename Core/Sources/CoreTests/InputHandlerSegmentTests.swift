@@ -1,5 +1,6 @@
 import XCTest
 @testable import KeynacoCore
+@testable import KeynacoTestSupport
 
 private final class SegmentRebuildDictMismatchMockAzoo: AzooKeyConverting, @unchecked Sendable {
     var isZenzaiEnabled: Bool { false }
