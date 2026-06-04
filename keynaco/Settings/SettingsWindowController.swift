@@ -6,7 +6,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     /// ウィンドウ終了時に `saveToDefaults` するため保持
     private weak var zenzaiViewController: ZenzaiViewController?
-    private weak var syncViewController: SyncViewController?
 
     private init() {
         let window = NSWindow(
@@ -30,24 +29,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let zenzaiVC = ZenzaiViewController()
         let zenzaiItem = NSTabViewItem(viewController: zenzaiVC)
         zenzaiItem.label = "Zenzai"
-        let syncVC = SyncViewController()
-        let syncItem = NSTabViewItem(viewController: syncVC)
-        syncItem.label = "同期"
-        let diaryVC = DiaryViewController()
-        let diaryItem = NSTabViewItem(viewController: diaryVC)
-        diaryItem.label = "日記"
         tabVC.addTabViewItem(userDictItem)
         tabVC.addTabViewItem(hiraganaPreferredItem)
         tabVC.addTabViewItem(historyItem)
         tabVC.addTabViewItem(zenzaiItem)
-        tabVC.addTabViewItem(syncItem)
-        tabVC.addTabViewItem(diaryItem)
 
         window.contentViewController = tabVC
         super.init(window: window)
         window.delegate = self
         zenzaiViewController = zenzaiVC
-        syncViewController = syncVC
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -55,7 +45,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         zenzaiViewController?.saveToDefaults()
         NotificationCenter.default.post(name: .keynacoZenzaiSettingsDidChange, object: nil)
-        syncViewController?.saveSettings()
     }
 
     func showSettings(selectingTab index: Int? = nil) {

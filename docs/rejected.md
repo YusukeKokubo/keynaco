@@ -4,6 +4,46 @@
 
 ---
 
+## S-1 NAS DB 同期（Settings タブ）（2026-06-05 削除）
+
+**概要**: Settings の「同期」タブで NAS 上の `history.db` パスを指定し、rsync でローカル DB と手動／終了時自動で同期する機能。`SyncSettings` + `SyncViewController` + `AppDelegate.applicationWillTerminate` の書き出し。
+
+**試みたこと**: SMB マウント先への rsync（`-av --checksum`）。インポート前に WAL チェックポイント・接続クローズ（`closeForImport`）して WAL/SHM 破損を防ぐ。終了時自動書き出しオプション。
+
+**削除の理由**:
+
+- **利用場面がない**: 単一マシン運用で NAS 同期を使う機会がなく、Settings タブが dead code になっていた
+- **rsync 依存の運用コスト**: パス設定・マウント状態・競合解決はユーザーが手動で面倒を見る必要があり、IME 本体に UI を持つ ROI が低い
+- **代替は十分**: マシン間共有が必要になった場合は `~/Library/Application Support/keynaco/history.db` を iCloud / 手動 rsync / バックアップツールで扱えばよく、専用タブは不要
+
+**削除した周辺**: `SyncSettings.swift` / `SyncViewController.swift`、`DatabaseManager.checkpoint` / `closeForImport` / `reopen`。
+
+**再検討するなら**: 複数 Mac で履歴・ユーザー辞書を常時同期する需要が実際に出てから。自動マージ（Last-Write-Wins ではなくフィールド単位）が必要なら POC から。
+
+> 関連: [concept.md](./concept.md)（NAS 同期の言及 — UI 実装は本エントリで不採用）
+
+---
+
+## J-1 日記自動生成（Settings タブ）（2026-06-05 削除）
+
+**概要**: `daily_log`（確定テキスト＋app_bundle_id）を素材に、Apple Intelligence（Foundation Models）で 1 日分の日記・日報を生成する Settings「日記」タブ。`DiaryViewController` + `DiaryGenerator` + `diary` テーブルへの保存。
+
+**試みたこと**: 日付選択 → 当日の `daily_log` 一覧表示 →「日記を生成」→ 生成結果の編集・保存・コピー。Guided Generation の動作確認は [PLAN260527](../plans/PLAN260527.md) で完了済み。
+
+**削除の理由**:
+
+- **利用場面がない**: 日報・振り返りを Settings から生成するワークフローを日常的に使わず、タブが dead code になっていた
+- **IME のコア価値とずれる**: 入力支援（履歴・Zenzai・候補）が主役であり、生成物の閲覧・編集 UI を IME 設定に持つ必然性が薄い
+- **データ基盤は別途保持**: `daily_log` への記録（`InputHandler.diaryBuffer` → `recordDailyLog`）は personalization 用コーパスとして継続。削除したのは生成 UI と `DiaryGenerator` のみ
+
+**削除した周辺**: `DiaryViewController.swift` / `DiaryGenerator.swift`、`DatabaseManager.saveDiary` / `fetchDiary` / `fetchDiaryDates`。既存 DB の `diary` テーブルはスキーマ上残るが未使用。
+
+**再検討するなら**: `daily_log` が数万字規模に育った後、日記生成ではなく personalization（[G-2](#g-2-tunerax-スクレイピング型-personalization-基盤の追加2026-05-29) 参照）の方が優先。日記 UI を復活させるなら独立アプリ or ショートカット連携の方が適切。
+
+> 関連: [PLAN260527](../plans/PLAN260527.md)、[apple-intelligence.md](./apple-intelligence.md)
+
+---
+
 ## I-1 セグメントモード（文節選択 / AzooKey Desktop `.selecting` 相当）（2026-06-04 削除）
 
 **概要**: Space で長文読みを文節単位に部分確定するモード。`SegmentState` + `AzooKeyCandidateMerge` + `firstClauseResults` マージ + Shift+←/→ 境界調整 + marked text 二重下線。azooKey-Desktop の `.selecting` を keynaco 向けに再実装したもの。

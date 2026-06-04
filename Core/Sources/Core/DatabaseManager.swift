@@ -63,33 +63,6 @@ public final class DatabaseManager: @unchecked Sendable {
         return dir.appendingPathComponent("history.db").path
     }
 
-    /// WAL をフラッシュしてから外部ツール（rsync 等）でファイルをコピーできる状態にする。
-    public func checkpoint() {
-        dbQueue.sync {
-            _ = sqlite3_wal_checkpoint_v2(self.db, nil, SQLITE_CHECKPOINT_FULL, nil, nil)
-        }
-    }
-
-    /// NAS インポート前に呼ぶ。WAL をチェックポイントし接続を閉じ、WAL/SHM ファイルを削除する。
-    /// rsync が db を置き換えた後に reopen() を呼ぶこと。
-    public func closeForImport() {
-        dbQueue.sync {
-            _ = sqlite3_wal_checkpoint_v2(self.db, nil, SQLITE_CHECKPOINT_TRUNCATE, nil, nil)
-            for (_, stmt) in self.stmtCache { sqlite3_finalize(stmt) }
-            self.stmtCache = [:]
-            sqlite3_close(self.db)
-            self.db = nil
-        }
-        let base = Self.dbPath
-        try? FileManager.default.removeItem(atPath: base + "-wal")
-        try? FileManager.default.removeItem(atPath: base + "-shm")
-    }
-
-    /// ファイルが外部から置き換えられた後（NAS インポート等）に接続を張り直す。
-    public func reopen() {
-        openDatabase()
-    }
-
     private func openDatabase() {
         let dir = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
