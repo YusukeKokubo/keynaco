@@ -2,27 +2,28 @@
 
 ## Step 1: 仮説を言語化する
 
-コードを読んで現状を整理したうえで仮説を立てるで。
+コードを読んで現状を整理したうえで仮説を立てる。
 
 ---
 
-**【機能】** セグメントモードで確定した複数文節の結合フレーズ（例：「たなかたろう」→「田中太郎」）を、次回 IME 起動後（セッションをまたいだあと）の変換にも使えるようにする
+**【機能】** 確定したフレーズ（例：「たなかたろう」→「田中太郎」）を、次回 IME 起動後（セッションをまたいだあと）の変換候補にも使えるようにする
 
-**【課題】** 今の「同一セッション内だけ」という認識がどこから来ているか確認が必要。コードを読んだ時点での観察：
+**【課題】** 「同一セッション内だけ」という認識がどこから来ているか、まず確認が必要。コードを読んだ時点での観察：
 
-- `doConfirmSegments` の `db.recordPrefixes(reading: fullReading, output: confirmed)` は SQLite（`DatabaseManager.shared`）への永続書き込みであり、構造上はセッションをまたいで機能するはず
-- `activateServer` でクリアされるのは `committedHistory`・`sessionTextBuffer`・`leftSideContext` の 3 つ（メモリ上のみ）
-- `buildSegmentCandidates` は `fetchHistoryExact` / `fetchHistoryPrefix` で SQLite を読んでいる
+- `recordPrefixes` / `db.record` は SQLite（`DatabaseManager.shared`）への永続書き込みであり、**プロセス再起動後も残る**
+- `activateServer` でクリアされるのは `committedHistory`・`sessionTextBuffer`・`leftSideContext` の 3 つ（**メモリ上のみ**）
+- 候補組み立て（`buildCandidateList`）は `fetchHistoryScoredMerged` 等で SQLite を読む
+- **2026-06-04 以降、セグメントモード（Space → 文節分割確定）は削除済み**（[`docs/rejected.md`](docs/rejected.md) I-1）。Space は候補窓表示（`buildCandidateList`）に使われる
 
 **→ 「同一セッション内だけ」の意味が 2 通り考えられる：**
 
 | 解釈 A | 解釈 B |
 |--------|--------|
-| `recordPrefixes` は動いているが、**セグメントモード内のキャッシュ** `segmentCandidateCache` が再起動でクリアされるため、次のセッションで候補が異なる位置に出る | Zenzai 左文脈（`sessionTextBuffer`）がセッション内のみ保持されるため、Zenzai プロモートが効かない = フレーズが「再現しない」と感じている |
+| 履歴 DB には書いているが、**候補の並び・スコア**がセッション内の `committedHistory` / Zenzai 左文脈に依存しており、再起動後に体感が変わる | Zenzai 左文脈（`sessionTextBuffer`）が `activateServer` で毎回クリアされるため、Zenzai プロモートが効かない = フレーズが「再現しない」と感じている |
 
-**【仮説】** 仮に解釈 A が正しければ、`recordPrefixes` がすでに SQLite に書いているため、実装は不要（すでに動いている）。解釈 B が正しければ、Zenzai 左文脈の永続化が課題。
+**【仮説】** 解釈 A が正しければ、`recordPrefixes` がすでに SQLite に書いているため、追加実装は不要（または候補順の問題）。解釈 B が正しければ、Zenzai 左文脈の永続化が別課題。
 
-**【前提条件の確認が必要】** 「田中太郎」を一度セグメントモードで確定 → IME を再起動 → 再び「たなかたろう」と打ったとき、history テーブルに `(input="たなかたろう", output="田中太郎")` があるかを確認することで前提を裏付けられる。
+**【前提条件の確認が必要】** 「田中太郎」を一度 Enter で確定 → IME を再起動 → 再び「たなかたろう」と打って Space を押したとき、`history` テーブルにエントリがあり、`candidates` に「田中太郎」が出るかを sandbox で確認する。
 
 ---
 
@@ -30,33 +31,33 @@
 
 | 検証したいこと | 使うツール |
 |---|---|
-| `doConfirmSegments` 後に SQLite に `fullReading → confirmed` が書かれているか | sandbox の `seed_history` 相当 or `debug_ime.py` で確定後に `db.fetchHistoryExact` の結果を確認 |
-| 再起動後に同じフレーズがセグメント候補に出るか | sandbox で reset → 入力シーケンスを送って `candidates` を確認 |
-| `sessionTextBuffer` がセッション外で Zenzai に影響しているか | sandbox で `set_left_context` を使って左文脈ありの場合と比較 |
+| Enter 確定後に SQLite に `reading → output` が書かれているか | sandbox + `seed_history` 相当、または `debug_ime.py` で確定後の `candidates` / `historyEnd` を確認 |
+| reset（`activateServer` 相当）後も同じフレーズが候補に出るか | sandbox で reset → 入力シーケンス → Space → `candidates` を確認 |
+| `sessionTextBuffer` が Zenzai プロモートに効いているか | sandbox で `set_left_context` を使い、左文脈あり/なしで候補順を比較 |
 
 **合否基準（先に決める）：**
 
-- SQLite に `(たなかたろう, 田中太郎)` が入っていて、reset 後も `buildSegmentCandidates` の `fetchHistoryExact("たなかたろう")` で拾えるなら → **すでにセッションをまたいで機能している。実装不要。**
-- 入っていない、または入っていても候補に出ない → 実装が必要（どのパスで漏れているか特定する）
+- SQLite に `(たなかたろう, 田中太郎)` が入っていて、reset 後も `buildCandidateList` 経由で「田中太郎」が候補に出るなら → **履歴のセッション横断はすでに動いている。追加実装は Zenzai 文脈の話か不要。**
+- 入っていない、または入っていても候補に出ない → どの確定パスで書き込みが漏れているか特定する
 
 ---
 
 ## Step 3: sandbox で確認すべき具体的コマンド
 
 ```python
-# 1. セグメントモードで「たなかたろう」を確定させてフレーズ記録を発生させる
+# 1. 「たなかたろう」を Enter で確定させて履歴記録を発生させる
 send({"reset": True})
-send({"type_string": "tanakataro", "then": "space"})  # セグメントモード入り
-# Enter で確定 → doConfirmSegments が呼ばれ db.recordPrefixes("たなかたろう", "田中太郎") のはず
+send({"type_string": "tanakataro", "then": "space"})  # 候補窓表示
+send({"key": "enter"})  # commitText → db.recordPrefixes(reading:output:)
 
 # 2. reset（activateServer 相当）後に候補を確認
 send({"reset": True})
 r = send({"type_string": "tanakataro", "then": "space",
-          "fields": ["candidates", "isSegmentMode", "segmentTexts"]})
-print(r["candidates"])  # 「田中太郎」が先頭付近に出るか？
+          "fields": ["candidates", "historyEnd", "fixedEnd"]})
+print(r["candidates"][:5])  # 「田中太郎」が history 候補として出るか？
 ```
 
-**ただし注意：** sandbox の `reset` が `activateServer` と同じかどうかを確認すること。`DatabaseManager.shared` は同一プロセス内で使い回されるため、プロセス再起動との区別が重要。
+**ただし注意：** sandbox の `reset` が `activateServer` と同じかどうかを確認すること。`DatabaseManager.shared` は同一プロセス内で使い回されるため、**プロセス再起動**との区別が重要。
 
 ---
 
@@ -66,24 +67,32 @@ print(r["candidates"])  # 「田中太郎」が先頭付近に出るか？
 
 ```
 【確認してほしいこと】
-1. 「たなかたろう」をセグメントモード（Space）で「田中」+「太郎」に確定
-2. reset して再度「たなかたろう」→ Space でセグメントモード
-3. candidates に「田中太郎」が出るか確認
+1. 「たなかたろう」を Space → 候補選択 → Enter で「田中太郎」に確定
+2. reset して再度「たなかたろう」→ Space
+3. candidates に「田中太郎」が出るか（historyEnd > fixedEnd か）確認
 
-出るなら → recordPrefixes がすでに機能していて、
-           「セッション内だけ」は Zenzai 左文脈の話だと判明する
-出ないなら → どのパスで SQLite 書き込みが漏れているか特定が必要
+出るなら → recordPrefixes / fetchHistoryScoredMerged がすでに機能しており、
+           「セッション内だけ」は Zenzai 左文脈（sessionTextBuffer）の話だと判明する
+出ないなら → どの確定パスで SQLite 書き込みが漏れているか特定が必要
 ```
 
 ---
 
-## SKILL.md の落とし穴メモが示す教訓
+## よくある落とし穴（現行コード向け）
 
-> 「フレーズ記録は `commitComposition` に同じコードがすでにあり、`doConfirmSegments` の漏れだった——コードを読んでいれば計画段階で分かった」
+**セグメントモード前提で議論しない**  
+Space → 文節分割は 2026-06 削除済み（rejected.md I-1）。デバッグ JSON の文節専用フィールドも廃止。
 
-今回は逆で、コードを読むと `doConfirmSegments`（SegmentMode.swift:294）と `commitComposition`（InputHandler.swift:215）の**両方に**フレーズ全体の `recordPrefixes` が実装されているのが見える。つまり実装自体は存在する。
+**「フレーズ記録」が何を指すか先に切り分ける**
 
-**「同一セッション内だけ」という体験が事実なら、sandbox で再現させてから原因を特定する。今すぐ実装を追加するのは早い。**
+| 対象 | 永続化 | セッションまたぎ |
+|------|--------|------------------|
+| `recordPrefixes` → SQLite `history` | ✅ | ✅（DB は残る） |
+| `sessionTextBuffer`（Zenzai 左文脈） | ❌ | ❌（activateServer でクリア） |
+| `committedHistory`（直近確定語リスト） | ❌ | ❌（同上） |
+
+**Phase 2 に飛ばない**  
+セッション横断の「体感」が本当に足りないか、まず Phase 1（上記 sandbox 確認）で測る。履歴がすでに効いているなら、永続化実装は過剰。
 
 ---
 
@@ -91,9 +100,9 @@ print(r["candidates"])  # 「田中太郎」が先頭付近に出るか？
 
 | ステータス | 内容 |
 |-----------|------|
-| 要確認 | sandbox で「セグメント確定 → reset → 再入力」で候補が出るか確認 |
-| 仮説 A（有力） | recordPrefixes は SQLite に書いており、セッションまたぎは**すでに動いている**可能性がある |
-| 仮説 B | Zenzai 左文脈（sessionTextBuffer）のセッションまたぎを望んでいる → これは別の機能要求 |
-| 実装判断 | sandbox の結果を見てから決める |
+| 要確認 | sandbox で「Enter 確定 → reset → 再入力 → Space」で履歴候補が出るか確認 |
+| 仮説 A（有力） | SQLite 履歴は**すでにセッションをまたぐ**。体感差は Zenzai / committedHistory のメモリ限定が原因の可能性 |
+| 仮説 B | Zenzai 左文脈（sessionTextBuffer）の永続化を望んでいる → 別機能要求（コスト・混線リスクあり） |
+| 実装判断 | sandbox の結果を見てから決める。Phase 1 の効果が測れないうちに Phase 2（永続化設計）に入らない |
 
 `/keynaco-ime-sandbox` スキルで上記の確認をしてからまた話し合いましょうか？

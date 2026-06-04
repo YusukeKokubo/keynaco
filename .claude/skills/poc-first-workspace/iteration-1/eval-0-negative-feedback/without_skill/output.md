@@ -140,4 +140,4 @@ public mutating func doEscape(...) {
 - `commitText` の input 一致チェックが誤適用を防ぐ安全弁
 - 既存 `penalizeAll` と組み合わさるので実質 count -= 2 相当になる（初回確定が count=1 なら Backspace 直後に削除）
 - 実装前にテストを書く（`InputHandlerHistoryTests` に「選び直し → rejectedOutput が追加ペナルティされる」ケースを追加）
-- セグメントモード（`doConfirmSegments`）は当面対象外とする（複数文節の複合確定で検出が複雑なため）
+- 対象は通常の Enter 確定パス（`commitText` / `doConfirmSelection`）のみ（セグメントモードは 2026-06 削除済み）
