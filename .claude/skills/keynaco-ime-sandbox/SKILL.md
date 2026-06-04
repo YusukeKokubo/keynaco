@@ -469,6 +469,20 @@ print(f"successor candidates: {r2['candidates'][:5]}")
 
 ### 5. セグメントモードの確認
 
+文節境界は AzooKey の部分候補 `inputLength`（Desktop の `composingCount`）。suffix / `segmentize` は境界に使わない。
+
+| 読み | ローマ字（IME 経由） | 備考 |
+|------|---------------------|------|
+| こんにちは | **`konnnichiha`** | `konnitiha` / `konnichiha` は読みが `こんいちは` になり得る |
+
+```python
+send({"reset": True})
+r = send({"type_string": "konnnichiha", "then": "space",
+          "fields": ["isSegmentMode", "segmentTexts", "selectedText", "candidates"]})
+print(f"isSegmentMode: {r['isSegmentMode']}")
+print(f"segments: {r['segmentTexts']}")  # 期待: ['こんにち', 'は']
+```
+
 ```python
 send({"reset": True})
 r = send({"type_string": "kyounohawaaidesu", "then": "space"})

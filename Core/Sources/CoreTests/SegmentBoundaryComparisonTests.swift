@@ -181,4 +181,31 @@ final class SegmentBoundaryComparisonTests: InputHandlerTestCase {
         XCTAssertEqual(handler.state.composedHiragana, "は")
         XCTAssertTrue(handler.state.isSegmentMode)
     }
+
+    /// PLAN260603 チェックリスト #1–#4（実エンジン・境界長）
+    func testPlan260603ChecklistSegmentBoundaries() {
+        let cases: [(romaji: String, reading: String?, end: Int, remain: String)] = [
+            ("anataha", nil, 3, "は"),
+            ("gakuseidesu", nil, 4, "です"),
+            ("watashihagakusei", nil, 3, "はがくせい"),
+            ("konnitiha", "こんにちは", 4, "は"),
+        ]
+        for c in cases {
+            setUp()
+            if let fixedReading = c.reading {
+                setComposedReading(fixedReading)
+            } else {
+                typeRomaji(c.romaji)
+            }
+            press(keyCode: 49)
+            guard let ss = handler.state.segmentState else {
+                XCTFail("\(c.romaji): 文節モードに入るはず"); continue
+            }
+            XCTAssertEqual(
+                ss.effectiveClauseEnd, c.end,
+                "\(c.romaji): 境界 \(c.end)"
+            )
+            XCTAssertEqual(ss.remainingReading, c.remain, "\(c.romaji): 残り")
+        }
+    }
 }

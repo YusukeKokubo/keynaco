@@ -132,6 +132,7 @@ cd Core && swift test
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。Shift+`,`/`.` は `characters` が `<`/`>` となり Bracket モード（`＜`/`＞` 候補）に入る
 - **z シーケンス**: `z` + 記号/矢印キーで特殊文字を挿入（`zCharMap` / `zArrowMap` 定義）。`InputHandlerZSequenceTests.swift` 参照。
 - **Bracket モード（`?` / `(` / `[` / `{` / `「` / `,` / `.` 等）**: 組成なし・ASCII モードでない状態でトリガー。`bracketOptions` マップで対応文字ペアを定義。US キーボードの `?` は `Shift+/`（`baseCharacters="/"`）なのでキーボード判定が必要（`InputHandler+Candidates.swift` 参照）。
+- **文節モード（Space 後）**: 境界はエンジン部分候補の `inputLength`（suffix / `segmentize` は使わない）。IME 実機で `こんにちは` を打つときはローマ字 `konnnichiha`（`konnitiha` は読み不一致になり得る）。回帰は `SegmentBoundaryComparisonTests` / `InputHandlerSegmentTests`。
 
 ## macOS 26 IME の罠
 

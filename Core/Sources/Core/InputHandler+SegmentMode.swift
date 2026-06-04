@@ -259,7 +259,7 @@ public extension InputHandler {
         )
     }
 
-    /// 先頭文節長でエンジン行を絞る。全文候補のみのときは prefix 読みで再取得（例: あなたは → あなた）。
+    /// 先頭文節長でエンジン行を絞る。`main`/`firstClause` マージ結果から `clauseEnd` でスコープする。
     private mutating func clauseScopedEngineRows(
         convertTarget: String,
         clauseEnd: Int,
@@ -290,20 +290,8 @@ public extension InputHandler {
             }
             return scoped
         }
-        guard clauseEnd < convertTarget.count else { return merged }
-        let prefix = String(convertTarget.prefix(clauseEnd))
-        guard !prefix.isEmpty else { return merged }
-        let prefixRaw = azooKeyConverter.requestConversionResult(
-            hiragana: prefix,
-            leftSideContext: azooKeyLeftContext,
-            richCandidates: true,
-            resetEngineSession: false
-        )
-        return AzooKeyCandidateMerge.mergedList(
-            result: prefixRaw,
-            convertTarget: prefix,
-            segmentEdition: segmentEdition
-        )
+        // 全文長の候補だけが返るときは merged をそのまま使う（旧 prefix 再変換は Phase 2 以降不要）。
+        return merged
     }
 
     mutating func syncFocusedSegmentSelection(from candidate: CandidateContext) {

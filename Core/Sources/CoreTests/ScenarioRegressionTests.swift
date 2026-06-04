@@ -3,6 +3,7 @@ import XCTest
 
 /// `docs/domain/scenarios.md` の入力トレースを回帰用に固定化したテスト。
 /// 辞書に依存しない箇所は `AzooKeyConverting` のモックで再現する。
+/// 文節境界（AzooKey 実エンジン）は `SegmentBoundaryComparisonTests` / `InputHandlerSegmentTests` を参照（PLAN260603）。
 
 // MARK: - S-01 用モック（2 文節に分割し「漢字」が選ばれる）
 

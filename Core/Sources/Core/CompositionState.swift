@@ -137,11 +137,12 @@ public struct SegmentState {
     /// 表示・確定に使う行（エンジン候補 + 履歴等を `rows` に統合）
     public var rows: [AzooKeyClauseCandidate]
     public var selectedIndex: Int
-    /// Shift+矢印 / Ctrl+i,o で境界を動かしたあとは `mainResults` のみ再取得
+    /// Shift+←/→ で `manualClauseEnd` を ±1 調整したあとは `mainResults` のみ再取得
+    /// （AzooKey Desktop の `editSegment` 相当。keynaco は 1 文字刻みのみ）。
     public var didExperienceSegmentEdition: Bool = false
-    /// Space 直後のエンジン既定境界（`firstClauseResults` 先頭の部分候補）。Shift+矢印で上書き。
+    /// Space 直後のエンジン既定境界（部分候補の `inputLength`）。Shift+矢印で `manualClauseEnd` に上書き。
     public var engineClauseEnd: Int
-    /// 手動境界（`convertTarget` 先頭からの文字数）。nil なら下記ルール。
+    /// 手動境界（`convertTarget` 先頭からの文字数）。nil なら `engineClauseEnd`。
     public var manualClauseEnd: Int?
     /// この Space セッションで確定済みの文節
     public var confirmedSegments: [(reading: String, text: String)] = []

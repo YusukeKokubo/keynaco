@@ -171,17 +171,24 @@ final class InputHandlerSegmentTests: InputHandlerTestCase {
     func testSequentialEnterConfirmsOneSegmentAtATime() {
         typeRomaji("watashihagakusei")
         press(keyCode: 49)
-        guard handler.state.isSegmentMode else { return }
+        guard handler.state.isSegmentMode, let ss0 = handler.state.segmentState else {
+            XCTFail("文節モードに入るはず"); return
+        }
+        XCTAssertEqual(ss0.effectiveClauseEnd, 3, "1 文節目: わたし")
+        XCTAssertEqual(ss0.clauseReading, "わたし")
 
         press(keyCode: 36)
         XCTAssertTrue(handler.state.isSegmentMode, "1 文節目確定後も残りがあればセグメントモード継続")
-        XCTAssertFalse(client.inserted.isEmpty, "1 文節目が insert されるはず")
+        XCTAssertEqual(client.inserted.joined(), "わたし")
+        XCTAssertEqual(handler.state.composedHiragana, "はがくせい")
+        XCTAssertGreaterThan(handler.state.segmentState?.effectiveClauseEnd ?? 0, 0)
 
-        press(keyCode: 36)
-        if handler.state.isSegmentMode {
+        while handler.state.isSegmentMode {
             press(keyCode: 36)
         }
         XCTAssertFalse(handler.state.isSegmentMode)
+        XCTAssertFalse(client.inserted.joined().isEmpty)
+        XCTAssertTrue(client.inserted.joined().hasPrefix("わたし"))
     }
 
     func testSegmentModeEscapeRestoresComposing() {
