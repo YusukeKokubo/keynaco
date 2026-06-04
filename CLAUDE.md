@@ -102,7 +102,7 @@ xcodebuild test -scheme keynaco -destination "platform=macOS"
 ./scripts/test_core.sh
 ```
 
-AzooKey 実辞書・セグメント境界比較（`KeynacoCoreSlowTests`、約 8 秒台）:
+AzooKey 実辞書・POS 分類（`KeynacoCoreSlowTests`、約 8 秒台）:
 
 ```bash
 ./scripts/test_core_slow.sh

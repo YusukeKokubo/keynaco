@@ -17,6 +17,8 @@
 
 **削除後の Space**: 組成中 Space → `buildCandidateList(autoShow: false)`（候補窓表示）。候補表示中 Space → 次候補（従来の ↑↓ 明示選択フローは維持）。
 
+**同時に廃止した周辺**: セグメント確定時の結合フレーズ `recordPrefixes`（`observation.md` 経過観察からも削除）、`scripts/check_segment_history_boundary.py` / `segment_boundary_compare.py`、デバッグ JSON の `isSegmentMode` / `segmentTexts` フィールド。
+
 **再検討するなら**: 使い込みで「長文を一気に打って Space 1 回で部分確定」が本当に必要か POC から。AzooKey Desktop 追従そのものを目的にしない。
 
 > 関連: [POC260603](../plans/POC260603.md)、[PLAN260603](../plans/PLAN260603.md)、[C-1 セグメントモード内の読み修正](#c-1-セグメントモード内の読み修正2026-04-30)

@@ -30,8 +30,8 @@ description: |
 【仮説】この機能を入れると X が Y になる
 
 【前提条件】仮説が成り立つために必要な条件
-  例: 「AzooKey がセグメント分割するケースが十分ある」
-       「候補1位が意図通りでないケースが頻発している」
+  例: 「候補1位が意図通りでないケースが頻発している」
+       「履歴・Zenzai では拾えない読みパターンがある」
 ```
 
 **前提条件が「たぶん〇〇のはず」という推測なら、そこを先に sandbox で確認する。**
@@ -43,8 +43,8 @@ description: |
 | 前提条件の機能がすでに実装済みか | **コードを読む**（最初にやる。既存実装の発見が最速） |
 | IME の変換・候補の動き | `keynaco-ime-sandbox` スキル |
 | 入力ロジックの単体動作 | `cd Core && swift test` |
-| セグメント分割の実態 | sandbox で `isSegmentMode` / `segmentTexts` を確認 |
 | 履歴候補の出方 | sandbox で `seed_history` + 入力シーケンス |
+| 括弧・Successor など特殊モード | sandbox で `isBracketMode` / `isSuccessorCandidateActive` を確認 |
 
 **検証の合否基準を先に決める**: 「〇〇が確認できれば実装する、△△なら実装しない」を言葉にしてから検証を始める。
 
@@ -55,8 +55,8 @@ sandbox での典型パターン:
 ```python
 send({"reset": True})
 r = send({"type_string": "...", "then": "space",
-          "fields": ["isSegmentMode", "segmentTexts", "candidates"]})
-print(r["segmentTexts"])  # 前提条件を確認
+          "fields": ["candidates", "selectedText", "historyEnd", "fixedEnd"]})
+print(r["candidates"][:5])  # 前提条件を確認
 ```
 
 結果を記録する:
@@ -82,8 +82,7 @@ print(r["segmentTexts"])  # 前提条件を確認
 ## よくある落とし穴
 
 **「簡単そうだから」で POC を飛ばす**  
-実装が3行でも効果がゼロなら無駄。過去の経験: フレーズ記録は `commitComposition` に同じコードがすでにあり、
-`doConfirmSegments` の漏れだった——コードを読んでいれば計画段階で分かった。
+実装が3行でも効果がゼロなら無駄。既存の `recordPrefixes` / 候補組み立てと重複していないか、コードを読んでから検証する。
 
 **AzooKey / Zenzai がすでに解決しているケース**  
 過去の経験: 「しんじゅくえき」「とうきょうとちじ」は AzooKey が1フレーズで変換済みだった。

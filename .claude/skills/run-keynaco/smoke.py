@@ -87,12 +87,14 @@ def main() -> int:
     if not r2.get("inserted"):
         failures.append(f"inserted: 確定テキストが空でした: {r2.get('inserted')}")
 
-    # セグメントモード
+    # Space で候補窓表示（組成中）
     send(sock, {"reset": True})
-    r3 = send(sock, {"type_string": "tanakatarou", "then": "space",
-                     "fields": ["isSegmentMode", "segmentTexts"]})
-    if not r3.get("isSegmentMode"):
-        failures.append("isSegmentMode: True が期待されましたが False でした")
+    r3 = send(sock, {"type_string": "kanzi", "then": "space",
+                     "fields": ["candidateVisible", "candidates"]})
+    if not r3.get("candidateVisible"):
+        failures.append("candidateVisible: Space 後に候補窓が表示されませんでした")
+    if not r3.get("candidates"):
+        failures.append("candidates: Space 後に候補が空でした")
 
     sock.close()
 

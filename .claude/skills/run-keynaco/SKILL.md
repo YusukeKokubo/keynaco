@@ -53,7 +53,7 @@ python3 .claude/skills/run-keynaco/smoke.py
 3. バイナリが HEAD と一致しているか（stale チェック）
 4. 基本変換:「kanzi」→ スペースで候補表示 → 「かんじ」が composedHiragana に入るか
 5. Enter 確定で `inserted` が空でないか
-6. セグメントモード:「tanakatarou」→ スペースで `isSegmentMode=true` になるか
+6. Space で候補窓: 組成中に Space → `candidateVisible=true` かつ候補非空
 
 ```
 commit: 76a5fa7 (HEAD 一致)

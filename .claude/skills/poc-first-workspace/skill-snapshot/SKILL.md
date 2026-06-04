@@ -26,7 +26,7 @@ description: |
 【仮説】この機能を入れると X が Y になる
 
 【前提条件】仮説が成り立つために必要な条件
-  例: 「AzooKey がセグメント分割するケースが十分ある」
+  例: 「候補1位が意図通りでないケースが頻発している」
 ```
 
 前提条件が怪しければ、そこを先に検証する。
@@ -37,8 +37,8 @@ description: |
 |---|---|
 | IME の変換・候補の動き | `keynaco-ime-sandbox` スキル |
 | 入力ロジックの単体動作 | `cd Core && swift test` |
-| セグメント分割の実態 | sandbox で `isSegmentMode` / `segmentTexts` を確認 |
 | 履歴候補の出方 | sandbox で `seed_history` + 入力シーケンス |
+| 括弧・Successor など特殊モード | sandbox で `isBracketMode` / `isSuccessorCandidateActive` を確認 |
 
 **検証の合否基準を先に決める**: 「〇〇が確認できれば実装する、△△なら実装しない」
 
@@ -49,8 +49,8 @@ sandbox での典型パターン:
 ```python
 send({"reset": True})
 r = send({"type_string": "...", "then": "space",
-          "fields": ["isSegmentMode", "segmentTexts", "candidates"]})
-print(r["segmentTexts"])  # 分割の実態を確認
+          "fields": ["candidates", "selectedText", "historyEnd", "fixedEnd"]})
+print(r["candidates"][:5])
 ```
 
 結果を記録する:

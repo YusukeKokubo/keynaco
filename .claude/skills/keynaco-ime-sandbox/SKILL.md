@@ -5,7 +5,7 @@ description: |
 
   次のような場面で積極的に使うこと:
   - 「"kanzi" と入力したら何候補が出るか」など特定の入力列の挙動を確認したいとき
-  - Successor モード・セグメントモード・ブラケットモードの動作を検証したいとき
+  - Successor モード・ブラケットモードの動作を検証したいとき
   - 候補の並び順・historyEnd・fixedEnd の値を確認したいとき
   - 複数の入力パターンを比較して IME のロジックを調べたいとき
   - ユーザーが「このシーケンスを試して」「このケースをデバッグして」と言ったとき
@@ -292,7 +292,6 @@ eisu(英数)=102  kana(かな)=104
   "composingText": "かんじ",     // composedHiragana + pendingRomaji
   "isAsciiMode": false,
   "isSuccessorCandidateActive": false, // 後続語候補表示中（組成空 + 候補 visible）
-  "isSegmentMode": false,        // 文節調整モード
   "isBracketMode": false,        // 括弧候補モード
   "isExplicitlySelected": false, // ↑↓で明示的に候補を選択したか
   "candidateVisible": true,
@@ -302,8 +301,6 @@ eisu(英数)=102  kana(かな)=104
   "fixedEnd": 2,                 // 固定候補（かな/カタカナ）末尾
   "candidates": ["漢字", "感じ", ...],
   "committedHistory": ["今日", "は"],
-  "segmentTexts": [],            // セグメントモード中の文節テキスト
-  "focusedSegmentIndex": 0,
   "predictionEnd": 0,            // 予測ブロック末尾（本番の CandidateWindow と同様）
   "isZenzaiEnabled": true,        // AzooKeyConverter の zenzaiEnabled フラグ
   "leftSideContext": "申請書を",  // 現在の leftSideContext（空なら Zenzai プロモートなし）
@@ -467,30 +464,7 @@ print(f"isSuccessorCandidateActive: {r2['isSuccessorCandidateActive']}")
 print(f"successor candidates: {r2['candidates'][:5]}")
 ```
 
-### 5. セグメントモードの確認
-
-文節境界は AzooKey の部分候補 `inputLength`（Desktop の `composingCount`）。suffix / `segmentize` は境界に使わない。
-
-| 読み | ローマ字（IME 経由） | 備考 |
-|------|---------------------|------|
-| こんにちは | **`konnnichiha`** | `konnitiha` / `konnichiha` は読みが `こんいちは` になり得る |
-
-```python
-send({"reset": True})
-r = send({"type_string": "konnnichiha", "then": "space",
-          "fields": ["isSegmentMode", "segmentTexts", "selectedText", "candidates"]})
-print(f"isSegmentMode: {r['isSegmentMode']}")
-print(f"segments: {r['segmentTexts']}")  # 期待: ['こんにち', 'は']
-```
-
-```python
-send({"reset": True})
-r = send({"type_string": "kyounohawaaidesu", "then": "space"})
-print(f"isSegmentMode: {r['isSegmentMode']}")
-print(f"segments: {r['segmentTexts']}")
-```
-
-### 6. 行単位でケースを分けてログを取る（Sandbox 連携）
+### 5. 行単位でケースを分けてログを取る（Sandbox 連携）
 
 Sandbox ウィンドウの左ペインは **1行 = 1テストケース**。Enter で行が確定し次の行へ進む。
 `reset` は Sandbox のログもクリアするので、複数ケースを比較するときのテンプレート:
@@ -533,7 +507,7 @@ print(r1["log"][0]["events"][-1]["summary"])   # 行1の最終イベント
 - `events` — その行に紐づく全スナップショット（`source`: `"ime"` / `"socket"` / `"annotation"`）
 - Enter をソケット経由で送ると行が自動的に進む（`keyCode 36` 後に組成がなければ `finishCurrentLine` が走る）
 
-### 7. Zenzai top-1 プロモーションの確認
+### 6. Zenzai top-1 プロモーションの確認
 
 Zenzai プロモーションには **isZenzaiEnabled=true** かつ **leftSideContext が非空** の両方が必要。
 `set_left_context` で左コンテキストを強制セットして検証する。

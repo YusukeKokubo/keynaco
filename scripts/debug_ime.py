@@ -326,7 +326,7 @@ class IMEClient:
         lines.append(f"  composedHiragana : {r.get('composedHiragana', '')!r}")
         lines.append(f"  pendingRomaji    : {r.get('pendingRomaji', '')!r}")
         lines.append(f"  markedText       : {r.get('markedText', '')!r}")
-        modes = [k for k in ("isAsciiMode", "isSuccessorMode", "isSegmentMode", "isBracketMode") if r.get(k)]
+        modes = [k for k in ("isAsciiMode", "isSuccessorMode", "isBracketMode") if r.get(k)]
         if modes:
             lines.append(f"  modes            : {', '.join(modes)}")
         if r.get("candidateVisible"):
@@ -351,11 +351,6 @@ class IMEClient:
                 )
         if r.get("committedHistory"):
             lines.append(f"  committedHistory : {r['committedHistory']}")
-        if r.get("isSegmentMode") and r.get("segmentTexts"):
-            segs = r["segmentTexts"]
-            fi = r.get("focusedSegmentIndex", 0)
-            parts = [f"[{s}]" if i == fi else s for i, s in enumerate(segs)]
-            lines.append(f"  segments         : {' | '.join(parts)}")
         return "\n".join(lines)
 
 
