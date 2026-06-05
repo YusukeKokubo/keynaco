@@ -4,7 +4,7 @@ import InputMethodKit
 
 extension InputController {
 
-    /// LLM 用の文脈プレフィックス。入力組み立ては `LeftContextSource`、結合は `LeftContextResolver`。
+    /// LLM / Zenzai 用左文脈。パイプラインは `LeftContextSource` MARK 参照。
     func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
         let cached = cachedSurroundingContext.map { (location: $0.location, before: $0.text.before) }
         let assembly = LeftContextSource.assembleProduction(

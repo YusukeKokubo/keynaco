@@ -143,14 +143,14 @@ public struct InputHandler {
     /// `buildCandidateList` の AzooKey 候補キャッシュ照合用（`leftSideContext` が変わると再取得）
     public var lastAzooKeyContext: String = ""
     public var lastAzooKeyResults: [String] = []
-    /// `LeftContextResolver`（`InputController.resolvedLLMDocumentContextPrefix`）から渡すカーソル左文（Zenzai）。空は文脈なし。
+    /// カーソル左文（Zenzai）。`LeftContextSource` → `LeftContextResolver` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
     public var leftSideContext: String = ""
     /// AzooKey API 用（空文字は `nil`）
     public var azooKeyLeftContext: String? { leftSideContext.isEmpty ? nil : leftSideContext }
     public var committedHistory: [String] = []
-    /// Zenzai 左文脈用のセッションバッファ（上限 50 字・文末でリセットしない）。
+    /// Zenzai 左文脈用。確定語ごとに加算（上限 50 字）。`leftSideContext` 素材 — 詳細は `LeftContextSource` MARK。
     public var sessionTextBuffer: String = ""
-    /// `pushCommitted` で文末記号により `committedHistory` を消した直後に立て、`InputController` が IMK 文脈キャッシュを捨てる。
+    /// 文末記号で `committedHistory` を消した直後に立て、`InputController` が IMK キャッシュを捨てる（`LeftContextSource` MARK）。
     public var documentSurroundingContextInvalidated = false
     public var lastCommittedOutput: String? {
         committedHistory.last

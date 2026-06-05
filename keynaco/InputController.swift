@@ -17,7 +17,8 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// 直近の `handle(event:client:)` の IMK クライアント（候補 UI 削除などキーイベント外の marked 同期用）。
     private weak var activeIMKClient: AnyObject?
 
-    /// `composedHiragana` が空→非空になったタイミングで `SurroundingIMKContext.fetch` 済み。`selectedRange().location` が一致するときだけ LLM 文脈に使う（Space 再取得は location 無効化で代替）。
+    /// IMK surrounding `before`/`after` のキャッシュ。更新・無効化タイミングは `LeftContextSource` ファイル先頭 MARK。
+    /// 組み立ては `LeftContextSource.assembleProduction`（`InputController+LLM.resolvedLLMDocumentContextPrefix`）。
     var cachedSurroundingContext: (location: Int, text: (before: String, after: String))?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
@@ -144,7 +145,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         }
     }
 
-    /// `handle` 内の `handler.handle` 成功後、候補ウィンドウ更新・周辺文脈・LLM 補助・誤変換のスケジュールまでを一括で行う。
+    /// キー処理後の副作用。`cachedSurroundingContext` の fetch/無効化は `LeftContextSource` MARK「本番」参照。
     @MainActor
     private func applyPostKeyDownEffects(
         action: CandidateAction,

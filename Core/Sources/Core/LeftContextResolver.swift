@@ -2,8 +2,8 @@ import Foundation
 
 /// Zenzai / AzooKey 用の左文脈プレフィックスを組み立てる（結合のみ）。
 ///
-/// 入力組み立て（本番キャッシュ lookup / サンドボックス `documentBefore`）は `LeftContextSource` が正本。
-/// IMK 取得・キャッシュ更新タイミングは `InputController` 側の責務。
+/// パイプライン俯瞰・IMK キャッシュ更新タイミングは `LeftContextSource` ファイル先頭 MARK が正本。
+/// 入力組み立ては `LeftContextSource`、本メソッドは 300/400 字結合のみ担当。
 ///
 /// 結合ルール（PLAN260506b）:
 /// - `before` 単体は最大 `maxBeforeLength` 字（カーソル近傍の末尾側）

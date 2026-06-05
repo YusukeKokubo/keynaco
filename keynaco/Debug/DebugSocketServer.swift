@@ -1117,7 +1117,7 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    /// サンドボックス用左文脈。入力組み立ては `LeftContextSource.resolveSandbox`。
+    /// `LeftContextSource.resolveSandbox` 経由。`makeResponse` 前に `syncLeftSideContext` で再計算（MARK「サンドボックス」参照）。
     func debugLeftContextPrefix() -> String {
         LeftContextSource.resolveSandbox(
             sessionBuffer: handler.sessionTextBuffer,
