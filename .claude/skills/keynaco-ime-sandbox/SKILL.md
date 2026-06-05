@@ -125,7 +125,8 @@ send({"reset": True})
 | インラインアサート | `{"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}}` |
 | 履歴シード | `{"seed_history": {"input": "かんじ", "output": "漢字", "times": 3}}` |
 | sessionTextBuffer 確認 | `{"state": true, "fields": ["sessionTextBuffer", "committedHistory"]}` — 文末後も buffer が残るか（[PLAN260525](../../plans/PLAN260525.md)） |
-| Zenzai 左コンテキスト固定 | `{"set_left_context": "申請書を"}` — Zenzai プロモートの有効化に必須。空文字で解除 |
+| Zenzai 左コンテキスト固定 | `{"set_left_context": "申請書を"}` — レスポンスに `leftSideContext` が返る。空文字で解除 |
+| 周辺文脈設定 | `{"set_surrounding": {"before": "...", "after": "..."}}` — 同上（`sessionTextBuffer` も返る） |
 
 `then` に指定できる名前: `space` / `enter` / `backspace` / `escape` / `tab` / `down` / `up` / `left` / `right` / `f6`–`f10` / `eisu` / `kana`
 
@@ -542,7 +543,7 @@ print(f"selectedRow={r['selectedRow']}, selectedText={r['selectedText']!r}")
 
 - **IMK パイプラインをバイパス**するため、クライアントアプリ依存の挙動（Electron の Enter 問題など）は再現しない
 - デフォルトのリセットではソケットサーバーは**インメモリ DB**。本番の `history.db` は **`{"reset": true, "useRealDB": true}`** を使ったときのみ一時コピーで参照する
-- デフォルトの `leftSideContext` は `LeftContextResolver` で `sessionTextBuffer` + `mockClient.documentBefore` を結合（`set_surrounding.before` で設定可）。`{"state": true}` でも `makeResponse` 時に再計算される。確定直後 Backspace（IME 非消費）では直前確定語を `documentBefore` から削除して本番 IMK の `before` 更新を模倣する。`set_left_context` で上書き可能
+- デフォルトの `leftSideContext` は `LeftContextSource.resolveSandbox` で `sessionTextBuffer` + `mockClient.documentBefore` を結合（`set_surrounding.before` で設定可）。`set_surrounding` / `set_left_context` / `{"state": true}` / キー処理の各レスポンスで再計算済みの `leftSideContext` が返る。確定直後 Backspace（IME 非消費）では直前確定語を `documentBefore` から削除して本番 IMK の `before` 更新を模倣する
 - **LLM は Debug ビルドのサーバー上で動く**（上記「LLM（Debug ビルド）」）。完了タイミングを見るときは `{"state": true}` ポーリング
 - セッションをまたぐときは必ず `{"reset": true}` を送信して状態をリセットすること（`reset` で LLM フェッチもキャンセルされ `llmEpoch` が進む）
 - 調査結果を報告するときは、各キー入力後の状態を表形式か箇条書きで整理して示すと読みやすい

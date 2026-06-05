@@ -79,17 +79,26 @@ extension DebugSocketServer {
     return Self.finalize(["ok": true], cmd: cmd)
     }
 
+    /// `set_surrounding` / `set_left_context` 後に `leftSideContext` を再計算して返す共通ペイロード。
+    func finalizeLeftContextCommand(cmd: [String: Any], extra: [String: Any] = [:]) -> [String: Any] {
+        syncLeftSideContext()
+        var payload: [String: Any] = ["ok": true, "leftSideContext": handler.leftSideContext]
+        payload["sessionTextBuffer"] = handler.sessionTextBuffer
+        for (k, v) in extra { payload[k] = v }
+        return Self.finalize(payload, cmd: cmd)
+    }
+
     func handleSetSurrounding(cmd: [String: Any]) -> [String: Any] {
     let sur = cmd["set_surrounding"] as! [String: Any]
     if let b = sur["before"] as? String { mockClient.documentBefore = b }
     if let a = sur["after"] as? String { mockClient.documentAfter = a }
-    return Self.finalize(["ok": true], cmd: cmd)
+    return finalizeLeftContextCommand(cmd: cmd)
     }
 
     func handleSetLeftContext(cmd: [String: Any]) -> [String: Any] {
     let ctx = cmd["set_left_context"] as! String
     debugLeftContextOverride = ctx.isEmpty ? nil : ctx
-    return Self.finalize(["ok": true], cmd: cmd)
+    return finalizeLeftContextCommand(cmd: cmd)
     }
 
     func handleTestSuite(cmd: [String: Any]) -> [String: Any] {

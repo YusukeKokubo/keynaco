@@ -47,7 +47,7 @@ import Foundation
 // - `mockClient.documentBefore` ← `set_surrounding.before`（location 概念なし・常に有効）
 // - `debugLeftContextOverride` ← `set_left_context`（非 nil なら resolver をバイパス）
 // - `makeResponse` / キー処理前の `syncLeftSideContext` で `handler.leftSideContext` を再計算
-// - `set_surrounding` 単体レスポンスに `leftSideContext` は載らないことがある → `{"state":true}` で確認
+// - `set_surrounding` / `set_left_context` も `syncLeftSideContext` 後に `leftSideContext` を返す
 //
 // ## 新規コードの入口
 //
