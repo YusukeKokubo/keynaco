@@ -128,6 +128,8 @@ public struct InputHandler {
 
     public var state = CompositionState()
     public var candidateSession = CandidateSession()
+    /// `activateServer` 直後に IMK が英数/かなキーを echo するのを 1 回だけ無視する（bc3c628）。
+    /// 英数キー押下そのものの二重送信ではない。セットは `InputController.activateServer` のみ。
     public var ignoreNextModeSwitch = false
     public var bracketCandidates: [String]? {
         get { candidateSession.bracketCandidates }

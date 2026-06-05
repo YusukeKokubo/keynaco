@@ -146,7 +146,7 @@ fast + slow 両方（CI・リリース前）:
 
 - **`InputController` での `handler` フィールド書き換えのタイミング**: `handle()` 内で同一ターン中に読む値は書き換え前の値（pre）を変数に退避してから使うこと。書き換え後の値が次キー以降のみ参照される場合は post 書きでよいが、混在するとサイレントに1キー遅延バグになる（実績あり）。
 - **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始（`GitHub` 等の混在ケース用）。`InputHandlerAsciiTests.swift` 参照。
-- **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` フラグで macOS の二重送信を防ぐ
+- **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` は **`activateServer` 直後に IMK が echo する英数/かなを 1 回無視**（入力ソース切替キーの余韻。英数押下の二重送信ではない）
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。Shift+`,`/`.` は `characters` が `<`/`>` となり Bracket モード（`＜`/`＞` 候補）に入る
 - **z シーケンス**: `z` + 記号/矢印キーで特殊文字を挿入（`zCharMap` / `zArrowMap` 定義）。`InputHandlerZSequenceTests.swift` 参照。
 - **Bracket モード（`?` / `(` / `[` / `{` / `「` / `,` / `.` 等）**: 組成なし・ASCII モードでない状態でトリガー。`bracketOptions` マップで対応文字ペアを定義。US キーボードの `?` は `Shift+/`（`baseCharacters="/"`）なのでキーボード判定が必要（`InputHandler+Candidates.swift` 参照）。

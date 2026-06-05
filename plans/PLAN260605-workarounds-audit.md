@@ -23,7 +23,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 | **A-4** | **推奨** | `IMKCandidates` はメンテ停滞・描画不安定の報告が多い。macOS 26 実機で `selectCandidate` が動作しなかった経験あり。 | 現状の `NSPanel` + `NSTableView`（`CandidateWindow`）維持。 | 一時的に `IMKCandidates` に戻し Electron 等で選択・描画が破綻しないか。 |
 | **A-5** | **推奨** | `super.setValue` 呼び出しで IMK が純正 IME 向けモード切替を強制し、自前の `isAsciiMode` と競合してルーティングが壊れる。 | `super` を呼ばず自前状態のみ更新（現状の空 override）。 | `super` 復帰後、メニューバーから英数/かなを連打して入力不能になるか。 |
 | **A-6** | **仕様** | Development 署名で `spctl -a` が rejected されるのは Gatekeeper の仕様。ワークアラウンドではない。 | 配布時は Developer ID + Notarization。 | 公証済み pkg で `spctl -a -vvv`。 |
-| **B-1** | **要検証** | 英数キー（keyCode 102）後の eisu/kana 二重送信。`ignoreNextModeSwitch` で 1 回無視。macOS 26 で修正されたかは Release Notes に出にくい。 | 再現しなければフラグ削除。`activateServer` 直後のセットも合わせて確認。 | 組成中に英数→即かな/英数。各種エディタで実打。 |
+| **B-1** | **必須**（意図確定 2026-06-05） | 入力ソース切替時、`activateServer` のあと **同じ英数/かなキーが `handle` に echo** される（bc3c628）。`ignoreNextModeSwitch` はその 1 回だけ無視。セット箇所は `activateServer` のみ（英数押下の二重送信ではない）。 | 削除不可（Core テスト `InputHandlerAsciiTests` で echo 挙動を固定）。IMK 実機で echo が消えたら削除再検討。 | 入力ソース切替直後に意図せず ASCII/かなになるか。 |
 | **B-2** | **仕様** | Caps Lock は `inputText` に来ない。`flagsChanged` で LED と `isAsciiMode` を同期するのが正しい。 | なし。 | Caps Lock でモードが期待どおりか。 |
 | **B-3** | **仕様** | `characters` / `baseCharacters` の使い分けは US/JIS 差の正しい `NSEvent` の使い方（Bracket モード等）。 | なし。 | US/JIS で Shift+`,` `.` 等の Bracket 遷移。 |
 | **C-1** | **必須** | Electron/Chromium は空 marked text で IME 非アクティブと誤認し Enter をアプリに流す。2026 年も報告あり。 | `MarkedTextSync` で候補選択中は実テキストを marked に渡す。 | `MarkedTextSync` 無効化後、VS Code/Cursor で候補中 Enter が改行暴発するか。 |
@@ -42,7 +42,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 | 項目 | 補足 |
 |------|------|
 | A-1 | Gemini は「`.inputmethod.`」と記載したが、本リポジトリの記録・実装は **ID に `inputmethod` 文字列を含む**（例: `com.yusuke.inputmethod.keynaco`）。厳密なドット区切り形式は未検証。 |
-| B-1 | `activateServer` でも `ignoreNextModeSwitch = true`（`InputController.swift`）。削除時は英数キー以外のモードイベント経路も見る。 |
+| B-1 | `ignoreNextModeSwitch = true` は **`activateServer` のみ**（`InputController.swift`）。`handleModeSwitchKey` が英数(102)/かな(104)を消費。`InputHandlerAsciiTests` に echo 無視テスト追加（2026-06-05）。 |
 | C-2 | `runKeyDown` は consumed に関係なく `applyPostKeyDownEffects` を呼ぶ（203–204 行付近の意図）。狭める場合は marked 同期と surrounding 更新を分離検討。 |
 | E-2 | `addRomaji` は `count >= 2` まで `needsRefresh == false`。`shouldRefreshWhileTypingAfterCommit` があると **確定直後の 1 文字目だけ** 余分に `buildCandidateList` が走る。 |
 
@@ -71,7 +71,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 
 1. ~~**E-2** — `hasBigramContext` のリネーム・コメント~~ ✅ 2026-06-05（`shouldRefreshWhileTypingAfterCommit`）
 2. **C-2** — 未消費キーでの post-effects 限定化
-3. **B-1** — `ignoreNextModeSwitch`（実機で二重送信が消えていれば削除）
+3. **B-1** — 必須（activateServer のモードキー echo）。IMK 実機で echo 消滅確認まで削除不可
 
 ### 大規模 refactor 候補（別 PLAN）
 
@@ -84,10 +84,10 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 
 | Step | 内容 | 完了条件 |
 |------|------|----------|
-| 1 | B-1 実機テスト（組成中→英数→かな、`activateServer` 直後） | 結果を本 PLAN の B-1 行に追記 |
+| 1 | B-1 IMK 実機（入力ソース切替直後のモード） | echo 消滅時のみ削除再検討。Core テストは 2026-06-05 追加済 |
 | 2 | ~~E-2 リネームのみ PR~~ | ✅ 2026-06-05 — `InputHandler+NormalInput.swift` |
 | 3 | C-2 `consumed` 限定 PR | sandbox: marked 同期・VS Code/Cursor Enter・高速入力 |
-| 4 | B-1 フラグ削除 PR | Step 1 で再現なしの場合のみ |
+| 4 | ~~B-1 フラグ削除 PR~~ | 保留 — echo は Core で再現固定。IMK 実機で消滅確認が必要 |
 
 ---
 
@@ -108,6 +108,6 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 
 ## 不確実性
 
-- **B-1**: macOS 26 で二重送信が修正されたかは公式明記が少ない。実機テスト必須。
+- **B-1**: 英数押下の二重送信ではなく activateServer の echo（bc3c628）。削除は IMK 実機で echo 消滅を確認してから。
 - **A-4**: `IMKCandidates` の macOS 26.1+ での改善は未再確認。
 - 外部ソース（IMKSwift / vChewing / ブログ）は設計参考であり、keynaco の採否は本リポジトリの regression + sandbox が正本。

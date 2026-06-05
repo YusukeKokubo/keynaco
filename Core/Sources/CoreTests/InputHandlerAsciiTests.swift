@@ -46,6 +46,34 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
         XCTAssertTrue(client.inserted.isEmpty)
     }
 
+    // MARK: - activateServer 直後のモードキー echo（ignoreNextModeSwitch）
+
+    func testSpuriousEisuAfterActivationIgnored() {
+        InputHandler.isAsciiMode = false
+        handler.ignoreNextModeSwitch = true
+        let result = press(keyCode: 102)
+        XCTAssertTrue(result.consumed)
+        XCTAssertFalse(InputHandler.isAsciiMode, "echo された英数は ASCII モードにしてはいけない")
+        XCTAssertFalse(handler.ignoreNextModeSwitch)
+    }
+
+    func testSpuriousKanaAfterActivationIgnored() {
+        InputHandler.isAsciiMode = true
+        handler.ignoreNextModeSwitch = true
+        let result = press(keyCode: 104)
+        XCTAssertTrue(result.consumed)
+        XCTAssertTrue(InputHandler.isAsciiMode, "echo されたかなは日本語モードへ戻してはいけない")
+        XCTAssertFalse(handler.ignoreNextModeSwitch)
+    }
+
+    func testModeSwitchHonoredAfterIgnoredEcho() {
+        InputHandler.isAsciiMode = false
+        handler.ignoreNextModeSwitch = true
+        press(keyCode: 102)
+        press(keyCode: 102)
+        XCTAssertTrue(InputHandler.isAsciiMode, "2 回目の英数は通常どおり ASCII モードへ")
+    }
+
     // MARK: - Shift + 文字 → 組成バッファに英字として貯める
     // See: docs/domain/scenarios.md#s-04-shift文字日本語モードで英字組成
 
