@@ -463,7 +463,7 @@ extension DebugSocketServer {
             mockClient.removeLastDocumentCharacter()
         }
     }
-    applyCandidateAction(action)
+    applyCandidateAction(action) // InputController と同様、consumed 不問で apply（冪等 sync）
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
         let reading = handler.lastConfirmedContext?.input ?? handler.lastCommittedReading ?? ""

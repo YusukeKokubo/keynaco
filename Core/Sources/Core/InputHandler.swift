@@ -306,7 +306,8 @@ public struct InputHandler {
     }
 
     /// `CandidateAction` を `candidateSession` に反映し marked text を同期する。
-    /// `.deleteSelected` の DB 削除もここ。候補ウィンドウ更新は `InputController` のみ。
+    /// `.deleteSelected` は Shift+Delete（キー）専用。候補 UI の削除ボタンは `removeCandidate` 経路（`InputController.onDelete`）。
+    /// 候補ウィンドウ更新は `InputController` のみ。
     public mutating func applyCandidateAction(_ action: CandidateAction, client: TextInputClient) {
         if case .deleteSelected = action,
            let text = candidateSession.selectedText {

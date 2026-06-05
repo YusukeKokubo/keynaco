@@ -28,6 +28,7 @@ class InputController: IMKInputController, @unchecked Sendable {
                 contentRect: .zero, styleMask: [.borderless],
                 backing: .buffered, defer: true
             )
+            // キー経路外。`.deleteSelected` ではなく removeCandidate + syncMarkedText（CandidateSession の doc 参照）。
             ic.candidateWindow.onDelete = { [weak ic] (text: String, row: Int) in
                 MainActor.assumeIsolated {
                     guard let ic else { return }
@@ -198,6 +199,8 @@ class InputController: IMKInputController, @unchecked Sendable {
             candidate: ctx,
             client: adapter
         )
+        // consumed に関係なく副作用を走らせる（未消費キーは state/action 不変で sync は冪等）。
+        // テストの `type`/`press` は consumed 時のみ applyCandidateAction（未消費は組成も変わらないため）。
         applyPostKeyDownEffects(
             action: action,
             adapter: adapter,

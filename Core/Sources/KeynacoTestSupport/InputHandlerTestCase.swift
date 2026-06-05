@@ -50,7 +50,7 @@ class InputHandlerTestCase: XCTestCase {
         let ctx = CandidateContext(isVisible: candidateVisible, selectedRow: selectedRow, selectedText: selectedText)
         let result = handler.handle(keyCode: 0, characters: chars, baseCharacters: base ?? chars,
                                     modifiers: modifiers, candidate: ctx, client: client)
-        if result.consumed { applyCandidateAction(result.candidateAction) }
+        if result.consumed { applyCandidateAction(result.candidateAction) } // 本番は未消費でも apply するが、ここでは不変なら省略可
         return result
     }
 

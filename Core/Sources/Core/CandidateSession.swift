@@ -46,7 +46,8 @@ public struct CandidateSession: Sendable, Equatable {
         bracketCandidates = nil
     }
 
-    /// 削除ボタン（UI）から行を除去する。DB 削除は呼び出し側の責務。
+    /// 候補ウィンドウの削除ボタン用。行除去のみ。DB 削除と marked 同期は `InputController.onDelete` が行う。
+    /// キーボードの Shift+Delete は `.deleteSelected` → `InputHandler.applyCandidateAction`（別経路）。
     public mutating func removeCandidate(at row: Int) {
         guard candidates.indices.contains(row) else { return }
         candidates.remove(at: row)
@@ -81,7 +82,7 @@ public struct CandidateSession: Sendable, Equatable {
             guard isVisible, !candidates.isEmpty else { break }
             selectedRow = (selectedRow - 1 + candidates.count) % candidates.count
             isExplicitlySelected = true
-        case .deleteSelected:
+        case .deleteSelected: // Shift+Delete。DB 削除は `applyCandidateAction` が apply 前に行う。
             guard isVisible, candidates.indices.contains(selectedRow) else { break }
             let row = selectedRow
             candidates.remove(at: row)
