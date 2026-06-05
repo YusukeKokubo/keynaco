@@ -544,12 +544,7 @@ extension DebugSocketServer {
         default:
             handler.candidateSession.apply(action)
         }
-        switch action {
-        case .none:
-            break
-        case .deleteSelected, .dismiss, .selectNext, .selectPrev, .show, .replaceCandidates:
-            handler.syncMarkedText(client: mockClient)
-        }
+        handler.syncMarkedText(client: mockClient)
     }
 }
 

@@ -18,13 +18,10 @@ public extension InputHandler {
         if keyCode == KeyCode.space {
             if !state.composedHiragana.isEmpty {
                 state.absorbPendingIntoComposed()
-                let action = buildCandidateList(trigger: .explicit)
-                applyMarkedText(client: client)
-                return (true, action)
+                return (true, buildCandidateList(trigger: .explicit))
             }
             // composed のみ空で pending ローマ字だけあるとき Space をホストへ漏らすと未確定が消えることがあるため消費する
             if !state.pendingRomaji.isEmpty {
-                applyMarkedText(client: client)
                 return (true, .none)
             }
             return (false, .none)
@@ -67,9 +64,7 @@ public extension InputHandler {
             return (true, .dismiss)
         }
         state.composedHiragana += special
-        let action = buildCandidateList()
-        applyMarkedText(client: client)
-        return (true, action)
+        return (true, buildCandidateList())
     }
 
     private mutating func handleZSequence(base: String, client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction)? {
@@ -83,14 +78,11 @@ public extension InputHandler {
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if state.composingText.isEmpty {
             bracketCandidates = options
-            client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
             return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, fixedEnd: 0))
         }
         flushPendingRomaji()
         state.composedHiragana += options[0]
-        let action = buildCandidateList()
-        applyMarkedText(client: client)
-        return (true, action)
+        return (true, buildCandidateList())
     }
 
     private mutating func handleShiftChar(
@@ -101,9 +93,7 @@ public extension InputHandler {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         else { flushPendingRomaji() }
         state.composedHiragana += chars
-        let action = buildCandidateList(trigger: .whileTyping)
-        applyMarkedText(client: client)
-        return (true, action)
+        return (true, buildCandidateList(trigger: .whileTyping))
     }
 
     private mutating func handleNonAsciiChar(
@@ -116,7 +106,6 @@ public extension InputHandler {
         } else {
             flushPendingRomaji()
             state.composedHiragana += chars
-            applyMarkedText(client: client)
         }
         return (true, .dismiss)
     }
@@ -128,9 +117,7 @@ public extension InputHandler {
               && state.composedHiragana.allSatisfy({ $0.isASCII }) else { return nil }
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         state.composedHiragana += chars
-        let action = buildCandidateList(trigger: .whileTyping)
-        applyMarkedText(client: client)
-        return (true, action)
+        return (true, buildCandidateList(trigger: .whileTyping))
     }
 
     private mutating func handleRomaji(
@@ -145,7 +132,6 @@ public extension InputHandler {
         } else {
             candidateAction = .dismiss
         }
-        applyMarkedText(client: client)
         return (true, candidateAction)
     }
 }

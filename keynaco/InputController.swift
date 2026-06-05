@@ -126,7 +126,8 @@ class InputController: IMKInputController, @unchecked Sendable {
         handler.syncMarkedText(client: IMKTextInputAdapter(activeIMKClient))
     }
 
-    /// `handler.handle` の戻り `CandidateAction` を `candidateSession` に反映し、パネル・marked text を更新する。
+    /// キー処理後の候補副作用。`session.apply` → ウィンドウ → `syncMarkedText` の順が不変。
+    /// 組成バッファの更新は `InputHandler.handle` 内、IMK への marked 反映はここだけ。
     @MainActor
     private func applyCandidateEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
         switch action {
@@ -150,12 +151,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             candidateWindow.present(session: handler.candidateSession, near: adapter.cursorRect())
         }
 
-        switch action {
-        case .none:
-            break
-        case .deleteSelected, .dismiss, .selectNext, .selectPrev, .show, .replaceCandidates:
-            handler.syncMarkedText(client: adapter)
-        }
+        handler.syncMarkedText(client: adapter)
     }
 
     /// `handle` 内の `handler.handle` 成功後、候補ウィンドウ更新・周辺文脈・LLM 補助・誤変換のスケジュールまでを一括で行う。

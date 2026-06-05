@@ -75,13 +75,21 @@ final class InputHandlerNumberTests: XCTestCase {
         let client = MockTextClient()
 
         for c in "1234" {
-            _ = handler.handle(keyCode: 0, characters: String(c), baseCharacters: String(c),
-                               modifiers: [], candidate: .hidden, client: client)
+            let r = handler.handle(keyCode: 0, characters: String(c), baseCharacters: String(c),
+                                   modifiers: [], candidate: .hidden, client: client)
+            if r.consumed {
+                handler.candidateSession.apply(r.candidateAction)
+                handler.syncMarkedText(client: client)
+            }
         }
         // "１２３４" を選択確定
         let ctx = CandidateContext(isVisible: true, selectedRow: 2, selectedText: "１２３４")
-        _ = handler.handle(keyCode: KeyCode.enter, characters: nil, baseCharacters: nil,
-                           modifiers: [], candidate: ctx, client: client)
+        let enter = handler.handle(keyCode: KeyCode.enter, characters: nil, baseCharacters: nil,
+                                   modifiers: [], candidate: ctx, client: client)
+        if enter.consumed {
+            handler.candidateSession.apply(enter.candidateAction)
+            handler.syncMarkedText(client: client)
+        }
         XCTAssertEqual(client.inserted.last, "１２３４")
 
         // 再度 "1234" を入力して候補を確認 → 履歴に "１２３４" が出ないこと

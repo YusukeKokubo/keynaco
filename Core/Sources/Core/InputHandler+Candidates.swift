@@ -315,7 +315,8 @@ public extension InputHandler {
             historyEnd: layout.historyEnd,
             initialRow: layout.initialRow,
             fixedEnd: layout.fixedEnd,
-            zenzaiRow: zRow
+            zenzaiRow: zRow,
+            initialIsExplicitlySelected: trigger == .explicit
         )
     }
 }

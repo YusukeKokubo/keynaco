@@ -63,14 +63,14 @@ public struct CandidateSession: Sendable, Equatable {
         switch action {
         case .none:
             break
-        case .show(let cands, let he, let initial, let fe, let zRow):
+        case .show(let cands, let he, let initial, let fe, let zRow, let initialExplicit):
             candidates = cands
             isVisible = !cands.isEmpty
             selectedRow = cands.isEmpty ? 0 : min(initial, cands.count - 1)
             historyEnd = he
             fixedEnd = fe
             zenzaiRow = zRow
-            isExplicitlySelected = false
+            isExplicitlySelected = initialExplicit
         case .dismiss:
             reset()
         case .selectNext:

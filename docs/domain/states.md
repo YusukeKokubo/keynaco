@@ -43,6 +43,20 @@ stateDiagram-v2
     組成中 --> 候補選択中 : Space（候補窓表示 / 次候補）
 ```
 
+## キー処理パイプライン（候補・marked text）
+
+`InputHandler` はキー → `CandidateAction` のみ返す。IMK への marked text 反映と候補ウィンドウ更新は `InputController` に集約する。
+
+```mermaid
+flowchart LR
+    KD[keyDown] --> H[InputHandler.handle]
+    H --> CA[CandidateAction]
+    CA --> SA[candidateSession.apply]
+    SA --> MT[syncMarkedText]
+    SA --> CW[CandidateWindow]
+    MT --> IMK[IMK client]
+```
+
 ## 注意点
 
 - **`isAsciiMode` は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須

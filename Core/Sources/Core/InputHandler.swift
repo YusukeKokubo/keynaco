@@ -3,7 +3,14 @@ import AppKit
 /// 候補ウィンドウに対する操作指示
 public enum CandidateAction: Sendable {
     case none
-    case show(candidates: [String], historyEnd: Int, initialRow: Int, fixedEnd: Int, zenzaiRow: Int? = nil)
+    case show(
+        candidates: [String],
+        historyEnd: Int,
+        initialRow: Int,
+        fixedEnd: Int,
+        zenzaiRow: Int? = nil,
+        initialIsExplicitlySelected: Bool = false
+    )
     case dismiss
     case selectNext
     case selectPrev
@@ -13,9 +20,16 @@ public enum CandidateAction: Sendable {
 
 public extension CandidateAction {
     /// `.show` の連想値。それ以外は `nil`。
-    var showPayload: (candidates: [String], historyEnd: Int, initialRow: Int, fixedEnd: Int, zenzaiRow: Int?)? {
-        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let zenzaiRow) = self {
-            return (candidates, historyEnd, initialRow, fixedEnd, zenzaiRow)
+    var showPayload: (
+        candidates: [String],
+        historyEnd: Int,
+        initialRow: Int,
+        fixedEnd: Int,
+        zenzaiRow: Int?,
+        initialIsExplicitlySelected: Bool
+    )? {
+        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let zenzaiRow, let initialExplicit) = self {
+            return (candidates, historyEnd, initialRow, fixedEnd, zenzaiRow, initialExplicit)
         }
         return nil
     }
@@ -291,24 +305,21 @@ public struct InputHandler {
         diaryBuffer = ""
     }
 
-    /// 組成バッファと `candidateSession` の選択行から marked text を組み立てて反映する。
-    /// `InputController.applyCandidateEffects` は `CandidateSession.apply` の直後に呼ぶ。
+    /// 組成バッファと `candidateSession` の選択行から marked text を組み立てる。
+    /// IMK への反映は `InputController.applyCandidateEffects`（キー処理後）と
+    /// `syncMarkedTextToActiveClient`（候補 UI 削除などキー外）のみが呼ぶ。
     public func syncMarkedText(client: TextInputClient) {
         let session = candidateSession
         let text = MarkedTextSync.resolve(
             isBracketMode: isBracketMode,
             candidateVisible: session.isVisible,
+            isExplicitlySelected: session.isExplicitlySelected,
             composedHiragana: state.composedHiragana,
             pendingRomaji: state.pendingRomaji,
             composingText: state.composingText,
             selectedCandidate: session.selectedText
         )
         client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-    }
-
-    /// `syncMarkedText` の別名。組成入力の各所から呼ばれる。
-    public func applyMarkedText(client: TextInputClient) {
-        syncMarkedText(client: client)
     }
 
     public mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
@@ -322,14 +333,14 @@ public struct InputHandler {
             lastConfirmedContext = nil
         }
         guard handled else { return (false, .none) }
-        let action: CandidateAction = needsRefresh ? buildCandidateList() : .dismiss
-        applyMarkedText(client: client)
+        let trigger: CandidateListTrigger =
+            candidateSession.isVisible && !candidateSession.isExplicitlySelected ? .whileTyping : .explicit
+        let action: CandidateAction = needsRefresh ? buildCandidateList(trigger: trigger) : .dismiss
         return (true, action)
     }
 
     public mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         guard state.reset() else { return (false, .none) }
-        applyMarkedText(client: client)
         return (true, .dismiss)
     }
 }

@@ -9,6 +9,7 @@ final class MarkedTextSyncTests: XCTestCase {
         XCTAssertEqual(MarkedTextSync.resolve(
             isBracketMode: true,
             candidateVisible: true,
+            isExplicitlySelected: false,
             composedHiragana: "",
             pendingRomaji: "",
             composingText: "",
@@ -22,6 +23,7 @@ final class MarkedTextSyncTests: XCTestCase {
         XCTAssertEqual(MarkedTextSync.resolve(
             isBracketMode: false,
             candidateVisible: true,
+            isExplicitlySelected: false,
             composedHiragana: "",
             pendingRomaji: "",
             composingText: "",
@@ -29,12 +31,13 @@ final class MarkedTextSyncTests: XCTestCase {
         ), "東京")
     }
 
-    func testComposing_usesSelectedPlusPending() {
+    func testComposing_usesSelectedPlusPendingWhenExplicit() {
         XCTAssertFalse(MarkedTextSync.needsCandidateOnly(
             isBracketMode: false, candidateVisible: true, composedHiragana: "かん"))
         XCTAssertEqual(MarkedTextSync.resolve(
             isBracketMode: false,
             candidateVisible: true,
+            isExplicitlySelected: true,
             composedHiragana: "かん",
             pendingRomaji: "j",
             composingText: "かんj",
@@ -46,6 +49,7 @@ final class MarkedTextSyncTests: XCTestCase {
         XCTAssertEqual(MarkedTextSync.resolve(
             isBracketMode: false,
             candidateVisible: false,
+            isExplicitlySelected: false,
             composedHiragana: "かんじ",
             pendingRomaji: "",
             composingText: "かんじ",
@@ -53,10 +57,23 @@ final class MarkedTextSyncTests: XCTestCase {
         ), "かんじ")
     }
 
-    func testComposingWithCandidates_usesSelectedPlusPending() {
+    func testWhileTypingSuggest_keepsComposingHiragana() {
         XCTAssertEqual(MarkedTextSync.resolve(
             isBracketMode: false,
             candidateVisible: true,
+            isExplicitlySelected: false,
+            composedHiragana: "かんじ",
+            pendingRomaji: "",
+            composingText: "かんじ",
+            selectedCandidate: "漢字"
+        ), "かんじ")
+    }
+
+    func testExplicitSelection_followsCandidate() {
+        XCTAssertEqual(MarkedTextSync.resolve(
+            isBracketMode: false,
+            candidateVisible: true,
+            isExplicitlySelected: true,
             composedHiragana: "かんじ",
             pendingRomaji: "",
             composingText: "かんじ",

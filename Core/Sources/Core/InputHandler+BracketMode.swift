@@ -57,7 +57,6 @@ public extension InputHandler {
         switch keyCode {
         case KeyCode.escape, KeyCode.backspace:
             bracketCandidates = nil
-            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0))
             return (true, .dismiss)
 
         case KeyCode.enter:
@@ -117,7 +116,6 @@ public extension InputHandler {
             // 候補表示中の Space は次候補（リストの再構築はしない）。未吸収ローマ字だけ先に組み込む。
             if !state.pendingRomaji.isEmpty {
                 state.absorbPendingIntoComposed()
-                applyMarkedText(client: client)
                 return (true, buildCandidateList(trigger: .explicit))
             }
             return (true, .selectNext)

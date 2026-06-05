@@ -33,16 +33,22 @@ final class AzooKeyCacheTests: XCTestCase {
         client = MockTextClient()
     }
 
+    private func postHandle(_ result: (consumed: Bool, candidateAction: CandidateAction)) {
+        guard result.consumed else { return }
+        handler.candidateSession.apply(result.candidateAction)
+        handler.syncMarkedText(client: client)
+    }
+
     func press(keyCode: UInt16, candidateVisible: Bool = false) {
         let ctx = CandidateContext(isVisible: candidateVisible, selectedRow: 0, selectedText: nil)
-        _ = handler.handle(keyCode: keyCode, characters: nil, baseCharacters: nil,
-                           modifiers: [], candidate: ctx, client: client)
+        postHandle(handler.handle(keyCode: keyCode, characters: nil, baseCharacters: nil,
+                                  modifiers: [], candidate: ctx, client: client))
     }
 
     func type(chars: String) {
         let ctx = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
-        _ = handler.handle(keyCode: 0, characters: chars, baseCharacters: chars,
-                           modifiers: [], candidate: ctx, client: client)
+        postHandle(handler.handle(keyCode: 0, characters: chars, baseCharacters: chars,
+                                  modifiers: [], candidate: ctx, client: client))
     }
 
     // MARK: - AzooKey 呼び出し回数
@@ -65,8 +71,8 @@ final class AzooKeyCacheTests: XCTestCase {
 
         // ↓ キー（候補ウィンドウ表示中扱い）
         let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: nil)
-        _ = handler.handle(keyCode: KeyCode.downArrow, characters: nil, baseCharacters: nil,
-                           modifiers: [], candidate: ctx, client: client)
+        postHandle(handler.handle(keyCode: KeyCode.downArrow, characters: nil, baseCharacters: nil,
+                                  modifiers: [], candidate: ctx, client: client))
         XCTAssertEqual(mock.requestCount, countAfterInput,
                        "↓ キーで composedHiragana が変わらなければ AzooKey を再呼びしないはず")
     }

@@ -37,12 +37,20 @@ final class ZenzaiLeftContextTests: XCTestCase {
 
     // MARK: - ヘルパー
 
+    private func postHandle(_ result: (consumed: Bool, candidateAction: CandidateAction)) -> CandidateAction {
+        if result.consumed {
+            handler.candidateSession.apply(result.candidateAction)
+            handler.syncMarkedText(client: client)
+        }
+        return result.candidateAction
+    }
+
     @discardableResult
     private func typeChar(_ ch: Character) -> CandidateAction {
         let s = String(ch)
         let ctx = CandidateContext(isVisible: false, selectedRow: 0, selectedText: nil)
-        return handler.handle(keyCode: 0, characters: s, baseCharacters: s,
-                              modifiers: [], candidate: ctx, client: client).candidateAction
+        return postHandle(handler.handle(keyCode: 0, characters: s, baseCharacters: s,
+                                         modifiers: [], candidate: ctx, client: client))
     }
 
     private func typeRomaji(_ s: String) { s.forEach { typeChar($0) } }
@@ -50,8 +58,8 @@ final class ZenzaiLeftContextTests: XCTestCase {
     @discardableResult
     private func pressSpace(candidateVisible: Bool = false, selectedRow: Int = 0) -> CandidateAction {
         let ctx = CandidateContext(isVisible: candidateVisible, selectedRow: selectedRow, selectedText: nil)
-        return handler.handle(keyCode: 49, characters: " ", baseCharacters: " ",
-                              modifiers: [], candidate: ctx, client: client).candidateAction
+        return postHandle(handler.handle(keyCode: 49, characters: " ", baseCharacters: " ",
+                                        modifiers: [], candidate: ctx, client: client))
     }
 
     @discardableResult
@@ -59,8 +67,8 @@ final class ZenzaiLeftContextTests: XCTestCase {
                             selectedText: String? = nil) -> CandidateAction {
         let ctx = CandidateContext(isVisible: candidateVisible, selectedRow: selectedRow,
                                    selectedText: selectedText)
-        return handler.handle(keyCode: 36, characters: "\r", baseCharacters: "\r",
-                              modifiers: [], candidate: ctx, client: client).candidateAction
+        return postHandle(handler.handle(keyCode: 36, characters: "\r", baseCharacters: "\r",
+                                         modifiers: [], candidate: ctx, client: client))
     }
 
     // MARK: - テスト

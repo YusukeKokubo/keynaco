@@ -48,8 +48,10 @@ class InputHandlerTestCase: XCTestCase {
         selectedText: String? = nil
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         let ctx = CandidateContext(isVisible: candidateVisible, selectedRow: selectedRow, selectedText: selectedText)
-        return handler.handle(keyCode: 0, characters: chars, baseCharacters: base ?? chars,
-                               modifiers: modifiers, candidate: ctx, client: client)
+        let result = handler.handle(keyCode: 0, characters: chars, baseCharacters: base ?? chars,
+                                    modifiers: modifiers, candidate: ctx, client: client)
+        if result.consumed { applyCandidateAction(result.candidateAction) }
+        return result
     }
 
     @discardableResult
@@ -62,15 +64,35 @@ class InputHandlerTestCase: XCTestCase {
         isExplicitlySelected: Bool = false
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         let ctx = CandidateContext(isVisible: candidateVisible, selectedRow: selectedRow, selectedText: selectedText, isExplicitlySelected: isExplicitlySelected)
-        return handler.handle(keyCode: keyCode, characters: nil, baseCharacters: nil,
-                               modifiers: modifiers, candidate: ctx, client: client)
+        let result = handler.handle(keyCode: keyCode, characters: nil, baseCharacters: nil,
+                                    modifiers: modifiers, candidate: ctx, client: client)
+        if result.consumed { applyCandidateAction(result.candidateAction) }
+        return result
     }
 
     func typeRomaji(_ s: String) {
         for c in s { type(chars: String(c), base: String(c)) }
     }
 
-    /// `InputController.applyCandidateEffects` と同じく session 反映後に marked text を同期する。
+    /// `handler.handle` の直後に `applyCandidateAction` する。`type` / `press` 以外から `handle` を呼ぶテスト用。
+    @discardableResult
+    func handleAndApply(
+        keyCode: UInt16,
+        characters: String? = nil,
+        baseCharacters: String? = nil,
+        modifiers: NSEvent.ModifierFlags = [],
+        candidate: CandidateContext? = nil
+    ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        let ctx = candidate ?? handler.candidateSession.context
+        let result = handler.handle(
+            keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
+            modifiers: modifiers, candidate: ctx, client: client
+        )
+        if result.consumed { applyCandidateAction(result.candidateAction) }
+        return result
+    }
+
+    /// `InputController.applyCandidateEffects` と同じく session 反映後に常に marked text を同期する。
     @discardableResult
     func applyCandidateAction(_ action: CandidateAction) -> CandidateAction {
         handler.candidateSession.apply(action)

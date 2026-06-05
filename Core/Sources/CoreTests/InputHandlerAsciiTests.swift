@@ -81,8 +81,7 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
     func testFullWidthSymbolDoesNotConfirmCandidate() {
         type(chars: "a", base: "a")
         let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
-        _ = handler.handle(keyCode: 0, characters: "！", baseCharacters: "!",
-                           modifiers: [], candidate: ctx, client: client)
+        _ = handleAndApply(keyCode: 0, characters: "！", baseCharacters: "!", candidate: ctx)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "あ！")
     }

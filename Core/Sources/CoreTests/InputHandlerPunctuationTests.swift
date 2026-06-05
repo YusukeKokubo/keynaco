@@ -68,8 +68,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     func testPeriodDoesNotCommitSelectedCandidate() {
         type(chars: "a", base: "a")
         let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
-        _ = handler.handle(keyCode: 0, characters: ".", baseCharacters: ".",
-                           modifiers: [], candidate: ctx, client: client)
+        _ = handleAndApply(keyCode: 0, characters: ".", baseCharacters: ".", candidate: ctx)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "あ。")
     }
@@ -77,8 +76,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     func testCommaDoesNotCommitSelectedCandidate() {
         type(chars: "a", base: "a")
         let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
-        _ = handler.handle(keyCode: 0, characters: ",", baseCharacters: ",",
-                           modifiers: [], candidate: ctx, client: client)
+        _ = handleAndApply(keyCode: 0, characters: ",", baseCharacters: ",", candidate: ctx)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "あ、")
     }
@@ -173,8 +171,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     func testBracketEnterConfirmsSelection() {
         type(chars: "[", base: "[")
         let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: "「")
-        _ = handler.handle(keyCode: KeyCode.enter, characters: nil, baseCharacters: nil,
-                           modifiers: [], candidate: ctx, client: client)
+        _ = handleAndApply(keyCode: KeyCode.enter, candidate: ctx)
         XCTAssertEqual(client.inserted, ["「"])
         XCTAssertFalse(handler.isBracketMode)
     }
@@ -182,8 +179,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     func testBracketEscapeCancels() {
         type(chars: "[", base: "[")
         let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: "「")
-        _ = handler.handle(keyCode: KeyCode.escape, characters: nil, baseCharacters: nil,
-                           modifiers: [], candidate: ctx, client: client)
+        _ = handleAndApply(keyCode: KeyCode.escape, candidate: ctx)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "")
         XCTAssertFalse(handler.isBracketMode)
@@ -192,8 +188,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     func testBracketSelectionThenNextChar() {
         type(chars: "[", base: "[")
         let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "【")
-        _ = handler.handle(keyCode: 0, characters: "a", baseCharacters: "a",
-                           modifiers: [], candidate: ctx, client: client)
+        _ = handleAndApply(keyCode: 0, characters: "a", baseCharacters: "a", candidate: ctx)
         XCTAssertEqual(client.inserted, ["【"])
         XCTAssertEqual(client.markedText, "あ")
         XCTAssertFalse(handler.isBracketMode)
@@ -307,8 +302,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertTrue(handler.isBracketMode)
         let selectedBracket = "「"
         let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: selectedBracket)
-        _ = handler.handle(keyCode: KeyCode.f7, characters: nil, baseCharacters: nil,
-                           modifiers: [], candidate: ctx, client: client)
+        _ = handleAndApply(keyCode: KeyCode.f7, candidate: ctx)
         XCTAssertFalse(handler.isBracketMode, "F キー後は括弧モードが解除されるはず")
         XCTAssertEqual(client.inserted.last, selectedBracket, "選択中の括弧が挿入されるはず")
     }

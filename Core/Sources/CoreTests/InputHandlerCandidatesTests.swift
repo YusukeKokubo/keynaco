@@ -60,11 +60,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         assertMarkedText(first, "Space 後の marked text は選択行と一致するはず")
 
         let ctx = handler.candidateSession.context
-        let (_, downAction) = handler.handle(
-            keyCode: KeyCode.downArrow, characters: nil, baseCharacters: nil,
-            modifiers: [], candidate: ctx, client: client
-        )
-        applyCandidateAction(downAction)
+        let (_, downAction) = handleAndApply(keyCode: KeyCode.downArrow, candidate: ctx)
         guard let second = handler.candidateSession.selectedText else {
             XCTFail("↓ 後の選択行がない"); return
         }
@@ -247,15 +243,13 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         applyCandidateAction(handler.buildCandidateList(trigger: .whileTyping))
         let before = handler.candidateSession.candidates
         let ctx = handler.candidateSession.context
-        let (consumed, action) = handler.handle(
-            keyCode: KeyCode.space, characters: " ", baseCharacters: " ",
-            modifiers: [], candidate: ctx, client: client
+        let (consumed, action) = handleAndApply(
+            keyCode: KeyCode.space, characters: " ", baseCharacters: " ", candidate: ctx
         )
         XCTAssertTrue(consumed)
         guard case .selectNext = action else {
             XCTFail("候補表示中の Space は .selectNext のはず: \(action)"); return
         }
-        applyCandidateAction(action)
         XCTAssertEqual(handler.candidateSession.candidates, before,
                        "候補表示中の Space でリストを差し替えないはず")
     }
