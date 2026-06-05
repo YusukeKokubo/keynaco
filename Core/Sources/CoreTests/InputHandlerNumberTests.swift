@@ -61,13 +61,13 @@ final class InputHandlerNumberTests: XCTestCase {
                          modifiers: [], candidate: .hidden, client: client)
         }
         let action = h.buildCandidateList(autoShow: true)
-        guard case .show(let cands, _, _, _) = action else {
+        guard let payload = action.showPayload else {
             XCTFail("Expected .show for digit input")
             return
         }
-        XCTAssertTrue(cands.contains("１２３４"), "全角候補が含まれるはず: \(cands)")
-        XCTAssertTrue(cands.contains("1,234"), "桁区切り候補が含まれるはず: \(cands)")
-        XCTAssertTrue(cands.contains("１，２３４"), "全角桁区切り候補が含まれるはず: \(cands)")
+        XCTAssertTrue(payload.candidates.contains("１２３４"), "全角候補が含まれるはず: \(payload.candidates)")
+        XCTAssertTrue(payload.candidates.contains("1,234"), "桁区切り候補が含まれるはず: \(payload.candidates)")
+        XCTAssertTrue(payload.candidates.contains("１，２３４"), "全角桁区切り候補が含まれるはず: \(payload.candidates)")
     }
 
     func testNumberCandidatesNotRecordedInHistory() {
@@ -92,11 +92,11 @@ final class InputHandlerNumberTests: XCTestCase {
                                 modifiers: [], candidate: .hidden, client: client2)
         }
         let action = handler2.buildCandidateList(autoShow: true)
-        guard case .show(let cands, let historyEnd, _, let fixedEnd) = action else {
+        guard let payload = action.showPayload else {
             XCTFail("Expected .show"); return
         }
         // 履歴セクション（fixedEnd..<historyEnd）に "１２３４" が含まれないこと
-        let historySection = Array(cands[fixedEnd..<historyEnd])
+        let historySection = Array(payload.candidates[payload.fixedEnd..<payload.historyEnd])
         XCTAssertFalse(historySection.contains("１２３４"), "全角候補は履歴に記録されてはいけない: \(historySection)")
     }
 }

@@ -31,22 +31,22 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         handler.leftSideContext = "左文脈"
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, let fixedEnd) = action else {
+        guard let payload = action.showPayload else {
             XCTFail(".show を返すはず: \(action)"); return
         }
-        XCTAssertEqual(candidates[fixedEnd - 1], top1, "Zenzai top-1 が固定枠末尾")
-        XCTAssertGreaterThanOrEqual(fixedEnd, 1, "Zenzai top-1 昇格で fixedEnd は少なくとも1")
+        XCTAssertEqual(payload.candidates[payload.fixedEnd - 1], top1, "Zenzai top-1 が固定枠末尾")
+        XCTAssertGreaterThanOrEqual(payload.fixedEnd, 1, "Zenzai top-1 昇格で fixedEnd は少なくとも1")
     }
 
     func testZenzaiPromotedRowIsBelowFixedEndForShiftDelete() {
         handler.leftSideContext = "ctx"
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
-        guard case .show(_, _, _, let fixedEnd) = action else {
+        guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        let promotedRow = fixedEnd - 1
-        XCTAssertLessThan(promotedRow, fixedEnd, "プロモート行は Shift+Delete 可能帯の外（index < fixedEnd）")
+        let promotedRow = payload.fixedEnd - 1
+        XCTAssertLessThan(promotedRow, payload.fixedEnd, "プロモート行は Shift+Delete 可能帯の外（index < fixedEnd）")
     }
 
     func testZenzaiPromotedTop1SingleOccurrenceAsideFromHistoryDup() {
@@ -54,10 +54,10 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         handler.leftSideContext = "ctx"
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _) = action else {
+        guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(candidates.filter { $0 == top1 }.count, 1, "辞書ブロックに top-1 が重複して現れない")
+        XCTAssertEqual(payload.candidates.filter { $0 == top1 }.count, 1, "辞書ブロックに top-1 が重複して現れない")
     }
 
     /// 高スコア履歴に読みと同じひらがながあるとき、Zenzai top-1 よりそちらを初期選択する。
@@ -68,12 +68,12 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         handler.db.record(input: "したい", output: "したい時に")
         typeRomaji("shitai")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _) = action else {
+        guard let payload = action.showPayload else {
             XCTFail(".show を返すはず: \(action)"); return
         }
-        XCTAssertTrue(candidates.contains("士大夫"), "Zenzai top-1 は候補に残る: \(candidates)")
-        XCTAssertEqual(candidates[initialRow], "したい", "履歴のひらがな一致が Zenzai より初期選択")
-        XCTAssertNotEqual(candidates[initialRow], "士大夫")
+        XCTAssertTrue(payload.candidates.contains("士大夫"), "Zenzai top-1 は候補に残る: \(payload.candidates)")
+        XCTAssertEqual(payload.candidates[payload.initialRow], "したい", "履歴のひらがな一致が Zenzai より初期選択")
+        XCTAssertNotEqual(payload.candidates[payload.initialRow], "士大夫")
     }
 
 }

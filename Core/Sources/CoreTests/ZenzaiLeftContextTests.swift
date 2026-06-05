@@ -70,13 +70,13 @@ final class ZenzaiLeftContextTests: XCTestCase {
         handler.leftSideContext = ""
         typeRomaji("kaisai")
         let action = pressSpace()
-        guard case .show(let candidates, _, _, let fixedEnd) = action else {
+        guard let payload = action.showPayload else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 0, "左文脈なし: fixedCount=0, Zenzai未発火 → fixedEnd=0")
-        XCTAssertEqual(candidates[0], "開催", "辞書先頭候補が row 0")
-        XCTAssertEqual(candidates[1], "快哉", "辞書2番目候補が row 1")
-        XCTAssertNil(handler.lastZenzaiRow, "Zenzai 未発火なので lastZenzaiRow は nil")
+        XCTAssertEqual(payload.fixedEnd, 0, "左文脈なし: fixedCount=0, Zenzai未発火 → fixedEnd=0")
+        XCTAssertEqual(payload.candidates[0], "開催", "辞書先頭候補が row 0")
+        XCTAssertEqual(payload.candidates[1], "快哉", "辞書2番目候補が row 1")
+        XCTAssertNil(handler.candidateSession.zenzaiRow, "Zenzai 未発火なので zenzaiRow は nil")
     }
 
     /// 左文脈あり: Zenzai top-1 が固定枠に昇格 → fixedEnd = 3
@@ -84,11 +84,11 @@ final class ZenzaiLeftContextTests: XCTestCase {
         handler.leftSideContext = "東京で"
         typeRomaji("kaisai")
         let action = pressSpace()
-        guard case .show(let candidates, _, _, let fixedEnd) = action else {
+        guard let payload = action.showPayload else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 1, "左文脈あり: Zenzai top-1 昇格で fixedEnd = 1 のはず")
-        XCTAssertEqual(candidates[0], "開催", "Zenzai top-1 が row 0 に昇格するはず")
+        XCTAssertEqual(payload.fixedEnd, 1, "左文脈あり: Zenzai top-1 昇格で fixedEnd = 1 のはず")
+        XCTAssertEqual(payload.candidates[0], "開催", "Zenzai top-1 が row 0 に昇格するはず")
     }
 
     /// sessionTextBuffer から leftSideContext を構築するフロー。
@@ -103,11 +103,11 @@ final class ZenzaiLeftContextTests: XCTestCase {
 
         typeRomaji("kaisai")
         let action = pressSpace()
-        guard case .show(let candidates, _, _, let fixedEnd) = action else {
+        guard let payload = action.showPayload else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(fixedEnd, 1, "sessionTextBuffer 由来の左文脈で Zenzai 発火 → fixedEnd = 1")
-        XCTAssertEqual(candidates[0], "開催", "Zenzai top-1「開催」が row 0 に昇格するはず")
+        XCTAssertEqual(payload.fixedEnd, 1, "sessionTextBuffer 由来の左文脈で Zenzai 発火 → fixedEnd = 1")
+        XCTAssertEqual(payload.candidates[0], "開催", "Zenzai top-1「開催」が row 0 に昇格するはず")
     }
 
     func testSessionBufferPersistsAcrossSentenceBoundary() {

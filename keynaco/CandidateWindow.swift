@@ -1,4 +1,5 @@
 import Cocoa
+import KeynacoCore
 
 // MARK: - セル用のカスタムビュー
 
@@ -133,11 +134,44 @@ final class CandidateWindow: NSPanel {
 
     // MARK: - Public API
 
-    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, fixedSectionEnd: Int? = nil, zenzaiRow: Int? = nil, near rect: NSRect) {
+    /// 位置を変えずリスト・選択だけ更新（削除ボタン等）。
+    func refreshFrom(session: CandidateSession) {
+        guard session.isVisible, !session.candidates.isEmpty else {
+            dismiss()
+            return
+        }
+        candidates = session.candidates
+        historySectionEnd = session.historyEnd
+        fixedRowCount = session.fixedEnd
+        selectedRow = session.selectedRow
+        isExplicitlySelected = session.isExplicitlySelected
+        zenzaiRowIndex = session.zenzaiRow
+        tableView.reloadData()
+        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
+    }
+
+    /// `CandidateSession` の内容をパネルに反映する。非表示なら `dismiss`。
+    func present(session: CandidateSession, near rect: NSRect) {
+        guard session.isVisible, !session.candidates.isEmpty else {
+            dismiss()
+            return
+        }
+        show(
+            candidates: session.candidates,
+            historySectionEnd: session.historyEnd,
+            initialRow: session.selectedRow,
+            fixedSectionEnd: session.fixedEnd,
+            zenzaiRow: session.zenzaiRow,
+            isExplicitlySelected: session.isExplicitlySelected,
+            near: rect
+        )
+    }
+
+    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, fixedSectionEnd: Int? = nil, zenzaiRow: Int? = nil, isExplicitlySelected: Bool = false, near rect: NSRect) {
         self.candidates = candidates
         self.historySectionEnd = historySectionEnd
         self.selectedRow = candidates.isEmpty ? 0 : min(initialRow, candidates.count - 1)
-        self.isExplicitlySelected = false
+        self.isExplicitlySelected = isExplicitlySelected
         self.fixedRowCount = fixedSectionEnd ?? initialRow
         self.zenzaiRowIndex = zenzaiRow
         tableView.reloadData()
@@ -183,6 +217,15 @@ final class CandidateWindow: NSPanel {
         fixedRowCount = 0
         historySectionEnd = 0
         zenzaiRowIndex = nil
+    }
+
+    /// `CandidateSession.apply(.selectNext/.selectPrev)` 後に選択行だけ同期する（ウィンドウ位置は変えない）。
+    func syncSelection(from session: CandidateSession) {
+        guard session.isVisible, !session.candidates.isEmpty else { return }
+        selectedRow = session.selectedRow
+        isExplicitlySelected = session.isExplicitlySelected
+        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
+        tableView.scrollRowToVisible(selectedRow)
     }
 
     func selectNext() {

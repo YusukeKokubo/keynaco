@@ -16,7 +16,7 @@ extension DebugSocketServer {
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
     }
     InputHandler.isAsciiMode = false
-    candidateWindow = DebugCandidateWindow()
+    handler.candidateSession.reset()
     mockClient.reset()
     debugLeftContextOverride = nil
     IMESandboxWindow.shared.clearSandbox()
@@ -453,7 +453,7 @@ extension DebugSocketServer {
     characters: chars,
     baseCharacters: base,
     modifiers: mods,
-    candidate: candidateWindow.context,
+    candidate: handler.candidateSession.context,
     client: mockClient
     )
     if keyCode == KeyCode.backspace, !consumed {
@@ -535,12 +535,21 @@ extension DebugSocketServer {
 
     /// `InputController.applyPostKeyDownEffects` の候補ウィンドウ副作用を模倣する。
     func applyCandidateAction(_ action: CandidateAction) {
-        candidateWindow.apply(action: action)
+        switch action {
+        case .deleteSelected:
+            if let text = handler.candidateSession.selectedText {
+                handler.db.deleteHistory(output: text)
+            }
+            handler.candidateSession.apply(action)
+        default:
+            handler.candidateSession.apply(action)
+        }
+        let session = handler.candidateSession
         switch action {
         case .show:
             if MarkedTextSync.needsCandidateOnly(
                 isBracketMode: handler.isBracketMode,
-                candidateVisible: candidateWindow.isVisible,
+                candidateVisible: session.isVisible,
                 composedHiragana: handler.state.composedHiragana
             ) {
                 syncMarkedTextForDebug()
@@ -553,13 +562,14 @@ extension DebugSocketServer {
     }
 
     func syncMarkedTextForDebug() {
+        let session = handler.candidateSession
         let text = MarkedTextSync.resolve(
             isBracketMode: handler.isBracketMode,
-            candidateVisible: candidateWindow.isVisible,
+            candidateVisible: session.isVisible,
             composedHiragana: handler.state.composedHiragana,
             pendingRomaji: handler.state.pendingRomaji,
             composingText: handler.state.composingText,
-            selectedCandidate: candidateWindow.selectedText
+            selectedCandidate: session.selectedText
         )
         mockClient.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }

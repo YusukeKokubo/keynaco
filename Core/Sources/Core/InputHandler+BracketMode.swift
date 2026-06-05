@@ -118,8 +118,8 @@ public extension InputHandler {
                 state.absorbPendingIntoComposed()
                 let action = buildCandidateList(autoShow: false)
                 applyMarkedText(client: client)
-                if case .show(let candidates, let historyEnd, _, _) = action {
-                    if isHiraganaPreferred(state.composedHiragana) || candidates.count > historyEnd {
+                if let payload = action.showPayload {
+                    if isHiraganaPreferred(state.composedHiragana) || payload.candidates.count > payload.historyEnd {
                         return (true, action)
                     }
                 }

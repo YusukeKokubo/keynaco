@@ -3,12 +3,22 @@ import AppKit
 /// 候補ウィンドウに対する操作指示
 public enum CandidateAction: Sendable {
     case none
-    case show(candidates: [String], historyEnd: Int, initialRow: Int, fixedEnd: Int)
+    case show(candidates: [String], historyEnd: Int, initialRow: Int, fixedEnd: Int, zenzaiRow: Int? = nil)
     case dismiss
     case selectNext
     case selectPrev
     case deleteSelected
     case replaceCandidates([String])
+}
+
+public extension CandidateAction {
+    /// `.show` の連想値。それ以外は `nil`。
+    var showPayload: (candidates: [String], historyEnd: Int, initialRow: Int, fixedEnd: Int, zenzaiRow: Int?)? {
+        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let zenzaiRow) = self {
+            return (candidates, historyEnd, initialRow, fixedEnd, zenzaiRow)
+        }
+        return nil
+    }
 }
 
 public struct CandidateContext: Sendable {
@@ -95,9 +105,13 @@ public struct InputHandler {
     public static let readingPunctuations: Set<String> = ["、", "・", "…"]
 
     public var state = CompositionState()
+    public var candidateSession = CandidateSession()
     public var ignoreNextModeSwitch = false
-    public var bracketCandidates: [String]? = nil
-    public var isBracketMode: Bool { bracketCandidates != nil }
+    public var bracketCandidates: [String]? {
+        get { candidateSession.bracketCandidates }
+        set { candidateSession.bracketCandidates = newValue }
+    }
+    public var isBracketMode: Bool { candidateSession.isBracketMode }
     /// 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。
     /// 不変条件: Backspace 以外のキー入力・ペナルティ実行後は `nil`。
     public var lastConfirmedContext: LastConfirmedContext? = nil
@@ -111,8 +125,6 @@ public struct InputHandler {
     public var leftSideContext: String = ""
     /// AzooKey API 用（空文字は `nil`）
     public var azooKeyLeftContext: String? { leftSideContext.isEmpty ? nil : leftSideContext }
-    /// Zenzai がプロモートした候補の行インデックス。文脈なし・Zenzai 無効時は `nil`。
-    public var lastZenzaiRow: Int? = nil
     public var committedHistory: [String] = []
     /// Zenzai 左文脈用のセッションバッファ（上限 50 字・文末でリセットしない）。
     public var sessionTextBuffer: String = ""

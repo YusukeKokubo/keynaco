@@ -12,15 +12,8 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
     nonisolated(unsafe) private var zenzaiSettingsObserver: NSObjectProtocol?
     nonisolated(unsafe) private var hiraganaPreferredObserver: NSObjectProtocol?
-    static let candidateWindow: CandidateWindow = {
-        let w = CandidateWindow(
-            contentRect: .zero, styleMask: [.borderless],
-            backing: .buffered, defer: true
-        )
-        return w
-    }()
 
-    var candidateWindow: CandidateWindow { Self.candidateWindow }
+    private var candidateWindow: CandidateWindow!
 
     /// `composedHiragana` が空→非空になったタイミングで `SurroundingIMKContext.fetch` 済み。`selectedRange().location` が一致するときだけ LLM 文脈に使う（Space 再取得は location 無効化で代替）。
     var cachedSurroundingContext: (location: Int, text: (before: String, after: String))?
@@ -29,10 +22,16 @@ class InputController: IMKInputController, @unchecked Sendable {
         super.init(server: server, delegate: delegate, client: inputClient)
         let ic = self
         MainActor.assumeIsolated {
+            ic.candidateWindow = CandidateWindow(
+                contentRect: .zero, styleMask: [.borderless],
+                backing: .buffered, defer: true
+            )
             ic.candidateWindow.onDelete = { [weak ic] (text: String, row: Int) in
                 MainActor.assumeIsolated {
-                    ic?.handler.db.deleteHistory(output: text)
-                    ic?.candidateWindow.removeCandidate(at: row)
+                    guard let ic else { return }
+                    ic.handler.db.deleteHistory(output: text)
+                    ic.handler.candidateSession.removeCandidate(at: row)
+                    ic.candidateWindow.refreshFrom(session: ic.handler.candidateSession)
                 }
             }
         }
@@ -106,6 +105,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.cachedSurroundingContext = nil
             ic.handler.leftSideContext = ""
             ic.handler.ignoreNextModeSwitch = true
+            ic.handler.candidateSession.reset()
             ic.candidateWindow.dismiss()
         }
     }
@@ -116,40 +116,44 @@ class InputController: IMKInputController, @unchecked Sendable {
         super.deactivateServer(sender)
     }
 
+    /// `handler.handle` の戻り `CandidateAction` を `candidateSession` に反映し、パネル・marked text を更新する。
+    @MainActor
+    private func applyCandidateEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
+        switch action {
+        case .deleteSelected:
+            if let text = handler.candidateSession.selectedText {
+                handler.db.deleteHistory(output: text)
+            }
+            handler.candidateSession.apply(action)
+        default:
+            handler.candidateSession.apply(action)
+        }
+
+        switch action {
+        case .none, .deleteSelected:
+            break
+        case .dismiss:
+            candidateWindow.dismiss()
+        case .selectNext, .selectPrev:
+            candidateWindow.syncSelection(from: handler.candidateSession)
+            syncMarkedText(client: adapter)
+        case .show, .replaceCandidates:
+            candidateWindow.present(session: handler.candidateSession, near: adapter.cursorRect())
+            if needsCandidateOnlyMarkedText {
+                syncMarkedText(client: adapter)
+            }
+        }
+    }
+
     /// `handle` 内の `handler.handle` 成功後、候補ウィンドウ更新・周辺文脈・LLM 補助・誤変換のスケジュールまでを一括で行う。
     @MainActor
     private func applyPostKeyDownEffects(
         action: CandidateAction,
         adapter: IMKTextInputAdapter,
         composedHiraganaWasEmpty: Bool,
-        composingWasEmpty: Bool,
         imkSenderForSurrounding: Any?
     ) {
-        switch action {
-        case .none:
-            break
-        case .show(let candidates, let historyEnd, let initialRow, let fixedEnd):
-            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
-            if needsCandidateOnlyMarkedText {
-                syncMarkedText(client: adapter)
-            }
-        case .dismiss:
-            candidateWindow.dismiss()
-        case .selectNext:
-            candidateWindow.selectNext()
-            syncMarkedText(client: adapter)
-        case .selectPrev:
-            candidateWindow.selectPrev()
-            syncMarkedText(client: adapter)
-        case .deleteSelected:
-            let row = candidateWindow.selectedRow
-            if let text = candidateWindow.selectedText() {
-                handler.db.deleteHistory(output: text)
-                candidateWindow.removeCandidate(at: row)
-            }
-        case .replaceCandidates(let candidates):
-            candidateWindow.replaceCandidates(candidates)
-        }
+        applyCandidateEffects(action: action, adapter: adapter)
 
         if handler.documentSurroundingContextInvalidated {
             cachedSurroundingContext = nil
@@ -173,7 +177,36 @@ class InputController: IMKInputController, @unchecked Sendable {
                 reading: handler.lastCommittedReading ?? ""
             )
         }
+    }
 
+    @MainActor
+    private func runKeyDown(
+        keyCode: UInt16,
+        characters: String?,
+        baseCharacters: String?,
+        modifiers: NSEvent.ModifierFlags,
+        adapter: IMKTextInputAdapter,
+        imkSenderForSurrounding: Any?
+    ) -> Bool {
+        handler.currentAppBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        handler.leftSideContext = resolvedLLMDocumentContextPrefix(adapter: adapter)
+        let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
+        let ctx = handler.candidateSession.context
+        let (consumed, action) = handler.handle(
+            keyCode: keyCode,
+            characters: characters,
+            baseCharacters: baseCharacters,
+            modifiers: modifiers,
+            candidate: ctx,
+            client: adapter
+        )
+        applyPostKeyDownEffects(
+            action: action,
+            adapter: adapter,
+            composedHiraganaWasEmpty: composedHiraganaWasEmpty,
+            imkSenderForSurrounding: imkSenderForSurrounding
+        )
+        return consumed
     }
 
     // MARK: - イベントハンドリング
@@ -197,81 +230,39 @@ class InputController: IMKInputController, @unchecked Sendable {
 
         let adapter = IMKTextInputAdapter(sender)
         let ic: InputController = self
-        // IMK の `handle` は nonisolated。候補ウィンドウ操作は従来どおり MainActor 前提（assumeIsolated はメイン以外では実行時クラッシュしうる）。
-        // `sender` / `self` は IMK ブリッジ上 nonisolated から MainActor 島へ渡すため nonisolated(unsafe) とする（Swift 6 sending）。
         nonisolated(unsafe) let imkSenderForSurrounding: Any? = sender
 
-        // @MainActor アクセス（candidateWindow・handler）を assumeIsolated に集約。ステータス通知は島から値を返し DispatchQueue.main.async で投稿する。
         #if DEBUG
         let (consumed, imeStateSnapshot) = MainActor.assumeIsolated {
-            let frontBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            ic.handler.currentAppBundleID = frontBundleID
-            let ctx = CandidateContext(
-                isVisible: ic.candidateWindow.isVisible,
-                selectedRow: ic.candidateWindow.selectedRow,
-                selectedText: ic.candidateWindow.selectedText(),
-                isExplicitlySelected: ic.candidateWindow.isExplicitlySelected,
-                historyEnd: ic.candidateWindow.historySectionEnd,
-                fixedEnd: ic.candidateWindow.fixedRowCount
-            )
-            ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
-            let composingWasEmpty = ic.handler.state.composingText.isEmpty
-            let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
-            let (consumed, action) = ic.handler.handle(
+            let consumed = ic.runKeyDown(
                 keyCode: keyCode,
                 characters: characters,
                 baseCharacters: baseCharacters,
                 modifiers: modifiers,
-                candidate: ctx,
-                client: adapter
-            )
-            ic.applyPostKeyDownEffects(
-                action: action,
                 adapter: adapter,
-                composedHiraganaWasEmpty: composedHiraganaWasEmpty,
-                composingWasEmpty: composingWasEmpty,
                 imkSenderForSurrounding: imkSenderForSurrounding
             )
             var snap = ic.handler.snapshot(markedText: adapter.lastMarkedText)
-            snap.candidateVisible = ic.candidateWindow.isVisible
-            snap.selectedRow = ic.candidateWindow.selectedRow
-            snap.selectedText = ic.candidateWindow.selectedText()
-            snap.isExplicitlySelected = ic.candidateWindow.isExplicitlySelected
-            snap.historyEnd = ic.candidateWindow.historySectionEnd
-            snap.fixedEnd = ic.candidateWindow.fixedRowCount
-            snap.candidates = Array(ic.candidateWindow.candidates.prefix(30))
+            let session = ic.handler.candidateSession
+            snap.candidateVisible = session.isVisible
+            snap.selectedRow = session.selectedRow
+            snap.selectedText = session.selectedText
+            snap.isExplicitlySelected = session.isExplicitlySelected
+            snap.historyEnd = session.historyEnd
+            snap.fixedEnd = session.fixedEnd
+            snap.candidates = Array(session.candidates.prefix(30))
             return (consumed, snap)
         }
         #else
         let consumed = MainActor.assumeIsolated {
-            let ctx = CandidateContext(
-                isVisible: ic.candidateWindow.isVisible,
-                selectedRow: ic.candidateWindow.selectedRow,
-                selectedText: ic.candidateWindow.selectedText(),
-                isExplicitlySelected: ic.candidateWindow.isExplicitlySelected,
-                historyEnd: ic.candidateWindow.historySectionEnd,
-                fixedEnd: ic.candidateWindow.fixedRowCount
-            )
-            ic.handler.currentAppBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            ic.handler.leftSideContext = ic.resolvedLLMDocumentContextPrefix(adapter: adapter)
-            let composingWasEmpty = ic.handler.state.composingText.isEmpty
-            let composedHiraganaWasEmpty = ic.handler.state.composedHiragana.isEmpty
-            let (consumed, action) = ic.handler.handle(
+            ic.runKeyDown(
                 keyCode: keyCode,
                 characters: characters,
                 baseCharacters: baseCharacters,
                 modifiers: modifiers,
-                candidate: ctx,
-                client: adapter
-            )
-            ic.applyPostKeyDownEffects(
-                action: action,
                 adapter: adapter,
-                composedHiraganaWasEmpty: composedHiraganaWasEmpty,
-                composingWasEmpty: composingWasEmpty,
                 imkSenderForSurrounding: imkSenderForSurrounding
             )
-            return consumed
         }
         #endif
         DispatchQueue.main.async {
@@ -292,23 +283,14 @@ class InputController: IMKInputController, @unchecked Sendable {
         let adapter = IMKTextInputAdapter(sender)
         let ic = self
         MainActor.assumeIsolated {
-            // 候補表示中で組成がない場合は system-triggered commit をスキップ
-            // (insertText の副作用で system が commitComposition を呼ぶことがある)
+            let session = ic.handler.candidateSession
             guard !(
-                ic.candidateWindow.isVisible
+                session.isVisible
                     && ic.handler.state.composedHiragana.isEmpty
-                    && !ic.handler.isBracketMode
+                    && !session.isBracketMode
             ) else { return }
-            let ctx = CandidateContext(
-                isVisible: ic.candidateWindow.isVisible,
-                selectedRow: ic.candidateWindow.selectedRow,
-                selectedText: ic.candidateWindow.selectedText(),
-                isExplicitlySelected: ic.candidateWindow.isExplicitlySelected,
-                historyEnd: ic.candidateWindow.historySectionEnd,
-                fixedEnd: ic.candidateWindow.fixedRowCount
-            )
-            ic.handler.commitComposition(client: adapter, candidate: ctx)
-            ic.handler.bracketCandidates = nil
+            ic.handler.commitComposition(client: adapter, candidate: session.context)
+            ic.handler.candidateSession.reset()
             ic.cachedSurroundingContext = nil
             ic.handler.leftSideContext = ""
             ic.candidateWindow.dismiss()
@@ -317,26 +299,23 @@ class InputController: IMKInputController, @unchecked Sendable {
 
     // MARK: - プライベートヘルパー
 
-    /// 括弧モード、または組成ひらがななしで候補のみ表示するとき。
-    /// `applyMarkedText` は `composingText` のみ載せるため、ここで選択候補を marked text に載せ直す。
     private var needsCandidateOnlyMarkedText: Bool {
         MarkedTextSync.needsCandidateOnly(
             isBracketMode: handler.isBracketMode,
-            candidateVisible: candidateWindow.isVisible,
+            candidateVisible: handler.candidateSession.isVisible,
             composedHiragana: handler.state.composedHiragana
         )
     }
 
-    /// 候補ウィンドウの選択状態と組成文字列を IMK marked text に反映する。
-    /// 打鍵中の組成更新は `InputHandler.applyMarkedText`、候補ウィンドウ操作後は本関数。
     private func syncMarkedText(client: TextInputClient) {
+        let session = handler.candidateSession
         let text = MarkedTextSync.resolve(
             isBracketMode: handler.isBracketMode,
-            candidateVisible: candidateWindow.isVisible,
+            candidateVisible: session.isVisible,
             composedHiragana: handler.state.composedHiragana,
             pendingRomaji: handler.state.pendingRomaji,
             composingText: handler.state.composingText,
-            selectedCandidate: candidateWindow.selectedText()
+            selectedCandidate: session.selectedText
         )
         client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }

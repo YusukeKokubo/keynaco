@@ -23,16 +23,14 @@ public extension InputHandler {
             autoShow: autoShow,
             readingOverride: reading
         )
-        let action = assembleCandidateList(from: sources, autoShow: autoShow)
-        lastZenzaiRow = resolveZenzaiRow(action: action, zenzaiPromoted: sources.zenzaiPromoted)
+        let action = assembleCandidateList(from: sources, autoShow: autoShow, zenzaiPromoted: sources.zenzaiPromoted)
         return action
     }
 
     /// 候補リスト中の Zenzai top-1 行を特定する。`assembleCandidateList` の副作用ではなく
     /// その結果から事後計算することで、リスト構築ロジックを純粋に保つ。
-    private func resolveZenzaiRow(action: CandidateAction, zenzaiPromoted: String?) -> Int? {
+    private func resolveZenzaiRow(candidates: [String], zenzaiPromoted: String?) -> Int? {
         guard let top1 = zenzaiPromoted,
-              case .show(let candidates, _, _, _) = action,
               let idx = candidates.firstIndex(of: top1) else { return nil }
         return idx
     }
@@ -254,7 +252,11 @@ public extension InputHandler {
         return sections
     }
 
-    private func assembleCandidateList(from sources: CandidateListSources, autoShow: Bool) -> CandidateAction {
+    private func assembleCandidateList(
+        from sources: CandidateListSources,
+        autoShow: Bool,
+        zenzaiPromoted: String?
+    ) -> CandidateAction {
         let h = sources.h
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
@@ -307,11 +309,16 @@ public extension InputHandler {
             return .dismiss
         }
 
+        let zRow = resolveZenzaiRow(
+            candidates: layout.candidates,
+            zenzaiPromoted: zenzaiPromoted
+        )
         return .show(
             candidates: layout.candidates,
             historyEnd: layout.historyEnd,
             initialRow: layout.initialRow,
-            fixedEnd: layout.fixedEnd
+            fixedEnd: layout.fixedEnd,
+            zenzaiRow: zRow
         )
     }
 }

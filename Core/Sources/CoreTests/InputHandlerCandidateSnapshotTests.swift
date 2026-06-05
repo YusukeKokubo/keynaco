@@ -22,13 +22,13 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         candidates: [String], historyEnd: Int, fixedEnd: Int, initialRow: Int,
         file: StaticString = #file, line: UInt = #line
     ) {
-        guard case .show(let c, let h, let r, let f) = action else {
+        guard let p = action.showPayload else {
             XCTFail("Expected .show but got \(action)", file: file, line: line); return
         }
-        XCTAssertEqual(c, candidates, "candidates", file: file, line: line)
-        XCTAssertEqual(h, historyEnd, "historyEnd", file: file, line: line)
-        XCTAssertEqual(f, fixedEnd, "fixedEnd", file: file, line: line)
-        XCTAssertEqual(r, initialRow, "initialRow", file: file, line: line)
+        XCTAssertEqual(p.candidates, candidates, "candidates", file: file, line: line)
+        XCTAssertEqual(p.historyEnd, historyEnd, "historyEnd", file: file, line: line)
+        XCTAssertEqual(p.fixedEnd, fixedEnd, "fixedEnd", file: file, line: line)
+        XCTAssertEqual(p.initialRow, initialRow, "initialRow", file: file, line: line)
     }
 
     // MARK: - A: 基本ケース（固定セクションなし）
@@ -277,16 +277,16 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub(["今日", "本日"]))
         typeRomaji("kyou")
         let action = handler.buildCandidateList()
-        guard case .show(let cands, let hEnd, _, _) = action else {
+        guard let p = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
         let expectedDates = InputHandler.generateDateTimeCandidates(for: "きょう")
         XCTAssertFalse(expectedDates.isEmpty, "日時候補が生成されるはず")
-        XCTAssertEqual(hEnd, 0, "履歴なしなら historyEnd=0")
-        XCTAssertEqual(Array(cands[0..<expectedDates.count]), expectedDates,
-                       "日時候補が先頭（historyEnd=0 の位置）から並ぶはず: \(cands)")
-        XCTAssertEqual(Array(cands.suffix(3)), ["今日", "本日", "キョウ"],
-                       "AzooKey 候補は日時候補の後ろ・カタカナは末尾: \(cands)")
+        XCTAssertEqual(p.historyEnd, 0, "履歴なしなら historyEnd=0")
+        XCTAssertEqual(Array(p.candidates[0..<expectedDates.count]), expectedDates,
+                       "日時候補が先頭（historyEnd=0 の位置）から並ぶはず: \(p.candidates)")
+        XCTAssertEqual(Array(p.candidates.suffix(3)), ["今日", "本日", "キョウ"],
+                       "AzooKey 候補は日時候補の後ろ・カタカナは末尾: \(p.candidates)")
     }
 
     // MARK: - H: autoShow

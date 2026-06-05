@@ -100,11 +100,11 @@ class InputHandlerTestCase: XCTestCase {
         in action: CandidateAction, _ msg: String = "",
         file: StaticString = #file, line: UInt = #line
     ) -> [String]? {
-        guard case .show(let candidates, _, _, _) = action else {
+        guard let payload = action.showPayload else {
             XCTFail("Expected .show but got \(action). \(msg)", file: file, line: line)
             return nil
         }
-        return candidates
+        return payload.candidates
     }
 
     func assertDismiss(

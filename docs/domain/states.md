@@ -10,7 +10,7 @@
 | **待機** | `isAsciiMode = false`、組成空、特殊モードなし |
 | **組成中** | `composedHiragana` または `pendingRomaji` が非空 |
 | **候補選択中** | 組成中 + `isExplicitlySelected = true`（↑↓ 操作済み）|
-| **括弧モード** | `bracketCandidates != nil`（組成空で `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを入力） |
+| **括弧モード** | `CandidateSession.bracketCandidates != nil`（`InputHandler.candidateSession`。組成空で `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを入力） |
 
 ## 状態遷移図
 

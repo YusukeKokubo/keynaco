@@ -22,7 +22,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
 | `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 6 ファイル。ユーザー辞書・ひらがな優先・変換履歴・Zenzai の 4 タブ） |
 | `keynaco/Resources/` | バンドルリソース（`zenz-v3.2-small-gguf/` = Zenzai モデル git submodule） |
-| `keynaco/Debug/` | デバッグ用ツール（`DebugSocketServer`・`DebugCandidateWindow`・`IMESandboxWindow`・`SocketMockClient` 等、本番動作には影響しない） |
+| `keynaco/Debug/` | デバッグ用ツール（`DebugSocketServer`・`IMESandboxWindow`・`SocketMockClient` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
 | `Core/Sources/Core/` | `KeynacoCore` の実装（`InputHandler` 等） |
 | `Core/Sources/CoreTests/` | `KeynacoCore` のユニットテスト（XCTest） |

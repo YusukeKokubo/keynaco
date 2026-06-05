@@ -95,10 +95,10 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         press(keyCode: 53)  // Escape で候補ウィンドウを閉じる
         typeRomaji("toukyou")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, let historyEnd, _, _) = action else {
+        guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertTrue(candidates.prefix(historyEnd).contains("東京"),
+        XCTAssertTrue(payload.candidates.prefix(payload.historyEnd).contains("東京"),
                       "前回確定した「東京」が次回変換で履歴候補として現れるはず")
     }
 

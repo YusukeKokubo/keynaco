@@ -26,7 +26,6 @@ final class DebugSocketServer: @unchecked Sendable {
     /// 本番 InputController の変換 converter とロック競合しないよう Debug 専用インスタンスを使う。
     let posLookupConverter = AzooKeyConverter()
     let mockClient = SocketMockClient()
-    var candidateWindow = DebugCandidateWindow()
 
     /// `set_left_context` で明示指定した左コンテキスト。nil なら `mockClient.documentBefore` から自動計算。
     var debugLeftContextOverride: String? = nil
@@ -1029,13 +1028,14 @@ final class DebugSocketServer: @unchecked Sendable {
 
     func makeResponse(inserted: [String]) -> [String: Any] {
         var snap = handler.snapshot(markedText: mockClient.markedText)
-        snap.candidateVisible   = candidateWindow.isVisible
-        snap.selectedRow        = candidateWindow.selectedRow
-        snap.selectedText       = candidateWindow.selectedText
-        snap.isExplicitlySelected = candidateWindow.isExplicitlySelected
-        snap.historyEnd         = candidateWindow.historyEnd
-        snap.fixedEnd           = candidateWindow.fixedEnd
-        snap.candidates         = candidateWindow.candidates
+        let session = handler.candidateSession
+        snap.candidateVisible   = session.isVisible
+        snap.selectedRow        = session.selectedRow
+        snap.selectedText       = session.selectedText
+        snap.isExplicitlySelected = session.isExplicitlySelected
+        snap.historyEnd         = session.historyEnd
+        snap.fixedEnd           = session.fixedEnd
+        snap.candidates         = session.candidates
 
         var dict: [String: Any] = [
             "inserted":           inserted,
@@ -1134,7 +1134,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private func updateMockMarkedText() {
         let text: String
-        if candidateWindow.isVisible, let selected = candidateWindow.selectedText {
+        if handler.candidateSession.isVisible, let selected = handler.candidateSession.selectedText {
             text = selected + handler.state.pendingRomaji
         } else {
             text = handler.state.composingText
