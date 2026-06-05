@@ -2,18 +2,27 @@ import XCTest
 @testable import KeynacoCore
 @testable import KeynacoTestSupport
 
-// composedHiragana が変わらない場合に requestCandidates が再呼び出しされないことを確認するテスト
+// composedHiragana / leftSideContext が変わらない場合に requestCandidates が再呼び出しされないことを確認する。
+// キャッシュ本体は `AzooKeyConverter.candidateCache`（Mock も同キーで模倣）。
 
 final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
     private(set) var requestCount = 0
     private(set) var lastLeftContext: String?
+    private var cache: [String: [String]] = [:]
+
+    private func cacheKey(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> String {
+        let ctx = leftSideContext ?? ""
+        return richCandidates ? "\(hiragana)|\(ctx)|rich" : "\(hiragana)|\(ctx)"
+    }
 
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
-        _ = hiragana
-        _ = richCandidates
         lastLeftContext = leftSideContext
+        let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
+        if let hit = cache[key] { return hit }
         requestCount += 1
-        return ["テスト"]
+        let result = ["テスト"]
+        cache[key] = result
+        return result
     }
 
     func commit(reading: String, text: String) { _ = (reading, text) }
@@ -79,7 +88,6 @@ final class AzooKeyCacheTests: XCTestCase {
     func testAzooKeyNotCalledAgainForSamePreviousHiragana() {
         // "かい" → バックスペース → "か" → "い" で "かい" に戻るとき、AzooKey を再呼びしない
         type(chars: "k"); type(chars: "a"); type(chars: "i")  // "かい" → AzooKey("かい") 1回
-        let countAfterKai = mock.requestCount
 
         press(keyCode: KeyCode.backspace)  // "か" に → AzooKey("か") 1回（変化あり）
         let countAfterBackspace = mock.requestCount

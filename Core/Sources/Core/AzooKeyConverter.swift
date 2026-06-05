@@ -21,6 +21,14 @@ private struct LockedConverter {
 }
 
 public final class AzooKeyConverter: @unchecked Sendable {
+    // MARK: - candidateCache（読み書き LRU）
+    //
+    // `requestCandidates` の結果 `[Candidate]` を `(hiragana, leftSideContext, richCandidates)` キーで保持。
+    // 同一キー再要求時は KanaKanjiConverter（Zenzai 推論含む）をスキップする。
+    // `commit(reading:text:)` は確定語学習のため `[Candidate]` 本体を参照する。
+    //
+    // かつて `InputHandler.lastAzooKey*` が whileTyping 専用に持っていた重複回避は本キャッシュに統合済み。
+
     // llama_context (Zenzai) は非スレッドセーフ。LockedConverter が全 converter.* 呼び出しを直列化する。
     private let locked = LockedConverter()
     private var candidateCache: [String: [Candidate]] = [:]
@@ -38,8 +46,15 @@ public final class AzooKeyConverter: @unchecked Sendable {
 
     public var candidateCacheCount: Int { candidateCache.count }
 
-    private static func cacheKey(segment: String, leftSideContext: String?) -> String {
-        "\(segment)|\(leftSideContext ?? "")"
+    private static func cacheKey(segment: String, leftSideContext: String?, richCandidates: Bool) -> String {
+        let ctx = leftSideContext ?? ""
+        return richCandidates ? "\(segment)|\(ctx)|rich" : "\(segment)|\(ctx)"
+    }
+
+    private static func candidateTexts(from candidates: [Candidate], inputLength: Int) -> [String] {
+        let filtered = filterCandidatesForDisplay(candidates, inputLength: inputLength)
+        let source = filtered.isEmpty ? candidates : filtered
+        return source.map(\.text)
     }
 
     private static func clearLearningData(at url: URL) {
@@ -107,17 +122,19 @@ public final class AzooKeyConverter: @unchecked Sendable {
     }
 
     public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [String] {
-        let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext)
+        let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
+        let inputLength = hiragana.count
+        if let cached = candidateCache[key] {
+            insertCache(key: key, value: cached)
+            return Self.candidateTexts(from: cached, inputLength: inputLength)
+        }
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
         let options = makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates)
         return locked.withLock { c in
             let result = c.requestCandidates(text, options: options)
             insertCache(key: key, value: result.mainResults)
-            let inputLength = hiragana.count
-            let filtered = Self.filterCandidatesForDisplay(result.mainResults, inputLength: inputLength)
-            let source = filtered.isEmpty ? result.mainResults : filtered
-            return source.map(\.text)
+            return Self.candidateTexts(from: result.mainResults, inputLength: inputLength)
         }
     }
 

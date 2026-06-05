@@ -3,6 +3,7 @@ import AppKit
 // MARK: - 候補リスト構築
 //
 // `buildCandidateList` : 候補列の組み立て（履歴・AzooKey 統合）
+// AzooKey 候補の重複呼び出し回避は `AzooKeyConverter.candidateCache`（read-through LRU）が担当。
 // 括弧モード・候補表示中は InputHandler+BracketMode.swift
 
 public extension InputHandler {
@@ -52,14 +53,8 @@ public extension InputHandler {
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
         let azooKeyCandidates: [String]
-        let ctxFingerprint = leftSideContext
         if h.allSatisfy({ $0.isASCII }) {
             azooKeyCandidates = []
-            if readingOverride == nil {
-                lastAzooKeyInput = ""; lastAzooKeyContext = ""; lastAzooKeyResults = []
-            }
-        } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, trigger == .whileTyping {
-            azooKeyCandidates = lastAzooKeyResults
         } else {
             let raw = azooKeyConverter.requestCandidates(
                 hiragana: h,
@@ -67,7 +62,6 @@ public extension InputHandler {
                 richCandidates: trigger == .explicit
             )
             azooKeyCandidates = raw.filter { !Self.isScriptMixed($0) }
-            lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)

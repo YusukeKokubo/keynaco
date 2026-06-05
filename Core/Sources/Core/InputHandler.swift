@@ -139,10 +139,6 @@ public struct InputHandler {
     public var lastConfirmedContext: LastConfirmedContext? = nil
     /// 直前の確定の読み（`commitText` 時の `finalizedText`）。
     public var lastCommittedReading: String? = nil
-    public var lastAzooKeyInput: String = ""
-    /// `buildCandidateList` の AzooKey 候補キャッシュ照合用（`leftSideContext` が変わると再取得）
-    public var lastAzooKeyContext: String = ""
-    public var lastAzooKeyResults: [String] = []
     /// カーソル左文（Zenzai）。`LeftContextSource` → `LeftContextResolver` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
     public var leftSideContext: String = ""
     /// AzooKey API 用（空文字は `nil`）

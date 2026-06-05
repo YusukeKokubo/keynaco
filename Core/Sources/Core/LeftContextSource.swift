@@ -48,6 +48,7 @@ import Foundation
 // - `debugLeftContextOverride` ← `set_left_context`（非 nil なら resolver をバイパス）
 // - `makeResponse` / キー処理前の `syncLeftSideContext` で `handler.leftSideContext` を再計算
 // - `set_surrounding` / `set_left_context` も `syncLeftSideContext` 後に `leftSideContext` を返す
+// - `documentBefore` が `sessionTextBuffer` の内容を既に含む場合、結合結果に短い重複が出ることがある（本番 IMK も同様）
 //
 // ## 新規コードの入口
 //

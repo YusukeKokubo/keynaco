@@ -24,6 +24,24 @@ final class AzooKeyConverterTests: XCTestCase {
         XCTAssertLessThanOrEqual(converter.candidateCacheCount, 50)
     }
 
+    func testRequestCandidatesCacheHitForSameKey() {
+        let converter = AzooKeyConverter()
+        let first = converter.requestCandidates(hiragana: "かい")
+        let countAfterFirst = converter.candidateCacheCount
+        let second = converter.requestCandidates(hiragana: "かい")
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(converter.candidateCacheCount, countAfterFirst, "同一キー再要求でキャッシュエントリ数は増えない")
+    }
+
+    func testRequestCandidatesCacheMissWhenRichCandidatesDiffers() {
+        let converter = AzooKeyConverter()
+        _ = converter.requestCandidates(hiragana: "かい", leftSideContext: nil, richCandidates: false)
+        let countAfterPlain = converter.candidateCacheCount
+        _ = converter.requestCandidates(hiragana: "かい", leftSideContext: nil, richCandidates: true)
+        XCTAssertEqual(converter.candidateCacheCount, countAfterPlain + 1,
+                       "richCandidates が異なれば別キーとしてキャッシュする")
+    }
+
     // MARK: - requestCandidates の候補に残余ひらがなが混入しない
 
     func testRequestCandidatesDoesNotProduceDanglingHiraganaCandidates() {
