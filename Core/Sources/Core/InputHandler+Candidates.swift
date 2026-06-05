@@ -297,7 +297,7 @@ public extension InputHandler {
         )
         guard !layout.candidates.isEmpty else { return .dismiss }
 
-        // POC（2026-05-28, observation.md 参照）: 打鍵中の autoShow で第一候補が機能語
+        // 打鍵中の autoShow で第一候補が機能語
         // （`HiraganaPreferredBuiltins.words` に登録された助詞・助動詞・接続詞等）の場合、
         // タイピングリズムを邪魔しないようサジェスト UI を出さない。Space 押下時 (autoShow=false)
         // は通常通り候補を出す。
