@@ -61,8 +61,8 @@ extension DatabaseManager {
     }
 
     /// 全 history を時間減衰スコアで集計して上位 N 件の (reading, output) を返す。
-    /// 1 モーラサジェスト POC（observation.md）の `frequentCommits` warmload 用。
-    /// 接続詞・感動詞は除外。末尾助詞は `recordPrefixes` 側でトリム済みなので追加フィルタは不要。
+    /// Settings「ひらがな優先」候補の提案用など。接続詞・感動詞は除外。
+    /// 末尾助詞は `recordPrefixes` 側でトリム済みなので追加フィルタは不要。
     public func fetchTopFrequentEntries(limit: Int) -> [(reading: String, output: String)] {
         dbQueue.sync {
             let now = self.nowEpoch()

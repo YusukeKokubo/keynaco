@@ -259,43 +259,6 @@ public extension InputHandler {
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
-        // POC（2026-05-28, observation.md）: 1 モーラサジェストの信頼度ゲート。
-        // 拗音（ゃゅょ等の小書き仮名）は独立モーラではないので、`じょ`/`きょ`/`しゃ` も
-        // 1 モーラ扱いでゲート対象。`あい`（2 モーラ）等は対象外で通常パスへ。
-        // 数字/日時候補があるときは通常パスに任せる。
-        let smallKana: Set<Character> = ["ゃ", "ゅ", "ょ", "ゎ", "ぁ", "ぃ", "ぅ", "ぇ", "ぉ"]
-        let primaryKanaCount = h.filter { !smallKana.contains($0) }.count
-        let isSingleMora = !h.isEmpty && primaryKanaCount == 1 && !h.allSatisfy({ $0.isASCII })
-        if autoShow, isSingleMora, numberCandidates.isEmpty, dateTimeCandidates.isEmpty {
-            let recents = recentCommitsMatching(prefix: h)
-            // 読みが助詞・ひらがな固定語（てにをはが 等）のとき: ひらがなを row 0 に固定し、
-            // その下に前方一致の過去語を並べる（observation.md 1モーラサジェスト・2026-05-29 調整）。
-            // ひらがな優先なので Space/Enter ではまず h が確定し、過去語は矢印で選べる。両立させる狙い。
-            if isHiraganaPreferred(h) {
-                let rest = recents.filter { $0 != h }
-                // 並べる過去語がなければ単独ひらがなの窓は無意味なので出さない（組成のまま継続）。
-                guard !rest.isEmpty else { return .dismiss }
-                let candidates = [h] + rest
-                return .show(
-                    candidates: candidates,
-                    historyEnd: candidates.count,
-                    initialRow: 0,
-                    fixedEnd: 1
-                )
-            }
-            guard !recents.isEmpty else { return .dismiss }
-            // 第一候補が機能語なら（「は」→「は」のような自己一致など）抑制
-            if HiraganaPreferredBuiltins.words[recents[0]] != nil {
-                return .dismiss
-            }
-            return .show(
-                candidates: recents,
-                historyEnd: recents.count,
-                initialRow: 0,
-                fixedEnd: 0
-            )
-        }
-
         if autoShow && sources.totalHistoryCount == 0 && sources.azooKeyCandidates.isEmpty
             && sources.userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
             return .dismiss

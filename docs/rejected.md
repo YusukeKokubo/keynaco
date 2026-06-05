@@ -4,6 +4,24 @@
 
 ---
 
+## O-1 1 モーラサジェスト（2026-06-05 削除）
+
+**概要**: `autoShow` で読みが 1 モーラ（小書き仮名除く主仮名 1 文字）のとき、セッション内 `recentCommits`（50 件）と起動時 DB warmload `frequentCommits`（20 件）の前方一致だけを候補に出す経路。助詞読みではひらがな row 0 固定＋過去語を下に並べる調整あり（2026-05-29）。
+
+**削除の理由**:
+
+- **2 モーラ以上の通常経路で足りる**: `fetchHistoryScoredMerged`（`LIKE '読み%'`）・AzooKey 予測補完・機能語 UI 抑制が部分読みを担う。1 モーラ専用の in-memory リストは重複
+- **観察で価値未確認**: 仕様どおり動くことは sandbox / ユニットテストで確認したが、打鍵削減・助詞入力のチラつき改善は体感未測定のまま
+- **複雑さ**: `commitText` フック・起動 warmload・`assembleCandidateList` 早期 return が IME 本体に残り、保守コストに見合わない
+
+**削除した周辺**: `RecentCommit` / `recentCommits` / `frequentCommits` / `appendRecentCommit` / `recentCommitsMatching` / `loadFrequentCommits`、`InputHandler+Candidates.swift` の 1 モーラゲート、`InputHandlerCandidatesTests.testSingleMora*`。`fetchTopFrequentEntries` は Settings「ひらがな優先」候補提案用に継続。
+
+**再検討するなら**: 1 モーラだけ DB 履歴では弱い（スコア閾値・件数上限）と判断した場合。macOS 側の類似 API との比較は [IDEA260529](../ideas/IDEA260529.md) 参照。
+
+> 関連: [observation.md](./observation.md)（経過観察リストから削除）、[POC260529b](../plans/POC260529b.md)
+
+---
+
 ## D-3 イベントビューアー（2026-06-05 削除）
 
 **概要**: メニューバー ⌨ から開くキーイベント・確定テキスト・候補リストのリアルタイム表示ウィンドウ。`InputController` / `IMKTextInputAdapter` から `#if DEBUG` 経由でログを受け取る。JSONL エクスポート対応。

@@ -55,17 +55,6 @@ public struct LastConfirmedContext: Equatable {
     public let fullReading: String?
 }
 
-/// 直近確定 1 エントリ。1 モーラサジェスト POC（2026-05-28, observation.md）。
-/// メモリ常駐・直近 `recentCommitCap` 件のみ保持。確定時に `appendRecentCommit` で記録、`recentCommitsMatching` で検索する。
-public struct RecentCommit: Sendable, Equatable {
-    public let reading: String
-    public let output: String
-    public init(reading: String, output: String) {
-        self.reading = reading
-        self.output = output
-    }
-}
-
 public enum KeyCode {
     public static let eisu:      UInt16 = 102
     public static let kana:      UInt16 = 104
@@ -132,14 +121,6 @@ public struct InputHandler {
     public var lastCommittedOutput: String? {
         committedHistory.last
     }
-    /// 直近 `recentCommitCap` 件の確定リスト（FIFO リングバッファ相当）。1 モーラサジェスト POC（2026-05-28, observation.md）の根拠データ。
-    /// `composedHiragana` が 1 モーラ（小書き仮名を除いた主仮名 1 文字）の autoShow 時、この前方一致のみを候補に出す（信頼度ゲート）。
-    public var recentCommits: [RecentCommit] = []
-    public static let recentCommitCap: Int = 50
-    /// `loadFrequentCommits` で起動時に DB から warmload される頻出語の上位 N 件。
-    /// recentCommits と並んで 1 モーラサジェストの matching pool になる（recent → frequent の優先順）。
-    public var frequentCommits: [RecentCommit] = []
-    public static let frequentCommitCap: Int = 20
     /// 日記用バッファ: 句点（。！？）で区切られた文を蓄積し、文末でまとめて daily_log へ記録する。
     public var diaryBuffer: String = ""
     /// daily_log に記録する際のアプリ bundle ID。InputController がキーイベント処理前に設定する。
@@ -163,37 +144,6 @@ public struct InputHandler {
         }
     }
 
-    /// 直近確定リストに `(reading, output)` を追加し、上限超過分は先頭から捨てる。
-    /// 1 モーラサジェスト POC（observation.md）の信頼度ゲート用。`commitText` からのみ呼ばれる想定。
-    public mutating func appendRecentCommit(reading: String, output: String) {
-        guard !reading.isEmpty, !output.isEmpty else { return }
-        recentCommits.append(RecentCommit(reading: reading, output: output))
-        if recentCommits.count > Self.recentCommitCap {
-            recentCommits.removeFirst(recentCommits.count - Self.recentCommitCap)
-        }
-    }
-
-    /// `prefix` で前方一致する直近確定 + DB warmload 頻出の output を返す。重複は排除し、
-    /// recentCommits（最近 → 古い）→ frequentCommits（DB スコア順）の優先順で並べる。
-    public func recentCommitsMatching(prefix: String) -> [String] {
-        guard !prefix.isEmpty else { return [] }
-        var seen = Set<String>()
-        var results: [String] = []
-        for entry in recentCommits.reversed() where entry.reading.hasPrefix(prefix) {
-            if seen.insert(entry.output).inserted { results.append(entry.output) }
-        }
-        for entry in frequentCommits where entry.reading.hasPrefix(prefix) {
-            if seen.insert(entry.output).inserted { results.append(entry.output) }
-        }
-        return results
-    }
-
-    /// DB から頻出上位 `frequentCommitCap` 件を warmload する。InputHandler 生成時に 1 回呼ぶ想定。
-    public mutating func loadFrequentCommits() {
-        frequentCommits = db.fetchTopFrequentEntries(limit: Self.frequentCommitCap)
-            .map { RecentCommit(reading: $0.reading, output: $0.output) }
-    }
-
     public let db: DatabaseManager
     public var azooKeyConverter: any AzooKeyConverting
 
@@ -201,7 +151,6 @@ public struct InputHandler {
         self.db = db
         self.azooKeyConverter = azooKeyConverter ?? AzooKeyConverter()
         self.hiraganaPreferredSet = db.fetchHiraganaPreferredSet()
-        loadFrequentCommits()
     }
 
     // MARK: - 公開インターフェース
@@ -274,14 +223,6 @@ public struct InputHandler {
         if !state.composingText.isEmpty && !skipHistory && !isPunctuation,
            committedHistory.last != nil {
             lastCommittedReading = state.finalizedText
-        }
-        // 1 文字サジェスト POC（observation.md）: 確定時に直近 10 分の確定リストへ追加。
-        // 確定パスは複数あるが、すべて最終的に commitText を通るので 1 箇所フックで十分。
-        if !skipHistory && !isPunctuation && !text.isEmpty {
-            let reading = fullReading ?? state.finalizedText
-            if !reading.isEmpty {
-                appendRecentCommit(reading: reading, output: text)
-            }
         }
         lastConfirmedContext = LastConfirmedContext(
             input: state.finalizedText,
