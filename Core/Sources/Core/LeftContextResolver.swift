@@ -4,6 +4,7 @@ import Foundation
 ///
 /// `sessionTextBuffer`（keynaco 確定語バッファ）と IMK `before`（キャッシュ済み・location 一致時のみ）
 /// を結合する。IMK 取得・キャッシュ更新は `InputController` 側の責務。
+/// サンドボックス（`DebugSocketServer.debugLeftContextPrefix`）は `mockClient.documentBefore` を `imkBefore` に載せる。
 ///
 /// 結合ルール（PLAN260506b）:
 /// - `before` 単体は最大 `maxBeforeLength` 字（カーソル近傍の末尾側）

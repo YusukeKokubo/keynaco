@@ -73,4 +73,16 @@ final class LeftContextResolverTests: XCTestCase {
     func testEmptyInputs() {
         XCTAssertEqual(resolve(), "")
     }
+
+    /// `DebugSocketServer.debugLeftContextPrefix` は `documentBefore` を `imkBefore` に載せる。
+    func testSandboxDocumentBeforePath() {
+        XCTAssertEqual(
+            resolve(sessionBuffer: "報告書", imkBefore: "今日は"),
+            "報告書今日は"
+        )
+        XCTAssertEqual(
+            resolve(sessionBuffer: "", imkBefore: String(repeating: "文", count: 500)).count,
+            LeftContextResolver.maxBeforeLength
+        )
+    }
 }

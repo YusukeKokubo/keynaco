@@ -1116,20 +1116,15 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
+    /// サンドボックス用左文脈。`mockClient.documentBefore` を IMK `before` 相当として `LeftContextResolver` に渡す。
     func debugLeftContextPrefix() -> String {
         if let override = debugLeftContextOverride { return override }
-        let historyJoined = handler.sessionTextBuffer
         let before = mockClient.documentBefore
-        if !before.isEmpty {
-            let beforeTruncated = before.count > 300 ? String(before.suffix(300)) : before
-            if !historyJoined.isEmpty {
-                let maxBefore = max(0, 400 - historyJoined.count)
-                let trimmed = beforeTruncated.count > maxBefore ? String(beforeTruncated.suffix(maxBefore)) : beforeTruncated
-                return historyJoined + trimmed
-            }
-            return beforeTruncated
-        }
-        return historyJoined
+        return LeftContextResolver.resolve(.init(
+            sessionBuffer: handler.sessionTextBuffer,
+            imkBefore: before.isEmpty ? nil : before,
+            cursorLocationAvailable: true
+        ))
     }
 
     private func updateMockMarkedText() {
