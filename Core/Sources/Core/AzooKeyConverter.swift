@@ -93,7 +93,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
             // （考える/おはよう/ありがとう）も大量に吐くが、物理キーボードでは価値が薄くノイズ源になるため
             // requestCandidates 側で「ruby 長 > 入力長（=予測）かつ末尾表層が非漢字」を落とす（POC260529b'）。
             // 残った予測候補は composingCount==inputLength でカバレッジフィルタを通り dictionary セクションへ。
-            // E2E 検証・経過観察: POC260529b / docs/observation.md。
+            // E2E 検証・採用判断: POC260529b（2026-06-05 卒業）。
             requireJapanesePrediction: .autoMix,
             requireEnglishPrediction: .disabled,
             keyboardLanguage: .ja_JP,
