@@ -134,26 +134,10 @@ class InputController: IMKInputController, @unchecked Sendable {
             candidateWindow.dismiss()
         case .selectNext:
             candidateWindow.selectNext()
-            if handler.isBracketMode {
-                let text = candidateWindow.selectedText() ?? ""
-                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            } else if candidateWindow.isVisible && handler.state.composedHiragana.isEmpty && !handler.isBracketMode {
-                let text = candidateWindow.selectedText() ?? ""
-                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            } else {
-                updateMarkedText(client: adapter)
-            }
+            syncMarkedText(client: adapter)
         case .selectPrev:
             candidateWindow.selectPrev()
-            if handler.isBracketMode {
-                let text = candidateWindow.selectedText() ?? ""
-                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            } else if candidateWindow.isVisible && handler.state.composedHiragana.isEmpty && !handler.isBracketMode {
-                let text = candidateWindow.selectedText() ?? ""
-                adapter.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            } else {
-                updateMarkedText(client: adapter)
-            }
+            syncMarkedText(client: adapter)
         case .deleteSelected:
             let row = candidateWindow.selectedRow
             if let text = candidateWindow.selectedText() {
@@ -330,9 +314,18 @@ class InputController: IMKInputController, @unchecked Sendable {
 
     // MARK: - プライベートヘルパー
 
-    private func updateMarkedText(client: TextInputClient) {
+    /// 候補ウィンドウの選択状態と組成文字列を IMK marked text に反映する。
+    ///
+    /// - 括弧モード、または組成ひらがななしで候補のみ表示: 選択候補のみ（Electron が空 marked text を非アクティブ扱いする対策）
+    /// - 通常の組成中: 選択候補 + `pendingRomaji`
+    /// - 候補非表示: `composingText`
+    private func syncMarkedText(client: TextInputClient) {
         let text: String
-        if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
+        let candidateOnly = handler.isBracketMode
+            || (candidateWindow.isVisible && handler.state.composedHiragana.isEmpty)
+        if candidateOnly, let selected = candidateWindow.selectedText() {
+            text = selected
+        } else if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
             text = selected + handler.state.pendingRomaji
         } else {
             text = handler.state.composingText
