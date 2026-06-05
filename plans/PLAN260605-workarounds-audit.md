@@ -27,7 +27,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 | **B-2** | **仕様** | Caps Lock は `inputText` に来ない。`flagsChanged` で LED と `isAsciiMode` を同期するのが正しい。 | なし。 | Caps Lock でモードが期待どおりか。 |
 | **B-3** | **仕様** | `characters` / `baseCharacters` の使い分けは US/JIS 差の正しい `NSEvent` の使い方（Bracket モード等）。 | なし。 | US/JIS で Shift+`,` `.` 等の Bracket 遷移。 |
 | **C-1** | **必須** | Electron/Chromium は空 marked text で IME 非アクティブと誤認し Enter をアプリに流す。2026 年も報告あり。 | `MarkedTextSync` で候補選択中は実テキストを marked に渡す。 | `MarkedTextSync` 無効化後、VS Code/Cursor で候補中 Enter が改行暴発するか。 |
-| **C-2** | **要検証** | 未消費キー（`consumed == false`）でも `applyPostKeyDownEffects` を実行（冪等同期の意図）。macOS 26 で引っ掛かりの原因になり得る。 | `consumed == true` のみに絞る、または副作用を種類別に分離。 | リファクタ後、高速タイピング・矢印移動で marked 遅延や Electron 退行がないか。 |
+| **C-2** | **整理済**（2026-06-05） | 未消費でも Enter 空組成は `documentSurroundingContextInvalidated` を立てるため post-effects 全スキップは不可。 | `applyCandidateEffects`（marked 同期）のみ `consumed` 時。surrounding / POS は従来どおり条件付き。 | sandbox: 矢印・候補中 Enter・高速入力。 |
 | **C-3** | **必須** | Terminal/Electron 等で `selectedRange()` が `NSNotFound`。無理に surrounding を使うとクラッシュやゴミ文脈。 | `LeftContextSource.assembleProduction` のガード・キャッシュ破棄を維持。 | ガード外しで Terminal / Cursor 内蔵ターミナルで BS 連打・変換。 |
 | **D-1** | **必須** | IMK SDK が Swift 6 `@MainActor` 隔離に未対応。`handle` / `init` は nonisolated のため `assumeIsolated` / `nonisolated(unsafe)` が現実解。 | **将来**: IMK 薄ブリッジ + `@MainActor` Session（IMKSwift 等を参考に別 PLAN）。 | `assumeIsolated` 除去でコンパイルエラーを確認。 |
 | **D-2** | **仕様** | `KanaKanjiConverter` / Zenzai `llama_context` は非スレッドセーフ。`LockedConverter`（NSLock）は必須。 | ロック削除不可。Actor への閉じ込めは改善候補（`Task.detached` の `commit` 経路含む）。 | ロック外しで変換連打時 SIGABRT。 |
@@ -43,7 +43,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 |------|------|
 | A-1 | Gemini は「`.inputmethod.`」と記載したが、本リポジトリの記録・実装は **ID に `inputmethod` 文字列を含む**（例: `com.yusuke.inputmethod.keynaco`）。厳密なドット区切り形式は未検証。 |
 | B-1 | `ignoreNextModeSwitch = true` は **`activateServer` のみ**（`InputController.swift`）。`handleModeSwitchKey` が英数(102)/かな(104)を消費。`InputHandlerAsciiTests` に echo 無視テスト追加（2026-06-05）。 |
-| C-2 | `runKeyDown` は consumed に関係なく `applyPostKeyDownEffects` を呼ぶ（203–204 行付近の意図）。狭める場合は marked 同期と surrounding 更新を分離検討。 |
+| C-2 | 2026-06-05: `applyCandidateEffects` を `consumed` 時のみ。矢印等は `needsSurroundingSideEffects` が false なら post-effects 全体をスキップ。Enter 空組成は未消費でも surrounding 無効化を維持。 |
 | E-2 | `addRomaji` は `count >= 2` まで `needsRefresh == false`。`shouldRefreshWhileTypingAfterCommit` があると **確定直後の 1 文字目だけ** 余分に `buildCandidateList` が走る。 |
 
 ### 関連ファイル
@@ -70,7 +70,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 ### まず整理してよい（リスク低〜中、要テスト）
 
 1. ~~**E-2** — `hasBigramContext` のリネーム・コメント~~ ✅ 2026-06-05（`shouldRefreshWhileTypingAfterCommit`）
-2. **C-2** — 未消費キーでの post-effects 限定化
+2. ~~**C-2** — 未消費キーでの post-effects 限定化~~ ✅ 2026-06-05（marked 同期のみ consumed 限定）
 3. **B-1** — 必須（activateServer のモードキー echo）。IMK 実機で echo 消滅確認まで削除不可
 
 ### 大規模 refactor 候補（別 PLAN）
@@ -86,7 +86,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 |------|------|----------|
 | 1 | B-1 IMK 実機（入力ソース切替直後のモード） | echo 消滅時のみ削除再検討。Core テストは 2026-06-05 追加済 |
 | 2 | ~~E-2 リネームのみ PR~~ | ✅ 2026-06-05 — `InputHandler+NormalInput.swift` |
-| 3 | C-2 `consumed` 限定 PR | sandbox: marked 同期・VS Code/Cursor Enter・高速入力 |
+| 3 | ~~C-2 `consumed` 限定 PR~~ | ✅ 2026-06-05 — `InputController.applyPostKeyDownEffects`。sandbox 手動確認は任意 |
 | 4 | ~~B-1 フラグ削除 PR~~ | 保留 — echo は Core で再現固定。IMK 実機で消滅確認が必要 |
 
 ---

@@ -148,12 +148,23 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// キー処理後の副作用。`cachedSurroundingContext` の fetch/無効化は `LeftContextSource` MARK「本番」参照。
     @MainActor
     private func applyPostKeyDownEffects(
+        consumed: Bool,
         action: CandidateAction,
         adapter: IMKTextInputAdapter,
         composedHiraganaWasEmpty: Bool,
         imkSenderForSurrounding: Any?
     ) {
-        applyCandidateEffects(action: action, adapter: adapter)
+        // 未消費でも Enter 空組成などで `documentSurroundingContextInvalidated` が立つ（consumed 限定不可）。
+        let needsSurroundingSideEffects = consumed
+            || handler.documentSurroundingContextInvalidated
+            || adapter.didInsertText
+            || (composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty)
+
+        if consumed {
+            applyCandidateEffects(action: action, adapter: adapter)
+        }
+
+        guard needsSurroundingSideEffects else { return }
 
         if handler.documentSurroundingContextInvalidated {
             cachedSurroundingContext = nil
@@ -200,9 +211,9 @@ class InputController: IMKInputController, @unchecked Sendable {
             candidate: ctx,
             client: adapter
         )
-        // consumed に関係なく副作用を走らせる（未消費キーは state/action 不変で sync は冪等）。
-        // テストの `type`/`press` は consumed 時のみ applyCandidateAction（未消費は組成も変わらないため）。
+        // 矢印等の未消費キーは marked 同期をスキップ。Enter 空組成の surrounding 無効化は未消費でも必要。
         applyPostKeyDownEffects(
+            consumed: consumed,
             action: action,
             adapter: adapter,
             composedHiraganaWasEmpty: composedHiraganaWasEmpty,
