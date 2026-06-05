@@ -43,6 +43,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `test_core_slow.sh` | Core 重いテストのみ（`KeynacoCoreSlowTests`、AzooKey 実機） |
 | `test_core_all.sh` | Core fast + slow 両方 |
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
+| `test_marked_text_sandbox.sh` | marked text 同期・候補 Space/Shift+Delete のソケット回帰（`smoke.py` からも実行） |
 | `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
 | `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
 

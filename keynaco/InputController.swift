@@ -14,6 +14,8 @@ class InputController: IMKInputController, @unchecked Sendable {
     nonisolated(unsafe) private var hiraganaPreferredObserver: NSObjectProtocol?
 
     private var candidateWindow: CandidateWindow!
+    /// 直近の `handle(event:client:)` の IMK クライアント（候補 UI 削除などキーイベント外の marked 同期用）。
+    private weak var activeIMKClient: AnyObject?
 
     /// `composedHiragana` が空→非空になったタイミングで `SurroundingIMKContext.fetch` 済み。`selectedRange().location` が一致するときだけ LLM 文脈に使う（Space 再取得は location 無効化で代替）。
     var cachedSurroundingContext: (location: Int, text: (before: String, after: String))?
@@ -32,6 +34,7 @@ class InputController: IMKInputController, @unchecked Sendable {
                     ic.handler.db.deleteHistory(output: text)
                     ic.handler.candidateSession.removeCandidate(at: row)
                     ic.candidateWindow.refreshFrom(session: ic.handler.candidateSession)
+                    ic.syncMarkedTextToActiveClient()
                 }
             }
         }
@@ -114,6 +117,13 @@ class InputController: IMKInputController, @unchecked Sendable {
         handler.flushDiaryBuffer()
         commitComposition(sender)
         super.deactivateServer(sender)
+    }
+
+    /// 候補セッション変更後、直近の IMK クライアントへ marked text を反映する。
+    @MainActor
+    private func syncMarkedTextToActiveClient() {
+        guard let activeIMKClient else { return }
+        handler.syncMarkedText(client: IMKTextInputAdapter(activeIMKClient))
     }
 
     /// `handler.handle` の戻り `CandidateAction` を `candidateSession` に反映し、パネル・marked text を更新する。
@@ -231,6 +241,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         let baseCharacters = event.charactersIgnoringModifiers
         let modifiers = event.modifierFlags
 
+        activeIMKClient = sender as AnyObject?
         let adapter = IMKTextInputAdapter(sender)
         let ic: InputController = self
         nonisolated(unsafe) let imkSenderForSurrounding: Any? = sender

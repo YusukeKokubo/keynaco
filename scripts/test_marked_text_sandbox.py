@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Marked text 同期のデバッグソケット回帰テスト。
+"""Marked text / 候補 UI のデバッグソケット回帰テスト。
 
 前提: Debug ビルドの keynaco が起動し、$TMPDIR/keynaco-debug.sock で待ち受けていること。
+
+  ./scripts/test_marked_text_sandbox.sh
 """
 from __future__ import annotations
 
@@ -13,6 +15,7 @@ import sys
 
 SOCKET_PATH = os.path.join(os.environ.get("TMPDIR", "/tmp"), "keynaco-debug.sock")
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SHIFT = 131072
 
 MARKED_TEXT_SUITE: dict = {
     "before_each": [{"reset": True}],
@@ -39,20 +42,33 @@ MARKED_TEXT_SUITE: dict = {
             "assert": {"composedHiragana": "かんじ", "markedText": "かんじ"},
         },
         {
-            "name": "space-keeps-hiragana-marked",
-            "cmds": [{"type_string": "kanzi", "then": "space"}],
-            "assert": {"markedText": "かんじ", "candidateVisible": True},
+            "name": "space-marked-follows-selection",
+            "cmds": [{"type_string": "kanzi"}, {"key": "space"}],
+            "assert": {"candidateVisible": True, "markedText": "感じ", "selectedText": "感じ"},
         },
         {
             "name": "down-syncs-selected-while-composing",
-            "cmds": [{"type_string": "kan", "then": "space"}, {"key": "down"}],
-            "assert_contains": {"markedText": "感"},
-            "assert_not": {"markedText": "かん"},
+            "cmds": [{"type_string": "kanzi"}, {"key": "space"}, {"key": "down"}],
+            "assert": {"markedText": "漢字", "selectedText": "漢字", "isExplicitlySelected": True},
         },
         {
-            "name": "up-syncs-selected-while-composing",
-            "cmds": [{"type_string": "kan", "then": "space"}, {"key": "down"}, {"key": "up"}],
-            "assert": {"markedText": "管理", "selectedText": "管理"},
+            "name": "kanzi-space-down-enter-kanji",
+            "cmds": [
+                {"type_string": "kanzi"},
+                {"key": "space"},
+                {"key": "down"},
+                {"key": "enter"},
+            ],
+            "assert_contains": {"inserted": "漢字"},
+        },
+        {
+            "name": "shift-delete-removes-history-candidate",
+            "cmds": [
+                {"seed_history": {"input": "じっそう", "output": "実装", "times": 5}},
+                {"type_string": "jissou", "then": "space", "assert_contains": {"candidates": "実装"}},
+                {"key": "backspace", "mods": SHIFT},
+            ],
+            "assert_not": {"assert_contains": {"candidates": "実装"}},
         },
         {
             "name": "enter-matches-selected-candidate",
@@ -114,6 +130,64 @@ def verify_build(head: str, state: dict) -> None:
         )
 
 
+def assert_marked_equals_selected(state: dict, label: str) -> str | None:
+    marked = state.get("markedText")
+    selected = state.get("selectedText")
+    if marked != selected:
+        return f"{label}: markedText={marked!r} selectedText={selected!r}"
+    return None
+
+
+def run_integrity_checks(sock: socket.socket, buf: bytearray) -> int:
+    """test_suite で表現しにくい cross-field / リスト不変チェック。"""
+    failures: list[str] = []
+    send(sock, buf, {"reset": True})
+
+    r_type = send(sock, buf, {"type_string": "kanzi"})
+    cands_before = list(r_type.get("candidates", []))
+    r_space = send(sock, buf, {"key": "space"})
+    cands_after = list(r_space.get("candidates", []))
+    if cands_before != cands_after:
+        failures.append(
+            f"space-rebuild: candidates changed\n  before={cands_before[:5]}\n  after={cands_after[:5]}"
+        )
+    if err := assert_marked_equals_selected(r_space, "after-space"):
+        failures.append(err)
+    if r_space.get("selectedRow", 0) <= r_type.get("selectedRow", 0):
+        failures.append(
+            f"space-advance: expected row increase, got {r_type.get('selectedRow')} -> {r_space.get('selectedRow')}"
+        )
+
+    send(sock, buf, {"reset": True})
+    send(sock, buf, {"seed_history": {"input": "じっそう", "output": "実装", "times": 5}})
+    r_j = send(sock, buf, {"type_string": "jissou", "then": "space"})
+    cands = r_j.get("candidates", [])
+    if "実装" not in cands:
+        failures.append(f"shift-delete-setup: 実装 not in candidates: {cands[:6]}")
+    else:
+        target = cands.index("実装")
+        state = r_j
+        for _ in range(len(cands) * 2):
+            if state.get("selectedRow") == target:
+                break
+            state = send(sock, buf, {"key": "down"})
+        else:
+            failures.append("shift-delete-setup: could not select 実装 row")
+            state = r_j
+        if state.get("selectedText") == "実装":
+            r_del = send(sock, buf, {"key": "backspace", "mods": SHIFT})
+            if "実装" in r_del.get("candidates", []):
+                failures.append("shift-delete: 実装 still in candidates after Shift+Backspace")
+            if err := assert_marked_equals_selected(r_del, "after-shift-delete"):
+                failures.append(err)
+
+    for msg in failures:
+        print(f"  FAIL  {msg}")
+    if not failures:
+        print("  PASS  integrity checks (space list + shift-delete marked)")
+    return len(failures)
+
+
 def print_results(suite: dict) -> int:
     summary = suite.get("summary", {})
     print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -135,8 +209,8 @@ def print_results(suite: dict) -> int:
             )
     total = summary.get("total", 0)
     passed = summary.get("passed", 0)
-    print(f"\nMarked text sandbox: {passed}/{total} passed")
-    return 1 if failed else 0
+    print(f"\nMarked text sandbox suite: {passed}/{total} passed")
+    return failed
 
 
 def main() -> None:
@@ -149,9 +223,17 @@ def main() -> None:
 
     buf = bytearray()
     verify_build(head, send(sock, buf, {"state": True}))
-    suite = send(sock, buf, MARKED_TEXT_SUITE)
+    suite_failed = print_results(send(sock, buf, MARKED_TEXT_SUITE))
+    print()
+    print("Integrity checks:")
+    integrity_failed = run_integrity_checks(sock, buf)
     sock.close()
-    raise SystemExit(print_results(suite))
+
+    total_fail = suite_failed + integrity_failed
+    if total_fail:
+        print(f"\nFAILED: {total_fail} issue(s)")
+        raise SystemExit(1)
+    print("\nOK: marked text / candidate sandbox regression passed")
 
 
 if __name__ == "__main__":

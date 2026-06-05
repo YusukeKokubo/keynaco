@@ -16,6 +16,10 @@ import sys
 import socket as _socket
 
 SOCKET_PATH = os.path.join(os.environ.get("TMPDIR", "/tmp"), "keynaco-debug.sock")
+REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+MARKED_TEXT_REGRESSION = os.path.join(REPO_ROOT, "scripts", "test_marked_text_sandbox.py")
 
 
 def check_process() -> bool:
@@ -105,6 +109,12 @@ def main() -> int:
         return 2
 
     print("OK: 全 smoke test 通過")
+
+    reg = subprocess.run([sys.executable, MARKED_TEXT_REGRESSION], cwd=REPO_ROOT)
+    if reg.returncode != 0:
+        print("FAIL: test_marked_text_sandbox.py が失敗しました")
+        return 2
+
     return 0
 
 
