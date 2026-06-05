@@ -52,7 +52,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
     /// 組成中 + 候補表示では marked text が選択行に追従する（`InputController` 経路）。
     func testMarkedTextFollowsSelectedRowWhileComposing_kanzi() {
         typeRomaji("kanzi")
-        let showAction = handler.buildCandidateList(autoShow: false)
+        let showAction = handler.buildCandidateList(trigger: .explicit)
         applyCandidateAction(showAction)
         guard let first = handler.candidateSession.selectedText else {
             XCTFail("候補選択行がない"); return
@@ -184,7 +184,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         setUpWithConverter(SnapStub(["グロトスク", "ぐろとすく"]))
         handler.state.composedHiragana = "ぐろとすく"
         handler.state.pendingRomaji = ""
-        let action = handler.buildCandidateList(autoShow: true)
+        let action = handler.buildCandidateList(trigger: .whileTyping)
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
@@ -198,7 +198,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.leftSideContext = "prefix"
         handler.state.composedHiragana = "よいのでは"
         handler.state.pendingRomaji = ""
-        let action = handler.buildCandidateList(autoShow: true)
+        let action = handler.buildCandidateList(trigger: .whileTyping)
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
@@ -242,13 +242,22 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "あいk")
     }
 
-    func testSpaceDuringCandidatesShowsCandidateList() {
-        type(chars: "a", base: "a")
-        let result = press(keyCode: 49, candidateVisible: true, selectedRow: 0)
-        XCTAssertTrue(result.consumed)
-        guard case .show = result.candidateAction else {
-            XCTFail("Space は .show を返すはず: \(result.candidateAction)"); return
+    func testSpaceDuringCandidatesSelectsNextWithoutRebuild() {
+        typeRomaji("kanzi")
+        applyCandidateAction(handler.buildCandidateList(trigger: .whileTyping))
+        let before = handler.candidateSession.candidates
+        let ctx = handler.candidateSession.context
+        let (consumed, action) = handler.handle(
+            keyCode: KeyCode.space, characters: " ", baseCharacters: " ",
+            modifiers: [], candidate: ctx, client: client
+        )
+        XCTAssertTrue(consumed)
+        guard case .selectNext = action else {
+            XCTFail("候補表示中の Space は .selectNext のはず: \(action)"); return
         }
+        applyCandidateAction(action)
+        XCTAssertEqual(handler.candidateSession.candidates, before,
+                       "候補表示中の Space でリストを差し替えないはず")
     }
 
     func testSelectKatakanaCandidate() {
@@ -390,11 +399,11 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
     // See: docs/domain/glossary.md#autoshow
 
     func testAutoShowDismissesWhenNoCandidates() {
-        // ASCII 組成（履歴ゼロ・辞書スキップ）で文字入力 → buildCandidateList(autoShow:true) は .dismiss
+        // ASCII 組成（履歴ゼロ・辞書スキップ）で文字入力 → whileTyping は .dismiss
         let (consumed, action) = type(chars: "X", base: "x", modifiers: .shift)
         XCTAssertTrue(consumed)
         guard case .dismiss = action else {
-            XCTFail("履歴・辞書・予測候補がゼロなら autoShow は .dismiss を返すはず: \(action)"); return
+            XCTFail("履歴・辞書・予測候補がゼロなら whileTyping は .dismiss を返すはず: \(action)"); return
         }
     }
 
@@ -488,7 +497,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let (_, action) = type(chars: "i", base: "i")
         guard case .show = action else {
-            XCTFail("低スコア履歴のみでも AzooKey があれば autoShow は .show のはず: \(action)"); return
+            XCTFail("低スコア履歴のみでも AzooKey があれば whileTyping は .show のはず: \(action)"); return
         }
     }
 

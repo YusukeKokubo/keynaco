@@ -52,7 +52,7 @@ final class AzooKeyCacheTests: XCTestCase {
         type(chars: "k")
         type(chars: "a")
         type(chars: "i")  // composedHiragana = "かい"
-        XCTAssertEqual(mock.requestCount, 1, "autoShow=true の buildCandidateList で1回呼ばれるはず")
+        XCTAssertEqual(mock.requestCount, 1, "whileTyping の buildCandidateList で1回呼ばれるはず")
     }
 
     func testAzooKeyNotCalledAgainWhenHiraganaUnchanged() {
@@ -60,7 +60,7 @@ final class AzooKeyCacheTests: XCTestCase {
         // → AzooKey は追加で呼ばれないはず
         type(chars: "k")
         type(chars: "a")
-        type(chars: "i")  // composedHiragana = "かい" → buildCandidateList(autoShow:true) → AzooKey 1回
+        type(chars: "i")  // composedHiragana = "かい" → buildCandidateList(whileTyping) → AzooKey 1回
         let countAfterInput = mock.requestCount
 
         // ↓ キー（候補ウィンドウ表示中扱い）
@@ -101,7 +101,7 @@ final class AzooKeyCacheTests: XCTestCase {
         XCTAssertEqual(mock.requestCount, 1)
 
         handler.leftSideContext = "前文テスト"
-        _ = handler.buildCandidateList(autoShow: false)
+        _ = handler.buildCandidateList(trigger: .explicit)
         XCTAssertEqual(mock.requestCount, 2, "左文脈が変われば同じ読みでも AzooKey を再呼びするはず")
         XCTAssertEqual(mock.lastLeftContext, "前文テスト")
     }

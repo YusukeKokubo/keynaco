@@ -9,21 +9,20 @@ public extension InputHandler {
 
     // MARK: - buildCandidateList
 
-    /// - Parameter autoShow: 文字入力中の自動表示（true）か Space など明示トリガー（false）か。
-    ///   autoShow=true のとき履歴も辞書候補もなければ表示しない。
-    mutating func buildCandidateList(autoShow: Bool = false) -> CandidateAction {
-        buildCandidateListInternal(forReading: nil, autoShow: autoShow)
+    /// - Parameter trigger: `.whileTyping` は打鍵中のサジェスト、`.explicit` は Space（未表示時）等。
+    mutating func buildCandidateList(trigger: CandidateListTrigger = .explicit) -> CandidateAction {
+        buildCandidateListInternal(forReading: nil, trigger: trigger)
     }
 
     private mutating func buildCandidateListInternal(
         forReading reading: String?,
-        autoShow: Bool
+        trigger: CandidateListTrigger
     ) -> CandidateAction {
         let sources = collectCandidateSources(
-            autoShow: autoShow,
+            trigger: trigger,
             readingOverride: reading
         )
-        let action = assembleCandidateList(from: sources, autoShow: autoShow, zenzaiPromoted: sources.zenzaiPromoted)
+        let action = assembleCandidateList(from: sources, trigger: trigger, zenzaiPromoted: sources.zenzaiPromoted)
         return action
     }
 
@@ -48,7 +47,7 @@ public extension InputHandler {
     }
 
     private mutating func collectCandidateSources(
-        autoShow: Bool,
+        trigger: CandidateListTrigger,
         readingOverride: String? = nil
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
@@ -59,13 +58,13 @@ public extension InputHandler {
             if readingOverride == nil {
                 lastAzooKeyInput = ""; lastAzooKeyContext = ""; lastAzooKeyResults = []
             }
-        } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, autoShow {
+        } else if h == lastAzooKeyInput, ctxFingerprint == lastAzooKeyContext, trigger == .whileTyping {
             azooKeyCandidates = lastAzooKeyResults
         } else {
             let raw = azooKeyConverter.requestCandidates(
                 hiragana: h,
                 leftSideContext: azooKeyLeftContext,
-                richCandidates: !autoShow
+                richCandidates: trigger == .explicit
             )
             azooKeyCandidates = raw.filter { !Self.isScriptMixed($0) }
             lastAzooKeyInput = h; lastAzooKeyContext = ctxFingerprint; lastAzooKeyResults = azooKeyCandidates
@@ -154,14 +153,14 @@ public extension InputHandler {
 
     /// 履歴・予測・ユーザー辞書・数値/日時がなく AzooKey のみのとき、読みのひらがなを先頭固定する。
     private func shouldAddDefaultFixedHiragana(
-        autoShow: Bool,
+        trigger: CandidateListTrigger,
         fixedSlot: FixedSlot,
         hiraganaInHistory: Bool,
         sources: CandidateListSources,
         numberCandidates: [String],
         dateTimeCandidates: [String]
     ) -> Bool {
-        autoShow
+        trigger == .whileTyping
             && fixedSlot == .none
             && !hiraganaInHistory
             && sources.highHistoryCount == 0
@@ -254,14 +253,14 @@ public extension InputHandler {
 
     private func assembleCandidateList(
         from sources: CandidateListSources,
-        autoShow: Bool,
+        trigger: CandidateListTrigger,
         zenzaiPromoted: String?
     ) -> CandidateAction {
         let h = sources.h
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
-        if autoShow && sources.totalHistoryCount == 0 && sources.azooKeyCandidates.isEmpty
+        if trigger == .whileTyping && sources.totalHistoryCount == 0 && sources.azooKeyCandidates.isEmpty
             && sources.userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
             return .dismiss
         }
@@ -271,7 +270,7 @@ public extension InputHandler {
         let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
 
         let addsDefaultFixedHiragana = shouldAddDefaultFixedHiragana(
-            autoShow: autoShow,
+            trigger: trigger,
             fixedSlot: fixedSlot,
             hiraganaInHistory: hiraganaInHistory,
             sources: sources,
@@ -299,11 +298,9 @@ public extension InputHandler {
         )
         guard !layout.candidates.isEmpty else { return .dismiss }
 
-        // 打鍵中の autoShow で第一候補が機能語
-        // （`HiraganaPreferredBuiltins.words` に登録された助詞・助動詞・接続詞等）の場合、
-        // タイピングリズムを邪魔しないようサジェスト UI を出さない。Space 押下時 (autoShow=false)
-        // は通常通り候補を出す。
-        if autoShow,
+        // 打鍵中のみ: 第一候補が機能語（助詞・助動詞等）ならサジェスト UI を出さない。
+        // 明示トリガ（Space・未表示時）は候補を出す。
+        if trigger == .whileTyping,
            layout.initialRow < layout.candidates.count,
            HiraganaPreferredBuiltins.words[layout.candidates[layout.initialRow]] != nil {
             return .dismiss

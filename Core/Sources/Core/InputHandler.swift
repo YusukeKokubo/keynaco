@@ -58,6 +58,14 @@ public struct CandidateContext: Sendable {
     )
 }
 
+/// `buildCandidateList` の呼び出し元。候補列の組み立てロジックは共通、UI 抑制だけ分岐する。
+public enum CandidateListTrigger: Sendable {
+    /// 打鍵中。候補ゼロ・機能語のみのときはパネルを出さない。
+    case whileTyping
+    /// Space（候補非表示時）・バックスペース更新など。候補があれば出す。
+    case explicit
+}
+
 /// 確定直後 Backspace で `penalizeAll` するための、直前確定の学習コンテキスト。
 public struct LastConfirmedContext: Equatable {
     public let input: String

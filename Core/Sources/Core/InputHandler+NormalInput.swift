@@ -18,7 +18,7 @@ public extension InputHandler {
         if keyCode == KeyCode.space {
             if !state.composedHiragana.isEmpty {
                 state.absorbPendingIntoComposed()
-                let action = buildCandidateList(autoShow: false)
+                let action = buildCandidateList(trigger: .explicit)
                 applyMarkedText(client: client)
                 return (true, action)
             }
@@ -101,7 +101,7 @@ public extension InputHandler {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         else { flushPendingRomaji() }
         state.composedHiragana += chars
-        let action = buildCandidateList(autoShow: true)
+        let action = buildCandidateList(trigger: .whileTyping)
         applyMarkedText(client: client)
         return (true, action)
     }
@@ -128,7 +128,7 @@ public extension InputHandler {
               && state.composedHiragana.allSatisfy({ $0.isASCII }) else { return nil }
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         state.composedHiragana += chars
-        let action = buildCandidateList(autoShow: true)
+        let action = buildCandidateList(trigger: .whileTyping)
         applyMarkedText(client: client)
         return (true, action)
     }
@@ -141,7 +141,7 @@ public extension InputHandler {
         let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
         let candidateAction: CandidateAction
         if needsRefresh || hasBigramContext {
-            candidateAction = buildCandidateList(autoShow: true)
+            candidateAction = buildCandidateList(trigger: .whileTyping)
         } else {
             candidateAction = .dismiss
         }

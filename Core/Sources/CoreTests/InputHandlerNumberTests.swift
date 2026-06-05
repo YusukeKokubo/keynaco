@@ -60,7 +60,7 @@ final class InputHandlerNumberTests: XCTestCase {
             _ = h.handle(keyCode: 0, characters: String(c), baseCharacters: String(c),
                          modifiers: [], candidate: .hidden, client: client)
         }
-        let action = h.buildCandidateList(autoShow: true)
+        let action = h.buildCandidateList(trigger: .whileTyping)
         guard let payload = action.showPayload else {
             XCTFail("Expected .show for digit input")
             return
@@ -91,7 +91,7 @@ final class InputHandlerNumberTests: XCTestCase {
             _ = handler2.handle(keyCode: 0, characters: String(c), baseCharacters: String(c),
                                 modifiers: [], candidate: .hidden, client: client2)
         }
-        let action = handler2.buildCandidateList(autoShow: true)
+        let action = handler2.buildCandidateList(trigger: .whileTyping)
         guard let payload = action.showPayload else {
             XCTFail("Expected .show"); return
         }

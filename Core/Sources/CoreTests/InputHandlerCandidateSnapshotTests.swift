@@ -248,7 +248,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
         handler.leftSideContext = "prefix"
         typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(autoShow: true),
+        assertLayout(handler.buildCandidateList(trigger: .whileTyping),
                      candidates: ["Zen先頭", "あい", "辞書B", "アイ"],
                      historyEnd: 2, fixedEnd: 2, initialRow: 0)
     }
@@ -256,7 +256,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
     func testSnap_F7_ZenzaiFirstAutoShowNoContext() {
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
         typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(autoShow: true),
+        assertLayout(handler.buildCandidateList(trigger: .whileTyping),
                      candidates: ["あい", "Zen先頭", "辞書B", "アイ"],
                      historyEnd: 1, fixedEnd: 1, initialRow: 0)
     }
@@ -289,13 +289,13 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
                        "AzooKey 候補は日時候補の後ろ・カタカナは末尾: \(p.candidates)")
     }
 
-    // MARK: - H: autoShow
+    // MARK: - H: whileTyping
 
     func testSnap_H1_AutoShowDismissWhenEmpty() {
         useStub(SnapStub([]))
         typeRomaji("ai")
-        guard case .dismiss = handler.buildCandidateList(autoShow: true) else {
-            XCTFail("候補ゼロの autoShow は .dismiss を返すはず"); return
+        guard case .dismiss = handler.buildCandidateList(trigger: .whileTyping) else {
+            XCTFail("候補ゼロの whileTyping は .dismiss を返すはず"); return
         }
     }
 
@@ -303,7 +303,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub([]))
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(autoShow: true),
+        assertLayout(handler.buildCandidateList(trigger: .whileTyping),
                      candidates: ["愛", "アイ"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
     }
