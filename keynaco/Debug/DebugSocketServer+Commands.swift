@@ -463,7 +463,7 @@ extension DebugSocketServer {
             mockClient.removeLastDocumentCharacter()
         }
     }
-    candidateWindow.apply(action: action)
+    applyCandidateAction(action)
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
         let reading = handler.lastConfirmedContext?.input ?? handler.lastCommittedReading ?? ""
@@ -531,6 +531,37 @@ extension DebugSocketServer {
             output: output, reading: reading, converter: posLookupConverter
         ) else { return }
         handler.db.updatePOS(output: output, pos: c.pos)
+    }
+
+    /// `InputController.applyPostKeyDownEffects` の候補ウィンドウ副作用を模倣する。
+    func applyCandidateAction(_ action: CandidateAction) {
+        candidateWindow.apply(action: action)
+        switch action {
+        case .show:
+            if MarkedTextSync.needsCandidateOnly(
+                isBracketMode: handler.isBracketMode,
+                candidateVisible: candidateWindow.isVisible,
+                composedHiragana: handler.state.composedHiragana
+            ) {
+                syncMarkedTextForDebug()
+            }
+        case .selectNext, .selectPrev:
+            syncMarkedTextForDebug()
+        default:
+            break
+        }
+    }
+
+    func syncMarkedTextForDebug() {
+        let text = MarkedTextSync.resolve(
+            isBracketMode: handler.isBracketMode,
+            candidateVisible: candidateWindow.isVisible,
+            composedHiragana: handler.state.composedHiragana,
+            pendingRomaji: handler.state.pendingRomaji,
+            composingText: handler.state.composingText,
+            selectedCandidate: candidateWindow.selectedText
+        )
+        mockClient.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
 }
 
