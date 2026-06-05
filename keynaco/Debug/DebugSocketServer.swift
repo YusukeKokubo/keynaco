@@ -1117,13 +1117,13 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    /// サンドボックス用左文脈。`debugLeftContextOverride` がなければ `LeftContextResolver` に委譲。
+    /// サンドボックス用左文脈。入力組み立ては `LeftContextSource.resolveSandbox`。
     func debugLeftContextPrefix() -> String {
-        if let override = debugLeftContextOverride { return override }
-        return LeftContextResolver.resolve(.sandbox(
+        LeftContextSource.resolveSandbox(
             sessionBuffer: handler.sessionTextBuffer,
-            documentBefore: mockClient.documentBefore
-        ))
+            documentBefore: mockClient.documentBefore,
+            override: debugLeftContextOverride
+        )
     }
 
     /// `makeResponse` / キー処理前に `handler.leftSideContext` を最新化する。

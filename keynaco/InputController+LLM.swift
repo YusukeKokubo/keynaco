@@ -4,31 +4,18 @@ import InputMethodKit
 
 extension InputController {
 
-    /// LLM 用の文脈プレフィックス。合成ルールは `LeftContextResolver` が正本。
+    /// LLM 用の文脈プレフィックス。入力組み立ては `LeftContextSource`、結合は `LeftContextResolver`。
     func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
-        let loc = adapter.selectedRange().location
-        guard loc != NSNotFound else {
-            return LeftContextResolver.resolve(.production(
-                sessionBuffer: handler.sessionTextBuffer,
-                imkBefore: nil,
-                cursorLocationAvailable: false
-            ))
-        }
-
-        var imkBefore: String?
-        if let cache = cachedSurroundingContext {
-            if cache.location == loc, !cache.text.before.isEmpty {
-                imkBefore = cache.text.before
-            } else {
-                cachedSurroundingContext = nil
-            }
-        }
-
-        return LeftContextResolver.resolve(.production(
+        let cached = cachedSurroundingContext.map { (location: $0.location, before: $0.text.before) }
+        let assembly = LeftContextSource.assembleProduction(
             sessionBuffer: handler.sessionTextBuffer,
-            imkBefore: imkBefore,
-            cursorLocationAvailable: true
-        ))
+            cursorLocation: adapter.selectedRange().location,
+            cachedSurrounding: cached
+        )
+        if assembly.shouldClearCache {
+            cachedSurroundingContext = nil
+        }
+        return LeftContextResolver.resolve(assembly.input)
     }
 
     /// 確定語の品詞を AzooKey 辞書で判定し、DB の pos を更新する。

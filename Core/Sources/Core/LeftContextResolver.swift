@@ -1,10 +1,9 @@
 import Foundation
 
-/// Zenzai / AzooKey 用の左文脈プレフィックスを組み立てる。
+/// Zenzai / AzooKey 用の左文脈プレフィックスを組み立てる（結合のみ）。
 ///
-/// `sessionTextBuffer`（keynaco 確定語バッファ）と IMK `before`（キャッシュ済み・location 一致時のみ）
-/// を結合する。IMK 取得・キャッシュ更新は `InputController` 側の責務。
-/// サンドボックス（`DebugSocketServer.debugLeftContextPrefix`）は `mockClient.documentBefore` を `imkBefore` に載せる。
+/// 入力組み立て（本番キャッシュ lookup / サンドボックス `documentBefore`）は `LeftContextSource` が正本。
+/// IMK 取得・キャッシュ更新タイミングは `InputController` 側の責務。
 ///
 /// 結合ルール（PLAN260506b）:
 /// - `before` 単体は最大 `maxBeforeLength` 字（カーソル近傍の末尾側）
@@ -35,7 +34,7 @@ public enum LeftContextResolver {
             self.cursorLocationAvailable = cursorLocationAvailable
         }
 
-        /// 本番: `InputController.resolvedLLMDocumentContextPrefix` が IMK キャッシュから組み立てる入力。
+        /// 本番: `LeftContextSource.assembleProduction` が IMK キャッシュから組み立てる入力。
         public static func production(
             sessionBuffer: String,
             imkBefore: String?,
