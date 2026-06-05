@@ -125,9 +125,11 @@ public extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         let needsRefresh = state.addRomaji(base)
-        let hasBigramContext = lastCommittedOutput != nil && !state.composedHiragana.isEmpty
+        // `addRomaji` は composed 2 文字目まで false。直前確定直後の 1 文字目だけ whileTyping を走らせる（旧名 hasBigramContext）。
+        let shouldRefreshWhileTypingAfterCommit =
+            lastCommittedOutput != nil && !state.composedHiragana.isEmpty
         let candidateAction: CandidateAction
-        if needsRefresh || hasBigramContext {
+        if needsRefresh || shouldRefreshWhileTypingAfterCommit {
             candidateAction = buildCandidateList(trigger: .whileTyping)
         } else {
             candidateAction = .dismiss

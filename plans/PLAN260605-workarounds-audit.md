@@ -32,7 +32,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 | **D-1** | **必須** | IMK SDK が Swift 6 `@MainActor` 隔離に未対応。`handle` / `init` は nonisolated のため `assumeIsolated` / `nonisolated(unsafe)` が現実解。 | **将来**: IMK 薄ブリッジ + `@MainActor` Session（IMKSwift 等を参考に別 PLAN）。 | `assumeIsolated` 除去でコンパイルエラーを確認。 |
 | **D-2** | **仕様** | `KanaKanjiConverter` / Zenzai `llama_context` は非スレッドセーフ。`LockedConverter`（NSLock）は必須。 | ロック削除不可。Actor への閉じ込めは改善候補（`Task.detached` の `commit` 経路含む）。 | ロック外しで変換連打時 SIGABRT。 |
 | **E-1** | **仕様** | `hiddenPendingN`（`nn` → ん + 非表示 n）は標準的ローマ字処理。 | なし。 | `InputHandlerZSequenceTests` / 組成テスト。 |
-| **E-2** | **整理候補** | `hasBigramContext` は bigram DB 廃止後の名残。実態は `committedHistory.last != nil` かつ組成非空で whileTyping 再構築。 | リネーム（例: `shouldRefreshWhileTypingAfterCommit`）+ コメント。挙動変更は別 PR・sandbox。 | 条件を常に true/false に固定して 1 文字目サジェストの差分確認。 |
+| **E-2** | **整理済**（2026-06-05） | 旧 `hasBigramContext` → `shouldRefreshWhileTypingAfterCommit`。実態は `lastCommittedOutput != nil` かつ組成非空で whileTyping 再構築。 | 挙動変更・条件見直しは別 PR・sandbox。 | 条件を常に true/false に固定して 1 文字目サジェストの差分確認。 |
 | **E-3** | **仕様** | 同一ターン内の handler 状態は pre 退避必須（1 キー遅延バグの実績）。 | なし。 | `CLAUDE.md`「キー入力の挙動」参照。 |
 
 ---
@@ -44,7 +44,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 | A-1 | Gemini は「`.inputmethod.`」と記載したが、本リポジトリの記録・実装は **ID に `inputmethod` 文字列を含む**（例: `com.yusuke.inputmethod.keynaco`）。厳密なドット区切り形式は未検証。 |
 | B-1 | `activateServer` でも `ignoreNextModeSwitch = true`（`InputController.swift`）。削除時は英数キー以外のモードイベント経路も見る。 |
 | C-2 | `runKeyDown` は consumed に関係なく `applyPostKeyDownEffects` を呼ぶ（203–204 行付近の意図）。狭める場合は marked 同期と surrounding 更新を分離検討。 |
-| E-2 | `addRomaji` は `count >= 2` まで `needsRefresh == false`。`hasBigramContext` があると **確定直後の 1 文字目だけ** 余分に `buildCandidateList` が走る。 |
+| E-2 | `addRomaji` は `count >= 2` まで `needsRefresh == false`。`shouldRefreshWhileTypingAfterCommit` があると **確定直後の 1 文字目だけ** 余分に `buildCandidateList` が走る。 |
 
 ### 関連ファイル
 
@@ -69,7 +69,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 
 ### まず整理してよい（リスク低〜中、要テスト）
 
-1. **E-2** — `hasBigramContext` のリネーム・コメント・条件の見直し
+1. ~~**E-2** — `hasBigramContext` のリネーム・コメント~~ ✅ 2026-06-05（`shouldRefreshWhileTypingAfterCommit`）
 2. **C-2** — 未消費キーでの post-effects 限定化
 3. **B-1** — `ignoreNextModeSwitch`（実機で二重送信が消えていれば削除）
 
@@ -85,7 +85,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 | Step | 内容 | 完了条件 |
 |------|------|----------|
 | 1 | B-1 実機テスト（組成中→英数→かな、`activateServer` 直後） | 結果を本 PLAN の B-1 行に追記 |
-| 2 | E-2 リネームのみ PR | 挙動不変・テスト緑 |
+| 2 | ~~E-2 リネームのみ PR~~ | ✅ 2026-06-05 — `InputHandler+NormalInput.swift` |
 | 3 | C-2 `consumed` 限定 PR | sandbox: marked 同期・VS Code/Cursor Enter・高速入力 |
 | 4 | B-1 フラグ削除 PR | Step 1 で再現なしの場合のみ |
 
