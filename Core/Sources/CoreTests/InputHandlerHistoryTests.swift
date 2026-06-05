@@ -95,7 +95,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         press(keyCode: 53)  // Escape で候補ウィンドウを閉じる
         typeRomaji("toukyou")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, let historyEnd, _, _, _) = action else {
+        guard case .show(let candidates, let historyEnd, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.prefix(historyEnd).contains("東京"),

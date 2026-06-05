@@ -128,8 +128,8 @@ class InputController: IMKInputController, @unchecked Sendable {
         switch action {
         case .none:
             break
-        case .show(let candidates, let historyEnd, let initialRow, let predictionEnd, let fixedEnd):
-            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, predictionEnd: predictionEnd, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
+        case .show(let candidates, let historyEnd, let initialRow, let fixedEnd):
+            candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
         case .dismiss:
             candidateWindow.dismiss()
         case .selectNext:

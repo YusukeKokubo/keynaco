@@ -84,7 +84,7 @@ public extension InputHandler {
         if state.composingText.isEmpty {
             bracketCandidates = options
             client.setMarkedText(options[0], selectionRange: NSRange(location: options[0].count, length: 0))
-            return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, predictionEnd: 0, fixedEnd: 0))
+            return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, fixedEnd: 0))
         }
         flushPendingRomaji()
         state.composedHiragana += options[0]

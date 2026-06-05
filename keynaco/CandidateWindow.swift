@@ -79,10 +79,8 @@ final class CandidateWindow: NSPanel {
     private(set) var isExplicitlySelected: Bool = false
     /// スクロール範囲外の固定行数（削除ボタンを非表示にする行数）
     private(set) var fixedRowCount: Int = 0
-    /// 履歴セクションの末尾インデックス（この行の後にセパレータを描画）
+    /// 履歴セクションの末尾インデックス（fixedRowCount <= row < historySectionEnd が履歴行）
     private(set) var historySectionEnd: Int = 0
-    /// 予測セクションの末尾インデックス（fixedRowCount <= row < predictionSectionEnd が予測行）
-    private var predictionSectionEnd: Int = 0
     /// Zenzai がプロモートした候補の行インデックス（nil = Zenzai 非発火）
     private var zenzaiRowIndex: Int? = nil
 
@@ -135,10 +133,9 @@ final class CandidateWindow: NSPanel {
 
     // MARK: - Public API
 
-    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, predictionEnd: Int = 0, fixedSectionEnd: Int? = nil, zenzaiRow: Int? = nil, near rect: NSRect) {
+    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, fixedSectionEnd: Int? = nil, zenzaiRow: Int? = nil, near rect: NSRect) {
         self.candidates = candidates
         self.historySectionEnd = historySectionEnd
-        self.predictionSectionEnd = predictionEnd
         self.selectedRow = candidates.isEmpty ? 0 : min(initialRow, candidates.count - 1)
         self.isExplicitlySelected = false
         self.fixedRowCount = fixedSectionEnd ?? initialRow
@@ -185,7 +182,6 @@ final class CandidateWindow: NSPanel {
         isExplicitlySelected = false
         fixedRowCount = 0
         historySectionEnd = 0
-        predictionSectionEnd = 0
         zenzaiRowIndex = nil
     }
 
@@ -214,7 +210,6 @@ final class CandidateWindow: NSPanel {
     func removeCandidate(at row: Int) {
         guard row >= 0, row < candidates.count else { return }
         candidates.remove(at: row)
-        if row < predictionSectionEnd { predictionSectionEnd -= 1 }
         if row < historySectionEnd { historySectionEnd -= 1 }
         tableView.reloadData()
         if candidates.isEmpty {
@@ -256,24 +251,22 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
         rowView.label.stringValue = candidates[row]
         rowView.deleteButton.tag = row
         rowView.deleteButton.isHidden = row < fixedRowCount || row >= historySectionEnd
-        rowView.isHistory = row >= predictionSectionEnd && row < historySectionEnd
+        rowView.isHistory = row >= fixedRowCount && row < historySectionEnd
 
         let sectionLabelText: String
         if row == zenzaiRowIndex {
             sectionLabelText = "Zenzai"
         } else {
             switch row {
-            case fixedRowCount where row < predictionSectionEnd:      sectionLabelText = "予測"
-            case predictionSectionEnd where row < historySectionEnd:  sectionLabelText = "履歴"
+            case fixedRowCount where row < historySectionEnd:  sectionLabelText = "履歴"
             case historySectionEnd where historySectionEnd < candidates.count: sectionLabelText = "辞書"
-            default:                                                   sectionLabelText = ""
+            default:                                           sectionLabelText = ""
             }
         }
         rowView.sectionLabel.stringValue = sectionLabelText
         rowView.sectionLabel.textColor = row == zenzaiRowIndex ? .systemPurple : .tertiaryLabelColor
 
-        let showDivider = (predictionSectionEnd > fixedRowCount && row == predictionSectionEnd - 1 && predictionSectionEnd <= historySectionEnd)
-            || (row == historySectionEnd - 1 && historySectionEnd < candidates.count)
+        let showDivider = row == historySectionEnd - 1 && historySectionEnd < candidates.count
         rowView.sectionDivider.isHidden = !showDivider
 
         return rowView

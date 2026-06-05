@@ -31,7 +31,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         handler.leftSideContext = "左文脈"
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+        guard case .show(let candidates, _, _, let fixedEnd) = action else {
             XCTFail(".show を返すはず: \(action)"); return
         }
         XCTAssertEqual(candidates[fixedEnd - 1], top1, "Zenzai top-1 が固定枠末尾")
@@ -42,7 +42,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         handler.leftSideContext = "ctx"
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
-        guard case .show(_, _, _, _, let fixedEnd) = action else {
+        guard case .show(_, _, _, let fixedEnd) = action else {
             XCTFail(".show を返すはず"); return
         }
         let promotedRow = fixedEnd - 1
@@ -54,7 +54,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         handler.leftSideContext = "ctx"
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates.filter { $0 == top1 }.count, 1, "辞書ブロックに top-1 が重複して現れない")
@@ -68,7 +68,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         handler.db.record(input: "したい", output: "したい時に")
         typeRomaji("shitai")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("士大夫"), "Zenzai top-1 は候補に残る: \(candidates)")

@@ -3,7 +3,7 @@ import AppKit
 /// 候補ウィンドウに対する操作指示
 public enum CandidateAction: Sendable {
     case none
-    case show(candidates: [String], historyEnd: Int, initialRow: Int, predictionEnd: Int, fixedEnd: Int)
+    case show(candidates: [String], historyEnd: Int, initialRow: Int, fixedEnd: Int)
     case dismiss
     case selectNext
     case selectPrev

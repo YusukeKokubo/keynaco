@@ -61,7 +61,7 @@ final class InputHandlerNumberTests: XCTestCase {
                          modifiers: [], candidate: .hidden, client: client)
         }
         let action = h.buildCandidateList(autoShow: true)
-        guard case .show(let cands, _, _, _, _) = action else {
+        guard case .show(let cands, _, _, _) = action else {
             XCTFail("Expected .show for digit input")
             return
         }
@@ -92,7 +92,7 @@ final class InputHandlerNumberTests: XCTestCase {
                                 modifiers: [], candidate: .hidden, client: client2)
         }
         let action = handler2.buildCandidateList(autoShow: true)
-        guard case .show(let cands, let historyEnd, _, _, let fixedEnd) = action else {
+        guard case .show(let cands, let historyEnd, _, let fixedEnd) = action else {
             XCTFail("Expected .show"); return
         }
         // 履歴セクション（fixedEnd..<historyEnd）に "１２３４" が含まれないこと

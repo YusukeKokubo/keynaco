@@ -173,7 +173,6 @@ final class DebugSocketServer: @unchecked Sendable {
         "selectedRow": "int",
         "selectedText": "string|null",
         "historyEnd": "int",
-        "predictionEnd": "int",
         "fixedEnd": "int",
         "candidates": "array<string>",
         "committedHistory": "array<string>",
@@ -753,7 +752,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
         "isAsciiMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
-        "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
+        "historyEnd", "fixedEnd", "candidates", "committedHistory",
         "candidateEntries", "changed", "explain",
         "ok", "matched", "timedOut", "waitField", "state", "steps", "last",
     ]
@@ -1050,7 +1049,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "candidateVisible":   snap.candidateVisible,
             "selectedRow":        snap.selectedRow,
             "historyEnd":         snap.historyEnd,
-            "predictionEnd":      candidateWindow.predictionEnd,
             "fixedEnd":           snap.fixedEnd,
             "candidates":         snap.candidates,
             "committedHistory":   snap.committedHistory,
@@ -1062,7 +1060,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,
                 fixedEnd: snap.fixedEnd,
-                predictionEnd: candidateWindow.predictionEnd,
                 historyEnd: snap.historyEnd
             ),
         ]
@@ -1073,14 +1070,10 @@ final class DebugSocketServer: @unchecked Sendable {
     static func candidateSection(
         row: Int,
         fixedEnd: Int,
-        predictionEnd: Int,
         historyEnd: Int
     ) -> String {
         if row < fixedEnd {
             return "fixed"
-        }
-        if row < predictionEnd {
-            return "prediction"
         }
         if row < historyEnd {
             return "history"
@@ -1091,7 +1084,6 @@ final class DebugSocketServer: @unchecked Sendable {
     static func makeCandidateEntries(
         candidates: [String],
         fixedEnd: Int,
-        predictionEnd: Int,
         historyEnd: Int
     ) -> [[String: Any]] {
         candidates.enumerated().map { idx, text in
@@ -1101,7 +1093,6 @@ final class DebugSocketServer: @unchecked Sendable {
                 "section": candidateSection(
                     row: idx,
                     fixedEnd: fixedEnd,
-                    predictionEnd: predictionEnd,
                     historyEnd: historyEnd
                 )
             ]
@@ -1112,7 +1103,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
         "isAsciiMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
-        "historyEnd", "predictionEnd", "fixedEnd", "candidates", "committedHistory",
+        "historyEnd", "fixedEnd", "candidates", "committedHistory",
         "candidateEntries"
     ]
 

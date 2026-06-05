@@ -70,7 +70,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
         handler.leftSideContext = ""
         typeRomaji("kaisai")
         let action = pressSpace()
-        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+        guard case .show(let candidates, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
         XCTAssertEqual(fixedEnd, 0, "左文脈なし: fixedCount=0, Zenzai未発火 → fixedEnd=0")
@@ -84,7 +84,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
         handler.leftSideContext = "東京で"
         typeRomaji("kaisai")
         let action = pressSpace()
-        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+        guard case .show(let candidates, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
         XCTAssertEqual(fixedEnd, 1, "左文脈あり: Zenzai top-1 昇格で fixedEnd = 1 のはず")
@@ -103,7 +103,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
 
         typeRomaji("kaisai")
         let action = pressSpace()
-        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+        guard case .show(let candidates, _, _, let fixedEnd) = action else {
             XCTFail("Expected .show but got \(action)"); return
         }
         XCTAssertEqual(fixedEnd, 1, "sessionTextBuffer 由来の左文脈で Zenzai 発火 → fixedEnd = 1")

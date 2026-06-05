@@ -14,7 +14,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "。")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("。"))
             XCTAssertTrue(candidates.contains("."))
         } else {
@@ -27,7 +27,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "、")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("、"))
             XCTAssertTrue(candidates.contains(","))
         } else {
@@ -89,7 +89,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let result = type(chars: "<", base: ",", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "＜")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("＜"))
         } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
@@ -100,7 +100,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let result = type(chars: ">", base: ".", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "＞")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("＞"))
         } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
@@ -139,7 +139,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "「")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("「"))
             XCTAssertTrue(candidates.contains("【"))
         } else {
@@ -151,7 +151,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let result = type(chars: "]", base: "]")
         XCTAssertTrue(result.consumed)
         XCTAssertEqual(client.markedText, "」")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("」"))
             XCTAssertTrue(candidates.contains("】"))
         } else {
@@ -163,7 +163,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let result = type(chars: "(", base: "9", modifiers: .shift)
         XCTAssertTrue(result.consumed)
         XCTAssertEqual(client.markedText, "（")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("（"))
         } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
@@ -331,7 +331,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "？")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("？"))
             XCTAssertTrue(candidates.contains("?"))
         } else {
@@ -345,7 +345,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "？")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("？"))
             XCTAssertTrue(candidates.contains("?"))
         } else {
@@ -368,7 +368,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         XCTAssertTrue(client.inserted.isEmpty)
         XCTAssertEqual(client.markedText, "！")
-        if case .show(let candidates, _, _, _, _) = result.candidateAction {
+        if case .show(let candidates, _, _, _) = result.candidateAction {
             XCTAssertTrue(candidates.contains("！"))
             XCTAssertTrue(candidates.contains("!"))
         } else {

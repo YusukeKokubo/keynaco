@@ -5,7 +5,6 @@ public struct CandidateSection: Sendable {
         case fixedHiragana  // ひらがな先頭固定（hiraganaPreferred 時）
         case userDict       // ユーザー辞書
         case zenzaiTop1     // Zenzai top-1 プロモート
-        case prediction     // n-gram 予測
         case highHistory    // 高スコア履歴
         case number         // 数値変換
         case dateTime       // 日時変換
@@ -36,68 +35,39 @@ public enum InitialRowPolicy: Sendable {
 // MARK: - CandidateLayout
 
 /// 候補リストとそのセクション境界をまとめた値。
-/// `0 <= fixedEnd <= predictionEnd <= historyEnd <= candidates.count` を保証する。
+/// `0 <= fixedEnd <= historyEnd <= candidates.count` を保証する。
 public struct CandidateLayout: Sendable {
 
     public let candidates: [String]
     /// .fixedHiragana / .userDict / .zenzaiTop1 の末尾インデックス
     public let fixedEnd: Int
-    /// fixedEnd + .prediction の末尾
-    public let predictionEnd: Int
-    /// predictionEnd + .highHistory の末尾
+    /// fixedEnd + .highHistory の末尾（Shift+Delete で削除可能な履歴ブロックの終端）
     public let historyEnd: Int
     public let initialRow: Int
 
-    // MARK: 既存の assembler が使うシンプルなイニシャライザ（Step 3 で段階的に移行）
+    private static let fixedSectionKinds: Set<CandidateSection.Kind> = [
+        .fixedHiragana, .userDict, .zenzaiTop1,
+    ]
 
-    public init(
-        candidates: [String],
-        fixedEnd: Int,
-        predictionEnd: Int,
-        historyEnd: Int,
-        initialRow: Int
-    ) {
-        assert(fixedEnd >= 0, "fixedEnd >= 0")
-        assert(predictionEnd >= fixedEnd, "predictionEnd >= fixedEnd")
-        assert(historyEnd >= predictionEnd, "historyEnd >= predictionEnd")
-        assert(historyEnd <= candidates.count, "historyEnd <= candidates.count")
-        assert(initialRow >= 0 && initialRow < max(1, candidates.count), "initialRow in [0, count)")
-        self.candidates = candidates
-        self.fixedEnd = fixedEnd
-        self.predictionEnd = predictionEnd
-        self.historyEnd = historyEnd
-        self.initialRow = initialRow
-    }
-
-    // MARK: セクション宣言的イニシャライザ（Step 2 で追加・Step 3 で assembler が移行）
-
-    // 現行の assembleCandidateList と一致する順序。
-    // .number / .dateTime を .azooKeyDict より前に置くことで historyEnd への挿入と同じ効果を再現する。
     public static let defaultSectionOrder: [CandidateSection.Kind] = [
         .fixedHiragana,
         .userDict,
         .zenzaiTop1,
-        .prediction,
         .highHistory,
         .number, .dateTime,
         .azooKeyDict,
         .katakana,
     ]
 
-    /// Zenzai top-1 をひらがな固定より前に置く順序（履歴・予測なしでZenzai提案ありの場合に使用）
+    /// Zenzai top-1 をひらがな固定より前に置く順序（履歴なしで Zenzai 提案ありの場合に使用）
     public static let zenzaiFirstSectionOrder: [CandidateSection.Kind] = [
         .userDict,
         .zenzaiTop1,
         .fixedHiragana,
-        .prediction,
         .highHistory,
         .number, .dateTime,
         .azooKeyDict,
         .katakana,
-    ]
-
-    private static let fixedSectionKinds: Set<CandidateSection.Kind> = [
-        .fixedHiragana, .userDict, .zenzaiTop1,
     ]
 
     public init(
@@ -113,7 +83,6 @@ public struct CandidateLayout: Sendable {
         var seen = Set<String>()
         var result: [String] = []
         var fixedEndAcc = 0
-        var predictionEndAcc: Int? = nil
         var historyEndAcc: Int? = nil
 
         for kind in sectionOrder {
@@ -124,9 +93,6 @@ public struct CandidateLayout: Sendable {
             if Self.fixedSectionKinds.contains(kind) {
                 fixedEndAcc = result.count
             }
-            if kind == .prediction, predictionEndAcc == nil {
-                predictionEndAcc = result.count
-            }
             if kind == .highHistory, historyEndAcc == nil {
                 historyEndAcc = result.count
             }
@@ -134,13 +100,10 @@ public struct CandidateLayout: Sendable {
 
         candidates = result
         fixedEnd = fixedEndAcc
-        predictionEnd = predictionEndAcc ?? fixedEndAcc
-        historyEnd = historyEndAcc ?? predictionEndAcc ?? fixedEndAcc
+        historyEnd = historyEndAcc ?? fixedEndAcc
 
-        assert(fixedEnd <= predictionEnd,
-               "fixedEnd (\(fixedEndAcc)) > predictionEnd (\(predictionEnd))")
-        assert(predictionEnd <= historyEnd,
-               "predictionEnd (\(predictionEnd)) > historyEnd (\(historyEnd))")
+        assert(fixedEnd <= historyEnd,
+               "fixedEnd (\(fixedEndAcc)) > historyEnd (\(historyEnd))")
         assert(historyEnd <= result.count,
                "historyEnd (\(historyEnd)) > candidates.count (\(result.count))")
 

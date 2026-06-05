@@ -24,7 +24,6 @@ final class CandidateLayoutTests: XCTestCase {
         let l = layout()
         XCTAssertEqual(l.candidates, [])
         XCTAssertEqual(l.fixedEnd, 0)
-        XCTAssertEqual(l.predictionEnd, 0)
         XCTAssertEqual(l.historyEnd, 0)
         XCTAssertEqual(l.initialRow, 0)
     }
@@ -33,7 +32,6 @@ final class CandidateLayoutTests: XCTestCase {
         let l = layout((.azooKeyDict, ["辞書A", "辞書B"]))
         XCTAssertEqual(l.candidates, ["辞書A", "辞書B"])
         XCTAssertEqual(l.fixedEnd, 0)
-        XCTAssertEqual(l.predictionEnd, 0)
         XCTAssertEqual(l.historyEnd, 0)
         XCTAssertEqual(l.initialRow, 0)
     }
@@ -44,7 +42,6 @@ final class CandidateLayoutTests: XCTestCase {
         let l = layout((.fixedHiragana, ["の"]), (.azooKeyDict, ["辞書A"]), policy: .firstMatching("の"))
         XCTAssertEqual(l.candidates, ["の", "辞書A"])
         XCTAssertEqual(l.fixedEnd, 1)
-        XCTAssertEqual(l.predictionEnd, 1)
         XCTAssertEqual(l.historyEnd, 1)
         XCTAssertEqual(l.initialRow, 0)
     }
@@ -53,7 +50,6 @@ final class CandidateLayoutTests: XCTestCase {
         let l = layout((.userDict, ["UD1", "UD2"]), (.azooKeyDict, ["辞書A"]))
         XCTAssertEqual(l.candidates, ["UD1", "UD2", "辞書A"])
         XCTAssertEqual(l.fixedEnd, 2)
-        XCTAssertEqual(l.predictionEnd, 2)
         XCTAssertEqual(l.historyEnd, 2)
         XCTAssertEqual(l.initialRow, 2)  // afterFixed → fixedEnd=2
     }
@@ -62,25 +58,22 @@ final class CandidateLayoutTests: XCTestCase {
         let l = layout((.zenzaiTop1, ["Zen"]), (.azooKeyDict, ["辞書A"]))
         XCTAssertEqual(l.candidates, ["Zen", "辞書A"])
         XCTAssertEqual(l.fixedEnd, 1)
-        XCTAssertEqual(l.predictionEnd, 1)
         XCTAssertEqual(l.historyEnd, 1)
         XCTAssertEqual(l.initialRow, 1)
     }
 
     func testAllBoundaries() {
-        // fixedEnd=4, predictionEnd=7, historyEnd=9
+        // fixedEnd=4, historyEnd=6
         let l = layout(
             (.fixedHiragana, ["の"]),
             (.userDict, ["UD1", "UD2"]),
             (.zenzaiTop1, ["Zen"]),
-            (.prediction, ["P1", "P2", "P3"]),
             (.highHistory, ["H1", "H2"]),
             (.azooKeyDict, ["A1", "A2"])
         )
-        XCTAssertEqual(l.candidates, ["の", "UD1", "UD2", "Zen", "P1", "P2", "P3", "H1", "H2", "A1", "A2"])
+        XCTAssertEqual(l.candidates, ["の", "UD1", "UD2", "Zen", "H1", "H2", "A1", "A2"])
         XCTAssertEqual(l.fixedEnd, 4)
-        XCTAssertEqual(l.predictionEnd, 7)
-        XCTAssertEqual(l.historyEnd, 9)
+        XCTAssertEqual(l.historyEnd, 6)
         XCTAssertEqual(l.initialRow, 4)
     }
 
@@ -115,12 +108,12 @@ final class CandidateLayoutTests: XCTestCase {
     }
 
     func testDedupFirstOccurrenceWins() {
-        // prediction に "X" → azooKeyDict の "X" は除外。固定端は変わらない
+        // highHistory に "X" → azooKeyDict の "X" は除外
         let l = layout(
-            (.prediction, ["X", "P1"]),
+            (.highHistory, ["X", "H1"]),
             (.azooKeyDict, ["X", "A1"])
         )
-        XCTAssertEqual(l.candidates, ["X", "P1", "A1"])
+        XCTAssertEqual(l.candidates, ["X", "H1", "A1"])
         XCTAssertEqual(l.candidates.filter { $0 == "X" }.count, 1)
     }
 
@@ -183,30 +176,22 @@ final class CandidateLayoutTests: XCTestCase {
     // MARK: - カスタム sectionOrder
 
     func testCustomSectionOrderWithoutFixedSections() {
-        let customOrder: [CandidateSection.Kind] = [.prediction, .highHistory, .azooKeyDict]
+        let customOrder: [CandidateSection.Kind] = [.highHistory, .azooKeyDict]
         let l = layout(
-            (.prediction, ["P1"]),
             (.highHistory, ["H1"]),
             (.azooKeyDict, ["A1"]),
             order: customOrder
         )
-        XCTAssertEqual(l.candidates, ["P1", "H1", "A1"])
+        XCTAssertEqual(l.candidates, ["H1", "A1"])
         XCTAssertEqual(l.fixedEnd, 0)
-        XCTAssertEqual(l.predictionEnd, 1)
-        XCTAssertEqual(l.historyEnd, 2)
+        XCTAssertEqual(l.historyEnd, 1)
     }
 
     // MARK: - 不変条件
 
-    func testInvariantFixedEndLeqPredictionEnd() {
-        // fixedEnd <= predictionEnd は常に成立
-        let l = layout((.fixedHiragana, ["の"]), (.prediction, ["P"]), (.azooKeyDict, ["A"]))
-        XCTAssertLessThanOrEqual(l.fixedEnd, l.predictionEnd)
-    }
-
-    func testInvariantPredictionEndLeqHistoryEnd() {
-        let l = layout((.prediction, ["P"]), (.highHistory, ["H"]), (.azooKeyDict, ["A"]))
-        XCTAssertLessThanOrEqual(l.predictionEnd, l.historyEnd)
+    func testInvariantFixedEndLeqHistoryEnd() {
+        let l = layout((.fixedHiragana, ["の"]), (.highHistory, ["H"]), (.azooKeyDict, ["A"]))
+        XCTAssertLessThanOrEqual(l.fixedEnd, l.historyEnd)
     }
 
     func testInvariantHistoryEndLeqCandidatesCount() {

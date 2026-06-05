@@ -16,7 +16,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("スペースで .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("あ"))
@@ -30,7 +30,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("あい"), "ひらがなが候補に含まれるはず")
@@ -41,7 +41,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("ア"), "カタカナが候補に含まれるはず")
@@ -54,7 +54,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "たのしい")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail("Space で .show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("楽しい"), "「楽しい」が候補に含まれるはず: \(candidates)")
@@ -76,7 +76,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertGreaterThan(candidates.count, 2, "azooKey が候補を返すはず")
@@ -88,7 +88,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates[initialRow], "愛", "履歴候補「愛」が初期選択")
@@ -100,7 +100,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordPrefixes(reading: "の", output: "ノックアウト")
         typeRomaji("no")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(initialRow, 0)
@@ -111,7 +111,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordPrefixes(reading: "の", output: "の")
         typeRomaji("no")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         let noIdx = candidates.firstIndex(of: "の")
@@ -130,7 +130,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordPrefixes(reading: "とか", output: "戸籍")
         typeRomaji("toka")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates[initialRow], "とか")
@@ -140,7 +140,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordPrefixes(reading: "では", output: "出羽")
         typeRomaji("deha")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates[initialRow], "では")
@@ -150,7 +150,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.recordPrefixes(reading: "これ", output: "己れ")
         typeRomaji("kore")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertEqual(candidates[initialRow], "これ")
@@ -162,7 +162,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.state.composedHiragana = "ぐろとすく"
         handler.state.pendingRomaji = ""
         let action = handler.buildCandidateList(autoShow: true)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("グロトスク"), "未知語でもカタカナ候補が表示されるはず")
@@ -176,7 +176,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.state.composedHiragana = "よいのでは"
         handler.state.pendingRomaji = ""
         let action = handler.buildCandidateList(autoShow: true)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertFalse(candidates.contains("ヨイノデハ"), "変換候補がある場合はカタカナを除外")
@@ -186,7 +186,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "あい")
         type(chars: "a", base: "a")
         let (_, action) = type(chars: "i", base: "i")
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("あい"), "ひらがなが履歴候補として現れるはず")
@@ -197,7 +197,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "アイ")
         type(chars: "a", base: "a")
         let (_, action) = type(chars: "i", base: "i")
-        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+        guard case .show(let candidates, _, let initialRow, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("アイ"), "カタカナが履歴候補として現れるはず")
@@ -238,7 +238,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "u", base: "u")
         let (consumed, action) = press(keyCode: 49)
         XCTAssertTrue(consumed)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(candidates.contains("う"))
@@ -410,7 +410,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "かいしゃ", output: "Acme Corp")
         typeRomaji("kaisha")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains("Acme Corp"), "ユーザー辞書エントリが候補に含まれるはず: \(candidates)")
@@ -420,7 +420,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "かいしゃ", output: "Acme Corp")
         typeRomaji("kaisha")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+        guard case .show(let candidates, _, _, let fixedEnd) = action else {
             XCTFail(".show を返すはず"); return
         }
         guard let udRow = candidates.firstIndex(of: "Acme Corp") else {
@@ -433,7 +433,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "かいしゃ", output: "Acme Corp")
         typeRomaji("kais")  // "かいs" — 前方一致（未完成）
         let (_, action) = press(keyCode: 49)
-        if case .show(let candidates, _, _, _, _) = action {
+        if case .show(let candidates, _, _, _) = action {
             XCTAssertFalse(candidates.contains("Acme Corp"), "前方一致ではユーザー辞書エントリが現れないはず")
         }
     }
@@ -451,7 +451,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         handler.db.clock = { t0 + 40 * 86400 }
         typeRomaji("ai")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず: \(action)"); return
         }
         XCTAssertFalse(candidates.contains(marker), "低スコア履歴は候補に載せない")
@@ -479,7 +479,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         typeRomaji("ha")
         XCTAssertEqual(handler.state.composedHiragana, "は")
         let action = handler.buildCandidateList(autoShow: true)
-        guard case .show(let candidates, let historyEnd, let initialRow, _, let fixedEnd) = action else {
+        guard case .show(let candidates, let historyEnd, let initialRow, let fixedEnd) = action else {
             XCTFail("助詞読みの 1 モーラ autoShow は .show を返すはず: \(action)"); return
         }
         XCTAssertEqual(candidates.first, "は", "ひらがなが row 0 に来るはず: \(candidates)")
@@ -503,7 +503,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         typeRomaji("jo")
         XCTAssertEqual(handler.state.composedHiragana, "じょ")
         let action = handler.buildCandidateList(autoShow: true)
-        guard case .show(let candidates, _, _, _, let fixedEnd) = action else {
+        guard case .show(let candidates, _, _, let fixedEnd) = action else {
             XCTFail("非助詞読みの 1 モーラ autoShow は .show を返すはず: \(action)"); return
         }
         XCTAssertEqual(candidates.first, "情報", "非助詞では過去語が先頭: \(candidates)")
@@ -515,7 +515,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
     func testKyouIncludesDateCandidates() {
         typeRomaji("kyou")
         let (_, action) = press(keyCode: 49)
-        guard case .show(let candidates, _, _, _, _) = action else {
+        guard case .show(let candidates, _, _, _) = action else {
             XCTFail(".show を返すはず: \(action)"); return
         }
         XCTAssertTrue(candidates.contains { $0.contains("-") }, "ISO日付が候補に含まれるはず: \(candidates)")

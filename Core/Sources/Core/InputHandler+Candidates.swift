@@ -2,7 +2,7 @@ import AppKit
 
 // MARK: - 候補リスト構築
 //
-// `buildCandidateList` : 候補列の組み立て（履歴・bi-gram・azooKey 統合）
+// `buildCandidateList` : 候補列の組み立て（履歴・AzooKey 統合）
 // 括弧モード・候補表示中は InputHandler+BracketMode.swift
 
 public extension InputHandler {
@@ -32,7 +32,7 @@ public extension InputHandler {
     /// その結果から事後計算することで、リスト構築ロジックを純粋に保つ。
     private func resolveZenzaiRow(action: CandidateAction, zenzaiPromoted: String?) -> Int? {
         guard let top1 = zenzaiPromoted,
-              case .show(let candidates, _, _, _, _) = action,
+              case .show(let candidates, _, _, _) = action,
               let idx = candidates.firstIndex(of: top1) else { return nil }
         return idx
     }
@@ -44,8 +44,6 @@ public extension InputHandler {
         let highHistory: [String]
         let totalHistoryCount: Int
         let highHistoryCount: Int
-        let uniquePredictions: [String]
-        let predictCount: Int
         let zenzaiPromoted: String?
         let azooKeyUniq: [String]
         let historySeen: Set<String>
@@ -96,10 +94,6 @@ public extension InputHandler {
         let azooKeyUniq = azooKeyCandidates.filter {
             !historySeen.contains($0) && $0 != zenzaiPromoted
         }
-        let candidateSeen = historySeen.union(Set(azooKeyCandidates))
-        let uniquePredictions: [String] = []
-        let predictCount = 0
-
         return CandidateListSources(
             h: h,
             azooKeyCandidates: azooKeyCandidates,
@@ -107,8 +101,6 @@ public extension InputHandler {
             highHistory: highHistory,
             totalHistoryCount: totalHistoryCount,
             highHistoryCount: highHistoryCount,
-            uniquePredictions: uniquePredictions,
-            predictCount: predictCount,
             zenzaiPromoted: zenzaiPromoted,
             azooKeyUniq: azooKeyUniq,
             historySeen: historySeen
@@ -174,7 +166,6 @@ public extension InputHandler {
         autoShow
             && fixedSlot == .none
             && !hiraganaInHistory
-            && sources.predictCount == 0
             && sources.highHistoryCount == 0
             && sources.totalHistoryCount == 0
             && sources.userDictRaw.isEmpty
@@ -205,13 +196,10 @@ public extension InputHandler {
         let hiragana = state.composedHiragana
         let katakana = KanaUtils.hiraganaToKatakana(hiragana)
 
-        let basePool = sources.uniquePredictions + sources.highHistory + sources.azooKeyUniq
-        let allCandidatesSeen = sources.historySeen
-            .union(Set(sources.azooKeyCandidates))
-            .union(Set(sources.uniquePredictions))
+        let allCandidatesSeen = sources.historySeen.union(Set(sources.azooKeyCandidates))
 
         var sections: [CandidateSection] = []
-        var insertedSet = Set(basePool)
+        var insertedSet = Set(sources.highHistory + sources.azooKeyUniq)
 
         switch fixedSlot {
         case .hiragana:
@@ -245,9 +233,6 @@ public extension InputHandler {
             sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
         }
 
-        if !sources.uniquePredictions.isEmpty {
-            sections.append(CandidateSection(kind: .prediction, items: sources.uniquePredictions))
-        }
         if !sources.highHistory.isEmpty {
             sections.append(CandidateSection(kind: .highHistory, items: sources.highHistory))
         }
@@ -295,7 +280,6 @@ public extension InputHandler {
                     candidates: candidates,
                     historyEnd: candidates.count,
                     initialRow: 0,
-                    predictionEnd: candidates.count,
                     fixedEnd: 1
                 )
             }
@@ -308,21 +292,17 @@ public extension InputHandler {
                 candidates: recents,
                 historyEnd: recents.count,
                 initialRow: 0,
-                predictionEnd: recents.count,
                 fixedEnd: 0
             )
         }
 
-        if autoShow && sources.totalHistoryCount == 0 && sources.azooKeyCandidates.isEmpty && sources.predictCount == 0
+        if autoShow && sources.totalHistoryCount == 0 && sources.azooKeyCandidates.isEmpty
             && sources.userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
             return .dismiss
         }
 
         let hiragana = state.composedHiragana
-        let predictCount = sources.predictCount
-        let highHistoryCount = sources.highHistoryCount
-        let basePool = sources.uniquePredictions + sources.highHistory + sources.azooKeyUniq
-        let hiraganaInHistory = basePool.prefix(predictCount + highHistoryCount).contains(hiragana)
+        let hiraganaInHistory = sources.highHistory.contains(hiragana)
         let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
 
         let addsDefaultFixedHiragana = shouldAddDefaultFixedHiragana(
@@ -368,7 +348,6 @@ public extension InputHandler {
             candidates: layout.candidates,
             historyEnd: layout.historyEnd,
             initialRow: layout.initialRow,
-            predictionEnd: layout.predictionEnd,
             fixedEnd: layout.fixedEnd
         )
     }

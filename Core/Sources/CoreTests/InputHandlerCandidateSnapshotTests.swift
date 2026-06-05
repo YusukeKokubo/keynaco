@@ -19,15 +19,14 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     private func assertLayout(
         _ action: CandidateAction,
-        candidates: [String], historyEnd: Int, predictionEnd: Int, fixedEnd: Int, initialRow: Int,
+        candidates: [String], historyEnd: Int, fixedEnd: Int, initialRow: Int,
         file: StaticString = #file, line: UInt = #line
     ) {
-        guard case .show(let c, let h, let r, let p, let f) = action else {
+        guard case .show(let c, let h, let r, let f) = action else {
             XCTFail("Expected .show but got \(action)", file: file, line: line); return
         }
         XCTAssertEqual(c, candidates, "candidates", file: file, line: line)
         XCTAssertEqual(h, historyEnd, "historyEnd", file: file, line: line)
-        XCTAssertEqual(p, predictionEnd, "predictionEnd", file: file, line: line)
         XCTAssertEqual(f, fixedEnd, "fixedEnd", file: file, line: line)
         XCTAssertEqual(r, initialRow, "initialRow", file: file, line: line)
     }
@@ -39,7 +38,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B", "アイ"],
-                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_A2_OneHighHistory() {
@@ -48,7 +47,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛", "辞書A", "辞書B", "アイ"],
-                     historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_A3_ThreeHighHistories() {
@@ -61,7 +60,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛情", "愛媛", "愛知", "辞書A", "辞書B", "アイ"],
-                     historyEnd: 3, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 3, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_A4_LowHistoryOnly() {
@@ -73,7 +72,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B", "アイ"],
-                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_A5_HighAndLowHistory() {
@@ -86,7 +85,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛", "辞書A", "辞書B", "アイ"],
-                     historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
     // MARK: - C: hiraganaPreferred
@@ -96,7 +95,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "辞書A", "辞書B", "ノ"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
     }
 
     func testSnap_C2_HiraganaPreferredWrongHistory() {
@@ -105,7 +104,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "ノックアウト", "辞書A", "辞書B", "ノ"],
-                     historyEnd: 2, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
+                     historyEnd: 2, fixedEnd: 1, initialRow: 0)
     }
 
     func testSnap_C3_HiraganaPreferredHiraganaInHistory() {
@@ -114,7 +113,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "辞書A", "辞書B", "ノ"],
-                     historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_C4_HiraganaPreferredWithUserDict() {
@@ -123,7 +122,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("toka")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["とか", "UD戸籍", "辞書A", "辞書B", "トカ"],
-                     historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
+                     historyEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 
     // MARK: - D: 長音符・小母音を含む読み（カタカナ先頭固定の特別扱いはしない）
@@ -141,7 +140,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         XCTAssertEqual(handler.state.composedHiragana, "とーたる")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B", "トータル"],
-                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_D2_LongVowelKatakanaInHistory() {
@@ -153,7 +152,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         type(chars: "r", base: "r"); type(chars: "u", base: "u")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["トータル", "辞書A", "辞書B"],
-                     historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_D3_SmallVowelNoHistory() {
@@ -164,7 +163,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         XCTAssertEqual(handler.state.composedHiragana, "ねいてぃぶ")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B", "ネイティブ"],
-                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     // MARK: - E: ユーザー辞書
@@ -175,7 +174,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "辞書A", "辞書B", "アイ"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 1)
+                     historyEnd: 1, fixedEnd: 1, initialRow: 1)
     }
 
     func testSnap_E2_UserDictWithHighHistory() {
@@ -185,7 +184,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "愛", "辞書A", "辞書B", "アイ"],
-                     historyEnd: 2, predictionEnd: 1, fixedEnd: 1, initialRow: 1)
+                     historyEnd: 2, fixedEnd: 1, initialRow: 1)
     }
 
     func testSnap_E3_UserDictDedupedWhenInAzooKey() {
@@ -194,7 +193,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "辞書B", "アイ"],
-                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     // MARK: - F: Zenzai top-1 プロモート
@@ -205,7 +204,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
     }
 
     func testSnap_F2_ZenzaiNoContext() {
@@ -213,7 +212,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_F3_ZenzaiDisabled() {
@@ -222,7 +221,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_F4_ZenzaiTop1AlreadyInHistory() {
@@ -232,7 +231,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_F5_ZenzaiWithUserDict() {
@@ -242,7 +241,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
+                     historyEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 
     func testSnap_F6_ZenzaiFirstWithAutoShow() {
@@ -251,7 +250,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(autoShow: true),
                      candidates: ["Zen先頭", "あい", "辞書B", "アイ"],
-                     historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
+                     historyEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 
     func testSnap_F7_ZenzaiFirstAutoShowNoContext() {
@@ -259,7 +258,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(autoShow: true),
                      candidates: ["あい", "Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 1, predictionEnd: 1, fixedEnd: 1, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
     }
 
     // MARK: - G: 数値・日時候補
@@ -271,14 +270,14 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         XCTAssertEqual(handler.state.composedHiragana, "1234")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["１２３４", "1,234", "１，２３４"],
-                     historyEnd: 0, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
     }
 
     func testSnap_G2_DateTimeCandidatesAtHistoryEnd() {
         useStub(SnapStub(["今日", "本日"]))
         typeRomaji("kyou")
         let action = handler.buildCandidateList()
-        guard case .show(let cands, let hEnd, _, _, _) = action else {
+        guard case .show(let cands, let hEnd, _, _) = action else {
             XCTFail(".show を返すはず"); return
         }
         let expectedDates = InputHandler.generateDateTimeCandidates(for: "きょう")
@@ -306,7 +305,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(autoShow: true),
                      candidates: ["愛", "アイ"],
-                     historyEnd: 1, predictionEnd: 0, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
     }
 
     // MARK: - I: 全セクション組み合わせ
@@ -323,7 +322,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "辞書A", "愛", "アイ"],
-                     historyEnd: 3, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
+                     historyEnd: 3, fixedEnd: 2, initialRow: 0)
     }
 
     func testSnap_I2_HiraganaPreferredWithZenzai() {
@@ -332,6 +331,6 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "Zen先頭", "ノ"],
-                     historyEnd: 2, predictionEnd: 2, fixedEnd: 2, initialRow: 0)
+                     historyEnd: 2, fixedEnd: 2, initialRow: 0)
     }
 }
