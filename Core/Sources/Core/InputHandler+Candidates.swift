@@ -153,7 +153,10 @@ public extension InputHandler {
                 if sources.zenzaiPromoted != nil { return .atZero }
                 return .firstMatching(sources.h)
             }
-            // 履歴があっても Zenzai がプロモートされとれば row 0 を初期選択にする
+            // 高スコア履歴に読みと同じ表記があるときは Zenzai よりそちらを初期選択（例: したい）
+            if hiraganaInHistory, sources.zenzaiPromoted != nil {
+                return .firstMatching(sources.h)
+            }
             if sources.zenzaiPromoted != nil { return .atZero }
             return .afterFixed
         }

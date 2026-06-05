@@ -60,4 +60,20 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         XCTAssertEqual(candidates.filter { $0 == top1 }.count, 1, "辞書ブロックに top-1 が重複して現れない")
     }
 
+    /// 高スコア履歴に読みと同じひらがながあるとき、Zenzai top-1 よりそちらを初期選択する。
+    func testZenzaiInitialRowPrefersHiraganaExactMatchInHistory() {
+        zenzaiMock.candidateLines = ["士大夫", "死体", "支隊"]
+        handler.leftSideContext = "文脈"
+        handler.db.record(input: "したい", output: "したい")
+        handler.db.record(input: "したい", output: "したい時に")
+        typeRomaji("shitai")
+        let (_, action) = press(keyCode: 49)
+        guard case .show(let candidates, _, let initialRow, _, _) = action else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(candidates.contains("士大夫"), "Zenzai top-1 は候補に残る: \(candidates)")
+        XCTAssertEqual(candidates[initialRow], "したい", "履歴のひらがな一致が Zenzai より初期選択")
+        XCTAssertNotEqual(candidates[initialRow], "士大夫")
+    }
+
 }
