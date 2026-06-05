@@ -78,8 +78,7 @@ final class InputHandlerNumberTests: XCTestCase {
             let r = handler.handle(keyCode: 0, characters: String(c), baseCharacters: String(c),
                                    modifiers: [], candidate: .hidden, client: client)
             if r.consumed {
-                handler.candidateSession.apply(r.candidateAction)
-                handler.syncMarkedText(client: client)
+                handler.applyCandidateAction(r.candidateAction, client: client)
             }
         }
         // "１２３４" を選択確定
@@ -87,8 +86,7 @@ final class InputHandlerNumberTests: XCTestCase {
         let enter = handler.handle(keyCode: KeyCode.enter, characters: nil, baseCharacters: nil,
                                    modifiers: [], candidate: ctx, client: client)
         if enter.consumed {
-            handler.candidateSession.apply(enter.candidateAction)
-            handler.syncMarkedText(client: client)
+            handler.applyCandidateAction(enter.candidateAction, client: client)
         }
         XCTAssertEqual(client.inserted.last, "１２３４")
 

@@ -51,9 +51,9 @@ stateDiagram-v2
 flowchart LR
     KD[keyDown] --> H[InputHandler.handle]
     H --> CA[CandidateAction]
-    CA --> SA[candidateSession.apply]
-    SA --> MT[syncMarkedText]
-    SA --> CW[CandidateWindow]
+    CA --> ACA[applyCandidateAction]
+    ACA --> MT[syncMarkedText]
+    ACA --> CW[CandidateWindow]
     MT --> IMK[IMK client]
 ```
 

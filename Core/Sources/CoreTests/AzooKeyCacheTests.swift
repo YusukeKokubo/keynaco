@@ -35,8 +35,7 @@ final class AzooKeyCacheTests: XCTestCase {
 
     private func postHandle(_ result: (consumed: Bool, candidateAction: CandidateAction)) {
         guard result.consumed else { return }
-        handler.candidateSession.apply(result.candidateAction)
-        handler.syncMarkedText(client: client)
+        handler.applyCandidateAction(result.candidateAction, client: client)
     }
 
     func press(keyCode: UInt16, candidateVisible: Bool = false) {

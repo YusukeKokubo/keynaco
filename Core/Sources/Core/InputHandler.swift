@@ -305,9 +305,19 @@ public struct InputHandler {
         diaryBuffer = ""
     }
 
+    /// `CandidateAction` を `candidateSession` に反映し marked text を同期する。
+    /// `.deleteSelected` の DB 削除もここ。候補ウィンドウ更新は `InputController` のみ。
+    public mutating func applyCandidateAction(_ action: CandidateAction, client: TextInputClient) {
+        if case .deleteSelected = action,
+           let text = candidateSession.selectedText {
+            db.deleteHistory(output: text)
+        }
+        candidateSession.apply(action)
+        syncMarkedText(client: client)
+    }
+
     /// 組成バッファと `candidateSession` の選択行から marked text を組み立てる。
-    /// IMK への反映は `InputController.applyCandidateEffects`（キー処理後）と
-    /// `syncMarkedTextToActiveClient`（候補 UI 削除などキー外）のみが呼ぶ。
+    /// 通常は `applyCandidateAction` 経由。キー外（候補 UI 削除など）は `syncMarkedText` を直接呼ぶ。
     public func syncMarkedText(client: TextInputClient) {
         let session = candidateSession
         let text = MarkedTextSync.resolve(

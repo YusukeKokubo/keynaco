@@ -39,8 +39,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
 
     private func postHandle(_ result: (consumed: Bool, candidateAction: CandidateAction)) -> CandidateAction {
         if result.consumed {
-            handler.candidateSession.apply(result.candidateAction)
-            handler.syncMarkedText(client: client)
+            handler.applyCandidateAction(result.candidateAction, client: client)
         }
         return result.candidateAction
     }

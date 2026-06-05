@@ -533,18 +533,9 @@ extension DebugSocketServer {
         handler.db.updatePOS(output: output, pos: c.pos)
     }
 
-    /// `InputController.applyPostKeyDownEffects` の候補ウィンドウ副作用を模倣する。
+    /// `InputController.applyCandidateEffects` の session + marked 部分（ウィンドウなし）。
     func applyCandidateAction(_ action: CandidateAction) {
-        switch action {
-        case .deleteSelected:
-            if let text = handler.candidateSession.selectedText {
-                handler.db.deleteHistory(output: text)
-            }
-            handler.candidateSession.apply(action)
-        default:
-            handler.candidateSession.apply(action)
-        }
-        handler.syncMarkedText(client: mockClient)
+        handler.applyCandidateAction(action, client: mockClient)
     }
 }
 

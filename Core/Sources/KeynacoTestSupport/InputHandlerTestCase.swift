@@ -92,11 +92,10 @@ class InputHandlerTestCase: XCTestCase {
         return result
     }
 
-    /// `InputController.applyCandidateEffects` と同じく session 反映後に常に marked text を同期する。
+    /// `InputController.applyCandidateEffects` の session + marked 部分（ウィンドウなし）。
     @discardableResult
     func applyCandidateAction(_ action: CandidateAction) -> CandidateAction {
-        handler.candidateSession.apply(action)
-        handler.syncMarkedText(client: client)
+        handler.applyCandidateAction(action, client: client)
         return action
     }
 
