@@ -446,7 +446,7 @@ extension DebugSocketServer {
         && composedHiraganaWasEmpty
         && pendingRomajiWasEmpty
     ) ? handler.lastConfirmedContext?.output : nil
-    handler.leftSideContext = debugLeftContextPrefix()
+    syncLeftSideContext()
     let before = makeResponse(inserted: [])
     let (consumed, action) = handler.handle(
     keyCode: keyCode,

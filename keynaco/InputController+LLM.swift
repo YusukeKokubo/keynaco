@@ -8,7 +8,7 @@ extension InputController {
     func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
         let loc = adapter.selectedRange().location
         guard loc != NSNotFound else {
-            return LeftContextResolver.resolve(.init(
+            return LeftContextResolver.resolve(.production(
                 sessionBuffer: handler.sessionTextBuffer,
                 imkBefore: nil,
                 cursorLocationAvailable: false
@@ -24,7 +24,7 @@ extension InputController {
             }
         }
 
-        return LeftContextResolver.resolve(.init(
+        return LeftContextResolver.resolve(.production(
             sessionBuffer: handler.sessionTextBuffer,
             imkBefore: imkBefore,
             cursorLocationAvailable: true

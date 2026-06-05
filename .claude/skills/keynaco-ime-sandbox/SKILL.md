@@ -398,11 +398,15 @@ Zenzai 左文脈は `sessionTextBuffer`（`set_left_context` または確定の�
 send({"reset": True})
 send({"type_string": "houkoku", "then": "space"})
 send({"key": "enter", "fields": ["sessionTextBuffer"]})
-send({"type_string": "。", "then": "enter"})
+send({"type_string": "。"})  # 句点は直挿入。組成なし Enter は buffer をクリアするので送らない
 r = send({"state": True, "fields": ["sessionTextBuffer", "committedHistory"]})
-assert r["sessionTextBuffer"] != ""
+assert r["sessionTextBuffer"] == "報告書"  # houkoku 確定が「報告書」の場合
 assert r["committedHistory"] == []  # 文末で history はクリア、buffer は残る
 ```
+
+### 罠6: 組成なし Enter で sessionTextBuffer が消える
+
+組成中テキストが空の状態で Enter を送ると `sessionTextBuffer` がクリアされる（`testSessionTextBufferClearedOnBareEnter`）。句点 `。` を `type_string` で直挿入した直後に `then: "enter"` すると buffer が空になるので注意。
 
 ### 罠5: ローマ字の seed_history と type_string を揃える
 
@@ -538,7 +542,7 @@ print(f"selectedRow={r['selectedRow']}, selectedText={r['selectedText']!r}")
 
 - **IMK パイプラインをバイパス**するため、クライアントアプリ依存の挙動（Electron の Enter 問題など）は再現しない
 - デフォルトのリセットではソケットサーバーは**インメモリ DB**。本番の `history.db` は **`{"reset": true, "useRealDB": true}`** を使ったときのみ一時コピーで参照する
-- デフォルトの `leftSideContext` は `mockClient.documentBefore`（`insertText` 累積、`set_surrounding.before` で設定可）。確定直後 Backspace（IME 非消費）では直前確定語を `documentBefore` から削除して本番 IMK の `before` 更新を模倣する。`set_left_context` で上書き可能
+- デフォルトの `leftSideContext` は `LeftContextResolver` で `sessionTextBuffer` + `mockClient.documentBefore` を結合（`set_surrounding.before` で設定可）。`{"state": true}` でも `makeResponse` 時に再計算される。確定直後 Backspace（IME 非消費）では直前確定語を `documentBefore` から削除して本番 IMK の `before` 更新を模倣する。`set_left_context` で上書き可能
 - **LLM は Debug ビルドのサーバー上で動く**（上記「LLM（Debug ビルド）」）。完了タイミングを見るときは `{"state": true}` ポーリング
 - セッションをまたぐときは必ず `{"reset": true}` を送信して状態をリセットすること（`reset` で LLM フェッチもキャンセルされ `llmEpoch` が進む）
 - 調査結果を報告するときは、各キー入力後の状態を表形式か箇条書きで整理して示すと読みやすい

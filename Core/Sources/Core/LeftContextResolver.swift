@@ -34,6 +34,28 @@ public enum LeftContextResolver {
             self.imkBefore = imkBefore
             self.cursorLocationAvailable = cursorLocationAvailable
         }
+
+        /// 本番: `InputController.resolvedLLMDocumentContextPrefix` が IMK キャッシュから組み立てる入力。
+        public static func production(
+            sessionBuffer: String,
+            imkBefore: String?,
+            cursorLocationAvailable: Bool
+        ) -> Self {
+            .init(
+                sessionBuffer: sessionBuffer,
+                imkBefore: imkBefore,
+                cursorLocationAvailable: cursorLocationAvailable
+            )
+        }
+
+        /// サンドボックス: `mockClient.documentBefore` を IMK `before` 相当として載せる。
+        public static func sandbox(sessionBuffer: String, documentBefore: String) -> Self {
+            .init(
+                sessionBuffer: sessionBuffer,
+                imkBefore: documentBefore.isEmpty ? nil : documentBefore,
+                cursorLocationAvailable: true
+            )
+        }
     }
 
     public static func resolve(_ input: Input) -> String {

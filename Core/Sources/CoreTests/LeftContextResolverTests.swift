@@ -74,15 +74,25 @@ final class LeftContextResolverTests: XCTestCase {
         XCTAssertEqual(resolve(), "")
     }
 
-    /// `DebugSocketServer.debugLeftContextPrefix` は `documentBefore` を `imkBefore` に載せる。
-    func testSandboxDocumentBeforePath() {
-        XCTAssertEqual(
-            resolve(sessionBuffer: "報告書", imkBefore: "今日は"),
-            "報告書今日は"
+    func testSandboxInputFactory() {
+        let input = LeftContextResolver.Input.sandbox(
+            sessionBuffer: "報告書",
+            documentBefore: "今日は"
         )
-        XCTAssertEqual(
-            resolve(sessionBuffer: "", imkBefore: String(repeating: "文", count: 500)).count,
-            LeftContextResolver.maxBeforeLength
+        XCTAssertEqual(LeftContextResolver.resolve(input), "報告書今日は")
+        let emptyBefore = LeftContextResolver.Input.sandbox(sessionBuffer: "のみ", documentBefore: "")
+        XCTAssertEqual(LeftContextResolver.resolve(emptyBefore), "のみ")
+        let long = LeftContextResolver.resolve(.sandbox(
+            sessionBuffer: "",
+            documentBefore: String(repeating: "文", count: 500)
+        ))
+        XCTAssertEqual(long.count, LeftContextResolver.maxBeforeLength)
+    }
+
+    func testProductionInputFactory() {
+        let noCursor = LeftContextResolver.Input.production(
+            sessionBuffer: "buf", imkBefore: "前文", cursorLocationAvailable: false
         )
+        XCTAssertEqual(LeftContextResolver.resolve(noCursor), "buf")
     }
 }

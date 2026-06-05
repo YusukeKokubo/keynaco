@@ -1027,6 +1027,7 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     func makeResponse(inserted: [String]) -> [String: Any] {
+        syncLeftSideContext()
         var snap = handler.snapshot(markedText: mockClient.markedText)
         let session = handler.candidateSession
         snap.candidateVisible   = session.isVisible
@@ -1116,15 +1117,18 @@ final class DebugSocketServer: @unchecked Sendable {
         }
     }
 
-    /// サンドボックス用左文脈。`mockClient.documentBefore` を IMK `before` 相当として `LeftContextResolver` に渡す。
+    /// サンドボックス用左文脈。`debugLeftContextOverride` がなければ `LeftContextResolver` に委譲。
     func debugLeftContextPrefix() -> String {
         if let override = debugLeftContextOverride { return override }
-        let before = mockClient.documentBefore
-        return LeftContextResolver.resolve(.init(
+        return LeftContextResolver.resolve(.sandbox(
             sessionBuffer: handler.sessionTextBuffer,
-            imkBefore: before.isEmpty ? nil : before,
-            cursorLocationAvailable: true
+            documentBefore: mockClient.documentBefore
         ))
+    }
+
+    /// `makeResponse` / キー処理前に `handler.leftSideContext` を最新化する。
+    func syncLeftSideContext() {
+        handler.leftSideContext = debugLeftContextPrefix()
     }
 
     private func updateMockMarkedText() {
