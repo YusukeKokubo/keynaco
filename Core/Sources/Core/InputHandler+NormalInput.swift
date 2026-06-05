@@ -19,12 +19,12 @@ public extension InputHandler {
             if !state.composedHiragana.isEmpty {
                 state.absorbPendingIntoComposed()
                 let action = buildCandidateList(autoShow: false)
-                applyMarkedText(candidateText: nil, client: client)
+                applyMarkedText(client: client)
                 return (true, action)
             }
             // composed のみ空で pending ローマ字だけあるとき Space をホストへ漏らすと未確定が消えることがあるため消費する
             if !state.pendingRomaji.isEmpty {
-                applyMarkedText(candidateText: nil, client: client)
+                applyMarkedText(client: client)
                 return (true, .none)
             }
             return (false, .none)
@@ -68,7 +68,7 @@ public extension InputHandler {
         }
         state.composedHiragana += special
         let action = buildCandidateList()
-        applyMarkedText(candidateText: nil, client: client)
+        applyMarkedText(client: client)
         return (true, action)
     }
 
@@ -89,7 +89,7 @@ public extension InputHandler {
         flushPendingRomaji()
         state.composedHiragana += options[0]
         let action = buildCandidateList()
-        applyMarkedText(candidateText: nil, client: client)
+        applyMarkedText(client: client)
         return (true, action)
     }
 
@@ -102,7 +102,7 @@ public extension InputHandler {
         else { flushPendingRomaji() }
         state.composedHiragana += chars
         let action = buildCandidateList(autoShow: true)
-        applyMarkedText(candidateText: nil, client: client)
+        applyMarkedText(client: client)
         return (true, action)
     }
 
@@ -116,7 +116,7 @@ public extension InputHandler {
         } else {
             flushPendingRomaji()
             state.composedHiragana += chars
-            applyMarkedText(candidateText: nil, client: client)
+            applyMarkedText(client: client)
         }
         return (true, .dismiss)
     }
@@ -129,7 +129,7 @@ public extension InputHandler {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         state.composedHiragana += chars
         let action = buildCandidateList(autoShow: true)
-        applyMarkedText(candidateText: nil, client: client)
+        applyMarkedText(client: client)
         return (true, action)
     }
 
@@ -145,7 +145,7 @@ public extension InputHandler {
         } else {
             candidateAction = .dismiss
         }
-        applyMarkedText(candidateText: nil, client: client)
+        applyMarkedText(client: client)
         return (true, candidateAction)
     }
 }

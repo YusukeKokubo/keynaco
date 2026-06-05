@@ -271,12 +271,9 @@ public struct InputHandler {
         diaryBuffer = ""
     }
 
-    public func applyMarkedText(candidateText: String?, client: TextInputClient) {
-        if let selected = candidateText {
-            let text = selected + state.pendingRomaji
-            client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-            return
-        }
+    /// 組成バッファ（`composingText`）を marked text に反映する。
+    /// 候補ウィンドウの選択行との同期（括弧モード・Electron 向け）はアプリ層の `InputController.syncMarkedText` が担う。
+    public func applyMarkedText(client: TextInputClient) {
         let text = state.composingText
         client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
@@ -293,13 +290,13 @@ public struct InputHandler {
         }
         guard handled else { return (false, .none) }
         let action: CandidateAction = needsRefresh ? buildCandidateList() : .dismiss
-        applyMarkedText(candidateText: nil, client: client)
+        applyMarkedText(client: client)
         return (true, action)
     }
 
     public mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         guard state.reset() else { return (false, .none) }
-        applyMarkedText(candidateText: nil, client: client)
+        applyMarkedText(client: client)
         return (true, .dismiss)
     }
 }

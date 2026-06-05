@@ -130,6 +130,9 @@ class InputController: IMKInputController, @unchecked Sendable {
             break
         case .show(let candidates, let historyEnd, let initialRow, let fixedEnd):
             candidateWindow.show(candidates: candidates, historySectionEnd: historyEnd, initialRow: initialRow, fixedSectionEnd: fixedEnd, zenzaiRow: handler.lastZenzaiRow, near: adapter.cursorRect())
+            if needsCandidateOnlyMarkedText {
+                syncMarkedText(client: adapter)
+            }
         case .dismiss:
             candidateWindow.dismiss()
         case .selectNext:
@@ -314,16 +317,22 @@ class InputController: IMKInputController, @unchecked Sendable {
 
     // MARK: - プライベートヘルパー
 
+    /// 括弧モード、または組成ひらがななしで候補のみ表示するとき。
+    /// `applyMarkedText` は `composingText` のみ載せるため、ここで選択候補を marked text に載せ直す。
+    private var needsCandidateOnlyMarkedText: Bool {
+        handler.isBracketMode
+            || (candidateWindow.isVisible && handler.state.composedHiragana.isEmpty)
+    }
+
     /// 候補ウィンドウの選択状態と組成文字列を IMK marked text に反映する。
+    /// 打鍵中の組成更新は `InputHandler.applyMarkedText`、候補ウィンドウ操作後は本関数。
     ///
-    /// - 括弧モード、または組成ひらがななしで候補のみ表示: 選択候補のみ（Electron が空 marked text を非アクティブ扱いする対策）
+    /// - `needsCandidateOnlyMarkedText`: 選択候補のみ（Electron が空 marked text を非アクティブ扱いする対策）
     /// - 通常の組成中: 選択候補 + `pendingRomaji`
     /// - 候補非表示: `composingText`
     private func syncMarkedText(client: TextInputClient) {
         let text: String
-        let candidateOnly = handler.isBracketMode
-            || (candidateWindow.isVisible && handler.state.composedHiragana.isEmpty)
-        if candidateOnly, let selected = candidateWindow.selectedText() {
+        if needsCandidateOnlyMarkedText, let selected = candidateWindow.selectedText() {
             text = selected
         } else if candidateWindow.isVisible, let selected = candidateWindow.selectedText() {
             text = selected + handler.state.pendingRomaji
