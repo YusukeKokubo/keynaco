@@ -136,12 +136,15 @@ class InputController: IMKInputController, @unchecked Sendable {
             candidateWindow.dismiss()
         case .selectNext, .selectPrev:
             candidateWindow.syncSelection(from: handler.candidateSession)
-            syncMarkedText(client: adapter)
         case .show, .replaceCandidates:
             candidateWindow.present(session: handler.candidateSession, near: adapter.cursorRect())
-            if needsCandidateOnlyMarkedText {
-                syncMarkedText(client: adapter)
-            }
+        }
+
+        switch action {
+        case .none:
+            break
+        case .deleteSelected, .dismiss, .selectNext, .selectPrev, .show, .replaceCandidates:
+            handler.syncMarkedText(client: adapter)
         }
     }
 
@@ -298,26 +301,5 @@ class InputController: IMKInputController, @unchecked Sendable {
     }
 
     // MARK: - プライベートヘルパー
-
-    private var needsCandidateOnlyMarkedText: Bool {
-        MarkedTextSync.needsCandidateOnly(
-            isBracketMode: handler.isBracketMode,
-            candidateVisible: handler.candidateSession.isVisible,
-            composedHiragana: handler.state.composedHiragana
-        )
-    }
-
-    private func syncMarkedText(client: TextInputClient) {
-        let session = handler.candidateSession
-        let text = MarkedTextSync.resolve(
-            isBracketMode: handler.isBracketMode,
-            candidateVisible: session.isVisible,
-            composedHiragana: handler.state.composedHiragana,
-            pendingRomaji: handler.state.pendingRomaji,
-            composingText: handler.state.composingText,
-            selectedCandidate: session.selectedText
-        )
-        client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
-    }
 
 }

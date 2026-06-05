@@ -70,6 +70,14 @@ class InputHandlerTestCase: XCTestCase {
         for c in s { type(chars: String(c), base: String(c)) }
     }
 
+    /// `InputController.applyCandidateEffects` と同じく session 反映後に marked text を同期する。
+    @discardableResult
+    func applyCandidateAction(_ action: CandidateAction) -> CandidateAction {
+        handler.candidateSession.apply(action)
+        handler.syncMarkedText(client: client)
+        return action
+    }
+
     /// 既定の `setUp` 後に AzooKey スタブ等へ差し替える。
     func setUpWithConverter(_ converter: any AzooKeyConverting) {
         let db = DatabaseManager(inMemory: true)

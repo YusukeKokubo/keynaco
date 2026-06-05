@@ -49,6 +49,29 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
 
     // MARK: - 漢字変換（azooKey）
 
+    /// 組成中 + 候補表示では marked text が選択行に追従する（`InputController` 経路）。
+    func testMarkedTextFollowsSelectedRowWhileComposing_kanzi() {
+        typeRomaji("kanzi")
+        let showAction = handler.buildCandidateList(autoShow: false)
+        applyCandidateAction(showAction)
+        guard let first = handler.candidateSession.selectedText else {
+            XCTFail("候補選択行がない"); return
+        }
+        assertMarkedText(first, "Space 後の marked text は選択行と一致するはず")
+
+        let ctx = handler.candidateSession.context
+        let (_, downAction) = handler.handle(
+            keyCode: KeyCode.downArrow, characters: nil, baseCharacters: nil,
+            modifiers: [], candidate: ctx, client: client
+        )
+        applyCandidateAction(downAction)
+        guard let second = handler.candidateSession.selectedText else {
+            XCTFail("↓ 後の選択行がない"); return
+        }
+        XCTAssertNotEqual(first, second, "↓ で別候補に移るはず")
+        assertMarkedText(second, "↓ 後の marked text は選択行と一致するはず")
+    }
+
     func testTanoshiiConvertsToKanji() {
         typeRomaji("tanoshii")
         XCTAssertEqual(client.markedText, "たのしい")

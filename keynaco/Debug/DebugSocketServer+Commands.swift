@@ -544,34 +544,12 @@ extension DebugSocketServer {
         default:
             handler.candidateSession.apply(action)
         }
-        let session = handler.candidateSession
         switch action {
-        case .show:
-            if MarkedTextSync.needsCandidateOnly(
-                isBracketMode: handler.isBracketMode,
-                candidateVisible: session.isVisible,
-                composedHiragana: handler.state.composedHiragana
-            ) {
-                syncMarkedTextForDebug()
-            }
-        case .selectNext, .selectPrev:
-            syncMarkedTextForDebug()
-        default:
+        case .none:
             break
+        case .deleteSelected, .dismiss, .selectNext, .selectPrev, .show, .replaceCandidates:
+            handler.syncMarkedText(client: mockClient)
         }
-    }
-
-    func syncMarkedTextForDebug() {
-        let session = handler.candidateSession
-        let text = MarkedTextSync.resolve(
-            isBracketMode: handler.isBracketMode,
-            candidateVisible: session.isVisible,
-            composedHiragana: handler.state.composedHiragana,
-            pendingRomaji: handler.state.pendingRomaji,
-            composingText: handler.state.composingText,
-            selectedCandidate: session.selectedText
-        )
-        mockClient.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
 }
 

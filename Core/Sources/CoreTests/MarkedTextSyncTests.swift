@@ -52,4 +52,15 @@ final class MarkedTextSyncTests: XCTestCase {
             selectedCandidate: nil
         ), "かんじ")
     }
+
+    func testComposingWithCandidates_usesSelectedPlusPending() {
+        XCTAssertEqual(MarkedTextSync.resolve(
+            isBracketMode: false,
+            candidateVisible: true,
+            composedHiragana: "かんじ",
+            pendingRomaji: "",
+            composingText: "かんじ",
+            selectedCandidate: "漢字"
+        ), "漢字")
+    }
 }

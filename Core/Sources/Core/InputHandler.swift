@@ -283,11 +283,24 @@ public struct InputHandler {
         diaryBuffer = ""
     }
 
-    /// 組成バッファ（`composingText`）を marked text に反映する。
-    /// 候補ウィンドウの選択行との同期（括弧モード・Electron 向け）はアプリ層の `InputController.syncMarkedText` が担う。
-    public func applyMarkedText(client: TextInputClient) {
-        let text = state.composingText
+    /// 組成バッファと `candidateSession` の選択行から marked text を組み立てて反映する。
+    /// `InputController.applyCandidateEffects` は `CandidateSession.apply` の直後に呼ぶ。
+    public func syncMarkedText(client: TextInputClient) {
+        let session = candidateSession
+        let text = MarkedTextSync.resolve(
+            isBracketMode: isBracketMode,
+            candidateVisible: session.isVisible,
+            composedHiragana: state.composedHiragana,
+            pendingRomaji: state.pendingRomaji,
+            composingText: state.composingText,
+            selectedCandidate: session.selectedText
+        )
         client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+    }
+
+    /// `syncMarkedText` の別名。組成入力の各所から呼ばれる。
+    public func applyMarkedText(client: TextInputClient) {
+        syncMarkedText(client: client)
     }
 
     public mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {

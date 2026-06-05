@@ -1,7 +1,6 @@
 import Foundation
 
-/// IMK marked text の組み立て。`InputHandler.applyMarkedText`（組成バッファ）と
-/// 候補ウィンドウ操作後の同期（`InputController.syncMarkedText` / Debug ソケット）で共有する。
+/// IMK marked text の組み立て。`InputHandler.syncMarkedText` が唯一の適用経路。
 public enum MarkedTextSync {
 
     /// 括弧モード、または組成ひらがななしで候補のみ表示するとき。

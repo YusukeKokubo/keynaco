@@ -114,6 +114,8 @@ public extension InputHandler {
         case KeyCode.tab where modifiers.contains(.shift):
             return (true, .selectPrev)
         case KeyCode.space:
+            // ひらがな優先の読みでは Space で候補列を再構築する（次候補へは ↓ / Tab）。
+            // 再構築後の marked text は `InputController` が `CandidateSession.apply` 直後に同期する。
             if !candidate.isExplicitlySelected, !state.composedHiragana.isEmpty {
                 state.absorbPendingIntoComposed()
                 let action = buildCandidateList(autoShow: false)
