@@ -105,7 +105,11 @@ final class ZenzaiLeftContextTests: XCTestCase {
         pressEnter(candidateVisible: true, selectedRow: 0, selectedText: "とうきょう")
         typeRomaji("de")
         pressEnter()
-        handler.leftSideContext = handler.sessionTextBuffer
+        handler.leftSideContext = LeftContextResolver.resolve(.init(
+            sessionBuffer: handler.sessionTextBuffer,
+            imkBefore: nil,
+            cursorLocationAvailable: true
+        ))
         XCTAssertEqual(handler.leftSideContext, "とうきょうで")
 
         typeRomaji("kaisai")

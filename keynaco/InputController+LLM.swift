@@ -4,31 +4,31 @@ import InputMethodKit
 
 extension InputController {
 
-    /// LLM 用の文脈プレフィックス。IMK の `before`（キャッシュ・location 一致時）が非空なら、`sessionTextBuffer` が空でないときは先頭にその全量を付けたうえで `before` を続ける（`before` は最大 300 字に切り詰めた後、結合総長が 400 字を超えないようカーソル近傍の末尾側を採用）。`sessionTextBuffer` は切り捨てない。`before` が空またはキャッシュ不一致時は `sessionTextBuffer` のみ。
+    /// LLM 用の文脈プレフィックス。合成ルールは `LeftContextResolver` が正本。
     func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
-        let historyJoined = handler.sessionTextBuffer
         let loc = adapter.selectedRange().location
-        guard loc != NSNotFound else { return historyJoined }
+        guard loc != NSNotFound else {
+            return LeftContextResolver.resolve(.init(
+                sessionBuffer: handler.sessionTextBuffer,
+                imkBefore: nil,
+                cursorLocationAvailable: false
+            ))
+        }
 
-        if let cache = cachedSurroundingContext, cache.location == loc, !cache.text.before.isEmpty {
-            let rawBefore = cache.text.before
-            let beforeTruncated =
-                rawBefore.count > 300 ? String(rawBefore.suffix(300)) : rawBefore
-            if !historyJoined.isEmpty {
-                let maxBefore = max(0, 400 - historyJoined.count)
-                let trimmedBefore =
-                    beforeTruncated.count > maxBefore
-                    ? String(beforeTruncated.suffix(maxBefore))
-                    : beforeTruncated
-                return historyJoined + trimmedBefore
+        var imkBefore: String?
+        if let cache = cachedSurroundingContext {
+            if cache.location == loc, !cache.text.before.isEmpty {
+                imkBefore = cache.text.before
+            } else {
+                cachedSurroundingContext = nil
             }
-            return beforeTruncated
         }
 
-        if cachedSurroundingContext != nil {
-            cachedSurroundingContext = nil
-        }
-        return historyJoined
+        return LeftContextResolver.resolve(.init(
+            sessionBuffer: handler.sessionTextBuffer,
+            imkBefore: imkBefore,
+            cursorLocationAvailable: true
+        ))
     }
 
     /// 確定語の品詞を AzooKey 辞書で判定し、DB の pos を更新する。

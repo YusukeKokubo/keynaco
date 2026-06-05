@@ -143,7 +143,7 @@ public struct InputHandler {
     /// `buildCandidateList` の AzooKey 候補キャッシュ照合用（`leftSideContext` が変わると再取得）
     public var lastAzooKeyContext: String = ""
     public var lastAzooKeyResults: [String] = []
-    /// `resolvedLLMDocumentContextPrefix` 等から渡すカーソル左文（Zenzai）。空は文脈なし。
+    /// `LeftContextResolver`（`InputController.resolvedLLMDocumentContextPrefix`）から渡すカーソル左文（Zenzai）。空は文脈なし。
     public var leftSideContext: String = ""
     /// AzooKey API 用（空文字は `nil`）
     public var azooKeyLeftContext: String? { leftSideContext.isEmpty ? nil : leftSideContext }
