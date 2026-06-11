@@ -83,7 +83,7 @@ class InputHandlerTestCase: XCTestCase {
         modifiers: NSEvent.ModifierFlags = [],
         candidate: CandidateContext? = nil
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        let ctx = candidate ?? handler.candidateSession.context
+        let ctx = candidate ?? handler.candidateSession.makeContext()
         let result = handler.handle(
             keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
             modifiers: modifiers, candidate: ctx, client: client

@@ -59,7 +59,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
         assertMarkedText(first, "Space 後の marked text は選択行と一致するはず")
 
-        let ctx = handler.candidateSession.context
+        let ctx = handler.candidateSession.makeContext()
         let (_, downAction) = handleAndApply(keyCode: KeyCode.downArrow, candidate: ctx)
         guard let second = handler.candidateSession.selectedText else {
             XCTFail("↓ 後の選択行がない"); return
@@ -242,7 +242,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         typeRomaji("kanzi")
         applyCandidateAction(handler.buildCandidateList(trigger: .whileTyping))
         let before = handler.candidateSession.candidates
-        let ctx = handler.candidateSession.context
+        let ctx = handler.candidateSession.makeContext()
         let (consumed, action) = handleAndApply(
             keyCode: KeyCode.space, characters: " ", baseCharacters: " ", candidate: ctx
         )

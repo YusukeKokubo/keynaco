@@ -39,7 +39,6 @@ extension InputHandler {
         let azooKeyCandidates: [String]
         let userDictRaw: [String]
         let highHistory: [String]
-        let totalHistoryCount: Int
         let highHistoryCount: Int
         let zenzaiPromoted: String?
         let historyOutputSet: Set<String>
@@ -71,8 +70,6 @@ extension InputHandler {
         }
         highHistory = Array(highHistory.prefix(Self.maxHighHistoryCount))
         let highHistoryCount = highHistory.count
-        let totalHistoryCount = highHistoryCount
-
         let historyOutputSet = Set(historyScored.map(\.output))
         let zenzaiPromoted: String? = {
             guard azooKeyConverter.isZenzaiEnabled,
@@ -85,7 +82,6 @@ extension InputHandler {
             azooKeyCandidates: azooKeyCandidates,
             userDictRaw: userDictRaw,
             highHistory: highHistory,
-            totalHistoryCount: totalHistoryCount,
             highHistoryCount: highHistoryCount,
             zenzaiPromoted: zenzaiPromoted,
             historyOutputSet: historyOutputSet
@@ -122,7 +118,6 @@ extension InputHandler {
             && fixedSlot == .none
             && !hiraganaInHistory
             && sources.highHistoryCount == 0
-            && sources.totalHistoryCount == 0
             && sources.userDictRaw.isEmpty
             && numberCandidates.isEmpty
             && dateTimeCandidates.isEmpty
@@ -148,7 +143,7 @@ extension InputHandler {
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
-        if trigger == .whileTyping && sources.totalHistoryCount == 0 && sources.azooKeyCandidates.isEmpty
+        if trigger == .whileTyping && sources.highHistoryCount == 0 && sources.azooKeyCandidates.isEmpty
             && sources.userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
             return .dismiss
         }

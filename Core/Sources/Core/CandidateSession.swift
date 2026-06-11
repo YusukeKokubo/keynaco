@@ -51,7 +51,8 @@ public struct CandidateSession: Sendable, Equatable {
         return candidates[selectedRow]
     }
 
-    public var context: CandidateContext {
+    /// `CandidateContext` を現在のフィールドから組み立てる。呼ぶたびに再計算される。
+    public func makeContext() -> CandidateContext {
         CandidateContext(
             isVisible: isVisible,
             selectedRow: selectedRow,

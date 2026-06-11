@@ -30,6 +30,8 @@ public struct LeftContext: Equatable, Sendable {
     /// 300/400 字結合後（AzooKey / Zenzai API 引数の実体）
     public var combined: String
 
+    /// AzooKey / Zenzai API に渡す左文脈。`combined` が空（カーソル位置未取得・文脈なし）のときは
+    /// nil を渡して「文脈なし」扱いにする（空文字列と nil は API 的に等価だが nil の方が意図明確）。
     public var azooKeyValue: String? { combined.isEmpty ? nil : combined }
 
     public static let empty = LeftContext(sessionBuffer: "", imkBefore: nil, combined: "")
