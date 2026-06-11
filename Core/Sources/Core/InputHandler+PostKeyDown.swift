@@ -44,7 +44,7 @@ public extension InputHandler {
         newIMKSnapshot: IMKSurroundingSnapshot?
     ) {
         let needsIMKMaintenance = consumed
-            || cache.invalidated
+            || cache.isInvalidated
             || didInsertText
             || (composedHiraganaWasEmpty && !state.composedHiragana.isEmpty)
 

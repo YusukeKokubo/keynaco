@@ -117,11 +117,11 @@ public enum LeftContextSource {
         }
 
         var imkBefore: String?
-        if let snap = cache.snapshot {
+        if case .valid(let snap) = cache {
             if snap.location == cursorLocation, !snap.before.isEmpty {
                 imkBefore = snap.before
             } else {
-                cache.snapshot = nil
+                cache = .empty
             }
         }
 
@@ -140,21 +140,20 @@ public enum LeftContextSource {
         composedHiraganaWasEmpty: Bool,
         newSnapshot: IMKSurroundingSnapshot?
     ) {
-        if cache.invalidated {
-            cache.snapshot = nil
-            cache.invalidated = false
+        if case .invalidated = cache {
+            cache = .empty
         }
         if composedHiraganaEmpty {
-            cache.snapshot = nil
+            cache = .empty
         } else if composedHiraganaWasEmpty && !composedHiraganaEmpty {
             if let newSnapshot {
-                cache.snapshot = newSnapshot
+                cache = .valid(newSnapshot)
             }
         }
     }
 
     public static func resetCache(_ cache: inout LeftContextIMKCache) {
-        cache = LeftContextIMKCache()
+        cache = .empty
     }
 
     /// サンドボックス: `documentBefore` を IMK `before` 相当として結合。`override` 指定時は resolver を通さない。

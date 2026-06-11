@@ -100,12 +100,9 @@ struct CandidateLayout: Sendable {
 
         candidates = result
         fixedEnd = fixedEndAcc
-        historyEnd = historyEndAcc ?? fixedEndAcc
-
-        assert(fixedEnd <= historyEnd,
-               "fixedEnd (\(fixedEndAcc)) > historyEnd (\(historyEnd))")
-        assert(historyEnd <= result.count,
-               "historyEnd (\(historyEnd)) > candidates.count (\(result.count))")
+        // ループ構造上これらが破れることはないが、リリースビルドでも不変式を保証するため防御的に計算する。
+        let rawHistoryEnd = historyEndAcc ?? fixedEndAcc
+        historyEnd = min(max(rawHistoryEnd, fixedEndAcc), result.count)
 
         switch initialRowPolicy {
         case .firstMatching(let s):

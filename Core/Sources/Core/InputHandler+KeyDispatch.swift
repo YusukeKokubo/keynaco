@@ -74,7 +74,7 @@ extension InputHandler {
     private mutating func resetContextOnEnter() {
         committedHistory.removeAll()
         sessionTextBuffer = ""
-        leftContextIMKCache.invalidated = true
+        leftContextIMKCache = .invalidated
     }
 
     private mutating func handleFunctionKeyIfNeeded(

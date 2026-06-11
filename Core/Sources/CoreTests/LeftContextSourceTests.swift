@@ -6,7 +6,7 @@ final class LeftContextSourceTests: XCTestCase {
     // MARK: - Production
 
     func testProductionCacheHit() {
-        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+        var cache: LeftContextIMKCache = .valid(IMKSurroundingSnapshot(
             location: 10, before: "今日は", after: ""
         ))
         let ctx = LeftContextSource.resolveProduction(
@@ -20,7 +20,7 @@ final class LeftContextSourceTests: XCTestCase {
     }
 
     func testProductionLocationMismatchClearsCache() {
-        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+        var cache: LeftContextIMKCache = .valid(IMKSurroundingSnapshot(
             location: 3, before: "前文", after: ""
         ))
         let ctx = LeftContextSource.resolveProduction(
@@ -33,7 +33,7 @@ final class LeftContextSourceTests: XCTestCase {
     }
 
     func testProductionEmptyBeforeClearsCache() {
-        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+        var cache: LeftContextIMKCache = .valid(IMKSurroundingSnapshot(
             location: 3, before: "", after: ""
         ))
         let ctx = LeftContextSource.resolveProduction(
@@ -57,7 +57,7 @@ final class LeftContextSourceTests: XCTestCase {
     }
 
     func testProductionCursorUnavailable() {
-        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+        var cache: LeftContextIMKCache = .valid(IMKSurroundingSnapshot(
             location: 1, before: "前文", after: ""
         ))
         let ctx = LeftContextSource.resolveProduction(
@@ -72,10 +72,7 @@ final class LeftContextSourceTests: XCTestCase {
     // MARK: - applyPostKeyDown
 
     func testApplyPostKeyDownConsumesInvalidated() {
-        var cache = LeftContextIMKCache(
-            snapshot: IMKSurroundingSnapshot(location: 1, before: "x", after: ""),
-            invalidated: true
-        )
+        var cache: LeftContextIMKCache = .invalidated
         LeftContextSource.applyPostKeyDown(
             cache: &cache,
             composedHiraganaEmpty: false,
@@ -83,11 +80,11 @@ final class LeftContextSourceTests: XCTestCase {
             newSnapshot: nil
         )
         XCTAssertNil(cache.snapshot)
-        XCTAssertFalse(cache.invalidated)
+        XCTAssertFalse(cache.isInvalidated)
     }
 
     func testApplyPostKeyDownClearsOnEmptyComposition() {
-        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+        var cache: LeftContextIMKCache = .valid(IMKSurroundingSnapshot(
             location: 1, before: "x", after: ""
         ))
         LeftContextSource.applyPostKeyDown(
@@ -112,10 +109,7 @@ final class LeftContextSourceTests: XCTestCase {
     }
 
     func testResetCache() {
-        var cache = LeftContextIMKCache(
-            snapshot: IMKSurroundingSnapshot(location: 1, before: "x", after: ""),
-            invalidated: true
-        )
+        var cache: LeftContextIMKCache = .invalidated
         LeftContextSource.resetCache(&cache)
         XCTAssertEqual(cache, LeftContextIMKCache())
     }

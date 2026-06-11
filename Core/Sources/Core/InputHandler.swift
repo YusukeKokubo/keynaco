@@ -166,12 +166,12 @@ public struct InputHandler {
     public var lastCommittedReading: String? = nil
     /// 左文脈の解決結果。`LeftContextSource` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
     public var leftContext: LeftContext = .empty
-    /// IMK surrounding キャッシュ。`invalidated` は `LeftContextSource.applyPostKeyDown` が消費する。
+    /// IMK surrounding キャッシュ。`.invalidated` は `LeftContextSource.applyPostKeyDown` が `.empty` に遷移させる。
     ///
     /// | 操作 | 箇所 |
     /// |------|------|
-    /// | **set `invalidated`** | `pushCommitted` の文末記号（`。` `！` `？`）、ASCII モード Enter、組成空 Enter |
-    /// | **clear** | `LeftContextSource.applyPostKeyDown`（キャッシュ nil 化後） |
+    /// | **`.invalidated` にセット** | `pushCommitted` の文末記号（`。` `！` `？`）、ASCII モード Enter、組成空 Enter |
+    /// | **`.empty` に遷移** | `LeftContextSource.applyPostKeyDown` |
     public var leftContextIMKCache = LeftContextIMKCache()
     public var committedHistory: [String] = []
     /// Zenzai 左文脈用。確定語ごとに加算（上限 50 字）。`leftContext.sessionBuffer` の素材 — 詳細は `LeftContextSource` MARK。
@@ -186,7 +186,7 @@ public struct InputHandler {
     public mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
             committedHistory.removeAll()
-            leftContextIMKCache.invalidated = true
+            leftContextIMKCache = .invalidated
             return
         }
         if InputHandler.readingPunctuations.contains(text) { return }

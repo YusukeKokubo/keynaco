@@ -232,7 +232,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         // 組成なし Enter（改行）→ committedHistory がクリアされ lastCommittedOutput が nil になる
         let passthrough = press(keyCode: 36)
         XCTAssertFalse(passthrough.consumed, "空組成 Enter はホストへ渡す")
-        XCTAssertTrue(handler.leftContextIMKCache.invalidated,
+        XCTAssertTrue(handler.leftContextIMKCache.isInvalidated,
                       "InputController は未消費でも surrounding キャッシュを捨てる必要がある")
         XCTAssertNil(handler.lastCommittedOutput, "改行後は lastCommittedOutput が nil になるはず")
     }

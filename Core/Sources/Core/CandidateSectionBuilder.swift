@@ -31,6 +31,8 @@ enum CandidateSectionBuilder {
         var seen = Set(input.highHistory + azooKeyUniq)
 
         if input.fixedSlot == .hiragana || input.addsDefaultFixedHiragana {
+            // allCandidatesSeen（全候補のスナップショット）にある場合は、seen から一度外して
+            // 固定枠が先取りできるようにし、追加後に再登録して後続の重複排除を機能させる。
             if allCandidatesSeen.contains(input.hiragana) { seen.remove(input.hiragana) }
             sections.append(CandidateSection(kind: .fixedHiragana, items: [input.hiragana]))
             seen.insert(input.hiragana)

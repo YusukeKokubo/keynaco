@@ -37,10 +37,7 @@ final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
     }
 
     func testProductionOverloadMaintainsIMKCacheWhenInvalidatedWithoutConsumption() {
-        handler.leftContextIMKCache = LeftContextIMKCache(
-            snapshot: IMKSurroundingSnapshot(location: 1, before: "x", after: ""),
-            invalidated: true
-        )
+        handler.leftContextIMKCache = .invalidated
         handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,
             action: .none,
@@ -51,11 +48,11 @@ final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
             newIMKSnapshot: nil
         )
         XCTAssertNil(handler.leftContextIMKCache.snapshot)
-        XCTAssertFalse(handler.leftContextIMKCache.invalidated)
+        XCTAssertFalse(handler.leftContextIMKCache.isInvalidated)
     }
 
     func testSandboxOverloadSkipsIMKMaintenance() {
-        handler.leftContextIMKCache = LeftContextIMKCache(invalidated: true)
+        handler.leftContextIMKCache = .invalidated
         handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,
             action: .none,
@@ -63,6 +60,6 @@ final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
             composedHiraganaWasEmpty: true,
             didInsertText: false
         )
-        XCTAssertTrue(handler.leftContextIMKCache.invalidated)
+        XCTAssertTrue(handler.leftContextIMKCache.isInvalidated)
     }
 }

@@ -12,14 +12,21 @@ public struct IMKSurroundingSnapshot: Equatable, Sendable {
     }
 }
 
-public struct LeftContextIMKCache: Equatable, Sendable {
-    public var snapshot: IMKSurroundingSnapshot?
-    public var invalidated: Bool = false
+public enum LeftContextIMKCache: Equatable, Sendable {
+    case empty
+    case valid(IMKSurroundingSnapshot)
+    /// キー処理中に無効化された。`applyPostKeyDown` で `.empty` に遷移する。
+    case invalidated
 
-    public init(snapshot: IMKSurroundingSnapshot? = nil, invalidated: Bool = false) {
-        self.snapshot = snapshot
-        self.invalidated = invalidated
+    public init() { self = .empty }
+
+    /// キャッシュ済みスナップショット。`.valid` 以外は nil。
+    public var snapshot: IMKSurroundingSnapshot? {
+        guard case .valid(let snap) = self else { return nil }
+        return snap
     }
+
+    public var isInvalidated: Bool { self == .invalidated }
 }
 
 /// 左文脈の解決結果。`sessionBuffer` / `imkBefore` / `combined` を1対1で保持する。
