@@ -18,15 +18,20 @@ public final class DatabaseManager: @unchecked Sendable {
     func nowEpoch() -> Int64 { clock() }
 
     private static let hiraganaPreferredSeededKey = "hiragana_preferred_seeded_v1"
+    static let schemaVersionLatest = 4
+
+    private enum SchemaMigration: Int, CaseIterable {
+        case dropDeprecatedNgramTables = 1
+        case ensureHistoryPOSColumn = 2
+        case dropDeprecatedHistoryColumns = 3
+        case ensureDailyLogAppColumn = 4
+    }
 
     private init() {
         writeAsync = true
         openDatabase()
         createTables()
-        dropDeprecatedNgramTables()
-        ensureHistoryPOSColumn()
-        dropDeprecatedHistoryColumns()
-        ensureDailyLogAppColumn()
+        runMigrations()
         seedHiraganaPreferredIfNeeded()
     }
 
@@ -35,7 +40,7 @@ public final class DatabaseManager: @unchecked Sendable {
         writeAsync = false
         guard sqlite3_open(":memory:", &db) == SQLITE_OK else { return }
         createTables()
-        dropDeprecatedNgramTables()
+        runMigrations()
     }
 
     /// デバッグ用: 既存ファイル DB を開く（一時スナップショット等）。`CREATE` は付けず、誤った空ファイル生成を避ける。
@@ -43,8 +48,7 @@ public final class DatabaseManager: @unchecked Sendable {
         writeAsync = false
         guard sqlite3_open_v2(snapshotPath, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else { return }
         createTables()
-        dropDeprecatedNgramTables()
-        dropDeprecatedHistoryColumns()
+        runMigrations()
     }
 
     deinit {
@@ -122,6 +126,39 @@ public final class DatabaseManager: @unchecked Sendable {
 
     func dispatchWrite(_ block: @escaping () -> Void) {
         if writeAsync { dbQueue.async(execute: block) } else { dbQueue.sync(execute: block) }
+    }
+
+    /// テスト用: `PRAGMA user_version` の現在値。
+    var schemaUserVersion: Int { currentUserVersion() }
+
+    private func runMigrations() {
+        var version = currentUserVersion()
+        for migration in SchemaMigration.allCases where migration.rawValue > version {
+            applyMigration(migration)
+            version = migration.rawValue
+            setUserVersion(version)
+        }
+    }
+
+    private func currentUserVersion() -> Int {
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &stmt, nil) == SQLITE_OK,
+              sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int(stmt, 0))
+    }
+
+    private func setUserVersion(_ version: Int) {
+        sqlite3_exec(db, "PRAGMA user_version = \(version)", nil, nil, nil)
+    }
+
+    private func applyMigration(_ migration: SchemaMigration) {
+        switch migration {
+        case .dropDeprecatedNgramTables: dropDeprecatedNgramTables()
+        case .ensureHistoryPOSColumn: ensureHistoryPOSColumn()
+        case .dropDeprecatedHistoryColumns: dropDeprecatedHistoryColumns()
+        case .ensureDailyLogAppColumn: ensureDailyLogAppColumn()
+        }
     }
 
     /// 廃止した bigram / trigram / skip_bigram テーブルを既存 DB から削除する。

@@ -252,6 +252,24 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(results, ["東京", "東京都"], "登録順で返る")
     }
 
+    // MARK: - スキーママイグレーション
+
+    func testInMemoryInitAppliesLatestSchemaVersion() {
+        XCTAssertEqual(db.schemaUserVersion, DatabaseManager.schemaVersionLatest)
+    }
+
+    func testMigrationsAreIdempotentOnReopen() {
+        let path = NSTemporaryDirectory() + "keynaco-migration-\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        FileManager.default.createFile(atPath: path, contents: Data())
+        let first = DatabaseManager(snapshotPath: path)
+        XCTAssertEqual(first.schemaUserVersion, DatabaseManager.schemaVersionLatest)
+        let second = DatabaseManager(snapshotPath: path)
+        XCTAssertEqual(second.schemaUserVersion, DatabaseManager.schemaVersionLatest)
+        second.record(input: "てすと", output: "テスト")
+        XCTAssertTrue(second.fetchHistoryExact(reading: "てすと").contains("テスト"))
+    }
+
     // MARK: - penalizeAll（訂正シグナル）
 
     func testPenalizeAllDeletesHistoryWhenCountReachesZero() {
