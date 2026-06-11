@@ -2,8 +2,8 @@ import Foundation
 
 // MARK: - 左文脈パイプライン（俯瞰）
 //
-// Zenzai / AzooKey へ渡す `InputHandler.leftContext` の生成経路。結合ルールの正本は
-// `LeftContextResolver.combine`、入力組み立ての正本は本 enum。
+// Zenzai / AzooKey へ渡す `InputHandler.leftContext` の生成経路。
+// 結合ルール（`combine`）と入力組み立て（`resolveProduction` / `resolveSandbox`）を本 enum に集約。
 //
 // ```
 // [素材] sessionTextBuffer + LeftContextIMKCache
@@ -53,8 +53,49 @@ import Foundation
 //
 // 入力組み立ては **必ず** `LeftContextSource` 経由。
 
-/// 左文脈の入力組み立て。パイプライン俯瞰はファイル先頭 MARK を参照。
+/// 左文脈の入力組み立てと結合。パイプライン俯瞰はファイル先頭 MARK を参照。
 public enum LeftContextSource {
+
+    // MARK: - 結合ロジック（旧 LeftContextResolver）
+
+    /// IMK `before` 単体の上限（カーソル近傍の末尾側）
+    static let maxBeforeLength = 300
+    /// `sessionBuffer + before` 結合後の上限
+    static let maxCombinedLength = 400
+
+    /// `sessionBuffer` と IMK `before` を結合して左文脈文字列を作る。
+    ///
+    /// 結合ルール（PLAN260506b）:
+    /// - `before` 単体は最大 `maxBeforeLength` 字（末尾側）
+    /// - `sessionBuffer` が非空のときは全量を先頭に残し、結合総長が `maxCombinedLength` を
+    ///   超えないよう `before` 側のみ切り詰める（`sessionBuffer` は切らない）
+    static func combine(
+        sessionBuffer: String,
+        imkBefore: String?,
+        cursorLocationAvailable: Bool
+    ) -> String {
+        guard cursorLocationAvailable else { return sessionBuffer }
+
+        guard let rawBefore = imkBefore, !rawBefore.isEmpty else {
+            return sessionBuffer
+        }
+
+        let beforeTruncated =
+            rawBefore.count > maxBeforeLength
+            ? String(rawBefore.suffix(maxBeforeLength))
+            : rawBefore
+
+        guard !sessionBuffer.isEmpty else { return beforeTruncated }
+
+        let maxBefore = max(0, maxCombinedLength - sessionBuffer.count)
+        let trimmedBefore =
+            beforeTruncated.count > maxBefore
+            ? String(beforeTruncated.suffix(maxBefore))
+            : beforeTruncated
+        return sessionBuffer + trimmedBefore
+    }
+
+    // MARK: - 解決
 
     /// 本番: キャッシュ済み surrounding とカーソル位置から `LeftContext` を組み立てる。
     /// location 不一致時は `cache.snapshot` を nil 化する。
@@ -67,7 +108,7 @@ public enum LeftContextSource {
             return LeftContext(
                 sessionBuffer: sessionBuffer,
                 imkBefore: nil,
-                combined: LeftContextResolver.combine(
+                combined: combine(
                     sessionBuffer: sessionBuffer,
                     imkBefore: nil,
                     cursorLocationAvailable: false
@@ -84,7 +125,7 @@ public enum LeftContextSource {
             }
         }
 
-        let combined = LeftContextResolver.combine(
+        let combined = combine(
             sessionBuffer: sessionBuffer,
             imkBefore: imkBefore,
             cursorLocationAvailable: true
@@ -126,7 +167,7 @@ public enum LeftContextSource {
             return LeftContext(sessionBuffer: sessionBuffer, imkBefore: nil, combined: override)
         }
         let imkBefore = documentBefore.isEmpty ? nil : documentBefore
-        let combined = LeftContextResolver.combine(
+        let combined = combine(
             sessionBuffer: sessionBuffer,
             imkBefore: imkBefore,
             cursorLocationAvailable: true

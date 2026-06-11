@@ -8,7 +8,7 @@ final class LeftContextResolverTests: XCTestCase {
         imkBefore: String? = nil,
         cursorLocationAvailable: Bool = true
     ) -> String {
-        LeftContextResolver.combine(
+        LeftContextSource.combine(
             sessionBuffer: sessionBuffer,
             imkBefore: imkBefore,
             cursorLocationAvailable: cursorLocationAvailable
@@ -34,8 +34,8 @@ final class LeftContextResolverTests: XCTestCase {
     func testBeforeTruncatedToMaxBeforeLength() {
         let longBefore = String(repeating: "あ", count: 350)
         let result = combine(imkBefore: longBefore)
-        XCTAssertEqual(result.count, LeftContextResolver.maxBeforeLength)
-        XCTAssertEqual(result, String(longBefore.suffix(LeftContextResolver.maxBeforeLength)))
+        XCTAssertEqual(result.count, LeftContextSource.maxBeforeLength)
+        XCTAssertEqual(result, String(longBefore.suffix(LeftContextSource.maxBeforeLength)))
     }
 
     func testCombinedTruncatedWhenSessionPlusBeforeExceedsMax() {
@@ -43,8 +43,8 @@ final class LeftContextResolverTests: XCTestCase {
         let longBefore = String(repeating: "い", count: 350)
         let result = combine(sessionBuffer: session, imkBefore: longBefore)
         XCTAssertTrue(result.hasPrefix(session))
-        let beforePart = String(longBefore.suffix(LeftContextResolver.maxBeforeLength))
-        let maxBefore = LeftContextResolver.maxCombinedLength - session.count
+        let beforePart = String(longBefore.suffix(LeftContextSource.maxBeforeLength))
+        let maxBefore = LeftContextSource.maxCombinedLength - session.count
         let expectedBefore = String(beforePart.suffix(maxBefore))
         XCTAssertEqual(result, session + expectedBefore)
     }
@@ -54,7 +54,7 @@ final class LeftContextResolverTests: XCTestCase {
         let before = String(repeating: "い", count: 300)
         let result = combine(sessionBuffer: session, imkBefore: before)
         XCTAssertTrue(result.hasPrefix(session))
-        XCTAssertEqual(result.count, LeftContextResolver.maxCombinedLength)
+        XCTAssertEqual(result.count, LeftContextSource.maxCombinedLength)
     }
 
     func testCursorUnavailableReturnsSessionOnly() {
