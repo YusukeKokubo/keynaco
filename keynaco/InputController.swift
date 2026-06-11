@@ -134,8 +134,10 @@ class InputController: IMKInputController, @unchecked Sendable {
         handler.applyCandidateAction(action, client: adapter)
 
         switch action {
-        case .none, .deleteSelected:
+        case .none:
             break
+        case .deleteSelected:
+            candidateWindow.refreshFrom(session: handler.candidateSession)
         case .dismiss:
             candidateWindow.dismiss()
         case .selectNext, .selectPrev:
