@@ -49,8 +49,9 @@ extension InputHandler {
         readingOverride: String? = nil
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
+        let isAscii = h.allSatisfy({ $0.isASCII })
         let azooKeyCandidates: [String]
-        if h.allSatisfy({ $0.isASCII }) {
+        if isAscii {
             azooKeyCandidates = []
         } else {
             let raw = azooKeyConverter.requestCandidates(
@@ -60,17 +61,19 @@ extension InputHandler {
             )
             azooKeyCandidates = raw.filter { !KanaUtils.isScriptMixed($0) }
         }
-        let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
+        let historyKey = (!h.isEmpty && isAscii) ? h.lowercased() : h
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
         let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
         var highHistory: [String] = []
-        for row in historyScored where row.score >= Self.historyRecencyScoreCutoff {
-            highHistory.append(row.output)
+        var historyOutputSet = Set<String>()
+        for row in historyScored {
+            historyOutputSet.insert(row.output)
+            if row.score >= Self.historyRecencyScoreCutoff, highHistory.count < Self.maxHighHistoryCount {
+                highHistory.append(row.output)
+            }
         }
-        highHistory = Array(highHistory.prefix(Self.maxHighHistoryCount))
         let highHistoryCount = highHistory.count
-        let historyOutputSet = Set(historyScored.map(\.output))
         let zenzaiPromoted: String? = {
             guard azooKeyConverter.isZenzaiEnabled,
                   leftContext.azooKeyValue != nil,

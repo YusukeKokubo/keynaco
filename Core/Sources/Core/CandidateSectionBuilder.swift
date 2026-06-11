@@ -28,7 +28,9 @@ enum CandidateSectionBuilder {
         }
 
         var sections: [CandidateSection] = []
-        var seen = Set(input.highHistory + azooKeyUniq)
+        var seen = Set<String>(minimumCapacity: input.highHistory.count + azooKeyUniq.count)
+        for item in input.highHistory { seen.insert(item) }
+        for item in azooKeyUniq { seen.insert(item) }
 
         if input.fixedSlot == .hiragana || input.addsDefaultFixedHiragana {
             // allCandidatesSeen（全候補のスナップショット）にある場合は、seen から一度外して
