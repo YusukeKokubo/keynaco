@@ -1,7 +1,30 @@
 import Foundation
 
+/// 候補パネルの操作フェーズ（`isVisible` × `isExplicitlySelected` の 3 状態）。
+///
+/// フィールド置換は Phase 5 まで見送り。`historyEnd` / `fixedEnd` 等と常に連動するため。
+public enum CandidatePanelInteraction: Equatable, Sendable {
+    case hidden
+    /// 表示中だがユーザーは ↑↓/Space でまだ動かしていない（打鍵サジェスト・`.whileTyping` 表示）。
+    case passive
+    /// ユーザーが ↑↓/Space で候補を明示選択中。文字キーは先に選択候補を確定する。
+    case explicit
+}
+
 /// 候補 UI の単一の正本。`InputHandler` が `CandidateAction` を返し、`InputController` が
 /// `apply` 後に `CandidateWindow.present(session:)` で描画する。
+///
+/// ## `isVisible` / `isExplicitlySelected` のライフサイクル
+///
+/// 不変条件: `isExplicitlySelected == true` ⇒ `isVisible == true`。
+///
+/// | 操作 | `isVisible` | `isExplicitlySelected` |
+/// |------|-------------|------------------------|
+/// | `apply(.show)`（候補非空） | `true` | `initialIsExplicitlySelected`（`.explicit` トリガのみ `true`） |
+/// | `apply(.selectNext)` / `.selectPrev` | 維持 | `true` |
+/// | `apply(.replaceCandidates)` | 候補非空なら `true` | `false` |
+/// | `apply(.dismiss)` / `reset()` | `false` | `false` |
+/// | `removeCandidate` / `.deleteSelected` で空 | `false`（`reset()`） | `false` |
 public struct CandidateSession: Sendable, Equatable {
 
     public var candidates: [String] = []
@@ -16,6 +39,12 @@ public struct CandidateSession: Sendable, Equatable {
     public var bracketCandidates: [String]? = nil
 
     public var isBracketMode: Bool { bracketCandidates != nil }
+
+    /// `isVisible` と `isExplicitlySelected` から導出する操作フェーズ。
+    public var panelInteraction: CandidatePanelInteraction {
+        guard isVisible else { return .hidden }
+        return isExplicitlySelected ? .explicit : .passive
+    }
 
     public var selectedText: String? {
         guard isVisible, candidates.indices.contains(selectedRow) else { return nil }

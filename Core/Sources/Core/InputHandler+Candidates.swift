@@ -4,7 +4,7 @@ import AppKit
 //
 // `buildCandidateList` : 候補列の組み立て（履歴・AzooKey 統合）
 // AzooKey 候補の重複呼び出し回避は `AzooKeyConverter.candidateCache`（read-through LRU）が担当。
-// 括弧モード・候補表示中は InputHandler+BracketMode.swift
+// 候補表示中キーは InputHandler+CandidateInput.swift、括弧モードは +BracketMode.swift
 
 extension InputHandler {
 

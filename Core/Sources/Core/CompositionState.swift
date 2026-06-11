@@ -2,6 +2,13 @@ import AppKit
 
 /// InputController から分離した純粋な状態遷移ロジック。
 /// IMK ランタイムに依存しないため、ユニットテストで検証可能。
+///
+/// ## `hiddenPendingN` のライフサイクル（本 struct 内のみ set/clear）
+///
+/// | 操作 | 箇所 |
+/// |------|------|
+/// | **set `true`** | `addRomaji` — `"nn"` → `ん` + pending `"n"` 検出時 |
+/// | **clear `false`** | `absorbPendingIntoComposed`、`addRomaji` の hidden-n 分岐、`backspace`、`reset` |
 public struct CompositionState {
 
     /// "nn" 後の hidden n を保持すべき入力（y / n のみ）

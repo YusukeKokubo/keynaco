@@ -24,6 +24,17 @@ final class CandidateSessionTests: XCTestCase {
         XCTAssertEqual(s.selectedRow, 0)
     }
 
+    func testPanelInteractionPhases() {
+        var s = CandidateSession()
+        XCTAssertEqual(s.panelInteraction, .hidden)
+        s.apply(.show(candidates: ["a"], historyEnd: 0, initialRow: 0, fixedEnd: 0))
+        XCTAssertEqual(s.panelInteraction, .passive)
+        s.apply(.selectNext)
+        XCTAssertEqual(s.panelInteraction, .explicit)
+        s.apply(.dismiss)
+        XCTAssertEqual(s.panelInteraction, .hidden)
+    }
+
     func testDeleteSelectedShrinksHistoryEnd() {
         var s = CandidateSession()
         s.apply(.show(candidates: ["fix", "hist"], historyEnd: 2, initialRow: 1, fixedEnd: 1))

@@ -70,6 +70,12 @@ public struct CandidateContext: Sendable {
         isVisible: false, selectedRow: 0, selectedText: nil,
         isExplicitlySelected: false, historyEnd: 0, fixedEnd: 0
     )
+
+    /// `CandidateSession.panelInteraction` と同じ導出（`handle()` へのスナップショット用）。
+    public var panelInteraction: CandidatePanelInteraction {
+        guard isVisible else { return .hidden }
+        return isExplicitlySelected ? .explicit : .passive
+    }
 }
 
 /// `buildCandidateList` の呼び出し元。候補列の組み立てロジックは共通、UI 抑制だけ分岐する。
@@ -110,7 +116,11 @@ public enum KeyCode {
 /// 入力処理の本体。IMK・UI に依存しない純粋なロジック。
 ///
 /// 機能ごとの実装は extension で別ファイルに分散している：
-/// - `InputHandler+Candidates.swift`   ：候補リスト構築・候補表示中・通常入力
+/// - `InputHandler+KeyDispatch.swift`    ：`handle()` ルーティング
+/// - `InputHandler+NormalInput.swift`    ：ローマ字・記号・z シーケンス入力
+/// - `InputHandler+CandidateInput.swift` ：候補表示中のキー処理
+/// - `InputHandler+Candidates.swift`     ：候補リスト構築
+/// - `InputHandler+BracketMode.swift`    ：括弧モード
 public struct InputHandler {
 
     /// 英字直接入力モード。プロセス全体で 1 つの static（全 `InputController` / アプリ切替後も維持）。
@@ -137,7 +147,12 @@ public struct InputHandler {
     public var state = CompositionState()
     public var candidateSession = CandidateSession()
     /// `activateServer` 直後に IMK が英数/かなキーを echo するのを 1 回だけ無視する（bc3c628）。
-    /// 英数キー押下そのものの二重送信ではない。セットは `InputController.activateServer` のみ。
+    /// 英数キー押下そのものの二重送信ではない。
+    ///
+    /// | 操作 | 値 |
+    /// |------|-----|
+    /// | **set `true`** | `InputController.activateServer` のみ |
+    /// | **clear `false`** | 英数/かなキーで echo 抑制消費時（`handleModeSwitchKey`）、それ以外の任意キー（`handle()` 本流） |
     public var ignoreNextModeSwitch = false
     public var bracketCandidates: [String]? {
         get { candidateSession.bracketCandidates }
@@ -156,7 +171,12 @@ public struct InputHandler {
     public var committedHistory: [String] = []
     /// Zenzai 左文脈用。確定語ごとに加算（上限 50 字）。`leftSideContext` 素材 — 詳細は `LeftContextSource` MARK。
     public var sessionTextBuffer: String = ""
-    /// 文末記号で `committedHistory` を消した直後に立て、`InputController` が IMK キャッシュを捨てる（`LeftContextSource` MARK）。
+    /// IMK surrounding キャッシュ無効化フラグ。`InputController.applyPostKeyDownEffects` が読んで clear する。
+    ///
+    /// | 操作 | 箇所 |
+    /// |------|------|
+    /// | **set `true`** | `pushCommitted` の文末記号（`。` `！` `？`）、ASCII モード Enter、組成空 Enter |
+    /// | **clear `false`** | `InputController.applyPostKeyDownEffects`（キャッシュ nil 化後） |
     public var documentSurroundingContextInvalidated = false
     var lastCommittedOutput: String? {
         committedHistory.last
@@ -193,41 +213,7 @@ public struct InputHandler {
         self.hiraganaPreferredSet = db.fetchHiraganaPreferredSet()
     }
 
-    // MARK: - 公開インターフェース
-
-    public mutating func handle(
-        keyCode: UInt16,
-        characters: String?,
-        baseCharacters: String?,
-        modifiers: NSEvent.ModifierFlags,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
-        clearLastConfirmedContextUnlessBackspace(isBackspace: isBackspace)
-
-        if isBracketMode {
-            return handleBracketModeKey(
-                keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-                modifiers: modifiers, candidate: candidate, client: client)
-        }
-
-        let wasExplicitlySelected = candidate.isVisible && candidate.isExplicitlySelected
-
-        if let r = handleFunctionKeyIfNeeded(keyCode: keyCode, client: client) { return r }
-        if let r = handleModeSwitchKey(keyCode: keyCode, client: client) { return r }
-        ignoreNextModeSwitch = false
-        if let r = handleAsciiModeKey(
-            keyCode: keyCode, characters: characters, modifiers: modifiers, client: client) { return r }
-        if let r = handleCandidateVisibleOrComposeOnlyKey(
-            keyCode: keyCode, characters: characters, modifiers: modifiers, isBackspace: isBackspace,
-            candidate: candidate, client: client) { return r }
-
-        return handleNormalInput(
-            keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
-            modifiers: modifiers, wasExplicitlySelected: wasExplicitlySelected,
-            candidate: candidate, client: client)
-    }
+    // MARK: - 公開インターフェース（`handle` は InputHandler+KeyDispatch.swift）
 
     /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
     /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
@@ -359,92 +345,5 @@ public struct InputHandler {
     public mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
         guard state.reset() else { return (false, .none) }
         return (true, .dismiss)
-    }
-}
-
-// MARK: - handle() 分岐（薄型ディスパッチ用）
-
-extension InputHandler {
-    private mutating func clearLastConfirmedContextUnlessBackspace(isBackspace: Bool) {
-        if !isBackspace { lastConfirmedContext = nil }
-    }
-
-    private mutating func handleFunctionKeyIfNeeded(
-        keyCode: UInt16, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard !Self.isAsciiMode,
-              [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) else { return nil }
-        let consumed = handleFunctionKey(keyCode: keyCode, client: client)
-        return (consumed, consumed ? .dismiss : .none)
-    }
-
-    private mutating func handleModeSwitchKey(
-        keyCode: UInt16, client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard keyCode == KeyCode.eisu || keyCode == KeyCode.kana else { return nil }
-        if ignoreNextModeSwitch {
-            ignoreNextModeSwitch = false
-            return (true, .none)
-        }
-        if keyCode == KeyCode.eisu {
-            if state.isComposing { commitComposition(client: client) }
-            Self.isAsciiMode = true
-        } else {
-            Self.isAsciiMode = false
-        }
-        return (true, .none)
-    }
-
-    private mutating func handleAsciiModeKey(
-        keyCode: UInt16,
-        characters: String?,
-        modifiers: NSEvent.ModifierFlags,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard Self.isAsciiMode else { return nil }
-        if keyCode == KeyCode.escape { Self.isAsciiMode = false; return (true, .none) }
-        if keyCode == KeyCode.enter {
-            committedHistory.removeAll()
-            sessionTextBuffer = ""
-            documentSurroundingContextInvalidated = true
-            return (false, .none)
-        }
-        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
-        guard let chars = characters, !chars.isEmpty,
-              chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0x7F }) else { return (false, .none) }
-        client.insertText(chars)
-        return (true, .none)
-    }
-
-    private mutating func handleCandidateVisibleOrComposeOnlyKey(
-        keyCode: UInt16,
-        characters: String?,
-        modifiers: NSEvent.ModifierFlags,
-        isBackspace: Bool,
-        candidate: CandidateContext,
-        client: TextInputClient
-    ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        if candidate.isVisible {
-            if let r = handleCandidateVisible(
-                keyCode: keyCode, characters: characters,
-                modifiers: modifiers, candidate: candidate, client: client) { return r }
-            return nil
-        }
-        switch keyCode {
-        case KeyCode.enter:
-            guard state.isComposing else {
-                committedHistory.removeAll()
-                sessionTextBuffer = ""
-                documentSurroundingContextInvalidated = true
-                return (false, .none)
-            }
-            commitComposition(client: client)
-            return (true, .dismiss)
-        case KeyCode.escape:
-            return doEscape(client: client)
-        default:
-            if isBackspace { return doBackspace(client: client) }
-            return nil
-        }
     }
 }

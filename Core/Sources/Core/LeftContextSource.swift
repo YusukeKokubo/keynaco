@@ -39,8 +39,7 @@ import Foundation
 // - キャッシュあり location 不一致 or `before` 空 → `shouldClearCache`（呼び出し側が nil 化）
 //
 // その他キャッシュ nil: `activateServer`、`commitComposition`。
-// `documentSurroundingContextInvalidated` を立てるのは `pushCommitted` の文末記号、ASCII Enter、
-// 組成空 Enter（`InputHandler`）。
+// `documentSurroundingContextInvalidated` の set/clear 一覧は `InputHandler` の doc 参照。
 //
 // ## サンドボックス（DebugSocketServer）
 //
