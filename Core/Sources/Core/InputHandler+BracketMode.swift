@@ -82,7 +82,7 @@ public extension InputHandler {
 
     @discardableResult
     mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
-        guard !state.composingText.isEmpty else { return .none }
+        guard state.isComposing else { return .none }
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する

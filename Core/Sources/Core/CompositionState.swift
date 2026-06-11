@@ -22,6 +22,9 @@ public struct CompositionState {
         hiddenPendingN ? composedHiragana : composedHiragana + pendingRomaji
     }
 
+    /// 組成中（未確定テキストあり）。`composingText` が空でないとき true。
+    public var isComposing: Bool { !composingText.isEmpty }
+
     /// 確定時のテキストを返す（pending の "n" → "ん" 等を含む）
     public var finalizedText: String {
         // hiddenPendingN のとき pending "n" は捨てる（"nn" 後の確定は "ん" 1つ）
@@ -80,7 +83,7 @@ public struct CompositionState {
     /// - Returns: `(handled, candidateRefreshNeeded)`
     ///   handled=false は未確定文字列が空だった場合
     public mutating func backspace() -> (handled: Bool, candidateRefreshNeeded: Bool) {
-        guard !composingText.isEmpty else { return (false, false) }
+        guard isComposing else { return (false, false) }
         if hiddenPendingN {
             // "nn" → "ん"(表示) の状態: pending "n" と直前の "ん" をまとめて1操作で削除
             pendingRomaji = ""
@@ -97,7 +100,7 @@ public struct CompositionState {
     /// 全状態をリセットする。
     /// - Returns: リセット前に未確定文字列があったか
     public mutating func reset() -> Bool {
-        guard !composingText.isEmpty else { return false }
+        guard isComposing else { return false }
         composedHiragana = ""
         pendingRomaji = ""
         hiddenPendingN = false

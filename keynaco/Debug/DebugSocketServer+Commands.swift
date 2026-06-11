@@ -446,7 +446,7 @@ extension DebugSocketServer {
     let base  = cmd["base"]  as? String ?? chars
     let mods  = NSEvent.ModifierFlags(rawValue: (cmd["mods"] as? UInt) ?? 0)
 
-    let composingTextWasEmpty = handler.state.composingText.isEmpty
+    let composingTextWasEmpty = !handler.state.isComposing
     let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
     let pendingRomajiWasEmpty = handler.state.pendingRomaji.isEmpty
     let backspacePenalizeOutput: String? = (
@@ -484,7 +484,7 @@ extension DebugSocketServer {
     IMESandboxWindow.shared.appendSocketSnapshot(result, inserted: insertedTexts)
     if keyCode == 36 {
     let stillComposing = !handler.state.composedHiragana.isEmpty
-        || !handler.state.composingText.isEmpty
+        || handler.state.isComposing
         || !handler.state.pendingRomaji.isEmpty
     if !stillComposing {
         IMESandboxWindow.shared.finishCurrentLine()

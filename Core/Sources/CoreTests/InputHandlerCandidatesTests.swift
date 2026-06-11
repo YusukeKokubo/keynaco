@@ -340,7 +340,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertTrue(result.consumed)
         // 漢字ではなくひらがなが確定される
         XCTAssertEqual(client.inserted, ["か"])
-        XCTAssertTrue(handler.state.composingText.isEmpty, "確定後は組成バッファが空になるはず")
+        XCTAssertFalse(handler.state.isComposing, "確定後は組成バッファが空になるはず")
     }
 
     func testRightArrowDuringCandidateIgnoresSelectedCandidate() {

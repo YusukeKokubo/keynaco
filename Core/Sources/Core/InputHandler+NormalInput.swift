@@ -76,7 +76,7 @@ public extension InputHandler {
         chars: String, base: String, modifiers: NSEvent.ModifierFlags, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
-        if state.composingText.isEmpty {
+        if !state.isComposing {
             bracketCandidates = options
             return (true, .show(candidates: options, historyEnd: 0, initialRow: 0, fixedEnd: 0))
         }
@@ -100,7 +100,7 @@ public extension InputHandler {
         chars: String, isNonAscii: Bool, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard isNonAscii else { return nil }
-        if state.composingText.isEmpty {
+        if !state.isComposing {
             pushCommitted(chars)
             client.insertText(chars)
         } else {

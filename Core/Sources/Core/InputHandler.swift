@@ -232,7 +232,7 @@ public struct InputHandler {
     /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
     /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
     public mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
-        guard !state.composingText.isEmpty else { return }
+        guard state.isComposing else { return }
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         if candidate.isVisible, let selected = candidate.selectedText {
@@ -260,7 +260,7 @@ public struct InputHandler {
     ) {
         let isPunctuation = InputHandler.readingPunctuations.contains(text)
             || InputHandler.sentenceTerminators.contains(text)
-        if !state.composingText.isEmpty && !skipHistory && !isPunctuation,
+        if state.isComposing && !skipHistory && !isPunctuation,
            committedHistory.last != nil {
             lastCommittedReading = state.finalizedText
         }
@@ -287,7 +287,7 @@ public struct InputHandler {
 
     /// F6–F10 の変換確定。composingText が空なら false を返す。
     public mutating func handleFunctionKey(keyCode: UInt16, client: TextInputClient) -> Bool {
-        guard !state.composingText.isEmpty else { return false }
+        guard state.isComposing else { return false }
         state.absorbPendingIntoComposed()
         let hiragana = state.composedHiragana
         let text: String
@@ -387,7 +387,7 @@ extension InputHandler {
             return (true, .none)
         }
         if keyCode == KeyCode.eisu {
-            if !state.composingText.isEmpty { commitComposition(client: client) }
+            if state.isComposing { commitComposition(client: client) }
             Self.isAsciiMode = true
         } else {
             Self.isAsciiMode = false
@@ -432,7 +432,7 @@ extension InputHandler {
         }
         switch keyCode {
         case KeyCode.enter:
-            guard !state.composingText.isEmpty else {
+            guard state.isComposing else {
                 committedHistory.removeAll()
                 sessionTextBuffer = ""
                 documentSurroundingContextInvalidated = true

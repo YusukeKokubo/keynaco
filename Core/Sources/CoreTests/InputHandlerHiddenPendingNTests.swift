@@ -34,6 +34,6 @@ final class InputHandlerHiddenPendingNTests: InputHandlerTestCase {
         let (consumed, _) = press(keyCode: KeyCode.f6)
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.inserted.last, "ん")
-        XCTAssertTrue(handler.state.composingText.isEmpty)
+        XCTAssertFalse(handler.state.isComposing)
     }
 }

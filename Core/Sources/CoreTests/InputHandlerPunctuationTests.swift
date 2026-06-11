@@ -235,7 +235,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let (consumed, _) = press(keyCode: KeyCode.f6)
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.inserted.last, "か")
-        XCTAssertTrue(handler.state.composingText.isEmpty)
+        XCTAssertFalse(handler.state.isComposing)
     }
 
     func testF7ConfirmsKatakana() {
@@ -243,7 +243,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let (consumed, _) = press(keyCode: KeyCode.f7)
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.inserted.last, "カ")
-        XCTAssertTrue(handler.state.composingText.isEmpty)
+        XCTAssertFalse(handler.state.isComposing)
     }
 
     func testF8ConfirmsHankakuKatakana() {
@@ -251,7 +251,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let (consumed, _) = press(keyCode: KeyCode.f8)
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.inserted.last, "ｶ")
-        XCTAssertTrue(handler.state.composingText.isEmpty)
+        XCTAssertFalse(handler.state.isComposing)
     }
 
     func testF9ConfirmsZenkakuAscii() {
@@ -259,7 +259,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let (consumed, _) = press(keyCode: KeyCode.f9)
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.inserted.last, "ｎｉｈｏｎ")
-        XCTAssertTrue(handler.state.composingText.isEmpty)
+        XCTAssertFalse(handler.state.isComposing)
     }
 
     func testF10ConfirmsHankakuAscii() {
@@ -267,7 +267,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let (consumed, _) = press(keyCode: KeyCode.f10)
         XCTAssertTrue(consumed)
         XCTAssertEqual(client.inserted.last, "nihon")
-        XCTAssertTrue(handler.state.composingText.isEmpty)
+        XCTAssertFalse(handler.state.isComposing)
     }
 
     func testFunctionKeyForceFinalizesPendingRomaji() {
