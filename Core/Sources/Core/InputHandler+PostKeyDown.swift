@@ -2,26 +2,46 @@ import Foundation
 
 public extension InputHandler {
 
-    /// キー処理直後の共通副作用: 候補 `applyCandidateAction`、本番時は IMK キャッシュ更新。
-    ///
-    /// - Parameter alwaysApplyCandidateAction: sandbox は `true`。本番 `InputController` は `false`（`consumed` 時のみ）。
-    /// - Parameter imkCache: 本番は `&leftContextIMKCache`。sandbox は `nil` で IMK 経路をスキップ。
-    mutating func applyPostKeyDownEffects(
+    /// sandbox: 候補 `applyCandidateAction` を consumed 不問で適用。IMK キャッシュは更新しない。
+    mutating func applyPostKeyDownCandidateAndIMK(
+        consumed: Bool,
+        action: CandidateAction,
+        client: TextInputClient,
+        composedHiraganaWasEmpty: Bool,
+        didInsertText: Bool
+    ) {
+        applyCandidateAction(action, client: client)
+    }
+
+    /// 本番: `consumed` 時のみ候補 apply。`imkCache` をキー処理後のルールで更新する。
+    mutating func applyPostKeyDownCandidateAndIMK(
         consumed: Bool,
         action: CandidateAction,
         client: TextInputClient,
         composedHiraganaWasEmpty: Bool,
         didInsertText: Bool,
-        alwaysApplyCandidateAction: Bool,
-        imkCache: inout LeftContextIMKCache?,
+        imkCache: inout LeftContextIMKCache,
         newIMKSnapshot: IMKSurroundingSnapshot?
     ) {
-        if alwaysApplyCandidateAction || consumed {
+        if consumed {
             applyCandidateAction(action, client: client)
         }
+        maintainIMKCacheAfterKeyDown(
+            consumed: consumed,
+            composedHiraganaWasEmpty: composedHiraganaWasEmpty,
+            didInsertText: didInsertText,
+            cache: &imkCache,
+            newIMKSnapshot: newIMKSnapshot
+        )
+    }
 
-        guard var cache = imkCache else { return }
-
+    private mutating func maintainIMKCacheAfterKeyDown(
+        consumed: Bool,
+        composedHiraganaWasEmpty: Bool,
+        didInsertText: Bool,
+        cache: inout LeftContextIMKCache,
+        newIMKSnapshot: IMKSurroundingSnapshot?
+    ) {
         let needsIMKMaintenance = consumed
             || cache.invalidated
             || didInsertText
@@ -35,6 +55,5 @@ public extension InputHandler {
             composedHiraganaWasEmpty: composedHiraganaWasEmpty,
             newSnapshot: newIMKSnapshot
         )
-        imkCache = cache
     }
 }

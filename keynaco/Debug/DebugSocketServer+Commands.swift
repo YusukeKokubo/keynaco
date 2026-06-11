@@ -472,16 +472,12 @@ extension DebugSocketServer {
             mockClient.removeLastDocumentCharacter()
         }
     }
-    var imkCache: LeftContextIMKCache? = nil
-    handler.applyPostKeyDownEffects(
+    handler.applyPostKeyDownCandidateAndIMK(
         consumed: consumed,
         action: action,
         client: mockClient,
         composedHiraganaWasEmpty: composedHiraganaWasEmpty,
-        didInsertText: mockClient.hasPendingInsertions,
-        alwaysApplyCandidateAction: true,
-        imkCache: &imkCache,
-        newIMKSnapshot: nil
+        didInsertText: mockClient.hasPendingInsertions
     )
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {

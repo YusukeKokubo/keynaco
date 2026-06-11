@@ -127,7 +127,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         handler.syncMarkedText(client: IMKTextInputAdapter(activeIMKClient))
     }
 
-    /// 候補ウィンドウ更新のみ。session / marked は `InputHandler.applyPostKeyDownEffects` が担当。
+    /// 候補ウィンドウ更新のみ。session / marked は `InputHandler.applyPostKeyDownCandidateAndIMK` が担当。
     @MainActor
     private func applyCandidateWindowEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
         let panel = CandidatePanelModel(session: handler.candidateSession)
@@ -145,7 +145,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         }
     }
 
-    /// キー処理後の副作用。候補 / IMK は Core `applyPostKeyDownEffects`、ウィンドウは本ファイル。
+    /// キー処理後の副作用。候補 / IMK は Core、ウィンドウ・POS は本ファイル。
     @MainActor
     private func applyPostKeyDownEffects(
         consumed: Bool,
@@ -165,20 +165,17 @@ class InputController: IMKInputController, @unchecked Sendable {
             }
         }
 
-        var imkCache: LeftContextIMKCache? = handler.leftContextIMKCache
-        handler.applyPostKeyDownEffects(
+        var imkCache = handler.leftContextIMKCache
+        handler.applyPostKeyDownCandidateAndIMK(
             consumed: consumed,
             action: action,
             client: adapter,
             composedHiraganaWasEmpty: composedHiraganaWasEmpty,
             didInsertText: adapter.didInsertText,
-            alwaysApplyCandidateAction: false,
             imkCache: &imkCache,
             newIMKSnapshot: newSnapshot
         )
-        if let imkCache {
-            handler.leftContextIMKCache = imkCache
-        }
+        handler.leftContextIMKCache = imkCache
 
         if consumed {
             applyCandidateWindowEffects(action: action, adapter: adapter)

@@ -4,76 +4,64 @@ import XCTest
 
 final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
 
-    func testSkipsCandidateApplyWhenNotConsumedAndProductionPolicy() {
+    func testSkipsCandidateApplyWhenNotConsumedInProductionOverload() {
         handler.candidateSession.apply(
             .show(candidates: ["a"], historyEnd: 0, initialRow: 0, fixedEnd: 0)
         )
-        var cache: LeftContextIMKCache? = nil
-        handler.applyPostKeyDownEffects(
+        handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,
             action: .selectNext,
             client: client,
             composedHiraganaWasEmpty: true,
             didInsertText: false,
-            alwaysApplyCandidateAction: false,
-            imkCache: &cache,
+            imkCache: &handler.leftContextIMKCache,
             newIMKSnapshot: nil
         )
         XCTAssertEqual(handler.candidateSession.selectedRow, 0)
         XCTAssertFalse(handler.candidateSession.isExplicitlySelected)
     }
 
-    func testAlwaysApplyCandidateActionForSandboxPolicy() {
+    func testSandboxOverloadAlwaysAppliesCandidateAction() {
         handler.candidateSession.apply(
             .show(candidates: ["a", "b"], historyEnd: 0, initialRow: 0, fixedEnd: 0)
         )
-        var cache: LeftContextIMKCache? = nil
-        handler.applyPostKeyDownEffects(
+        handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,
             action: .selectNext,
             client: client,
             composedHiraganaWasEmpty: true,
-            didInsertText: false,
-            alwaysApplyCandidateAction: true,
-            imkCache: &cache,
-            newIMKSnapshot: nil
+            didInsertText: false
         )
         XCTAssertEqual(handler.candidateSession.selectedRow, 1)
         XCTAssertTrue(handler.candidateSession.isExplicitlySelected)
     }
 
-    func testMaintainsIMKCacheWhenInvalidatedWithoutConsumption() {
-        var cache: LeftContextIMKCache? = LeftContextIMKCache(
+    func testProductionOverloadMaintainsIMKCacheWhenInvalidatedWithoutConsumption() {
+        handler.leftContextIMKCache = LeftContextIMKCache(
             snapshot: IMKSurroundingSnapshot(location: 1, before: "x", after: ""),
             invalidated: true
         )
-        handler.leftContextIMKCache = cache!
-        handler.applyPostKeyDownEffects(
+        handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,
             action: .none,
             client: client,
             composedHiraganaWasEmpty: true,
             didInsertText: false,
-            alwaysApplyCandidateAction: false,
-            imkCache: &cache,
+            imkCache: &handler.leftContextIMKCache,
             newIMKSnapshot: nil
         )
-        XCTAssertNil(cache?.snapshot)
-        XCTAssertFalse(cache?.invalidated ?? true)
+        XCTAssertNil(handler.leftContextIMKCache.snapshot)
+        XCTAssertFalse(handler.leftContextIMKCache.invalidated)
     }
 
-    func testSkipsIMKMaintenanceWhenCacheNil() {
+    func testSandboxOverloadSkipsIMKMaintenance() {
         handler.leftContextIMKCache = LeftContextIMKCache(invalidated: true)
-        var cache: LeftContextIMKCache? = nil
-        handler.applyPostKeyDownEffects(
+        handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,
             action: .none,
             client: client,
             composedHiraganaWasEmpty: true,
-            didInsertText: false,
-            alwaysApplyCandidateAction: false,
-            imkCache: &cache,
-            newIMKSnapshot: nil
+            didInsertText: false
         )
         XCTAssertTrue(handler.leftContextIMKCache.invalidated)
     }
