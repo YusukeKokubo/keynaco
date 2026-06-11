@@ -23,7 +23,7 @@ struct CandidateSection: Sendable {
 
 // MARK: - InitialRowPolicy
 
-enum InitialRowPolicy: Sendable {
+enum InitialRowPolicy: Equatable, Sendable {
     /// 該当文字列の最初の出現位置（hiraganaPreferred 用）。見つからなければ afterFixed にフォールバック
     case firstMatching(String)
     /// 強制的に 0 行目（Zenzai top-1 を初期選択にする場合等）

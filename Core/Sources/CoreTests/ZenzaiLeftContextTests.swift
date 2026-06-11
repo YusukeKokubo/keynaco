@@ -3,8 +3,8 @@ import XCTest
 @testable import KeynacoTestSupport
 
 // Zenzai top-1 プロモートが leftSideContext の有無で変わることを検証する。
-// - 左文脈なし: azooKeyLeftContext == nil → Zenzai 未発火 → fixedEnd = kana×2
-// - 左文脈あり: azooKeyLeftContext != nil → Zenzai top-1 が固定枠に昇格 → fixedEnd = kana×2 + 1
+// - 左文脈なし: azooKeyLeftContext == nil → Zenzai 未発火 → 辞書先頭が row 0
+// - 左文脈あり: azooKeyLeftContext != nil → Zenzai top-1 が row 0 に昇格
 //
 // AzooKeyConverter の実モデル（gguf）はテスト環境では使えないため、
 // isZenzaiEnabled = true のモックで代替する。
@@ -72,7 +72,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
 
     // MARK: - テスト
 
-    /// 左文脈なし: Zenzai 未発火 → 辞書先頭候補 "開催" が row 0 に昇格（fixedEnd = 0）
+    /// 左文脈なし: Zenzai 未発火 → 辞書先頭候補 "開催" が row 0
     func testZenzaiNotPromotedWithoutLeftContext() {
         handler.leftSideContext = ""
         typeRomaji("kaisai")
@@ -80,13 +80,12 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard let payload = action.showPayload else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(payload.fixedEnd, 0, "左文脈なし: fixedCount=0, Zenzai未発火 → fixedEnd=0")
         XCTAssertEqual(payload.candidates[0], "開催", "辞書先頭候補が row 0")
         XCTAssertEqual(payload.candidates[1], "快哉", "辞書2番目候補が row 1")
         XCTAssertNil(handler.candidateSession.zenzaiRow, "Zenzai 未発火なので zenzaiRow は nil")
     }
 
-    /// 左文脈あり: Zenzai top-1 が固定枠に昇格 → fixedEnd = 3
+    /// 左文脈あり: Zenzai top-1 が row 0 に昇格
     func testZenzaiPromotedWithLeftContext() {
         handler.leftSideContext = "東京で"
         typeRomaji("kaisai")
@@ -94,8 +93,8 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard let payload = action.showPayload else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(payload.fixedEnd, 1, "左文脈あり: Zenzai top-1 昇格で fixedEnd = 1 のはず")
         XCTAssertEqual(payload.candidates[0], "開催", "Zenzai top-1 が row 0 に昇格するはず")
+        XCTAssertEqual(handler.candidateSession.zenzaiRow, 0, "Zenzai 発火時は zenzaiRow が設定される")
     }
 
     /// sessionTextBuffer から leftSideContext を構築するフロー。
@@ -116,8 +115,8 @@ final class ZenzaiLeftContextTests: XCTestCase {
         guard let payload = action.showPayload else {
             XCTFail("Expected .show but got \(action)"); return
         }
-        XCTAssertEqual(payload.fixedEnd, 1, "sessionTextBuffer 由来の左文脈で Zenzai 発火 → fixedEnd = 1")
         XCTAssertEqual(payload.candidates[0], "開催", "Zenzai top-1「開催」が row 0 に昇格するはず")
+        XCTAssertEqual(handler.candidateSession.zenzaiRow, 0, "sessionTextBuffer 由来の左文脈で Zenzai 発火")
     }
 
     func testSessionBufferPersistsAcrossSentenceBoundary() {

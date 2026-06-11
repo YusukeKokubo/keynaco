@@ -101,8 +101,7 @@ final class InputHandlerNumberTests: XCTestCase {
         guard let payload = action.showPayload else {
             XCTFail("Expected .show"); return
         }
-        // 履歴セクション（fixedEnd..<historyEnd）に "１２３４" が含まれないこと
-        let historySection = Array(payload.candidates[payload.fixedEnd..<payload.historyEnd])
-        XCTAssertFalse(historySection.contains("１２３４"), "全角候補は履歴に記録されてはいけない: \(historySection)")
+        XCTAssertEqual(payload.historyEnd, 0, "全角候補は履歴に記録されないため historyEnd=0")
+        XCTAssertTrue(payload.candidates.contains("１２３４"), "数値変換候補としては表示される: \(payload.candidates)")
     }
 }

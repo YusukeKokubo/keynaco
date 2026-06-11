@@ -23,8 +23,7 @@ extension InputHandler {
             trigger: trigger,
             readingOverride: reading
         )
-        let action = assembleCandidateList(from: sources, trigger: trigger, zenzaiPromoted: sources.zenzaiPromoted)
-        return action
+        return assembleCandidateList(from: sources, trigger: trigger)
     }
 
     /// 候補リスト中の Zenzai top-1 行を特定する。`assembleCandidateList` の副作用ではなく
@@ -43,8 +42,7 @@ extension InputHandler {
         let totalHistoryCount: Int
         let highHistoryCount: Int
         let zenzaiPromoted: String?
-        let azooKeyUniq: [String]
-        let historySeen: Set<String>
+        let historyOutputSet: Set<String>
     }
 
     private mutating func collectCandidateSources(
@@ -75,16 +73,13 @@ extension InputHandler {
         let highHistoryCount = highHistory.count
         let totalHistoryCount = highHistoryCount
 
-        let historySeen = Set(historyScored.map(\.output))
+        let historyOutputSet = Set(historyScored.map(\.output))
         let zenzaiPromoted: String? = {
             guard azooKeyConverter.isZenzaiEnabled,
                   azooKeyLeftContext != nil,
                   let top1 = azooKeyCandidates.first else { return nil }
             return top1
         }()
-        let azooKeyUniq = azooKeyCandidates.filter {
-            !historySeen.contains($0) && $0 != zenzaiPromoted
-        }
         return CandidateListSources(
             h: h,
             azooKeyCandidates: azooKeyCandidates,
@@ -93,8 +88,7 @@ extension InputHandler {
             totalHistoryCount: totalHistoryCount,
             highHistoryCount: highHistoryCount,
             zenzaiPromoted: zenzaiPromoted,
-            azooKeyUniq: azooKeyUniq,
-            historySeen: historySeen
+            historyOutputSet: historyOutputSet
         )
     }
 
@@ -105,50 +99,20 @@ extension InputHandler {
     /// 候補ヘッドの過剰膨張を抑える前方一致履歴の上限件数。
     private static let maxHighHistoryCount = 3
 
-    /// 先頭固定枠の種別。
-    private enum FixedSlot {
-        case none
-        case hiragana
-    }
-
     private func resolveFixedSlot(
         reading: String,
         hiraganaInHistory: Bool
-    ) -> FixedSlot {
+    ) -> CandidateFixedSlot {
         if isHiraganaPreferred(reading) {
             return hiraganaInHistory ? .none : .hiragana
         }
         return .none
     }
 
-    private func resolveInitialRowPolicy(
-        sources: CandidateListSources,
-        fixedSlot: FixedSlot,
-        hiraganaInHistory: Bool,
-        addsDefaultFixedHiragana: Bool
-    ) -> InitialRowPolicy {
-        switch fixedSlot {
-        case .hiragana:
-            return .firstMatching(sources.h)
-        case .none:
-            if addsDefaultFixedHiragana {
-                // Zenzai が先頭に来る場合は row 0 を初期選択にする
-                if sources.zenzaiPromoted != nil { return .atZero }
-                return .firstMatching(sources.h)
-            }
-            // 高スコア履歴に読みと同じ表記があるときは Zenzai よりそちらを初期選択（例: したい）
-            if hiraganaInHistory, sources.zenzaiPromoted != nil {
-                return .firstMatching(sources.h)
-            }
-            if sources.zenzaiPromoted != nil { return .atZero }
-            return .afterFixed
-        }
-    }
-
     /// 履歴・予測・ユーザー辞書・数値/日時がなく AzooKey のみのとき、読みのひらがなを先頭固定する。
     private func shouldAddDefaultFixedHiragana(
         trigger: CandidateListTrigger,
-        fixedSlot: FixedSlot,
+        fixedSlot: CandidateFixedSlot,
         hiraganaInHistory: Bool,
         sources: CandidateListSources,
         numberCandidates: [String],
@@ -176,79 +140,9 @@ extension InputHandler {
         return false
     }
 
-    private func buildSections(
-        from sources: CandidateListSources,
-        fixedSlot: FixedSlot,
-        hiraganaInHistory: Bool,
-        addsDefaultFixedHiragana: Bool,
-        numberCandidates: [String],
-        dateTimeCandidates: [String]
-    ) -> [CandidateSection] {
-        let hiragana = state.composedHiragana
-        let katakana = KanaUtils.hiraganaToKatakana(hiragana)
-
-        let allCandidatesSeen = sources.historySeen.union(Set(sources.azooKeyCandidates))
-
-        var sections: [CandidateSection] = []
-        var insertedSet = Set(sources.highHistory + sources.azooKeyUniq)
-
-        switch fixedSlot {
-        case .hiragana:
-            if allCandidatesSeen.contains(hiragana) { insertedSet.remove(hiragana) }
-            sections.append(CandidateSection(kind: .fixedHiragana, items: [hiragana]))
-            insertedSet.insert(hiragana)
-        case .none:
-            if addsDefaultFixedHiragana {
-                if allCandidatesSeen.contains(hiragana) { insertedSet.remove(hiragana) }
-                sections.append(CandidateSection(kind: .fixedHiragana, items: [hiragana]))
-                insertedSet.insert(hiragana)
-            }
-        }
-
-        let uniqueUserDict = sources.userDictRaw.filter { insertedSet.insert($0).inserted }
-        if !uniqueUserDict.isEmpty {
-            sections.append(CandidateSection(kind: .userDict, items: uniqueUserDict))
-        }
-
-        if let top1 = sources.zenzaiPromoted, insertedSet.insert(top1).inserted {
-            sections.append(CandidateSection(kind: .zenzaiTop1, items: [top1]))
-        }
-
-        let azooKeyItems = sources.azooKeyUniq.filter { candidate in
-            guard addsDefaultFixedHiragana && candidate == katakana else { return true }
-            let hasRealCandidates = sources.azooKeyCandidates.contains { $0 != katakana && $0 != hiragana }
-            if !hasRealCandidates { insertedSet.remove(candidate) }
-            return false
-        }
-        if !azooKeyItems.isEmpty {
-            sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
-        }
-
-        if !sources.highHistory.isEmpty {
-            sections.append(CandidateSection(kind: .highHistory, items: sources.highHistory))
-        }
-
-        let uniqueNumberCandidates = numberCandidates.filter { insertedSet.insert($0).inserted }
-        if !uniqueNumberCandidates.isEmpty {
-            sections.append(CandidateSection(kind: .number, items: uniqueNumberCandidates))
-        }
-        let uniqueDateTimeCandidates = dateTimeCandidates.filter { insertedSet.insert($0).inserted }
-        if !uniqueDateTimeCandidates.isEmpty {
-            sections.append(CandidateSection(kind: .dateTime, items: uniqueDateTimeCandidates))
-        }
-
-        if !hiragana.allSatisfy({ $0.isASCII }),
-           insertedSet.insert(katakana).inserted {
-            sections.append(CandidateSection(kind: .katakana, items: [katakana]))
-        }
-
-        return sections
-    }
-
     private func assembleCandidateList(
         from sources: CandidateListSources,
-        trigger: CandidateListTrigger,
-        zenzaiPromoted: String?
+        trigger: CandidateListTrigger
     ) -> CandidateAction {
         let h = sources.h
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
@@ -260,6 +154,7 @@ extension InputHandler {
         }
 
         let hiragana = state.composedHiragana
+        let katakana = KanaUtils.hiraganaToKatakana(hiragana)
         let hiraganaInHistory = sources.highHistory.contains(hiragana)
         let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
 
@@ -271,24 +166,30 @@ extension InputHandler {
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
         )
-        let sections = buildSections(
-            from: sources,
+        let built = CandidateSectionBuilder.build(CandidateSectionBuildInput(
+            reading: h,
+            hiragana: hiragana,
+            katakana: katakana,
+            azooKeyCandidates: sources.azooKeyCandidates,
+            userDictRaw: sources.userDictRaw,
+            highHistory: sources.highHistory,
+            historyOutputSet: sources.historyOutputSet,
+            zenzaiPromoted: sources.zenzaiPromoted,
             fixedSlot: fixedSlot,
-            hiraganaInHistory: hiraganaInHistory,
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
-        )
-        let zenzaiLeads = addsDefaultFixedHiragana && sources.zenzaiPromoted != nil
+        ))
         let layout = CandidateLayout(
-            sections: sections,
-            sectionOrder: zenzaiLeads ? CandidateLayout.zenzaiFirstSectionOrder : CandidateLayout.defaultSectionOrder,
-            initialRowPolicy: resolveInitialRowPolicy(
-                sources: sources,
+            sections: built.sections,
+            sectionOrder: built.sectionOrder,
+            initialRowPolicy: InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
+                reading: h,
                 fixedSlot: fixedSlot,
                 hiraganaInHistory: hiraganaInHistory,
-                addsDefaultFixedHiragana: addsDefaultFixedHiragana
-            )
+                addsDefaultFixedHiragana: addsDefaultFixedHiragana,
+                zenzaiPromoted: sources.zenzaiPromoted
+            ))
         )
         guard !layout.candidates.isEmpty else { return .dismiss }
 
@@ -302,7 +203,7 @@ extension InputHandler {
 
         let zRow = resolveZenzaiRow(
             candidates: layout.candidates,
-            zenzaiPromoted: zenzaiPromoted
+            zenzaiPromoted: sources.zenzaiPromoted
         )
         return .show(
             candidates: layout.candidates,

@@ -442,17 +442,29 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertTrue(payload.candidates.contains("Acme Corp"), "ユーザー辞書エントリが候補に含まれるはず: \(payload.candidates)")
     }
 
-    func testUserDictFixedEndProtectsEntries() {
+    func testUserDictShiftDeleteDoesNothing() {
         handler.db.addUserDict(input: "かいしゃ", output: "Acme Corp")
         typeRomaji("kaisha")
-        let (_, action) = press(keyCode: 49)
-        guard let payload = action.showPayload else {
+        let (_, showAction) = press(keyCode: 49)
+        guard let payload = showAction.showPayload,
+              let udRow = payload.candidates.firstIndex(of: "Acme Corp") else {
             XCTFail(".show を返すはず"); return
         }
-        guard let udRow = payload.candidates.firstIndex(of: "Acme Corp") else {
-            XCTFail("ユーザー辞書エントリが候補に含まれるはず: \(payload.candidates)"); return
+        let ctx = CandidateContext(
+            isVisible: true,
+            selectedRow: udRow,
+            selectedText: "Acme Corp",
+            isExplicitlySelected: true,
+            historyEnd: payload.historyEnd,
+            fixedEnd: payload.fixedEnd
+        )
+        let (_, action) = handler.handle(
+            keyCode: KeyCode.backspace, characters: nil, baseCharacters: nil,
+            modifiers: .shift, candidate: ctx, client: client
+        )
+        guard case .none = action else {
+            XCTFail("ユーザー辞書行の Shift+Delete は .none を返すはず: \(action)"); return
         }
-        XCTAssertLessThan(udRow, payload.fixedEnd, "ユーザー辞書行は fixedEnd より前（削除不可ゾーン）")
     }
 
     func testUserDictExactMatchOnly() {

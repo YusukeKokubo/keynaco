@@ -26,7 +26,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: zenzaiMock)
     }
 
-    func testZenzaiPromotedTop1AfterUserDictIncreasesFixedEnd() {
+    func testZenzaiPromotedTop1AtRowZero() {
         let top1 = zenzaiMock.candidateLines[0]
         handler.leftSideContext = "左文脈"
         type(chars: "a", base: "a")
@@ -34,19 +34,34 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず: \(action)"); return
         }
-        XCTAssertEqual(payload.candidates[payload.fixedEnd - 1], top1, "Zenzai top-1 が固定枠末尾")
-        XCTAssertGreaterThanOrEqual(payload.fixedEnd, 1, "Zenzai top-1 昇格で fixedEnd は少なくとも1")
+        XCTAssertEqual(payload.candidates[0], top1, "Zenzai top-1 が row 0")
+        XCTAssertEqual(handler.candidateSession.zenzaiRow, 0)
     }
 
-    func testZenzaiPromotedRowIsBelowFixedEndForShiftDelete() {
+    func testZenzaiPromotedRowShiftDeleteDoesNothing() {
+        let top1 = zenzaiMock.candidateLines[0]
         handler.leftSideContext = "ctx"
         type(chars: "a", base: "a")
-        let (_, action) = press(keyCode: 49)
-        guard let payload = action.showPayload else {
+        let (_, showAction) = press(keyCode: 49)
+        guard let payload = showAction.showPayload,
+              let promotedRow = payload.candidates.firstIndex(of: top1) else {
             XCTFail(".show を返すはず"); return
         }
-        let promotedRow = payload.fixedEnd - 1
-        XCTAssertLessThan(promotedRow, payload.fixedEnd, "プロモート行は Shift+Delete 可能帯の外（index < fixedEnd）")
+        let ctx = CandidateContext(
+            isVisible: true,
+            selectedRow: promotedRow,
+            selectedText: top1,
+            isExplicitlySelected: true,
+            historyEnd: payload.historyEnd,
+            fixedEnd: payload.fixedEnd
+        )
+        let (_, action) = handler.handle(
+            keyCode: KeyCode.backspace, characters: nil, baseCharacters: nil,
+            modifiers: .shift, candidate: ctx, client: client
+        )
+        guard case .none = action else {
+            XCTFail("Zenzai プロモート行の Shift+Delete は .none を返すはず: \(action)"); return
+        }
     }
 
     func testZenzaiPromotedTop1SingleOccurrenceAsideFromHistoryDup() {
