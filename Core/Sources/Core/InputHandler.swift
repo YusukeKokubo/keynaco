@@ -113,7 +113,15 @@ public enum KeyCode {
 /// - `InputHandler+Candidates.swift`   ：候補リスト構築・候補表示中・通常入力
 public struct InputHandler {
 
-    // 全InputControllerインスタンスで共有するモード（アプリ切替後も保持）
+    /// 英字直接入力モード。プロセス全体で 1 つの static（全 `InputController` / アプリ切替後も維持）。
+    ///
+    /// 不変条件:
+    /// - 英数キー（`KeyCode.eisu`）・かなキー（`KeyCode.kana`）・Escape（ASCII 中）・Caps Lock（`InputController.flagsChanged`）で更新
+    /// - `activateServer` 直後の `ignoreNextModeSwitch` とは独立（IMK のモードキー echo 抑制専用）
+    /// - ユニットテストは `setUp` で必ず `false` にリセットする
+    ///
+    /// `nonisolated(unsafe)`: IMK コールバックと `flagsChanged` が異なる isolation から触るため。
+    /// インスタンス状態へ移さない（意図的なグローバルモード）。
     public nonisolated(unsafe) static var isAsciiMode = false
 
     /// ひらがな優先語彙セット（DB `hiragana_preferred` テーブルから読み込み、設定変更時に再取得）。
@@ -364,7 +372,7 @@ extension InputHandler {
     private mutating func handleFunctionKeyIfNeeded(
         keyCode: UInt16, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard !InputHandler.isAsciiMode,
+        guard !Self.isAsciiMode,
               [KeyCode.f6, KeyCode.f7, KeyCode.f8, KeyCode.f9, KeyCode.f10].contains(keyCode) else { return nil }
         let consumed = handleFunctionKey(keyCode: keyCode, client: client)
         return (consumed, consumed ? .dismiss : .none)
@@ -380,9 +388,9 @@ extension InputHandler {
         }
         if keyCode == KeyCode.eisu {
             if !state.composingText.isEmpty { commitComposition(client: client) }
-            InputHandler.isAsciiMode = true
+            Self.isAsciiMode = true
         } else {
-            InputHandler.isAsciiMode = false
+            Self.isAsciiMode = false
         }
         return (true, .none)
     }
@@ -393,8 +401,8 @@ extension InputHandler {
         modifiers: NSEvent.ModifierFlags,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
-        guard InputHandler.isAsciiMode else { return nil }
-        if keyCode == KeyCode.escape { InputHandler.isAsciiMode = false; return (true, .none) }
+        guard Self.isAsciiMode else { return nil }
+        if keyCode == KeyCode.escape { Self.isAsciiMode = false; return (true, .none) }
         if keyCode == KeyCode.enter {
             committedHistory.removeAll()
             sessionTextBuffer = ""
