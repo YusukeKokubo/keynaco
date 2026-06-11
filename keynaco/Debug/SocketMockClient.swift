@@ -28,6 +28,8 @@ final class SocketMockClient: NSObject, TextInputClient, IMKTextInput, @unchecke
     func setMarkedText(_ text: String, selectionRange: NSRange) { markedText = text }
     func cursorRect() -> NSRect { .zero }
 
+    var hasPendingInsertions: Bool { !insertedTexts.isEmpty }
+
     func consume() -> [String] { let r = insertedTexts; insertedTexts = []; return r }
     func reset() { insertedTexts = []; markedText = ""; documentBefore = ""; documentAfter = "" }
 

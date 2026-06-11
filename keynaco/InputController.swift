@@ -127,11 +127,9 @@ class InputController: IMKInputController, @unchecked Sendable {
         handler.syncMarkedText(client: IMKTextInputAdapter(activeIMKClient))
     }
 
-    /// キー処理後の候補副作用。`applyCandidateAction` → ウィンドウ更新の順が不変。
+    /// 候補ウィンドウ更新のみ。session / marked は `InputHandler.applyPostKeyDownEffects` が担当。
     @MainActor
-    private func applyCandidateEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
-        handler.applyCandidateAction(action, client: adapter)
-
+    private func applyCandidateWindowEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
         let panel = CandidatePanelModel(session: handler.candidateSession)
         switch action {
         case .none:
@@ -147,7 +145,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         }
     }
 
-    /// キー処理後の副作用。IMK キャッシュの fetch/無効化は `LeftContextSource` MARK「本番」参照。
+    /// キー処理後の副作用。候補 / IMK は Core `applyPostKeyDownEffects`、ウィンドウは本ファイル。
     @MainActor
     private func applyPostKeyDownEffects(
         consumed: Bool,
@@ -156,18 +154,6 @@ class InputController: IMKInputController, @unchecked Sendable {
         composedHiraganaWasEmpty: Bool,
         imkSenderForSurrounding: Any?
     ) {
-        // 未消費でも Enter 空組成などで `leftContextIMKCache.invalidated` が立つ（consumed 限定不可）。
-        let needsSurroundingSideEffects = consumed
-            || handler.leftContextIMKCache.invalidated
-            || adapter.didInsertText
-            || (composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty)
-
-        if consumed {
-            applyCandidateEffects(action: action, adapter: adapter)
-        }
-
-        guard needsSurroundingSideEffects else { return }
-
         var newSnapshot: IMKSurroundingSnapshot?
         if composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty {
             // Space での再取得は冗長のため行わない（カーソル移動は location 不一致で無効化）。
@@ -178,12 +164,25 @@ class InputController: IMKInputController, @unchecked Sendable {
                 }
             }
         }
-        LeftContextSource.applyPostKeyDown(
-            cache: &handler.leftContextIMKCache,
-            composedHiraganaEmpty: handler.state.composedHiragana.isEmpty,
+
+        var imkCache: LeftContextIMKCache? = handler.leftContextIMKCache
+        handler.applyPostKeyDownEffects(
+            consumed: consumed,
+            action: action,
+            client: adapter,
             composedHiraganaWasEmpty: composedHiraganaWasEmpty,
-            newSnapshot: newSnapshot
+            didInsertText: adapter.didInsertText,
+            alwaysApplyCandidateAction: false,
+            imkCache: &imkCache,
+            newIMKSnapshot: newSnapshot
         )
+        if let imkCache {
+            handler.leftContextIMKCache = imkCache
+        }
+
+        if consumed {
+            applyCandidateWindowEffects(action: action, adapter: adapter)
+        }
 
         if adapter.didInsertText {
             schedulePOSClassification(

@@ -421,8 +421,6 @@ extension DebugSocketServer {
     return processCommand(expanded)
     }
 
-    /// 本番 `InputController.runKeyDown` + `applyPostKeyDownEffects` に対応。
-    /// sandbox は IMK キャッシュなし（`syncLeftSideContext` のみ）、`applyCandidateAction` は consumed 不問。
     func handleKeyEvent(cmd: [String: Any]) -> [String: Any] {
     let keyCode: UInt16
     switch cmd["keyCode"] {
@@ -474,7 +472,17 @@ extension DebugSocketServer {
             mockClient.removeLastDocumentCharacter()
         }
     }
-    applyCandidateAction(action) // InputController と同様、consumed 不問で apply（冪等 sync）
+    var imkCache: LeftContextIMKCache? = nil
+    handler.applyPostKeyDownEffects(
+        consumed: consumed,
+        action: action,
+        client: mockClient,
+        composedHiraganaWasEmpty: composedHiraganaWasEmpty,
+        didInsertText: mockClient.hasPendingInsertions,
+        alwaysApplyCandidateAction: true,
+        imkCache: &imkCache,
+        newIMKSnapshot: nil
+    )
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
         let reading = handler.lastConfirmedContext?.input ?? handler.lastCommittedReading ?? ""
@@ -544,10 +552,6 @@ extension DebugSocketServer {
         handler.db.updatePOS(output: output, pos: c.pos)
     }
 
-    /// `InputController.applyCandidateEffects` の session + marked 部分（ウィンドウなし）。
-    func applyCandidateAction(_ action: CandidateAction) {
-        handler.applyCandidateAction(action, client: mockClient)
-    }
 }
 
 #endif
