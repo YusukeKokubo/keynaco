@@ -2,10 +2,10 @@ import Foundation
 
 /// IMK marked text の組み立て。`InputHandler.syncMarkedText` が組み立ての正本。
 /// 適用は `InputHandler.applyCandidateAction` 経由（Controller / ソケット / テスト）。
-public enum MarkedTextSync {
+enum MarkedTextSync {
 
     /// 括弧モード、または組成ひらがななしで候補のみ表示するとき。
-    public static func needsCandidateOnly(
+    static func needsCandidateOnly(
         isBracketMode: Bool,
         candidateVisible: Bool,
         composedHiragana: String
@@ -13,7 +13,7 @@ public enum MarkedTextSync {
         isBracketMode || (candidateVisible && composedHiragana.isEmpty)
     }
 
-    public static func resolve(
+    static func resolve(
         isBracketMode: Bool,
         candidateVisible: Bool,
         isExplicitlySelected: Bool,

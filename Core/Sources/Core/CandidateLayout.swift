@@ -1,7 +1,7 @@
 // MARK: - CandidateSection
 
-public struct CandidateSection: Sendable {
-    public enum Kind: Hashable, Sendable {
+struct CandidateSection: Sendable {
+    enum Kind: Hashable, Sendable {
         case fixedHiragana  // ひらがな先頭固定（hiraganaPreferred 時）
         case userDict       // ユーザー辞書
         case zenzaiTop1     // Zenzai top-1 プロモート
@@ -12,10 +12,10 @@ public struct CandidateSection: Sendable {
         case katakana       // カタカナ変換（末尾固定）
     }
 
-    public let kind: Kind
-    public let items: [String]
+    let kind: Kind
+    let items: [String]
 
-    public init(kind: Kind, items: [String]) {
+    init(kind: Kind, items: [String]) {
         self.kind = kind
         self.items = items
     }
@@ -23,7 +23,7 @@ public struct CandidateSection: Sendable {
 
 // MARK: - InitialRowPolicy
 
-public enum InitialRowPolicy: Sendable {
+enum InitialRowPolicy: Sendable {
     /// 該当文字列の最初の出現位置（hiraganaPreferred 用）。見つからなければ afterFixed にフォールバック
     case firstMatching(String)
     /// 強制的に 0 行目（Zenzai top-1 を初期選択にする場合等）
@@ -36,20 +36,20 @@ public enum InitialRowPolicy: Sendable {
 
 /// 候補リストとそのセクション境界をまとめた値。
 /// `0 <= fixedEnd <= historyEnd <= candidates.count` を保証する。
-public struct CandidateLayout: Sendable {
+struct CandidateLayout: Sendable {
 
-    public let candidates: [String]
+    let candidates: [String]
     /// .fixedHiragana / .userDict / .zenzaiTop1 の末尾インデックス
-    public let fixedEnd: Int
+    let fixedEnd: Int
     /// fixedEnd + .highHistory の末尾（Shift+Delete で削除可能な履歴ブロックの終端）
-    public let historyEnd: Int
-    public let initialRow: Int
+    let historyEnd: Int
+    let initialRow: Int
 
     private static let fixedSectionKinds: Set<CandidateSection.Kind> = [
         .fixedHiragana, .userDict, .zenzaiTop1,
     ]
 
-    public static let defaultSectionOrder: [CandidateSection.Kind] = [
+    static let defaultSectionOrder: [CandidateSection.Kind] = [
         .fixedHiragana,
         .userDict,
         .zenzaiTop1,
@@ -60,7 +60,7 @@ public struct CandidateLayout: Sendable {
     ]
 
     /// Zenzai top-1 をひらがな固定より前に置く順序（履歴なしで Zenzai 提案ありの場合に使用）
-    public static let zenzaiFirstSectionOrder: [CandidateSection.Kind] = [
+    static let zenzaiFirstSectionOrder: [CandidateSection.Kind] = [
         .userDict,
         .zenzaiTop1,
         .fixedHiragana,
@@ -70,7 +70,7 @@ public struct CandidateLayout: Sendable {
         .katakana,
     ]
 
-    public init(
+    init(
         sections: [CandidateSection],
         sectionOrder: [CandidateSection.Kind],
         initialRowPolicy: InitialRowPolicy

@@ -7,7 +7,7 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
     func lcidForCommitted(reading: String, output: String) -> Int?
 }
 
-public extension AzooKeyConverting {
+extension AzooKeyConverting {
     var isZenzaiEnabled: Bool { false }
 
     func requestCandidates(hiragana: String) -> [String] {

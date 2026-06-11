@@ -111,7 +111,7 @@ extension DatabaseManager {
     }
 
     /// 未分類（pos IS NULL）の出力語を最大 `limit` 件返す（重複排除）。
-    public func fetchUnclassifiedHistory(limit: Int) -> [String] {
+    func fetchUnclassifiedHistory(limit: Int) -> [String] {
         dbQueue.sync {
             var results: [String] = []
             let sql = "SELECT DISTINCT output FROM history WHERE pos IS NULL LIMIT ?"
@@ -140,7 +140,7 @@ extension DatabaseManager {
 
     /// 未分類エントリを output 単位で返す。reading は同一 output の中で count 最大の input。
     /// `limit` 省略時は全件。
-    public func fetchUnclassifiedHistoryEntries(limit: Int? = nil) -> [(output: String, reading: String)] {
+    func fetchUnclassifiedHistoryEntries(limit: Int? = nil) -> [(output: String, reading: String)] {
         dbQueue.sync {
             var results: [(output: String, reading: String)] = []
             let limitClause = limit.map { _ in "LIMIT ?" } ?? ""

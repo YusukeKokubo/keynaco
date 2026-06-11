@@ -18,7 +18,7 @@ public enum CandidateAction: Sendable {
     case replaceCandidates([String])
 }
 
-public extension CandidateAction {
+extension CandidateAction {
     /// `.show` の連想値。それ以外は `nil`。
     var showPayload: (
         candidates: [String],
@@ -36,19 +36,19 @@ public extension CandidateAction {
 }
 
 public struct CandidateContext: Sendable {
-    public var isVisible: Bool
-    public var selectedRow: Int
-    public var selectedText: String?
+    public private(set) var isVisible: Bool
+    public private(set) var selectedRow: Int
+    public private(set) var selectedText: String?
     /// ユーザーが ↑↓ で明示的に候補を動かしたか（初期表示のまま = false）。
     ///
     /// 役割: `true` のとき、文字キー入力で選択候補をまず確定してから新しい文字を処理する。
     /// `false` のときは文字入力しても候補を確定せず組成に追加する。
     /// Enter は `isExplicitlySelected` に関係なく `selectedText`（現在の視覚的選択）をそのまま確定する。
-    public var isExplicitlySelected: Bool
+    public private(set) var isExplicitlySelected: Bool
     /// 履歴セクションの末尾インデックス（これ未満の行が履歴）
-    public var historyEnd: Int
+    public private(set) var historyEnd: Int
     /// ユーザー辞書+カナ固定行の末尾インデックス（これ未満の行は Shift+Delete 不可）
-    public var fixedEnd: Int
+    public private(set) var fixedEnd: Int
 
     public init(
         isVisible: Bool,
@@ -73,7 +73,7 @@ public struct CandidateContext: Sendable {
 }
 
 /// `buildCandidateList` の呼び出し元。候補列の組み立てロジックは共通、UI 抑制だけ分岐する。
-public enum CandidateListTrigger: Sendable {
+enum CandidateListTrigger: Sendable {
     /// 打鍵中。候補ゼロ・機能語のみのときはパネルを出さない。
     case whileTyping
     /// Space（候補非表示時）・バックスペース更新など。候補があれば出す。
@@ -121,10 +121,10 @@ public struct InputHandler {
     /// 役割: この集合に含まれる読みのとき、履歴スコア・予測候補の有無に関わらず
     /// `initialRow` をひらがな行にする（`assembleCandidateList`）。
     public var hiraganaPreferredSet: Set<String> = []
-    public static let sentenceTerminators: Set<String> = ["。", "！", "？"]
+    static let sentenceTerminators: Set<String> = ["。", "！", "？"]
     /// 文脈をリセットせず、かつ N-gram・履歴にも記録しない句読点。
     /// pushCommitted でスキップすることで直前単語が prev のまま維持される。
-    public static let readingPunctuations: Set<String> = ["、", "・", "…"]
+    static let readingPunctuations: Set<String> = ["、", "・", "…"]
 
     public var state = CompositionState()
     public var candidateSession = CandidateSession()
@@ -144,13 +144,13 @@ public struct InputHandler {
     /// カーソル左文（Zenzai）。`LeftContextSource` → `LeftContextResolver` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
     public var leftSideContext: String = ""
     /// AzooKey API 用（空文字は `nil`）
-    public var azooKeyLeftContext: String? { leftSideContext.isEmpty ? nil : leftSideContext }
+    var azooKeyLeftContext: String? { leftSideContext.isEmpty ? nil : leftSideContext }
     public var committedHistory: [String] = []
     /// Zenzai 左文脈用。確定語ごとに加算（上限 50 字）。`leftSideContext` 素材 — 詳細は `LeftContextSource` MARK。
     public var sessionTextBuffer: String = ""
     /// 文末記号で `committedHistory` を消した直後に立て、`InputController` が IMK キャッシュを捨てる（`LeftContextSource` MARK）。
     public var documentSurroundingContextInvalidated = false
-    public var lastCommittedOutput: String? {
+    var lastCommittedOutput: String? {
         committedHistory.last
     }
     /// 日記用バッファ: 句点（。！？）で区切られた文を蓄積し、文末でまとめて daily_log へ記録する。

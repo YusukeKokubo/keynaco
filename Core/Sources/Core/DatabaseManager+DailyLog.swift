@@ -4,10 +4,10 @@ import SQLite3
 extension DatabaseManager {
     // MARK: - daily_log テーブル操作
 
-    public struct DailyLogEntry: Sendable {
-        public let text: String
-        public let appBundleID: String?
-        public let createdAt: Int64
+    struct DailyLogEntry: Sendable {
+        let text: String
+        let appBundleID: String?
+        let createdAt: Int64
     }
 
     /// 確定テキストを daily_log に追記する。punctuation 除外は呼び出し側で行う。
@@ -31,7 +31,7 @@ extension DatabaseManager {
     }
 
     /// 指定日の確定テキストを時系列順（初出順）で返す。同一テキストは重複排除。
-    public func fetchDailyLog(for date: String) -> [DailyLogEntry] {
+    func fetchDailyLog(for date: String) -> [DailyLogEntry] {
         dbQueue.sync {
             let sql = """
             SELECT committed_text, app_bundle_id, MIN(created_at) AS first_seen
@@ -55,7 +55,7 @@ extension DatabaseManager {
     }
 
     /// 指定日の daily_log エントリ数を返す。
-    public func countDailyLog(for date: String) -> Int {
+    func countDailyLog(for date: String) -> Int {
         dbQueue.sync {
             let sql = "SELECT COUNT(*) FROM daily_log WHERE date = ?"
             guard let stmt = self.prepareUncachedStmt(sql) else { return 0 }
@@ -73,7 +73,7 @@ extension DatabaseManager {
         return f.string(from: Date())
     }
 
-    public static func dateString(from date: Date) -> String {
+    static func dateString(from date: Date) -> String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.locale = Locale(identifier: "en_US_POSIX")

@@ -56,7 +56,7 @@ public final class DatabaseManager: @unchecked Sendable {
 
     // MARK: - セットアップ
 
-    public static var dbPath: String {
+    static var dbPath: String {
         let dir = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("keynaco", isDirectory: true)

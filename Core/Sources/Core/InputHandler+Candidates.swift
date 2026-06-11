@@ -6,7 +6,7 @@ import AppKit
 // AzooKey 候補の重複呼び出し回避は `AzooKeyConverter.candidateCache`（read-through LRU）が担当。
 // 括弧モード・候補表示中は InputHandler+BracketMode.swift
 
-public extension InputHandler {
+extension InputHandler {
 
     // MARK: - buildCandidateList
 

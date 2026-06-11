@@ -44,7 +44,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
     private let zenzaiInferenceLimit: Int
     private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }
 
-    public var candidateCacheCount: Int { candidateCache.count }
+    var candidateCacheCount: Int { candidateCache.count }
 
     private static func cacheKey(segment: String, leftSideContext: String?, richCandidates: Bool) -> String {
         let ctx = leftSideContext ?? ""

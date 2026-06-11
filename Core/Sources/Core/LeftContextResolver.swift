@@ -12,9 +12,9 @@ import Foundation
 public enum LeftContextResolver {
 
     /// IMK `before` 単体の上限（従来の左文脈キャップ）
-    public static let maxBeforeLength = 300
+    static let maxBeforeLength = 300
     /// `sessionBuffer + before` 結合後の上限
-    public static let maxCombinedLength = 400
+    static let maxCombinedLength = 400
 
     public struct Input: Equatable, Sendable {
         /// 確定語セッションバッファ（`InputHandler.sessionTextBuffer`）
