@@ -106,7 +106,7 @@ extension InputHandler {
         if keyCode == KeyCode.enter {
             committedHistory.removeAll()
             sessionTextBuffer = ""
-            documentSurroundingContextInvalidated = true
+            leftContextIMKCache.invalidated = true
             return (false, .none)
         }
         guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
@@ -125,7 +125,7 @@ extension InputHandler {
             guard state.isComposing else {
                 committedHistory.removeAll()
                 sessionTextBuffer = ""
-                documentSurroundingContextInvalidated = true
+                leftContextIMKCache.invalidated = true
                 return (false, .none)
             }
             commitComposition(client: client)

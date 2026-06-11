@@ -164,20 +164,18 @@ public struct InputHandler {
     public var lastConfirmedContext: LastConfirmedContext? = nil
     /// 直前の確定の読み（`commitText` 時の `finalizedText`）。
     public var lastCommittedReading: String? = nil
-    /// カーソル左文（Zenzai）。`LeftContextSource` → `LeftContextResolver` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
-    public var leftSideContext: String = ""
-    /// AzooKey API 用（空文字は `nil`）
-    var azooKeyLeftContext: String? { leftSideContext.isEmpty ? nil : leftSideContext }
-    public var committedHistory: [String] = []
-    /// Zenzai 左文脈用。確定語ごとに加算（上限 50 字）。`leftSideContext` 素材 — 詳細は `LeftContextSource` MARK。
-    public var sessionTextBuffer: String = ""
-    /// IMK surrounding キャッシュ無効化フラグ。`InputController.applyPostKeyDownEffects` が読んで clear する。
+    /// 左文脈の解決結果。`LeftContextSource` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
+    public var leftContext: LeftContext = .empty
+    /// IMK surrounding キャッシュ。`invalidated` は `LeftContextSource.applyPostKeyDown` が消費する。
     ///
     /// | 操作 | 箇所 |
     /// |------|------|
-    /// | **set `true`** | `pushCommitted` の文末記号（`。` `！` `？`）、ASCII モード Enter、組成空 Enter |
-    /// | **clear `false`** | `InputController.applyPostKeyDownEffects`（キャッシュ nil 化後） |
-    public var documentSurroundingContextInvalidated = false
+    /// | **set `invalidated`** | `pushCommitted` の文末記号（`。` `！` `？`）、ASCII モード Enter、組成空 Enter |
+    /// | **clear** | `LeftContextSource.applyPostKeyDown`（キャッシュ nil 化後） |
+    public var leftContextIMKCache = LeftContextIMKCache()
+    public var committedHistory: [String] = []
+    /// Zenzai 左文脈用。確定語ごとに加算（上限 50 字）。`leftContext.sessionBuffer` の素材 — 詳細は `LeftContextSource` MARK。
+    public var sessionTextBuffer: String = ""
     var lastCommittedOutput: String? {
         committedHistory.last
     }
@@ -188,7 +186,7 @@ public struct InputHandler {
     public mutating func pushCommitted(_ text: String) {
         if InputHandler.sentenceTerminators.contains(text) {
             committedHistory.removeAll()
-            documentSurroundingContextInvalidated = true
+            leftContextIMKCache.invalidated = true
             return
         }
         if InputHandler.readingPunctuations.contains(text) { return }

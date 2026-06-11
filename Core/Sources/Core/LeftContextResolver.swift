@@ -16,52 +16,14 @@ public enum LeftContextResolver {
     /// `sessionBuffer + before` 結合後の上限
     static let maxCombinedLength = 400
 
-    public struct Input: Equatable, Sendable {
-        /// 確定語セッションバッファ（`InputHandler.sessionTextBuffer`）
-        public var sessionBuffer: String
-        /// location 一致かつ非空の IMK `before`。それ以外は `nil`
-        public var imkBefore: String?
-        /// `selectedRange().location != NSNotFound`
-        public var cursorLocationAvailable: Bool
+    public static func combine(
+        sessionBuffer: String,
+        imkBefore: String?,
+        cursorLocationAvailable: Bool
+    ) -> String {
+        guard cursorLocationAvailable else { return sessionBuffer }
 
-        public init(
-            sessionBuffer: String,
-            imkBefore: String?,
-            cursorLocationAvailable: Bool
-        ) {
-            self.sessionBuffer = sessionBuffer
-            self.imkBefore = imkBefore
-            self.cursorLocationAvailable = cursorLocationAvailable
-        }
-
-        /// 本番: `LeftContextSource.assembleProduction` が IMK キャッシュから組み立てる入力。
-        public static func production(
-            sessionBuffer: String,
-            imkBefore: String?,
-            cursorLocationAvailable: Bool
-        ) -> Self {
-            .init(
-                sessionBuffer: sessionBuffer,
-                imkBefore: imkBefore,
-                cursorLocationAvailable: cursorLocationAvailable
-            )
-        }
-
-        /// サンドボックス: `mockClient.documentBefore` を IMK `before` 相当として載せる。
-        public static func sandbox(sessionBuffer: String, documentBefore: String) -> Self {
-            .init(
-                sessionBuffer: sessionBuffer,
-                imkBefore: documentBefore.isEmpty ? nil : documentBefore,
-                cursorLocationAvailable: true
-            )
-        }
-    }
-
-    public static func resolve(_ input: Input) -> String {
-        let sessionBuffer = input.sessionBuffer
-        guard input.cursorLocationAvailable else { return sessionBuffer }
-
-        guard let rawBefore = input.imkBefore, !rawBefore.isEmpty else {
+        guard let rawBefore = imkBefore, !rawBefore.isEmpty else {
             return sessionBuffer
         }
 

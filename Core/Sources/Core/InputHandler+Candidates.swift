@@ -56,7 +56,7 @@ extension InputHandler {
         } else {
             let raw = azooKeyConverter.requestCandidates(
                 hiragana: h,
-                leftSideContext: azooKeyLeftContext,
+                leftSideContext: leftContext.azooKeyValue,
                 richCandidates: trigger == .explicit
             )
             azooKeyCandidates = raw.filter { !Self.isScriptMixed($0) }
@@ -76,7 +76,7 @@ extension InputHandler {
         let historyOutputSet = Set(historyScored.map(\.output))
         let zenzaiPromoted: String? = {
             guard azooKeyConverter.isZenzaiEnabled,
-                  azooKeyLeftContext != nil,
+                  leftContext.azooKeyValue != nil,
                   let top1 = azooKeyCandidates.first else { return nil }
             return top1
         }()

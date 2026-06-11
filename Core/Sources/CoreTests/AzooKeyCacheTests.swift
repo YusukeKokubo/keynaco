@@ -113,7 +113,7 @@ final class AzooKeyCacheTests: XCTestCase {
         type(chars: "i")
         XCTAssertEqual(mock.requestCount, 1)
 
-        handler.leftSideContext = "前文テスト"
+        handler.leftContext = .testing(combined: "前文テスト")
         _ = handler.buildCandidateList(trigger: .explicit)
         XCTAssertEqual(mock.requestCount, 2, "左文脈が変われば同じ読みでも AzooKey を再呼びするはず")
         XCTAssertEqual(mock.lastLeftContext, "前文テスト")

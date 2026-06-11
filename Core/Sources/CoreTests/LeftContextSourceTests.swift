@@ -6,82 +6,147 @@ final class LeftContextSourceTests: XCTestCase {
     // MARK: - Production
 
     func testProductionCacheHit() {
-        let assembly = LeftContextSource.assembleProduction(
+        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+            location: 10, before: "今日は", after: ""
+        ))
+        let ctx = LeftContextSource.resolveProduction(
             sessionBuffer: "東京",
-            cursorLocation: 10,
-            cachedSurrounding: (location: 10, before: "今日は")
+            cache: &cache,
+            cursorLocation: 10
         )
-        XCTAssertFalse(assembly.shouldClearCache)
-        XCTAssertEqual(
-            LeftContextResolver.resolve(assembly.input),
-            "東京今日は"
-        )
+        XCTAssertEqual(ctx.combined, "東京今日は")
+        XCTAssertEqual(ctx.imkBefore, "今日は")
+        XCTAssertNotNil(cache.snapshot)
     }
 
     func testProductionLocationMismatchClearsCache() {
-        let assembly = LeftContextSource.assembleProduction(
+        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+            location: 3, before: "前文", after: ""
+        ))
+        let ctx = LeftContextSource.resolveProduction(
             sessionBuffer: "buf",
-            cursorLocation: 5,
-            cachedSurrounding: (location: 10, before: "前文")
+            cache: &cache,
+            cursorLocation: 5
         )
-        XCTAssertTrue(assembly.shouldClearCache)
-        XCTAssertEqual(LeftContextResolver.resolve(assembly.input), "buf")
+        XCTAssertEqual(ctx.combined, "buf")
+        XCTAssertNil(cache.snapshot)
     }
 
-    func testProductionEmptyBeforeDoesNotUseCache() {
-        let assembly = LeftContextSource.assembleProduction(
+    func testProductionEmptyBeforeClearsCache() {
+        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+            location: 3, before: "", after: ""
+        ))
+        let ctx = LeftContextSource.resolveProduction(
             sessionBuffer: "のみ",
-            cursorLocation: 3,
-            cachedSurrounding: (location: 3, before: "")
+            cache: &cache,
+            cursorLocation: 3
         )
-        XCTAssertTrue(assembly.shouldClearCache)
-        XCTAssertEqual(LeftContextResolver.resolve(assembly.input), "のみ")
+        XCTAssertEqual(ctx.combined, "のみ")
+        XCTAssertNil(cache.snapshot)
     }
 
     func testProductionNoCache() {
-        let assembly = LeftContextSource.assembleProduction(
+        var cache = LeftContextIMKCache()
+        let ctx = LeftContextSource.resolveProduction(
             sessionBuffer: "session",
-            cursorLocation: 1,
-            cachedSurrounding: nil
+            cache: &cache,
+            cursorLocation: 1
         )
-        XCTAssertFalse(assembly.shouldClearCache)
-        XCTAssertEqual(LeftContextResolver.resolve(assembly.input), "session")
+        XCTAssertEqual(ctx.combined, "session")
+        XCTAssertNil(cache.snapshot)
     }
 
     func testProductionCursorUnavailable() {
-        let assembly = LeftContextSource.assembleProduction(
+        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+            location: 1, before: "前文", after: ""
+        ))
+        let ctx = LeftContextSource.resolveProduction(
             sessionBuffer: "buf",
-            cursorLocation: NSNotFound,
-            cachedSurrounding: (location: 0, before: "ignored")
+            cache: &cache,
+            cursorLocation: NSNotFound
         )
-        XCTAssertFalse(assembly.shouldClearCache)
-        XCTAssertEqual(LeftContextResolver.resolve(assembly.input), "buf")
+        XCTAssertEqual(ctx.combined, "buf")
+        XCTAssertNotNil(cache.snapshot, "cursor 不可でもキャッシュは触らない")
+    }
+
+    // MARK: - applyPostKeyDown
+
+    func testApplyPostKeyDownConsumesInvalidated() {
+        var cache = LeftContextIMKCache(
+            snapshot: IMKSurroundingSnapshot(location: 1, before: "x", after: ""),
+            invalidated: true
+        )
+        LeftContextSource.applyPostKeyDown(
+            cache: &cache,
+            composedHiraganaEmpty: false,
+            composedHiraganaWasEmpty: false,
+            newSnapshot: nil
+        )
+        XCTAssertNil(cache.snapshot)
+        XCTAssertFalse(cache.invalidated)
+    }
+
+    func testApplyPostKeyDownClearsOnEmptyComposition() {
+        var cache = LeftContextIMKCache(snapshot: IMKSurroundingSnapshot(
+            location: 1, before: "x", after: ""
+        ))
+        LeftContextSource.applyPostKeyDown(
+            cache: &cache,
+            composedHiraganaEmpty: true,
+            composedHiraganaWasEmpty: false,
+            newSnapshot: nil
+        )
+        XCTAssertNil(cache.snapshot)
+    }
+
+    func testApplyPostKeyDownStoresNewSnapshotOnFirstComposition() {
+        var cache = LeftContextIMKCache()
+        let snap = IMKSurroundingSnapshot(location: 5, before: "前文", after: "後文")
+        LeftContextSource.applyPostKeyDown(
+            cache: &cache,
+            composedHiraganaEmpty: false,
+            composedHiraganaWasEmpty: true,
+            newSnapshot: snap
+        )
+        XCTAssertEqual(cache.snapshot, snap)
+    }
+
+    func testResetCache() {
+        var cache = LeftContextIMKCache(
+            snapshot: IMKSurroundingSnapshot(location: 1, before: "x", after: ""),
+            invalidated: true
+        )
+        LeftContextSource.resetCache(&cache)
+        XCTAssertEqual(cache, LeftContextIMKCache())
     }
 
     // MARK: - Sandbox
 
     func testSandboxResolveFromDocumentBefore() {
-        let result = LeftContextSource.resolveSandbox(
+        let ctx = LeftContextSource.resolveSandbox(
             sessionBuffer: "報告書",
             documentBefore: "今日は"
         )
-        XCTAssertEqual(result, "報告書今日は")
+        XCTAssertEqual(ctx.combined, "報告書今日は")
+        XCTAssertEqual(ctx.imkBefore, "今日は")
     }
 
     func testSandboxOverrideBypassesResolver() {
-        let result = LeftContextSource.resolveSandbox(
+        let ctx = LeftContextSource.resolveSandbox(
             sessionBuffer: "ignored",
             documentBefore: "ignored",
-            override: "fixed-context"
+            override: "固定"
         )
-        XCTAssertEqual(result, "fixed-context")
+        XCTAssertEqual(ctx.combined, "固定")
+        XCTAssertNil(ctx.imkBefore)
     }
 
     func testSandboxEmptyDocumentBefore() {
-        let result = LeftContextSource.resolveSandbox(
+        let ctx = LeftContextSource.resolveSandbox(
             sessionBuffer: "のみ",
             documentBefore: ""
         )
-        XCTAssertEqual(result, "のみ")
+        XCTAssertEqual(ctx.combined, "のみ")
+        XCTAssertNil(ctx.imkBefore)
     }
 }

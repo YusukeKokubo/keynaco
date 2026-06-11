@@ -1055,7 +1055,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "committedHistory":   snap.committedHistory,
             "sessionTextBuffer":  snap.sessionTextBuffer,
             "isZenzaiEnabled":    handler.azooKeyConverter.isZenzaiEnabled,
-            "leftSideContext":    handler.leftSideContext,
+            "leftSideContext":    handler.leftContext.combined,
             "lastCommittedReading": handler.lastCommittedReading as Any,
             "surroundingAfter":   mockClient.documentAfter,
             "candidateEntries":   Self.makeCandidateEntries(
@@ -1118,7 +1118,7 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     /// `LeftContextSource.resolveSandbox` 経由。`makeResponse` 前に `syncLeftSideContext` で再計算（MARK「サンドボックス」参照）。
-    func debugLeftContextPrefix() -> String {
+    func debugLeftContext() -> LeftContext {
         LeftContextSource.resolveSandbox(
             sessionBuffer: handler.sessionTextBuffer,
             documentBefore: mockClient.documentBefore,
@@ -1126,9 +1126,9 @@ final class DebugSocketServer: @unchecked Sendable {
         )
     }
 
-    /// `makeResponse` / キー処理前に `handler.leftSideContext` を最新化する。
+    /// `makeResponse` / キー処理前に `handler.leftContext` を最新化する。
     func syncLeftSideContext() {
-        handler.leftSideContext = debugLeftContextPrefix()
+        handler.leftContext = debugLeftContext()
     }
 
     private func updateMockMarkedText() {

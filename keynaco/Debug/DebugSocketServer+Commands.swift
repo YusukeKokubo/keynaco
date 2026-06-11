@@ -82,7 +82,7 @@ extension DebugSocketServer {
     /// `set_surrounding` / `set_left_context` 後に `leftSideContext` を再計算して返す共通ペイロード。
     func finalizeLeftContextCommand(cmd: [String: Any], extra: [String: Any] = [:]) -> [String: Any] {
         syncLeftSideContext()
-        var payload: [String: Any] = ["ok": true, "leftSideContext": handler.leftSideContext]
+        var payload: [String: Any] = ["ok": true, "leftSideContext": handler.leftContext.combined]
         payload["sessionTextBuffer"] = handler.sessionTextBuffer
         for (k, v) in extra { payload[k] = v }
         return Self.finalize(payload, cmd: cmd)

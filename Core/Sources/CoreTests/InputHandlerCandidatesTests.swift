@@ -191,7 +191,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
     func testKnownWordWithZenzaiDoesNotShowKatakanaInMainList() {
         // 実質的な変換候補がある場合: カタカナは主要リストに出ない（既存の仕様を保護）
         setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: true))
-        handler.leftSideContext = "prefix"
+        handler.leftContext = .testing(combined: "prefix")
         handler.state.composedHiragana = "よいのでは"
         handler.state.pendingRomaji = ""
         let action = handler.buildCandidateList(trigger: .whileTyping)

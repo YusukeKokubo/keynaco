@@ -200,7 +200,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     func testSnap_F1_ZenzaiPromotedWithContext() {
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftSideContext = "prefix"
+        handler.leftContext = .testing(combined: "prefix")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
@@ -217,7 +217,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     func testSnap_F3_ZenzaiDisabled() {
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: false))
-        handler.leftSideContext = "prefix"
+        handler.leftContext = .testing(combined: "prefix")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
@@ -226,7 +226,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     func testSnap_F4_ZenzaiTop1AlreadyInHistory() {
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftSideContext = "prefix"
+        handler.leftContext = .testing(combined: "prefix")
         handler.db.record(input: "あい", output: "Zen先頭")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
@@ -236,7 +236,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     func testSnap_F5_ZenzaiWithUserDict() {
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftSideContext = "prefix"
+        handler.leftContext = .testing(combined: "prefix")
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
@@ -246,7 +246,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     func testSnap_F6_ZenzaiFirstWithAutoShow() {
         useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftSideContext = "prefix"
+        handler.leftContext = .testing(combined: "prefix")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(trigger: .whileTyping),
                      candidates: ["Zen先頭", "あい", "辞書B", "アイ"],
@@ -317,7 +317,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "哀")
         handler.db.clock = { t + 40 * 86400 }
         handler.db.record(input: "あい", output: "愛")
-        handler.leftSideContext = "prefix"
+        handler.leftContext = .testing(combined: "prefix")
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
@@ -327,7 +327,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     func testSnap_I2_HiraganaPreferredWithZenzai() {
         useStub(SnapStub(["Zen先頭"], zenzai: true))
-        handler.leftSideContext = "prefix"
+        handler.leftContext = .testing(combined: "prefix")
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "Zen先頭", "ノ"],

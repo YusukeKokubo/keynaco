@@ -4,20 +4,6 @@ import InputMethodKit
 
 extension InputController {
 
-    /// LLM / Zenzai 用左文脈。パイプラインは `LeftContextSource` MARK 参照。
-    func resolvedLLMDocumentContextPrefix(adapter: IMKTextInputAdapter) -> String {
-        let cached = cachedSurroundingContext.map { (location: $0.location, before: $0.text.before) }
-        let assembly = LeftContextSource.assembleProduction(
-            sessionBuffer: handler.sessionTextBuffer,
-            cursorLocation: adapter.selectedRange().location,
-            cachedSurrounding: cached
-        )
-        if assembly.shouldClearCache {
-            cachedSurroundingContext = nil
-        }
-        return LeftContextResolver.resolve(assembly.input)
-    }
-
     /// 確定語の品詞を AzooKey 辞書で判定し、DB の pos を更新する。
     func schedulePOSClassification(output: String, reading: String) {
         guard HiraganaPreferredBuiltins.words[output] == nil else { return }

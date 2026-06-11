@@ -17,10 +17,6 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// 直近の `handle(event:client:)` の IMK クライアント（候補 UI 削除などキーイベント外の marked 同期用）。
     private weak var activeIMKClient: AnyObject?
 
-    /// IMK surrounding `before`/`after` のキャッシュ。更新・無効化タイミングは `LeftContextSource` ファイル先頭 MARK。
-    /// 組み立ては `LeftContextSource.assembleProduction`（`InputController+LLM.resolvedLLMDocumentContextPrefix`）。
-    var cachedSurroundingContext: (location: Int, text: (before: String, after: String))?
-
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
         let ic = self
@@ -107,8 +103,8 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.state = CompositionState()
             ic.handler.committedHistory = []
             ic.handler.sessionTextBuffer = ""
-            ic.cachedSurroundingContext = nil
-            ic.handler.leftSideContext = ""
+            LeftContextSource.resetCache(&ic.handler.leftContextIMKCache)
+            ic.handler.leftContext = .empty
             ic.handler.ignoreNextModeSwitch = true
             ic.handler.candidateSession.reset()
             ic.candidateWindow.dismiss()
@@ -147,7 +143,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         }
     }
 
-    /// キー処理後の副作用。`cachedSurroundingContext` の fetch/無効化は `LeftContextSource` MARK「本番」参照。
+    /// キー処理後の副作用。IMK キャッシュの fetch/無効化は `LeftContextSource` MARK「本番」参照。
     @MainActor
     private func applyPostKeyDownEffects(
         consumed: Bool,
@@ -156,9 +152,9 @@ class InputController: IMKInputController, @unchecked Sendable {
         composedHiraganaWasEmpty: Bool,
         imkSenderForSurrounding: Any?
     ) {
-        // 未消費でも Enter 空組成などで `documentSurroundingContextInvalidated` が立つ（consumed 限定不可）。
+        // 未消費でも Enter 空組成などで `leftContextIMKCache.invalidated` が立つ（consumed 限定不可）。
         let needsSurroundingSideEffects = consumed
-            || handler.documentSurroundingContextInvalidated
+            || handler.leftContextIMKCache.invalidated
             || adapter.didInsertText
             || (composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty)
 
@@ -168,21 +164,22 @@ class InputController: IMKInputController, @unchecked Sendable {
 
         guard needsSurroundingSideEffects else { return }
 
-        if handler.documentSurroundingContextInvalidated {
-            cachedSurroundingContext = nil
-            handler.documentSurroundingContextInvalidated = false
-        }
-        if handler.state.composedHiragana.isEmpty {
-            cachedSurroundingContext = nil
-        } else if composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty {
+        var newSnapshot: IMKSurroundingSnapshot?
+        if composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty {
             // Space での再取得は冗長のため行わない（カーソル移動は location 不一致で無効化）。
             if let ctx = SurroundingIMKContext.fetch(from: imkSenderForSurrounding) {
                 let loc = adapter.selectedRange().location
                 if loc != NSNotFound {
-                    cachedSurroundingContext = (loc, ctx)
+                    newSnapshot = IMKSurroundingSnapshot(location: loc, before: ctx.before, after: ctx.after)
                 }
             }
         }
+        LeftContextSource.applyPostKeyDown(
+            cache: &handler.leftContextIMKCache,
+            composedHiraganaEmpty: handler.state.composedHiragana.isEmpty,
+            composedHiraganaWasEmpty: composedHiraganaWasEmpty,
+            newSnapshot: newSnapshot
+        )
 
         if adapter.didInsertText {
             schedulePOSClassification(
@@ -202,7 +199,11 @@ class InputController: IMKInputController, @unchecked Sendable {
         imkSenderForSurrounding: Any?
     ) -> Bool {
         handler.currentAppBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        handler.leftSideContext = resolvedLLMDocumentContextPrefix(adapter: adapter)
+        handler.leftContext = LeftContextSource.resolveProduction(
+            sessionBuffer: handler.sessionTextBuffer,
+            cache: &handler.leftContextIMKCache,
+            cursorLocation: adapter.selectedRange().location
+        )
         let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
         let ctx = handler.candidateSession.context
         let (consumed, action) = handler.handle(
@@ -307,8 +308,8 @@ class InputController: IMKInputController, @unchecked Sendable {
             ) else { return }
             ic.handler.commitComposition(client: adapter, candidate: session.context)
             ic.handler.candidateSession.reset()
-            ic.cachedSurroundingContext = nil
-            ic.handler.leftSideContext = ""
+            LeftContextSource.resetCache(&ic.handler.leftContextIMKCache)
+            ic.handler.leftContext = .empty
             ic.candidateWindow.dismiss()
         }
     }

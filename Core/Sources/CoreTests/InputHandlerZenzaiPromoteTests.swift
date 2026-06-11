@@ -28,7 +28,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
 
     func testZenzaiPromotedTop1AtRowZero() {
         let top1 = zenzaiMock.candidateLines[0]
-        handler.leftSideContext = "左文脈"
+        handler.leftContext = .testing(combined: "左文脈")
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
         guard let payload = action.showPayload else {
@@ -40,7 +40,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
 
     func testZenzaiPromotedRowShiftDeleteDoesNothing() {
         let top1 = zenzaiMock.candidateLines[0]
-        handler.leftSideContext = "ctx"
+        handler.leftContext = .testing(combined: "ctx")
         type(chars: "a", base: "a")
         let (_, showAction) = press(keyCode: 49)
         guard let payload = showAction.showPayload,
@@ -66,7 +66,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
 
     func testZenzaiPromotedTop1SingleOccurrenceAsideFromHistoryDup() {
         let top1 = zenzaiMock.candidateLines[0]
-        handler.leftSideContext = "ctx"
+        handler.leftContext = .testing(combined: "ctx")
         type(chars: "a", base: "a")
         let (_, action) = press(keyCode: 49)
         guard let payload = action.showPayload else {
@@ -78,7 +78,7 @@ final class InputHandlerZenzaiPromoteTests: InputHandlerTestCase {
     /// 高スコア履歴に読みと同じひらがながあるとき、Zenzai top-1 よりそちらを初期選択する。
     func testZenzaiInitialRowPrefersHiraganaExactMatchInHistory() {
         zenzaiMock.candidateLines = ["士大夫", "死体", "支隊"]
-        handler.leftSideContext = "文脈"
+        handler.leftContext = .testing(combined: "文脈")
         handler.db.record(input: "したい", output: "したい")
         handler.db.record(input: "したい", output: "したい時に")
         typeRomaji("shitai")

@@ -2,9 +2,9 @@ import XCTest
 @testable import KeynacoCore
 @testable import KeynacoTestSupport
 
-// Zenzai top-1 プロモートが leftSideContext の有無で変わることを検証する。
-// - 左文脈なし: azooKeyLeftContext == nil → Zenzai 未発火 → 辞書先頭が row 0
-// - 左文脈あり: azooKeyLeftContext != nil → Zenzai top-1 が row 0 に昇格
+// Zenzai top-1 プロモートが leftContext の有無で変わることを検証する。
+// - 左文脈なし: leftContext.azooKeyValue == nil → Zenzai 未発火 → 辞書先頭が row 0
+// - 左文脈あり: leftContext.azooKeyValue != nil → Zenzai top-1 が row 0 に昇格
 //
 // AzooKeyConverter の実モデル（gguf）はテスト環境では使えないため、
 // isZenzaiEnabled = true のモックで代替する。
@@ -74,7 +74,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
 
     /// 左文脈なし: Zenzai 未発火 → 辞書先頭候補 "開催" が row 0
     func testZenzaiNotPromotedWithoutLeftContext() {
-        handler.leftSideContext = ""
+        handler.leftContext = .empty
         typeRomaji("kaisai")
         let action = pressSpace()
         guard let payload = action.showPayload else {
@@ -87,7 +87,7 @@ final class ZenzaiLeftContextTests: XCTestCase {
 
     /// 左文脈あり: Zenzai top-1 が row 0 に昇格
     func testZenzaiPromotedWithLeftContext() {
-        handler.leftSideContext = "東京で"
+        handler.leftContext = .testing(combined: "東京で")
         typeRomaji("kaisai")
         let action = pressSpace()
         guard let payload = action.showPayload else {
@@ -97,18 +97,18 @@ final class ZenzaiLeftContextTests: XCTestCase {
         XCTAssertEqual(handler.candidateSession.zenzaiRow, 0, "Zenzai 発火時は zenzaiRow が設定される")
     }
 
-    /// sessionTextBuffer から leftSideContext を構築するフロー。
+    /// sessionTextBuffer から leftContext を構築するフロー。
     func testZenzaiPromotedFromSessionTextBuffer() {
         typeRomaji("toukyou")
         pressSpace()
         pressEnter(candidateVisible: true, selectedRow: 0, selectedText: "とうきょう")
         typeRomaji("de")
         pressEnter()
-        handler.leftSideContext = LeftContextResolver.resolve(.sandbox(
+        handler.leftContext = LeftContextSource.resolveSandbox(
             sessionBuffer: handler.sessionTextBuffer,
             documentBefore: ""
-        ))
-        XCTAssertEqual(handler.leftSideContext, "とうきょうで")
+        )
+        XCTAssertEqual(handler.leftContext.combined, "とうきょうで")
 
         typeRomaji("kaisai")
         let action = pressSpace()
