@@ -25,7 +25,9 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `keynaco/Debug/` | デバッグ用ツール（`DebugSocketServer`・`IMESandboxWindow`・`SocketMockClient` 等、本番動作には影響しない） |
 | `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
 | `Core/Sources/Core/` | `KeynacoCore` の実装（`InputHandler` 等） |
-| `Core/Sources/CoreTests/` | `KeynacoCore` のユニットテスト（XCTest） |
+| `Core/Sources/CoreTests/` | fast ユニットテスト（`InputHandler*` スタブ中心） |
+| `Core/Sources/CoreSlowTests/` | slow テスト（AzooKey 実辞書・POS 分類） |
+| `Core/Sources/KeynacoTestSupport/` | テストヘルパー（`MockTextClient` 等） |
 | `keynacoTests/` | アプリ専用テスト（`SurroundingIMKContext` 等） |
 | `keynaco.xcodeproj` | Xcode プロジェクト（リポジトリ管理。ローカル SPM で `Core/` を参照） |
 | `docs/` | `concept.md`（差別化軸）・`retrospectives.md`（メタルール）・`rejected.md`（不採用機能）・`domain/`（用語・状態遷移・シナリオ） |
@@ -43,9 +45,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `test_core_slow.sh` | Core 重いテストのみ（`KeynacoCoreSlowTests`、AzooKey 実機） |
 | `test_core_all.sh` | Core fast + slow 両方 |
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
-| `test_marked_text_sandbox.sh` | marked text 同期・候補 Space/Shift+Delete のソケット回帰（`smoke.py` からも実行） |
-| `repro_AB_storm_once.py` | A→B→新規接続リセット時のクラッシュ再現スクリプト |
-| `repro_debug_socket_stress.py` | ソケットのストレステスト・ECONNREFUSED 切り分け用 |
+| `test_marked_text_sandbox.sh` | marked text 同期・候補 Space/Shift+Delete のソケット回帰 |
 
 ### 起動チェーン（IMK ブートストラップ）
 
