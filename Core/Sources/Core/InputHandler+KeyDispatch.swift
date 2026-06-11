@@ -71,6 +71,12 @@ extension InputHandler {
         if !isBackspace { lastConfirmedContext = nil }
     }
 
+    private mutating func resetContextOnEnter() {
+        committedHistory.removeAll()
+        sessionTextBuffer = ""
+        leftContextIMKCache.invalidated = true
+    }
+
     private mutating func handleFunctionKeyIfNeeded(
         keyCode: UInt16, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
@@ -104,9 +110,7 @@ extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         if keyCode == KeyCode.escape { Self.isAsciiMode = false; return (true, .none) }
         if keyCode == KeyCode.enter {
-            committedHistory.removeAll()
-            sessionTextBuffer = ""
-            leftContextIMKCache.invalidated = true
+            resetContextOnEnter()
             return (false, .none)
         }
         guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
@@ -123,9 +127,7 @@ extension InputHandler {
         switch key {
         case .enter:
             guard state.isComposing else {
-                committedHistory.removeAll()
-                sessionTextBuffer = ""
-                leftContextIMKCache.invalidated = true
+                resetContextOnEnter()
                 return (false, .none)
             }
             commitComposition(client: client)

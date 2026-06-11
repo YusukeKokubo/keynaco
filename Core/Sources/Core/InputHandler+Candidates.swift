@@ -58,7 +58,7 @@ extension InputHandler {
                 leftSideContext: leftContext.azooKeyValue,
                 richCandidates: trigger == .explicit
             )
-            azooKeyCandidates = raw.filter { !Self.isScriptMixed($0) }
+            azooKeyCandidates = raw.filter { !KanaUtils.isScriptMixed($0) }
         }
         let historyKey = (!h.isEmpty && h.allSatisfy({ $0.isASCII })) ? h.lowercased() : h
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
@@ -121,18 +121,6 @@ extension InputHandler {
             && sources.userDictRaw.isEmpty
             && numberCandidates.isEmpty
             && dateTimeCandidates.isEmpty
-    }
-
-    /// ひらがなとカタカナが混在する表層（AzooKey が返す「きョ」等）を除外する。
-    private static func isScriptMixed(_ text: String) -> Bool {
-        var hasHiragana = false
-        var hasKatakana = false
-        for scalar in text.unicodeScalars {
-            if scalar.value >= 0x3041 && scalar.value <= 0x3096 { hasHiragana = true }
-            if scalar.value >= 0x30A1 && scalar.value <= 0x30F6 { hasKatakana = true }
-            if hasHiragana && hasKatakana { return true }
-        }
-        return false
     }
 
     private func assembleCandidateList(

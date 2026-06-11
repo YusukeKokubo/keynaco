@@ -30,23 +30,13 @@ enum CandidateSectionBuilder {
         var sections: [CandidateSection] = []
         var seen = Set(input.highHistory + azooKeyUniq)
 
-        switch input.fixedSlot {
-        case .hiragana:
+        if input.fixedSlot == .hiragana || input.addsDefaultFixedHiragana {
             if allCandidatesSeen.contains(input.hiragana) { seen.remove(input.hiragana) }
             sections.append(CandidateSection(kind: .fixedHiragana, items: [input.hiragana]))
             seen.insert(input.hiragana)
-        case .none:
-            if input.addsDefaultFixedHiragana {
-                if allCandidatesSeen.contains(input.hiragana) { seen.remove(input.hiragana) }
-                sections.append(CandidateSection(kind: .fixedHiragana, items: [input.hiragana]))
-                seen.insert(input.hiragana)
-            }
         }
 
-        let uniqueUserDict = input.userDictRaw.filter { seen.insert($0).inserted }
-        if !uniqueUserDict.isEmpty {
-            sections.append(CandidateSection(kind: .userDict, items: uniqueUserDict))
-        }
+        addSection(.userDict, from: input.userDictRaw, seen: &seen, into: &sections)
 
         if let top1 = input.zenzaiPromoted, seen.insert(top1).inserted {
             sections.append(CandidateSection(kind: .zenzaiTop1, items: [top1]))
@@ -68,15 +58,8 @@ enum CandidateSectionBuilder {
             sections.append(CandidateSection(kind: .highHistory, items: input.highHistory))
         }
 
-        let uniqueNumberCandidates = input.numberCandidates.filter { seen.insert($0).inserted }
-        if !uniqueNumberCandidates.isEmpty {
-            sections.append(CandidateSection(kind: .number, items: uniqueNumberCandidates))
-        }
-
-        let uniqueDateTimeCandidates = input.dateTimeCandidates.filter { seen.insert($0).inserted }
-        if !uniqueDateTimeCandidates.isEmpty {
-            sections.append(CandidateSection(kind: .dateTime, items: uniqueDateTimeCandidates))
-        }
+        addSection(.number, from: input.numberCandidates, seen: &seen, into: &sections)
+        addSection(.dateTime, from: input.dateTimeCandidates, seen: &seen, into: &sections)
 
         if !input.hiragana.allSatisfy({ $0.isASCII }),
            seen.insert(input.katakana).inserted {
@@ -88,5 +71,17 @@ enum CandidateSectionBuilder {
             : CandidateLayout.defaultSectionOrder
 
         return CandidateSectionBuildResult(sections: sections, sectionOrder: sectionOrder)
+    }
+
+    private static func addSection(
+        _ kind: CandidateSection.Kind,
+        from items: [String],
+        seen: inout Set<String>,
+        into sections: inout [CandidateSection]
+    ) {
+        let unique = items.filter { seen.insert($0).inserted }
+        if !unique.isEmpty {
+            sections.append(CandidateSection(kind: kind, items: unique))
+        }
     }
 }

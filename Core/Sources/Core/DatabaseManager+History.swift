@@ -273,7 +273,7 @@ extension DatabaseManager {
     /// `input == output` かつ全ひらがなのエントリは学習価値がないため記録しない。
     static func isHiraganaPassthrough(reading: String, output: String) -> Bool {
         guard reading == output else { return false }
-        guard output.unicodeScalars.allSatisfy({ $0.value >= 0x3041 && $0.value <= 0x3096 }) else { return false }
+        guard output.unicodeScalars.allSatisfy({ KanaUtils.isHiragana($0) }) else { return false }
         // 助詞・助動詞等（HiraganaPreferredBuiltins 登録語）は hiraganaPreferred の固定枠で出るため
         // 履歴記録は不要。それ以外のひらがな語（「さん」等）はユーザーが意図的にひらがな確定した
         // 実績として記録する。

@@ -4,6 +4,28 @@ import Foundation
 /// state を持たない pure な関数のみ。
 enum KanaUtils {
 
+    /// ひらがな（U+3041〜U+3096）かどうか。
+    static func isHiragana(_ scalar: UnicodeScalar) -> Bool {
+        scalar.value >= 0x3041 && scalar.value <= 0x3096
+    }
+
+    /// 全角カタカナ（U+30A1〜U+30F6）かどうか。
+    static func isKatakana(_ scalar: UnicodeScalar) -> Bool {
+        scalar.value >= 0x30A1 && scalar.value <= 0x30F6
+    }
+
+    /// ひらがなと全角カタカナが混在する文字列かどうか（AzooKey が返す「きョ」等を除外するため）。
+    static func isScriptMixed(_ text: String) -> Bool {
+        var hasHiragana = false
+        var hasKatakana = false
+        for scalar in text.unicodeScalars {
+            if isHiragana(scalar) { hasHiragana = true }
+            if isKatakana(scalar) { hasKatakana = true }
+            if hasHiragana && hasKatakana { return true }
+        }
+        return false
+    }
+
     /// ひらがな → 全角カタカナ。U+3041〜U+3096 を +0x60 シフト。
     static func hiraganaToKatakana(_ text: String) -> String {
         String(text.unicodeScalars.map { scalar in

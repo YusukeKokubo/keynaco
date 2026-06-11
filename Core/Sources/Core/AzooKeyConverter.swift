@@ -184,8 +184,8 @@ public final class AzooKeyConverter: @unchecked Sendable {
         let validCoverage = predictionFiltered.filter { c in
             guard c.data.count > 1, let last = c.data.last else { return true }
             guard last.word.count == 1, let scalar = last.word.unicodeScalars.first else { return true }
-            let isHiragana = (0x3041...0x3096).contains(scalar.value)
-            let isKatakana = (0x30A1...0x30F6).contains(scalar.value)
+            let isHiragana = KanaUtils.isHiragana(scalar)
+            let isKatakana = KanaUtils.isKatakana(scalar)
             guard isHiragana || isKatakana else { return true }
             return (147...554).contains(last.lcid)
         }
