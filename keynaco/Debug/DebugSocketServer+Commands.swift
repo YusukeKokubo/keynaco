@@ -462,7 +462,7 @@ extension DebugSocketServer {
     characters: chars,
     baseCharacters: base,
     modifiers: mods,
-    candidate: handler.candidateSession.context,
+    candidate: handler.candidateSession.makeContext(),
     client: mockClient
     )
     if keyCode == KeyCode.backspace, !consumed {
