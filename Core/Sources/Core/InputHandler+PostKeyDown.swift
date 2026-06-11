@@ -13,7 +13,10 @@ public extension InputHandler {
         applyCandidateAction(action, client: client)
     }
 
-    /// 本番: `consumed` 時のみ候補 apply。`imkCache` をキー処理後のルールで更新する。
+    /// 本番: 候補 apply と marked text 同期を `consumed` 不問で実行。`imkCache` をキー処理後のルールで更新する。
+    ///
+    /// `consumed` に関わらず常に `applyCandidateAction` を呼ぶことで、未消費キー後の marked text 同期漏れを防ぐ。
+    /// `action == .none` のときは candidateSession は変わらず `syncMarkedText` のみ走る（冪等）。
     mutating func applyPostKeyDownCandidateAndIMK(
         consumed: Bool,
         action: CandidateAction,
@@ -23,9 +26,7 @@ public extension InputHandler {
         imkCache: inout LeftContextIMKCache,
         newIMKSnapshot: IMKSurroundingSnapshot?
     ) {
-        if consumed {
-            applyCandidateAction(action, client: client)
-        }
+        applyCandidateAction(action, client: client)
         maintainIMKCacheAfterKeyDown(
             consumed: consumed,
             composedHiraganaWasEmpty: composedHiraganaWasEmpty,

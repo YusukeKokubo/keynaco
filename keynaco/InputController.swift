@@ -214,7 +214,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             candidate: ctx,
             client: adapter
         )
-        // 矢印等の未消費キーは marked 同期をスキップ。Enter 空組成の surrounding 無効化は未消費でも必要。
         applyPostKeyDownEffects(
             consumed: consumed,
             action: action,
