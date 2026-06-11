@@ -31,7 +31,10 @@ class InputController: IMKInputController, @unchecked Sendable {
                     guard let ic else { return }
                     ic.handler.db.deleteHistory(output: text)
                     ic.handler.candidateSession.removeCandidate(at: row)
-                    ic.candidateWindow.refreshFrom(session: ic.handler.candidateSession)
+                    ic.candidateWindow.apply(
+                        CandidatePanelModel(session: ic.handler.candidateSession),
+                        layout: .refreshInPlace
+                    )
                     ic.syncMarkedTextToActiveClient()
                 }
             }
@@ -129,17 +132,18 @@ class InputController: IMKInputController, @unchecked Sendable {
     private func applyCandidateEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
         handler.applyCandidateAction(action, client: adapter)
 
+        let panel = CandidatePanelModel(session: handler.candidateSession)
         switch action {
         case .none:
             break
         case .deleteSelected:
-            candidateWindow.refreshFrom(session: handler.candidateSession)
+            candidateWindow.apply(panel, layout: .refreshInPlace)
         case .dismiss:
-            candidateWindow.dismiss()
+            candidateWindow.apply(panel, layout: .dismiss)
         case .selectNext, .selectPrev:
-            candidateWindow.syncSelection(from: handler.candidateSession)
+            candidateWindow.apply(panel, layout: .selectionOnly)
         case .show, .replaceCandidates:
-            candidateWindow.present(session: handler.candidateSession, near: adapter.cursorRect())
+            candidateWindow.apply(panel, layout: .present(near: adapter.cursorRect()))
         }
     }
 
@@ -190,7 +194,7 @@ class InputController: IMKInputController, @unchecked Sendable {
     }
 
     @MainActor
-    private func runKeyDown(
+    func runKeyDown(
         keyCode: UInt16,
         characters: String?,
         baseCharacters: String?,
@@ -250,8 +254,8 @@ class InputController: IMKInputController, @unchecked Sendable {
         nonisolated(unsafe) let imkSenderForSurrounding: Any? = sender
 
         #if DEBUG
-        let (consumed, imeStateSnapshot) = MainActor.assumeIsolated {
-            let consumed = ic.runKeyDown(
+        return MainActor.assumeIsolated {
+            ic.runKeyDownPublishingSnapshot(
                 keyCode: keyCode,
                 characters: characters,
                 baseCharacters: baseCharacters,
@@ -259,19 +263,9 @@ class InputController: IMKInputController, @unchecked Sendable {
                 adapter: adapter,
                 imkSenderForSurrounding: imkSenderForSurrounding
             )
-            var snap = ic.handler.snapshot(markedText: adapter.lastMarkedText)
-            let session = ic.handler.candidateSession
-            snap.candidateVisible = session.isVisible
-            snap.selectedRow = session.selectedRow
-            snap.selectedText = session.selectedText
-            snap.isExplicitlySelected = session.isExplicitlySelected
-            snap.historyEnd = session.historyEnd
-            snap.fixedEnd = session.fixedEnd
-            snap.candidates = Array(session.candidates.prefix(30))
-            return (consumed, snap)
         }
         #else
-        let consumed = MainActor.assumeIsolated {
+        return MainActor.assumeIsolated {
             ic.runKeyDown(
                 keyCode: keyCode,
                 characters: characters,
@@ -282,16 +276,6 @@ class InputController: IMKInputController, @unchecked Sendable {
             )
         }
         #endif
-        DispatchQueue.main.async {
-            #if DEBUG
-            NotificationCenter.default.post(
-                name: .imeStateDidUpdate,
-                object: nil,
-                userInfo: ["snapshot": imeStateSnapshot]
-            )
-            #endif
-        }
-        return consumed
     }
 
     // MARK: - 確定

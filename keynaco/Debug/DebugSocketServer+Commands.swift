@@ -421,6 +421,8 @@ extension DebugSocketServer {
     return processCommand(expanded)
     }
 
+    /// 本番 `InputController.runKeyDown` + `applyPostKeyDownEffects` に対応。
+    /// sandbox は IMK キャッシュなし（`syncLeftSideContext` のみ）、`applyCandidateAction` は consumed 不問。
     func handleKeyEvent(cmd: [String: Any]) -> [String: Any] {
     let keyCode: UInt16
     switch cmd["keyCode"] {

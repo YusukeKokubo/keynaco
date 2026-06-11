@@ -1,0 +1,68 @@
+import Cocoa
+import KeynacoCore
+
+/// `CandidateSession` から導出する候補パネル描画用 view model。mutable 状態は持たない。
+struct CandidatePanelModel: Equatable {
+    let session: CandidateSession
+
+    init(session: CandidateSession) {
+        self.session = session
+    }
+
+    var candidates: [String] { session.candidates }
+    var selectedRow: Int { session.selectedRow }
+    var isExplicitlySelected: Bool { session.isExplicitlySelected }
+    var fixedEnd: Int { session.fixedEnd }
+    var historyEnd: Int { session.historyEnd }
+    var zenzaiRow: Int? { session.zenzaiRow }
+    var isPresented: Bool { session.isVisible && !session.candidates.isEmpty }
+
+    func section(for row: Int) -> CandidateRowSection {
+        CandidateRowMetadata.section(
+            row: row,
+            fixedEnd: fixedEnd,
+            historyEnd: historyEnd,
+            zenzaiRow: zenzaiRow
+        )
+    }
+
+    func showsDeleteButton(at row: Int) -> Bool {
+        CandidateRowMetadata.showsDeleteButton(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
+    }
+
+    func isHistoryRow(_ row: Int) -> Bool {
+        CandidateRowMetadata.isHistoryRow(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
+    }
+
+    func showsSectionDivider(at row: Int) -> Bool {
+        CandidateRowMetadata.showsSectionDivider(
+            row: row,
+            historyEnd: historyEnd,
+            candidateCount: candidates.count
+        )
+    }
+
+    /// 行右端のセクションラベル。境界行と Zenzai 行のみ非空。
+    func sectionLabel(for row: Int) -> String {
+        switch section(for: row) {
+        case .zenzai:
+            return "Zenzai"
+        case .history where row == fixedEnd:
+            return "履歴"
+        case .dictionary where row == historyEnd && row < candidates.count:
+            return "辞書"
+        default:
+            return ""
+        }
+    }
+
+    var selectedText: String? { session.selectedText }
+}
+
+/// 候補ウィンドウの更新種別。
+enum CandidatePanelLayout: Equatable {
+    case dismiss
+    case refreshInPlace
+    case selectionOnly
+    case present(near: NSRect)
+}

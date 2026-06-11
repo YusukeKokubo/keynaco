@@ -74,16 +74,7 @@ final class CandidateWindow: NSPanel {
 
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
-    private(set) var candidates: [String] = []
-    private(set) var selectedRow: Int = 0
-    /// ユーザーが ↑↓ で明示的に候補を動かしたか
-    private(set) var isExplicitlySelected: Bool = false
-    /// スクロール範囲外の固定行数（削除ボタンを非表示にする行数）
-    private(set) var fixedRowCount: Int = 0
-    /// 履歴セクションの末尾インデックス（fixedRowCount <= row < historySectionEnd が履歴行）
-    private(set) var historySectionEnd: Int = 0
-    /// Zenzai がプロモートした候補の行インデックス（nil = Zenzai 非発火）
-    private var zenzaiRowIndex: Int? = nil
+    private var model: CandidatePanelModel?
 
     var onSelect: ((String) -> Void)?
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
@@ -134,140 +125,71 @@ final class CandidateWindow: NSPanel {
 
     // MARK: - Public API
 
-    /// 位置を変えずリスト・選択だけ更新（削除ボタン等）。
-    func refreshFrom(session: CandidateSession) {
-        guard session.isVisible, !session.candidates.isEmpty else {
+    func apply(_ model: CandidatePanelModel, layout: CandidatePanelLayout) {
+        switch layout {
+        case .dismiss:
             dismiss()
-            return
+        case .refreshInPlace:
+            guard model.isPresented else {
+                dismiss()
+                return
+            }
+            self.model = model
+            tableView.reloadData()
+            syncTableSelection()
+        case .selectionOnly:
+            guard model.isPresented else { return }
+            self.model = model
+            syncTableSelection()
+            tableView.scrollRowToVisible(model.selectedRow)
+        case .present(let rect):
+            guard model.isPresented else {
+                dismiss()
+                return
+            }
+            self.model = model
+            presentNear(rect)
         }
-        candidates = session.candidates
-        historySectionEnd = session.historyEnd
-        fixedRowCount = session.fixedEnd
-        selectedRow = session.selectedRow
-        isExplicitlySelected = session.isExplicitlySelected
-        zenzaiRowIndex = session.zenzaiRow
-        tableView.reloadData()
-        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
     }
 
-    /// `CandidateSession` の内容をパネルに反映する。非表示なら `dismiss`。
-    func present(session: CandidateSession, near rect: NSRect) {
-        guard session.isVisible, !session.candidates.isEmpty else {
-            dismiss()
-            return
-        }
-        show(
-            candidates: session.candidates,
-            historySectionEnd: session.historyEnd,
-            initialRow: session.selectedRow,
-            fixedSectionEnd: session.fixedEnd,
-            zenzaiRow: session.zenzaiRow,
-            isExplicitlySelected: session.isExplicitlySelected,
-            near: rect
-        )
+    func dismiss() {
+        orderOut(nil)
+        model = nil
     }
 
-    func show(candidates: [String], historySectionEnd: Int = 0, initialRow: Int = 0, fixedSectionEnd: Int? = nil, zenzaiRow: Int? = nil, isExplicitlySelected: Bool = false, near rect: NSRect) {
-        self.candidates = candidates
-        self.historySectionEnd = historySectionEnd
-        self.selectedRow = candidates.isEmpty ? 0 : min(initialRow, candidates.count - 1)
-        self.isExplicitlySelected = isExplicitlySelected
-        self.fixedRowCount = fixedSectionEnd ?? initialRow
-        self.zenzaiRowIndex = zenzaiRow
+    private func syncTableSelection() {
+        guard let model else { return }
+        tableView.selectRowIndexes(IndexSet(integer: model.selectedRow), byExtendingSelection: false)
+    }
+
+    private func presentNear(_ rect: NSRect) {
+        guard let model else { return }
         tableView.reloadData()
 
         let rowHeight = tableView.rowHeight + tableView.intercellSpacing.height
         let maxVisibleRows = 8
-        let visibleCount = max(min(candidates.count, maxVisibleRows), 1)
+        let visibleCount = max(min(model.candidates.count, maxVisibleRows), 1)
         let height = CGFloat(visibleCount) * rowHeight + 8
         let width: CGFloat = 300
 
         var origin = NSPoint(x: rect.origin.x, y: rect.origin.y - height - 4)
-        // 画面下にはみ出す場合は上に表示
         if let screen = NSScreen.main, origin.y < screen.visibleFrame.origin.y {
             origin.y = rect.maxY + 4
         }
 
         setFrame(NSRect(x: origin.x, y: origin.y, width: width, height: height), display: true)
-        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
-        // 候補が少ないときは先頭から全行表示。多いときだけ initialRow を上端に合わせる。
-        let scrollRow = candidates.count <= maxVisibleRows ? 0 : initialRow
+        syncTableSelection()
+        let scrollRow = model.candidates.count <= maxVisibleRows ? 0 : model.selectedRow
         let scrollPoint = NSPoint(x: 0, y: CGFloat(scrollRow) * rowHeight)
         scrollView.contentView.scroll(to: scrollPoint)
         scrollView.reflectScrolledClipView(scrollView.contentView)
         orderFront(nil)
     }
 
-    /// 候補リストのみ差し替える（ウィンドウ位置は変えない）。
-    func replaceCandidates(_ candidates: [String]) {
-        self.candidates = candidates
-        selectedRow = candidates.isEmpty ? 0 : 0
-        isExplicitlySelected = false
-        tableView.reloadData()
-        if !candidates.isEmpty {
-            tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-        }
-    }
-
-    func dismiss() {
-        orderOut(nil)
-        candidates = []
-        selectedRow = 0
-        isExplicitlySelected = false
-        fixedRowCount = 0
-        historySectionEnd = 0
-        zenzaiRowIndex = nil
-    }
-
-    /// `CandidateSession.apply(.selectNext/.selectPrev)` 後に選択行だけ同期する（ウィンドウ位置は変えない）。
-    func syncSelection(from session: CandidateSession) {
-        guard session.isVisible, !session.candidates.isEmpty else { return }
-        selectedRow = session.selectedRow
-        isExplicitlySelected = session.isExplicitlySelected
-        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
-        tableView.scrollRowToVisible(selectedRow)
-    }
-
-    func selectNext() {
-        guard !candidates.isEmpty else { return }
-        selectedRow = (selectedRow + 1) % candidates.count
-        isExplicitlySelected = true
-        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
-        tableView.scrollRowToVisible(selectedRow)
-    }
-
-    func selectPrev() {
-        guard !candidates.isEmpty else { return }
-        selectedRow = (selectedRow - 1 + candidates.count) % candidates.count
-        isExplicitlySelected = true
-        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
-        tableView.scrollRowToVisible(selectedRow)
-    }
-
-    func selectedText() -> String? {
-        guard selectedRow >= 0, selectedRow < candidates.count else { return nil }
-        return candidates[selectedRow]
-    }
-
-    /// 指定行を候補リストから削除してテーブルを更新
-    func removeCandidate(at row: Int) {
-        guard row >= 0, row < candidates.count else { return }
-        candidates.remove(at: row)
-        if row < historySectionEnd { historySectionEnd -= 1 }
-        tableView.reloadData()
-        if candidates.isEmpty {
-            dismiss()
-            return
-        }
-        selectedRow = min(selectedRow, candidates.count - 1)
-        tableView.selectRowIndexes(IndexSet(integer: selectedRow), byExtendingSelection: false)
-    }
-
     @objc private func deleteButtonClicked(_ sender: NSButton) {
         let row = sender.tag
-        guard row >= 0, row < candidates.count else { return }
-        let text = candidates[row]
-        onDelete?(text, row)
+        guard let model, model.candidates.indices.contains(row) else { return }
+        onDelete?(model.candidates[row], row)
     }
 }
 
@@ -276,7 +198,7 @@ final class CandidateWindow: NSPanel {
 extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        candidates.count
+        model?.candidates.count ?? 0
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -290,27 +212,18 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
             rowView.identifier = id
         }
 
-        guard row < candidates.count else { return nil }
-        rowView.label.stringValue = candidates[row]
+        guard let model, model.candidates.indices.contains(row) else { return nil }
+        rowView.label.stringValue = model.candidates[row]
         rowView.deleteButton.tag = row
-        rowView.deleteButton.isHidden = row < fixedRowCount || row >= historySectionEnd
-        rowView.isHistory = row >= fixedRowCount && row < historySectionEnd
+        rowView.deleteButton.isHidden = !model.showsDeleteButton(at: row)
+        rowView.isHistory = model.isHistoryRow(row)
 
-        let sectionLabelText: String
-        if row == zenzaiRowIndex {
-            sectionLabelText = "Zenzai"
-        } else {
-            switch row {
-            case fixedRowCount where row < historySectionEnd:  sectionLabelText = "履歴"
-            case historySectionEnd where historySectionEnd < candidates.count: sectionLabelText = "辞書"
-            default:                                           sectionLabelText = ""
-            }
-        }
-        rowView.sectionLabel.stringValue = sectionLabelText
-        rowView.sectionLabel.textColor = row == zenzaiRowIndex ? .systemPurple : .tertiaryLabelColor
-
-        let showDivider = row == historySectionEnd - 1 && historySectionEnd < candidates.count
-        rowView.sectionDivider.isHidden = !showDivider
+        let labelText = model.sectionLabel(for: row)
+        rowView.sectionLabel.stringValue = labelText
+        rowView.sectionLabel.textColor = model.section(for: row) == .zenzai
+            ? .systemPurple
+            : .tertiaryLabelColor
+        rowView.sectionDivider.isHidden = !model.showsSectionDivider(at: row)
 
         return rowView
     }

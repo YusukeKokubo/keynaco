@@ -3,22 +3,23 @@
 import Foundation
 
 public extension InputHandler {
-    /// 候補ウィンドウの状態は `InputController` が上書きする（ここではダミーで埋める）。
+    /// `candidateSession` を含むデバッグ用スナップショット。
     func snapshot(markedText: String) -> InputHandlerSnapshot {
-        InputHandlerSnapshot(
+        let session = candidateSession
+        return InputHandlerSnapshot(
             composedHiragana: state.composedHiragana,
             pendingRomaji: state.pendingRomaji,
             composingText: state.composingText,
             markedText: markedText,
             isAsciiMode: Self.isAsciiMode,
             isBracketMode: isBracketMode,
-            isExplicitlySelected: false,
-            candidateVisible: false,
-            selectedRow: 0,
-            selectedText: nil,
-            historyEnd: 0,
-            fixedEnd: 0,
-            candidates: [],
+            isExplicitlySelected: session.isExplicitlySelected,
+            candidateVisible: session.isVisible,
+            selectedRow: session.selectedRow,
+            selectedText: session.selectedText,
+            historyEnd: session.historyEnd,
+            fixedEnd: session.fixedEnd,
+            candidates: session.candidates,
             committedHistory: Array(committedHistory.suffix(5)),
             sessionTextBuffer: sessionTextBuffer
         )

@@ -1028,15 +1028,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     func makeResponse(inserted: [String]) -> [String: Any] {
         syncLeftSideContext()
-        var snap = handler.snapshot(markedText: mockClient.markedText)
-        let session = handler.candidateSession
-        snap.candidateVisible   = session.isVisible
-        snap.selectedRow        = session.selectedRow
-        snap.selectedText       = session.selectedText
-        snap.isExplicitlySelected = session.isExplicitlySelected
-        snap.historyEnd         = session.historyEnd
-        snap.fixedEnd           = session.fixedEnd
-        snap.candidates         = session.candidates
+        let snap = handler.snapshot(markedText: mockClient.markedText)
 
         var dict: [String: Any] = [
             "inserted":           inserted,
@@ -1061,41 +1053,30 @@ final class DebugSocketServer: @unchecked Sendable {
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,
                 fixedEnd: snap.fixedEnd,
-                historyEnd: snap.historyEnd
+                historyEnd: snap.historyEnd,
+                zenzaiRow: handler.candidateSession.zenzaiRow
             ),
         ]
         if let st = snap.selectedText { dict["selectedText"] = st }
         return dict
     }
 
-    static func candidateSection(
-        row: Int,
-        fixedEnd: Int,
-        historyEnd: Int
-    ) -> String {
-        if row < fixedEnd {
-            return "fixed"
-        }
-        if row < historyEnd {
-            return "history"
-        }
-        return "dictionary_or_special"
-    }
-
     static func makeCandidateEntries(
         candidates: [String],
         fixedEnd: Int,
-        historyEnd: Int
+        historyEnd: Int,
+        zenzaiRow: Int?
     ) -> [[String: Any]] {
         candidates.enumerated().map { idx, text in
             [
                 "index": idx,
                 "text": text,
-                "section": candidateSection(
+                "section": CandidateRowMetadata.section(
                     row: idx,
                     fixedEnd: fixedEnd,
-                    historyEnd: historyEnd
-                )
+                    historyEnd: historyEnd,
+                    zenzaiRow: zenzaiRow
+                ).rawValue
             ]
         }
     }

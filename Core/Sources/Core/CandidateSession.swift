@@ -12,7 +12,7 @@ public enum CandidatePanelInteraction: Equatable, Sendable {
 }
 
 /// 候補 UI の単一の正本。`InputHandler` が `CandidateAction` を返し、`InputController` が
-/// `apply` 後に `CandidateWindow.present(session:)` で描画する。
+/// `apply` 後に `CandidateWindow.apply(_:layout:)` で描画する。
 ///
 /// ## `isVisible` / `isExplicitlySelected` のライフサイクル
 ///

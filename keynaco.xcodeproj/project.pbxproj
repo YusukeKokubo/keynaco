@@ -25,6 +25,8 @@
 		67352544F047475D84590AFE /* ZenzaiViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CD4B32B2C294E56820A1632 /* ZenzaiViewController.swift */; };
 		6827E18A7E43145D7F763817 /* SurroundingIMKContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B35A13234A024ED9F84F3147 /* SurroundingIMKContext.swift */; };
 		8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */; };
+		B2C3D4E5F60718293A4B5C01 /* CandidatePanelModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C02 /* CandidatePanelModel.swift */; };
+		C3D4E5F60718293A4B5C6D01 /* InputController+Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F60718293A4B5C6D02 /* InputController+Debug.swift */; };
 		8FCAA57CD336913498802E45 /* ggml-model-Q5_K_M.gguf in Resources */ = {isa = PBXBuildFile; fileRef = 8EB7EDA4E75C67B6FFD6F9B6 /* ggml-model-Q5_K_M.gguf */; };
 		9AE8B08BC605F7F8C6D7D6BF /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = FD84BA0A9E7DB8EC8968D9D1 /* InfoPlist.strings */; };
 		9D8C79D665B585F63D5695FF /* IMESandboxWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9289632F6594D9EE9A07926 /* IMESandboxWindow.swift */; };
@@ -77,6 +79,8 @@
 		AC5B60092B9315A5731AEF44 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		AED425059C465687B7765B08 /* InputSource@2x.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = "InputSource@2x.tiff"; sourceTree = "<group>"; };
 		AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
+		B2C3D4E5F60718293A4B5C02 /* CandidatePanelModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidatePanelModel.swift; sourceTree = "<group>"; };
+		C3D4E5F60718293A4B5C6D02 /* InputController+Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+Debug.swift"; sourceTree = "<group>"; };
 		B35A13234A024ED9F84F3147 /* SurroundingIMKContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundingIMKContext.swift; sourceTree = "<group>"; };
 		BC83CA0F9C13530D08702297 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		BE0A2E0B99A6B19E0BB84417 /* keynaco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = keynaco.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -117,8 +121,10 @@
 				19DE79F93A3BDB8CDBC90A08 /* AppDelegate.swift */,
 				443A77590841CE5845242FCF /* Assets.xcassets */,
 				AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */,
+				B2C3D4E5F60718293A4B5C02 /* CandidatePanelModel.swift */,
 				022B67AD4C0C026C0F7A0564 /* Info.plist */,
 				3A755C9097E561BF05FF3D11 /* InputController.swift */,
+				C3D4E5F60718293A4B5C6D02 /* InputController+Debug.swift */,
 				E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */,
 				8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */,
 				7D792FEB7E1E5625244BE8C4 /* InputSource.tiff */,
@@ -326,6 +332,7 @@
 			files = (
 				57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */,
 					8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
+				B2C3D4E5F60718293A4B5C01 /* CandidatePanelModel.swift in Sources */,
 				1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */,
 				A1B2C3D4E5F6071829ABCD01 /* DebugPOSClassifierV2.swift in Sources */,
 				D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */,
@@ -335,6 +342,7 @@
 				26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */,
 				9D8C79D665B585F63D5695FF /* IMESandboxWindow.swift in Sources */,
 				E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */,
+				C3D4E5F60718293A4B5C6D01 /* InputController+Debug.swift in Sources */,
 				E5F60718293A4B5C6D7E8F09 /* InputController+IMKAdapter.swift in Sources */,
 				7C3D2E1F4051627384A5B6C7 /* InputController+LLM.swift in Sources */,
 				9F5BA854FBF7AFBCE8215977 /* NSManualApplication.swift in Sources */,
