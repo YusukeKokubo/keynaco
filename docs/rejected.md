@@ -4,6 +4,28 @@
 
 ---
 
+## P-1 `.whileTyping` 短読み AzooKey スキップ（2026-06-12 不採用）
+
+**概要**: `collectCandidateSources` の入口で「`.whileTyping` かつ `composedHiragana.count <= 2`」のとき AzooKey を呼ばず空配列を返す。「かん」段階（2 文字）の AzooKey 呼び出しを省いて「かんじ」（3 文字）まで待つ狙い。
+
+**試みたこと**: `InputHandler+Candidates.swift` に 1 行追加。`swift test` で即座に 4 テスト失敗（`testTypingTwoVowelsAutoShowsDictionaryCandidates` / `testTypingShowsCandidatesWhenHistoryExists` / `testSnap_F6_ZenzaiFirstWithAutoShow` / `testSnap_F7_ZenzaiFirstAutoShowNoContext`）を確認してリバート。
+
+**不採用の理由**:
+
+- **2文字の単語が存在する**: `count <= 2` でスキップすると「あい」「かん」「いぬ」等の 2 文字完成語に対して AzooKey 候補がゼロになる。読みの長さだけでは「途中か完成か」を判定できない
+- **`needsRefresh` ゲートで既にコスト削減済み**: `addRomaji` は `composedHiragana.count >= 2` のときのみ `true` を返す。1 文字読みへの AzooKey 呼び出しはコード側が既に防いでいる。`count <= 1` のスキップは完全に no-op
+- **実効的な節約対象は2文字の1回だけ**: 「kanzi」の例で AzooKey 呼び出しは「かん」（2文字）と「かんじ」（3文字）の 2 回。スキップ可能なのは前者の1回だが、前述の理由でそれもできない
+
+**背景（Instruments 計測、2026-06-12）**:
+
+- AzooKey (`Kana2Kanji.kana2lattice`) は Main Thread CPU の 65%、Worker Thread の 72% を占有
+- その内部の `SetAlgebra.init(arr...)` が全体の約 40% ——これは AzooKey 内部なので keynaco 側からは変更不能
+- DB クエリ（`fetchHistoryScoredMerged` / `fetchUserDictCombined`）の時間は計測上ほぼゼロ
+
+**再検討するなら**: 「入力途中かどうか」を判定できる情報（`pendingRomaji` が空かどうか等）を組み合わせて条件を精緻化するか、非同期デバウンス（[IDEA260612](../ideas/IDEA260612.md) 案A）を使って AzooKey 呼び出し自体を遅延させる。ただし非同期化は `CandidateAction` の同期返却設計を変える必要があり、設計コストが高い。
+
+---
+
 ## O-1 1 モーラサジェスト（2026-06-05 削除）
 
 **概要**: `autoShow` で読みが 1 モーラ（小書き仮名除く主仮名 1 文字）のとき、セッション内 `recentCommits`（50 件）と起動時 DB warmload `frequentCommits`（20 件）の前方一致だけを候補に出す経路。助詞読みではひらがな row 0 固定＋過去語を下に並べる調整あり（2026-05-29）。
