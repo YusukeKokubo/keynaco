@@ -19,6 +19,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
         userDictRaw: [String] = [],
         highHistory: [String] = [],
         historyOutputSet: Set<String> = [],
+        exactMatchHistoryOutputs: Set<String> = [],
         zenzaiPromoted: String? = nil,
         fixedSlot: CandidateFixedSlot = .none,
         addsDefaultFixedHiragana: Bool = false
@@ -31,6 +32,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
             userDictRaw: userDictRaw,
             highHistory: highHistory,
             historyOutputSet: historyOutputSet,
+            exactMatchHistoryOutputs: exactMatchHistoryOutputs,
             zenzaiPromoted: zenzaiPromoted,
             fixedSlot: fixedSlot,
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
@@ -48,6 +50,33 @@ final class CandidateSectionBuilderTests: XCTestCase {
         let l = layout(from: input)
         XCTAssertEqual(l.candidates, ["Acme", "辞書B", "アイ"])
         XCTAssertEqual(l.candidates.filter { $0 == "Acme" }.count, 1)
+    }
+
+    func testExactMatchHistoryNotSuppressedFromAzooKeyWhenBeyondTopSlots() {
+        let input = baseInput(
+            reading: "かんじ",
+            hiragana: "かんじ",
+            azooKeyCandidates: ["漢字", "感じ", "完治"],
+            highHistory: ["漢字", "完治", "幹事"],
+            historyOutputSet: ["漢字", "完治", "幹事", "感じ"],
+            exactMatchHistoryOutputs: ["感じ"]
+        )
+        let l = layout(from: input)
+        XCTAssertTrue(l.candidates.contains("感じ"), "読み完全一致の履歴は辞書から除外しない")
+        XCTAssertEqual(l.candidates.filter { $0 == "漢字" }.count, 1, "履歴表示済みは辞書と重複しない")
+    }
+
+    func testPrefixOnlyHistoryStillSuppressedFromAzooKey() {
+        let input = baseInput(
+            reading: "かんじ",
+            hiragana: "かんじ",
+            azooKeyCandidates: ["漢字", "感じる"],
+            highHistory: ["漢字"],
+            historyOutputSet: ["漢字", "感じる"],
+            exactMatchHistoryOutputs: ["漢字"]
+        )
+        let l = layout(from: input)
+        XCTAssertFalse(l.candidates.contains("感じる"), "前方一致のみの履歴は辞書から除外する")
     }
 
     func testZenzaiTop1NotDuplicatedInAzooKey() {

@@ -78,6 +78,7 @@ extension InputHandler {
         let highHistory: [String]
         let highHistoryCount: Int
         let historyOutputSet: Set<String>
+        let exactMatchHistoryOutputs: Set<String>
     }
 
     private struct CandidateListSources {
@@ -88,6 +89,7 @@ extension InputHandler {
         let highHistoryCount: Int
         let zenzaiPromoted: String?
         let historyOutputSet: Set<String>
+        let exactMatchHistoryOutputs: Set<String>
     }
 
     private mutating func collectCandidateSources(
@@ -109,19 +111,31 @@ extension InputHandler {
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
         let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
+        let exactMatchHistoryOutputs = Set(db.fetchHistoryExact(reading: historyKey))
         var highHistory: [String] = []
         var historyOutputSet = Set<String>()
+        var seenInHighHistory = Set<String>()
         for row in historyScored {
             historyOutputSet.insert(row.output)
-            if row.score >= Self.historyRecencyScoreCutoff, highHistory.count < Self.maxHighHistoryCount {
+            if row.score >= Self.historyRecencyScoreCutoff,
+               highHistory.count < Self.maxHighHistoryCount,
+               seenInHighHistory.insert(row.output).inserted {
                 highHistory.append(row.output)
             }
+        }
+        // 読み完全一致の履歴は top3 枠外でも履歴欄に載せる（辞書側だけに落とさない）。
+        for row in historyScored {
+            guard exactMatchHistoryOutputs.contains(row.output),
+                  row.score >= Self.historyRecencyScoreCutoff,
+                  seenInHighHistory.insert(row.output).inserted else { continue }
+            highHistory.append(row.output)
         }
         return CheapCandidateSources(
             userDictRaw: userDictRaw,
             highHistory: highHistory,
             highHistoryCount: highHistory.count,
-            historyOutputSet: historyOutputSet
+            historyOutputSet: historyOutputSet,
+            exactMatchHistoryOutputs: exactMatchHistoryOutputs
         )
     }
 
@@ -156,7 +170,8 @@ extension InputHandler {
             highHistory: cheap.highHistory,
             highHistoryCount: cheap.highHistoryCount,
             zenzaiPromoted: zenzaiPromoted,
-            historyOutputSet: cheap.historyOutputSet
+            historyOutputSet: cheap.historyOutputSet,
+            exactMatchHistoryOutputs: cheap.exactMatchHistoryOutputs
         )
     }
 
@@ -235,6 +250,7 @@ extension InputHandler {
             userDictRaw: sources.userDictRaw,
             highHistory: sources.highHistory,
             historyOutputSet: sources.historyOutputSet,
+            exactMatchHistoryOutputs: sources.exactMatchHistoryOutputs,
             zenzaiPromoted: sources.zenzaiPromoted,
             fixedSlot: fixedSlot,
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,

@@ -89,6 +89,29 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(hist.contains("阿"), "候補選択→Enter 確定後に変換結果が履歴として記録されるはず")
     }
 
+    func testExactMatchHistoryShownBeyondTopThreeSlots() {
+        handler.db.record(input: "かんじ", output: "漢字")
+        handler.db.record(input: "かんじ", output: "漢字")
+        handler.db.record(input: "かんじ", output: "完治")
+        handler.db.record(input: "かんじ", output: "完治")
+        handler.db.record(input: "かんじ", output: "幹事")
+        handler.db.record(input: "かんじ", output: "感じ")
+
+        typeRomaji("kanzi")
+        let (_, action) = press(keyCode: 49)
+        guard let payload = action.showPayload else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(
+            payload.candidates.contains("感じ"),
+            "読み完全一致の履歴は top3 枠外でも候補に載るはず: \(payload.candidates)"
+        )
+        XCTAssertTrue(
+            payload.candidates.prefix(payload.historyEnd).contains("感じ"),
+            "履歴セクションに載るはず: \(payload.candidates.prefix(payload.historyEnd))"
+        )
+    }
+
     func testConversionHistoryBoostsNextConversion() {
         typeRomaji("toukyou")
         press(keyCode: 36, candidateVisible: true, selectedText: "東京")

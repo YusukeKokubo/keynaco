@@ -7,7 +7,10 @@ struct CandidateSectionBuildInput: Sendable {
     let azooKeyCandidates: [String]
     let userDictRaw: [String]
     let highHistory: [String]
+    /// `fetchHistoryScoredMerged` の全 output（固定ひらがな枠の重複判定用）。
     let historyOutputSet: Set<String>
+    /// 組成読み（marked ひらがな）と `input` が完全一致する履歴 output。
+    let exactMatchHistoryOutputs: Set<String>
     let zenzaiPromoted: String?
     let fixedSlot: CandidateFixedSlot
     let addsDefaultFixedHiragana: Bool
@@ -23,8 +26,15 @@ struct CandidateSectionBuildResult: Sendable {
 enum CandidateSectionBuilder {
     static func build(_ input: CandidateSectionBuildInput) -> CandidateSectionBuildResult {
         let allCandidatesSeen = input.historyOutputSet.union(Set(input.azooKeyCandidates))
-        let azooKeyUniq = input.azooKeyCandidates.filter {
-            !input.historyOutputSet.contains($0) && $0 != input.zenzaiPromoted
+        let azooKeyUniq = input.azooKeyCandidates.filter { candidate in
+            guard candidate != input.zenzaiPromoted else { return false }
+            if input.highHistory.contains(candidate) { return false }
+            // 前方一致のみの履歴は表示されないので辞書からも除外。読み完全一致は top3 外でも選べるよう残す。
+            if input.historyOutputSet.contains(candidate),
+               !input.exactMatchHistoryOutputs.contains(candidate) {
+                return false
+            }
+            return true
         }
 
         var sections: [CandidateSection] = []
