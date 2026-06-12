@@ -59,6 +59,26 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
         assertInjectPathMatchesSyncRich(stub: stub, trigger: .whileTyping)
         XCTAssertEqual(stub.lastRichCandidates, true)
     }
+
+    /// 打鍵中のかなプレースホルダ表示中に Space を押したら明示変換（辞書取得）へ昇格する。
+    func testDefer_spaceOnKanaPlaceholderUpgradesToExplicit() {
+        let stub = SnapStub(["低頻度", "定頻度"])
+        setUpWithConverter(stub)
+        handler.deferAzooKeyWhileTyping = true
+        typeRomaji("teihindo")
+        applyCandidateAction(handler.buildCandidateListWithoutAzooKey(trigger: .whileTyping).action)
+        XCTAssertEqual(handler.candidateSession.candidates, ["ていひんど", "テイヒンド"])
+        let ctx = handler.candidateSession.makeContext()
+        let (_, action) = handleAndApply(
+            keyCode: KeyCode.space, characters: " ", baseCharacters: " ", candidate: ctx
+        )
+        guard case .show(let show) = action else {
+            return XCTFail("expected .show from explicit upgrade, got \(action)")
+        }
+        XCTAssertTrue(show.candidates.contains("低頻度"),
+                      "Space on kana placeholder should fetch dictionary: \(show.candidates)")
+        XCTAssertTrue(show.initialIsExplicitlySelected)
+    }
 }
 
 extension InputHandlerTestCase {

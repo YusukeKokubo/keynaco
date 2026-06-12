@@ -42,6 +42,9 @@ extension InputHandler {
                 state.absorbPendingIntoComposed()
                 return (true, buildCandidateList(trigger: .explicit))
             }
+            if isAzooKeyPendingKanaPlaceholder(candidate) {
+                return (true, buildCandidateList(trigger: .explicit))
+            }
             return (true, .selectNext)
         case KeyCode.tab, KeyCode.downArrow:
             return (true, .selectNext)

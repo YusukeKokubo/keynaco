@@ -14,6 +14,15 @@ enum KanaUtils {
         scalar.value >= 0x30A1 && scalar.value <= 0x30F6
     }
 
+    /// CJK 統合漢字・拡張 A・々（AzooKey 残余フィルタと同じ範囲）。
+    static func containsCJKIdeograph(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            (0x4E00...0x9FFF).contains(scalar.value)
+                || (0x3400...0x4DBF).contains(scalar.value)
+                || scalar.value == 0x3005
+        }
+    }
+
     /// ひらがなと全角カタカナが混在する文字列かどうか（AzooKey が返す「きョ」等を除外するため）。
     static func isScriptMixed(_ text: String) -> Bool {
         var hasHiragana = false
