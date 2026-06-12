@@ -5,17 +5,14 @@ import XCTest
 // assembleCandidateList のリファクタ前後で候補リスト構造が変わっていないことを保証する。
 // PLAN260519 参照。
 
-final class SnapStub: BaseAzooKeyStub, @unchecked Sendable {
-    let lines: [String]
-    init(_ lines: [String], zenzai: Bool = false) {
-        self.lines = lines; super.init(); isZenzaiEnabled = zenzai
-    }
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] { lines }
-}
-
 final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
-    private func useStub(_ stub: SnapStub) { setUpWithConverter(stub) }
+    private var stub: SnapStub!
+
+    private func useStub(_ stub: SnapStub) {
+        self.stub = stub
+        setUpWithConverter(stub)
+    }
 
     private func assertLayout(
         _ action: CandidateAction,
@@ -39,6 +36,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B", "アイ"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_A2_OneHighHistory() {
@@ -48,6 +46,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛", "辞書A", "辞書B", "アイ"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_A3_ThreeHighHistories() {
@@ -61,6 +60,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛情", "愛媛", "愛知", "辞書A", "辞書B", "アイ"],
                      historyEnd: 3, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_A4_LowHistoryOnly() {
@@ -73,6 +73,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B", "アイ"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_A5_HighAndLowHistory() {
@@ -86,6 +87,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛", "辞書A", "辞書B", "アイ"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     // MARK: - C: hiraganaPreferred
@@ -96,6 +98,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "辞書A", "辞書B", "ノ"],
                      historyEnd: 1, fixedEnd: 1, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_C2_HiraganaPreferredWrongHistory() {
@@ -105,6 +108,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "ノックアウト", "辞書A", "辞書B", "ノ"],
                      historyEnd: 2, fixedEnd: 1, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_C3_HiraganaPreferredHiraganaInHistory() {
@@ -114,6 +118,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "辞書A", "辞書B", "ノ"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_C4_HiraganaPreferredWithUserDict() {
@@ -123,13 +128,10 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["とか", "UD戸籍", "辞書A", "辞書B", "トカ"],
                      historyEnd: 2, fixedEnd: 2, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     // MARK: - D: 長音符・小母音を含む読み（カタカナ先頭固定の特別扱いはしない）
-    //
-    // 以前は `foreignMarkers` ヒューリスティックで「ー」「ぁぃぅぇぉ」を含む読みを
-    // カタカナ先頭固定にしていたが、Zenzai/履歴ベースで十分なため削除。カタカナは
-    // 末尾の `.katakana` セクションで拾える（履歴ヒット時は履歴経路で先頭に来る）。
 
     func testSnap_D1_LongVowelNoHistory() {
         useStub(SnapStub(["辞書A", "辞書B"]))
@@ -141,6 +143,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B", "トータル"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_D2_LongVowelKatakanaInHistory() {
@@ -153,6 +156,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["トータル", "辞書A", "辞書B"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_D3_SmallVowelNoHistory() {
@@ -164,6 +168,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B", "ネイティブ"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     // MARK: - E: ユーザー辞書
@@ -175,6 +180,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "辞書A", "辞書B", "アイ"],
                      historyEnd: 1, fixedEnd: 1, initialRow: 1)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_E2_UserDictWithHighHistory() {
@@ -185,6 +191,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "愛", "辞書A", "辞書B", "アイ"],
                      historyEnd: 2, fixedEnd: 1, initialRow: 1)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_E3_UserDictDedupedWhenInAzooKey() {
@@ -194,6 +201,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "辞書B", "アイ"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     // MARK: - F: Zenzai top-1 プロモート
@@ -205,6 +213,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
                      historyEnd: 1, fixedEnd: 1, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_F2_ZenzaiNoContext() {
@@ -213,6 +222,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_F3_ZenzaiDisabled() {
@@ -222,6 +232,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_F4_ZenzaiTop1AlreadyInHistory() {
@@ -232,6 +243,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Zen先頭", "辞書B", "アイ"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_F5_ZenzaiWithUserDict() {
@@ -242,6 +254,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "Zen先頭", "辞書B", "アイ"],
                      historyEnd: 2, fixedEnd: 2, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_F6_ZenzaiFirstWithAutoShow() {
@@ -251,6 +264,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(trigger: .whileTyping),
                      candidates: ["Zen先頭", "あい", "辞書B", "アイ"],
                      historyEnd: 2, fixedEnd: 2, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
     }
 
     func testSnap_F7_ZenzaiFirstAutoShowNoContext() {
@@ -259,6 +273,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(trigger: .whileTyping),
                      candidates: ["あい", "Zen先頭", "辞書B", "アイ"],
                      historyEnd: 1, fixedEnd: 1, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
     }
 
     // MARK: - G: 数値・日時候補
@@ -271,6 +286,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["１２３４", "1,234", "１，２３４"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_G2_DateTimeCandidatesAtHistoryEnd() {
@@ -287,6 +303,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
                        "日時候補が先頭（historyEnd=0 の位置）から並ぶはず: \(p.candidates)")
         XCTAssertEqual(Array(p.candidates.suffix(3)), ["今日", "本日", "キョウ"],
                        "AzooKey 候補は日時候補の後ろ・カタカナは末尾: \(p.candidates)")
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     // MARK: - H: whileTyping
@@ -297,6 +314,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         guard case .dismiss = handler.buildCandidateList(trigger: .whileTyping) else {
             XCTFail("候補ゼロの whileTyping は .dismiss を返すはず"); return
         }
+        assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
     }
 
     func testSnap_H2_AutoShowShowsWithHistory() {
@@ -306,6 +324,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(trigger: .whileTyping),
                      candidates: ["愛", "アイ"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
     }
 
     // MARK: - I: 全セクション組み合わせ
@@ -323,6 +342,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "辞書A", "愛", "アイ"],
                      historyEnd: 3, fixedEnd: 2, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 
     func testSnap_I2_HiraganaPreferredWithZenzai() {
@@ -332,5 +352,6 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "Zen先頭", "ノ"],
                      historyEnd: 2, fixedEnd: 2, initialRow: 0)
+        assertInjectPathMatchesSync(stub: stub)
     }
 }

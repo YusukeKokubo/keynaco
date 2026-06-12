@@ -168,4 +168,65 @@ class InputHandlerTestCase: XCTestCase {
             XCTAssertTrue(list.contains(e), "候補に \(e) を含むはず。\(list)", file: file, line: line)
         }
     }
+
+    /// `buildCandidateList` と `withoutAzooKey` → `rebuildCandidateList` の結果が一致すること。
+    func assertInjectPathMatchesSync(
+        stub: any AzooKeyConverting,
+        trigger: CandidateListTrigger = .explicit,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let sync = handler.buildCandidateList(trigger: trigger)
+        let inject = injectPathAction(stub: stub, trigger: trigger, file: file, line: line)
+        assertCandidateActionEqual(sync, inject, file: file, line: line)
+    }
+
+    func assertCandidateActionEqual(
+        _ lhs: CandidateAction,
+        _ rhs: CandidateAction,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        switch (lhs, rhs) {
+        case (.dismiss, .dismiss), (.none, .none):
+            return
+        case let (.show(l), .show(r)):
+            XCTAssertEqual(l.candidates, r.candidates, "candidates", file: file, line: line)
+            XCTAssertEqual(l.historyEnd, r.historyEnd, "historyEnd", file: file, line: line)
+            XCTAssertEqual(l.fixedEnd, r.fixedEnd, "fixedEnd", file: file, line: line)
+            XCTAssertEqual(l.initialRow, r.initialRow, "initialRow", file: file, line: line)
+            XCTAssertEqual(l.zenzaiRow, r.zenzaiRow, "zenzaiRow", file: file, line: line)
+            XCTAssertEqual(
+                l.initialIsExplicitlySelected,
+                r.initialIsExplicitlySelected,
+                "initialIsExplicitlySelected",
+                file: file,
+                line: line
+            )
+        default:
+            XCTFail("Expected matching actions but got \(lhs) vs \(rhs)", file: file, line: line)
+        }
+    }
+
+    private func injectPathAction(
+        stub: any AzooKeyConverting,
+        trigger: CandidateListTrigger,
+        file: StaticString,
+        line: UInt
+    ) -> CandidateAction {
+        let (_, pending) = handler.buildCandidateListWithoutAzooKey(trigger: trigger)
+        guard let reading = pending else {
+            return handler.buildCandidateListWithoutAzooKey(trigger: trigger).action
+        }
+        let azooKey = stub.requestCandidates(
+            hiragana: reading,
+            leftSideContext: handler.leftContext.azooKeyValue,
+            richCandidates: trigger == .explicit
+        )
+        return handler.rebuildCandidateList(
+            reading: reading,
+            azooKeyCandidates: azooKey,
+            trigger: trigger
+        )
+    }
 }

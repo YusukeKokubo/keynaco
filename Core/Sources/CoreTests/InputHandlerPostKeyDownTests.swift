@@ -4,21 +4,23 @@ import XCTest
 
 final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
 
-    func testSkipsCandidateApplyWhenNotConsumedInProductionOverload() {
+    func testProductionOverloadAppliesCandidateActionWhenNotConsumed() {
         handler.candidateSession.apply(
-            .show(candidates: ["a"], historyEnd: 0, initialRow: 0, fixedEnd: 0)
+            .show(candidates: ["a", "b"], historyEnd: 0, initialRow: 0, fixedEnd: 0)
         )
+        var imkCache = handler.leftContextIMKCache
         handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,
             action: .selectNext,
             client: client,
             composedHiraganaWasEmpty: true,
             didInsertText: false,
-            imkCache: &handler.leftContextIMKCache,
+            imkCache: &imkCache,
             newIMKSnapshot: nil
         )
-        XCTAssertEqual(handler.candidateSession.selectedRow, 0)
-        XCTAssertFalse(handler.candidateSession.isExplicitlySelected)
+        handler.leftContextIMKCache = imkCache
+        XCTAssertEqual(handler.candidateSession.selectedRow, 1)
+        XCTAssertTrue(handler.candidateSession.isExplicitlySelected)
     }
 
     func testSandboxOverloadAlwaysAppliesCandidateAction() {
@@ -38,15 +40,17 @@ final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
 
     func testProductionOverloadMaintainsIMKCacheWhenInvalidatedWithoutConsumption() {
         handler.leftContextIMKCache = .invalidated
+        var imkCache = handler.leftContextIMKCache
         handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,
             action: .none,
             client: client,
             composedHiraganaWasEmpty: true,
             didInsertText: false,
-            imkCache: &handler.leftContextIMKCache,
+            imkCache: &imkCache,
             newIMKSnapshot: nil
         )
+        handler.leftContextIMKCache = imkCache
         XCTAssertNil(handler.leftContextIMKCache.snapshot)
         XCTAssertFalse(handler.leftContextIMKCache.isInvalidated)
     }

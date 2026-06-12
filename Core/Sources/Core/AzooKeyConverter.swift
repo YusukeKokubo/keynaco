@@ -60,6 +60,19 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return source.map(\.text)
     }
 
+    /// XCTest 並列実行時に学習メモリのファイル競合を避けるため、テスト中はインスタンスごとに隔離する。
+    private static func defaultMemoryURL() -> URL {
+        let appSupport = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first!
+            .appendingPathComponent("keynaco")
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("keynaco-tests-\(UUID().uuidString)", isDirectory: true)
+        }
+        return appSupport
+    }
+
     private static func clearLearningData(at url: URL) {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(atPath: url.path) else { return }
@@ -95,10 +108,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
         self.zenzaiEnabled = zenzaiEnabled
         self.zenzaiProfile = zenzaiProfile
         self.zenzaiInferenceLimit = max(1, min(zenzaiInferenceLimit, 50))
-        let memoryURL = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first!.appendingPathComponent("keynaco")
-        self.memoryURL = memoryURL
+        self.memoryURL = Self.defaultMemoryURL()
         try? FileManager.default.createDirectory(at: memoryURL, withIntermediateDirectories: true)
         if FileManager.default.fileExists(atPath: memoryURL.appendingPathComponent(".commit_lock").path) {
             Self.clearLearningData(at: memoryURL)

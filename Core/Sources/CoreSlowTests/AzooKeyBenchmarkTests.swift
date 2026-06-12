@@ -3,6 +3,7 @@ import XCTest
 
 /// AzooKey requestCandidates のレイテンシ計測テスト（Phase 0 判断用）。
 ///
+/// 実機 AzooKey を直列で使うため `KeynacoCoreSlowTests` に置く（fast 並列実行と競合しない）。
 /// `swift test -c release --filter AzooKeyBenchmarkTests` で Release 最適化ビルドで実行する。
 /// テスト結果は XCTFail にはならず、標準出力に統計を出力する。
 /// 判断基準: p95 が 16ms 以下 → 現状維持（案 C）、超える → Phase 1 へ進む。

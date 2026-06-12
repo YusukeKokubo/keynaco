@@ -29,6 +29,9 @@ extension InputHandler {
     }
 
     /// 非同期 AzooKey 結果の注入。`state.composedHiragana == reading` のときのみ有効。
+    ///
+    /// InputController は AzooKey タスク生成時に `trigger` をキャプチャして渡すこと
+    ///（コールバック時のデフォルト `.whileTyping` に頼らない）。
     public mutating func rebuildCandidateList(
         reading: String,
         azooKeyCandidates: [String],
