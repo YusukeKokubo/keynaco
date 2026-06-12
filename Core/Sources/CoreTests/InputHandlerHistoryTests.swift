@@ -94,7 +94,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         handler.db.record(input: "かんじ", output: "漢字")
         handler.db.record(input: "かんじ", output: "完治")
         handler.db.record(input: "かんじ", output: "完治")
-        handler.db.record(input: "かんじ", output: "幹事")
+        handler.db.record(input: "かんじる", output: "幹事")
         handler.db.record(input: "かんじ", output: "感じ")
 
         typeRomaji("kanzi")
@@ -110,6 +110,10 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
             payload.candidates.prefix(payload.historyEnd).contains("感じ"),
             "履歴セクションに載るはず: \(payload.candidates.prefix(payload.historyEnd))"
         )
+        if let otherIdx = payload.candidates.firstIndex(of: "幹事"),
+           let kanjiIdx = payload.candidates.firstIndex(of: "感じ") {
+            XCTAssertLessThan(kanjiIdx, otherIdx, "読み完全一致は前方一致のみの履歴より先に並ぶ")
+        }
     }
 
     func testConversionHistoryBoostsNextConversion() {

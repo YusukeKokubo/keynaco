@@ -6,6 +6,7 @@ struct CandidateSectionBuildInput: Sendable {
     let katakana: String
     let azooKeyCandidates: [String]
     let userDictRaw: [String]
+    let exactMatchHighHistory: [String]
     let highHistory: [String]
     /// `fetchHistoryScoredMerged` の全 output（固定ひらがな枠の重複判定用）。
     let historyOutputSet: Set<String>
@@ -26,9 +27,10 @@ struct CandidateSectionBuildResult: Sendable {
 enum CandidateSectionBuilder {
     static func build(_ input: CandidateSectionBuildInput) -> CandidateSectionBuildResult {
         let allCandidatesSeen = input.historyOutputSet.union(Set(input.azooKeyCandidates))
+        let allHighHistory = input.exactMatchHighHistory + input.highHistory
         let azooKeyUniq = input.azooKeyCandidates.filter { candidate in
             guard candidate != input.zenzaiPromoted else { return false }
-            if input.highHistory.contains(candidate) { return false }
+            if allHighHistory.contains(candidate) { return false }
             // 前方一致のみの履歴は表示されないので辞書からも除外。読み完全一致は top3 外でも選べるよう残す。
             if input.historyOutputSet.contains(candidate),
                !input.exactMatchHistoryOutputs.contains(candidate) {
@@ -38,8 +40,8 @@ enum CandidateSectionBuilder {
         }
 
         var sections: [CandidateSection] = []
-        var seen = Set<String>(minimumCapacity: input.highHistory.count + azooKeyUniq.count)
-        for item in input.highHistory { seen.insert(item) }
+        var seen = Set<String>(minimumCapacity: allHighHistory.count + azooKeyUniq.count)
+        for item in allHighHistory { seen.insert(item) }
         for item in azooKeyUniq { seen.insert(item) }
 
         if input.fixedSlot == .hiragana || input.addsDefaultFixedHiragana {
@@ -68,6 +70,10 @@ enum CandidateSectionBuilder {
             sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
         }
 
+        if !input.exactMatchHighHistory.isEmpty {
+            sections.append(CandidateSection(kind: .exactMatchHistory, items: input.exactMatchHighHistory))
+        }
+
         if !input.highHistory.isEmpty {
             sections.append(CandidateSection(kind: .highHistory, items: input.highHistory))
         }
@@ -80,9 +86,17 @@ enum CandidateSectionBuilder {
             sections.append(CandidateSection(kind: .katakana, items: [input.katakana]))
         }
 
-        let sectionOrder = input.addsDefaultFixedHiragana && input.zenzaiPromoted != nil
-            ? CandidateLayout.zenzaiFirstSectionOrder
-            : CandidateLayout.defaultSectionOrder
+        let hasExactMatchHistory = !input.exactMatchHighHistory.isEmpty
+        let sectionOrder: [CandidateSection.Kind]
+        if hasExactMatchHistory {
+            sectionOrder = input.addsDefaultFixedHiragana && input.zenzaiPromoted != nil
+                ? CandidateLayout.exactMatchZenzaiFirstSectionOrder
+                : CandidateLayout.exactMatchFirstSectionOrder
+        } else {
+            sectionOrder = input.addsDefaultFixedHiragana && input.zenzaiPromoted != nil
+                ? CandidateLayout.zenzaiFirstSectionOrder
+                : CandidateLayout.defaultSectionOrder
+        }
 
         return CandidateSectionBuildResult(sections: sections, sectionOrder: sectionOrder)
     }

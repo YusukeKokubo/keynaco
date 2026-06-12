@@ -5,7 +5,8 @@ struct CandidateSection: Sendable {
         case fixedHiragana  // ひらがな先頭固定（hiraganaPreferred 時）
         case userDict       // ユーザー辞書
         case zenzaiTop1     // Zenzai top-1 プロモート
-        case highHistory    // 高スコア履歴
+        case exactMatchHistory // 読み完全一致の履歴（Zenzai より優先）
+        case highHistory    // 前方一致などその他の高スコア履歴
         case number         // 数値変換
         case dateTime       // 日時変換
         case azooKeyDict    // AzooKey 辞書候補
@@ -45,9 +46,20 @@ struct CandidateLayout: Sendable {
     let historyEnd: Int
     let initialRow: Int
 
-    private static let fixedSectionKinds: Set<CandidateSection.Kind> = [
+    private static let defaultFixedSectionKinds: Set<CandidateSection.Kind> = [
         .fixedHiragana, .userDict, .zenzaiTop1,
     ]
+
+    /// 読み完全一致履歴を Zenzai より前に出す並びでは Zenzai を固定枠に含めない（履歴と Shift+Delete 境界を壊さないため）。
+    private static let exactMatchFirstFixedSectionKinds: Set<CandidateSection.Kind> = [
+        .fixedHiragana, .userDict,
+    ]
+
+    private static func fixedSectionKinds(for sectionOrder: [CandidateSection.Kind]) -> Set<CandidateSection.Kind> {
+        sectionOrder.contains(.exactMatchHistory)
+            ? exactMatchFirstFixedSectionKinds
+            : defaultFixedSectionKinds
+    }
 
     static let defaultSectionOrder: [CandidateSection.Kind] = [
         .fixedHiragana,
@@ -66,6 +78,29 @@ struct CandidateLayout: Sendable {
         .fixedHiragana,
         .highHistory,
         .number, .dateTime,
+        .azooKeyDict,
+        .katakana,
+    ]
+
+    /// 読み完全一致の履歴あり。Zenzai より先に exact / その他履歴を出す。
+    static let exactMatchFirstSectionOrder: [CandidateSection.Kind] = [
+        .fixedHiragana,
+        .userDict,
+        .exactMatchHistory,
+        .highHistory,
+        .number, .dateTime,
+        .zenzaiTop1,
+        .azooKeyDict,
+        .katakana,
+    ]
+
+    static let exactMatchZenzaiFirstSectionOrder: [CandidateSection.Kind] = [
+        .exactMatchHistory,
+        .userDict,
+        .fixedHiragana,
+        .highHistory,
+        .number, .dateTime,
+        .zenzaiTop1,
         .azooKeyDict,
         .katakana,
     ]
@@ -90,10 +125,10 @@ struct CandidateLayout: Sendable {
             for item in items where seen.insert(item).inserted {
                 result.append(item)
             }
-            if Self.fixedSectionKinds.contains(kind) {
+            if Self.fixedSectionKinds(for: sectionOrder).contains(kind) {
                 fixedEndAcc = result.count
             }
-            if kind == .highHistory, historyEndAcc == nil {
+            if kind == .exactMatchHistory || kind == .highHistory {
                 historyEndAcc = result.count
             }
         }

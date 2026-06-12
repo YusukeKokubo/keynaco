@@ -17,6 +17,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
         hiragana: String = "あい",
         azooKeyCandidates: [String] = ["辞書A", "辞書B"],
         userDictRaw: [String] = [],
+        exactMatchHighHistory: [String] = [],
         highHistory: [String] = [],
         historyOutputSet: Set<String> = [],
         exactMatchHistoryOutputs: Set<String> = [],
@@ -30,6 +31,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
             katakana: KanaUtils.hiraganaToKatakana(hiragana),
             azooKeyCandidates: azooKeyCandidates,
             userDictRaw: userDictRaw,
+            exactMatchHighHistory: exactMatchHighHistory,
             highHistory: highHistory,
             historyOutputSet: historyOutputSet,
             exactMatchHistoryOutputs: exactMatchHistoryOutputs,
@@ -57,13 +59,29 @@ final class CandidateSectionBuilderTests: XCTestCase {
             reading: "かんじ",
             hiragana: "かんじ",
             azooKeyCandidates: ["漢字", "感じ", "完治"],
+            exactMatchHighHistory: ["感じ"],
             highHistory: ["漢字", "完治", "幹事"],
             historyOutputSet: ["漢字", "完治", "幹事", "感じ"],
             exactMatchHistoryOutputs: ["感じ"]
         )
         let l = layout(from: input)
-        XCTAssertTrue(l.candidates.contains("感じ"), "読み完全一致の履歴は辞書から除外しない")
+        XCTAssertEqual(l.candidates.firstIndex(of: "感じ"), 0, "読み完全一致の履歴は先頭に出る")
         XCTAssertEqual(l.candidates.filter { $0 == "漢字" }.count, 1, "履歴表示済みは辞書と重複しない")
+    }
+
+    func testExactMatchHistoryPlacedBeforeZenzai() {
+        let input = baseInput(
+            reading: "かんじ",
+            hiragana: "かんじ",
+            azooKeyCandidates: ["Zen先頭", "漢字"],
+            exactMatchHighHistory: ["感じ"],
+            highHistory: ["漢字"],
+            zenzaiPromoted: "Zen先頭"
+        )
+        let built = CandidateSectionBuilder.build(input)
+        XCTAssertEqual(built.sectionOrder, CandidateLayout.exactMatchFirstSectionOrder)
+        let l = layout(from: input)
+        XCTAssertLessThan(l.candidates.firstIndex(of: "感じ")!, l.candidates.firstIndex(of: "Zen先頭")!)
     }
 
     func testPrefixOnlyHistoryStillSuppressedFromAzooKey() {

@@ -75,6 +75,7 @@ extension InputHandler {
 
     private struct CheapCandidateSources {
         let userDictRaw: [String]
+        let exactMatchHighHistory: [String]
         let highHistory: [String]
         let highHistoryCount: Int
         let historyOutputSet: Set<String>
@@ -85,6 +86,7 @@ extension InputHandler {
         let h: String
         let azooKeyCandidates: [String]
         let userDictRaw: [String]
+        let exactMatchHighHistory: [String]
         let highHistory: [String]
         let highHistoryCount: Int
         let zenzaiPromoted: String?
@@ -112,28 +114,31 @@ extension InputHandler {
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
         let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
         let exactMatchHistoryOutputs = Set(db.fetchHistoryExact(reading: historyKey))
+        var exactMatchHighHistory: [String] = []
         var highHistory: [String] = []
         var historyOutputSet = Set<String>()
-        var seenInHighHistory = Set<String>()
+        var seenExact = Set<String>()
+        var seenOther = Set<String>()
         for row in historyScored {
             historyOutputSet.insert(row.output)
             if row.score >= Self.historyRecencyScoreCutoff,
-               highHistory.count < Self.maxHighHistoryCount,
-               seenInHighHistory.insert(row.output).inserted {
-                highHistory.append(row.output)
+               exactMatchHistoryOutputs.contains(row.output),
+               seenExact.insert(row.output).inserted {
+                exactMatchHighHistory.append(row.output)
             }
         }
-        // 読み完全一致の履歴は top3 枠外でも履歴欄に載せる（辞書側だけに落とさない）。
         for row in historyScored {
-            guard exactMatchHistoryOutputs.contains(row.output),
-                  row.score >= Self.historyRecencyScoreCutoff,
-                  seenInHighHistory.insert(row.output).inserted else { continue }
+            guard row.score >= Self.historyRecencyScoreCutoff,
+                  !exactMatchHistoryOutputs.contains(row.output),
+                  highHistory.count < Self.maxHighHistoryCount,
+                  seenOther.insert(row.output).inserted else { continue }
             highHistory.append(row.output)
         }
         return CheapCandidateSources(
             userDictRaw: userDictRaw,
+            exactMatchHighHistory: exactMatchHighHistory,
             highHistory: highHistory,
-            highHistoryCount: highHistory.count,
+            highHistoryCount: exactMatchHighHistory.count + highHistory.count,
             historyOutputSet: historyOutputSet,
             exactMatchHistoryOutputs: exactMatchHistoryOutputs
         )
@@ -167,6 +172,7 @@ extension InputHandler {
             h: h,
             azooKeyCandidates: azooKeyCandidates,
             userDictRaw: cheap.userDictRaw,
+            exactMatchHighHistory: cheap.exactMatchHighHistory,
             highHistory: cheap.highHistory,
             highHistoryCount: cheap.highHistoryCount,
             zenzaiPromoted: zenzaiPromoted,
@@ -231,7 +237,8 @@ extension InputHandler {
 
         let hiragana = state.composedHiragana
         let katakana = KanaUtils.hiraganaToKatakana(hiragana)
-        let hiraganaInHistory = sources.highHistory.contains(hiragana)
+        let hiraganaInHistory = sources.exactMatchHighHistory.contains(hiragana)
+            || sources.highHistory.contains(hiragana)
         let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
 
         let addsDefaultFixedHiragana = shouldAddDefaultFixedHiragana(
@@ -248,6 +255,7 @@ extension InputHandler {
             katakana: katakana,
             azooKeyCandidates: sources.azooKeyCandidates,
             userDictRaw: sources.userDictRaw,
+            exactMatchHighHistory: sources.exactMatchHighHistory,
             highHistory: sources.highHistory,
             historyOutputSet: sources.historyOutputSet,
             exactMatchHistoryOutputs: sources.exactMatchHistoryOutputs,
@@ -265,7 +273,8 @@ extension InputHandler {
                 fixedSlot: fixedSlot,
                 hiraganaInHistory: hiraganaInHistory,
                 addsDefaultFixedHiragana: addsDefaultFixedHiragana,
-                zenzaiPromoted: sources.zenzaiPromoted
+                zenzaiPromoted: sources.zenzaiPromoted,
+                exactMatchHighHistory: sources.exactMatchHighHistory
             ))
         )
         guard !layout.candidates.isEmpty else { return .dismiss }

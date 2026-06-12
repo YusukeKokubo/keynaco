@@ -8,14 +8,16 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         fixedSlot: CandidateFixedSlot = .none,
         hiraganaInHistory: Bool = false,
         addsDefaultFixedHiragana: Bool = false,
-        zenzaiPromoted: String? = nil
+        zenzaiPromoted: String? = nil,
+        exactMatchHighHistory: [String] = []
     ) -> InitialRowPolicy {
         InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
             reading: reading,
             fixedSlot: fixedSlot,
             hiraganaInHistory: hiraganaInHistory,
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
-            zenzaiPromoted: zenzaiPromoted
+            zenzaiPromoted: zenzaiPromoted,
+            exactMatchHighHistory: exactMatchHighHistory
         ))
     }
 
@@ -50,5 +52,12 @@ final class InitialRowPolicyResolverTests: XCTestCase {
 
     func testAfterFixedDefault() {
         XCTAssertEqual(resolve(), .afterFixed)
+    }
+
+    func testExactMatchHistoryOverridesZenzai() {
+        XCTAssertEqual(
+            resolve(zenzaiPromoted: "Zen", exactMatchHighHistory: ["感じ"]),
+            .firstMatching("感じ")
+        )
     }
 }

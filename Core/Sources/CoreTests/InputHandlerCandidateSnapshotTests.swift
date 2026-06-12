@@ -340,8 +340,8 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["UD合い", "辞書A", "愛", "アイ"],
-                     historyEnd: 3, fixedEnd: 2, initialRow: 0)
+                     candidates: ["UD合い", "愛", "辞書A", "アイ"],
+                     historyEnd: 2, fixedEnd: 1, initialRow: 1)
         assertInjectPathMatchesSync(stub: stub)
     }
 
