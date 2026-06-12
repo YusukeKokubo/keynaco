@@ -23,6 +23,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     private var serverFd: Int32 = -1
     var handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: ZenzaiSettings.makeConverter())
+    let azooKeyScheduler = AzooKeyAsyncScheduler()
     /// 本番 InputController の変換 converter とロック競合しないよう Debug 専用インスタンスを使う。
     let posLookupConverter = AzooKeyConverter()
     let mockClient = SocketMockClient()
@@ -33,7 +34,9 @@ final class DebugSocketServer: @unchecked Sendable {
     /// `deinit` から参照するため `nonisolated(unsafe)`。書き込みは MainActor のみ。
     nonisolated(unsafe) var snapshotURL: URL?
 
-    private init() {}
+    private init() {
+        handler.deferAzooKeyWhileTyping = true
+    }
 
     deinit {
         Self.removeSnapshotArtifacts(baseURL: snapshotURL)
@@ -108,9 +111,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 guard !lineData.isEmpty else { continue }
 
                 // Data（Sendable）を MainActor に渡し、String（Sendable）を受け取る
-                let responseJSON = await MainActor.run { [self] in
-                    self.processAndSerialize(lineData)
-                }
+                let responseJSON = await processAndSerializeAsync(lineData)
 
                 await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
                     DispatchQueue.global(qos: .utility).async {
@@ -126,9 +127,10 @@ final class DebugSocketServer: @unchecked Sendable {
 
     // MARK: - コマンド処理（MainActor 上で実行）
 
-    private func processAndSerialize(_ lineData: Data) -> String {
+    @MainActor
+    private func processAndSerializeAsync(_ lineData: Data) async -> String {
         let cmd = (try? JSONSerialization.jsonObject(with: lineData) as? [String: Any]) ?? [:]
-        let dict = Self.withProtocolMetadata(processCommand(cmd))
+        let dict = Self.withProtocolMetadata(await processCommandAsync(cmd))
         guard let data = try? JSONSerialization.data(withJSONObject: dict),
               let str = String(data: data, encoding: .utf8) else { return #"{"error":"serialization"}"# }
         return str
@@ -758,7 +760,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let knownCommandKeys: Set<String> = [
         "reset", "state", "get_log", "annotate",
-        "wait_until", "assert_eventually", "seed_history",
+        "wait_until", "wait_azoo_key", "assert_eventually", "seed_history",
         "set_surrounding", "set_left_context",
         "benchmark",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
@@ -1002,7 +1004,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     // MARK: - コマンド処理（MainActor 上で実行）
 
-    func processCommand(_ cmd: [String: Any]) -> [String: Any] {
+    func processCommandAsync(_ cmd: [String: Any]) async -> [String: Any] {
         if cmd["schema"] != nil {
             return Self.schemaResponse(cmd: cmd)
         }
@@ -1014,6 +1016,7 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["lint_suite"] is [[String: Any]] { return handleLintSuite(cmd: cmd) }
         if cmd["wait_until"] is [String: Any] { return handleWaitUntil(cmd: cmd) }
         if cmd["assert_eventually"] is [String: Any] { return handleAssertEventually(cmd: cmd) }
+        if cmd["wait_azoo_key"] != nil { return await handleWaitAzooKeyAsync(cmd: cmd) }
         if cmd["seed_history"] is [String: Any] { return handleSeedHistory(cmd: cmd) }
         if cmd["query_pos"] is [Any] { return handleQueryPos(cmd: cmd) }
         if cmd["pos_availability"] != nil { return handlePosAvailability(cmd: cmd) }
@@ -1021,10 +1024,10 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
         if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
         if cmd["benchmark"] is [String: Any] { return handleBenchmark(cmd: cmd) }
-        if cmd["test_suite"] is [[String: Any]] { return handleTestSuite(cmd: cmd) }
-        if cmd["sequence"] is [[String: Any]] { return handleSequence(cmd: cmd) }
-        if cmd["type_string"] is String { return handleTypeString(cmd: cmd) }
-        if cmd["key"] is String { return handleKey(cmd: cmd) }
+        if cmd["test_suite"] is [[String: Any]] { return await handleTestSuite(cmd: cmd) }
+        if cmd["sequence"] is [[String: Any]] { return await handleSequence(cmd: cmd) }
+        if cmd["type_string"] is String { return await handleTypeString(cmd: cmd) }
+        if cmd["key"] is String { return await handleKey(cmd: cmd) }
         return handleKeyEvent(cmd: cmd)
     }
 
@@ -1058,6 +1061,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 historyEnd: snap.historyEnd,
                 zenzaiRow: handler.candidateSession.zenzaiRow
             ),
+            "pendingAzooKey":     azooKeyScheduler.hasPendingWork,
         ]
         if let st = snap.selectedText { dict["selectedText"] = st }
         return dict

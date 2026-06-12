@@ -1,0 +1,59 @@
+import Cocoa
+import KeynacoCore
+import InputMethodKit
+
+extension InputController {
+
+    func cancelAzooKeyAsyncWork() {
+        azooKeyScheduler.cancelPendingWork()
+    }
+
+    func scheduleAzooKeyReplacementIfNeeded(
+        generation: Int,
+        consumed: Bool,
+        adapter: IMKTextInputAdapter
+    ) {
+        guard consumed, let reading = handler.pendingAzooKeyReading else { return }
+        let leftContext = handler.leftContext.azooKeyValue
+        let converter = handler.azooKeyConverter
+        azooKeyScheduler.schedule(
+            generation: generation,
+            reading: reading,
+            leftSideContext: leftContext,
+            converter: converter
+        ) { [weak self] candidates in
+            guard let self else { return }
+            self.applyAsyncAzooKeyResult(
+                generation: generation,
+                reading: reading,
+                candidates: candidates,
+                adapter: adapter
+            )
+        }
+    }
+
+    private func applyAsyncAzooKeyResult(
+        generation: Int,
+        reading: String,
+        candidates: [String],
+        adapter: IMKTextInputAdapter
+    ) {
+        guard azooKeyScheduler.candidateGeneration == generation else { return }
+        guard handler.state.composedHiragana == reading else { return }
+        guard !handler.candidateSession.isExplicitlySelected else { return }
+        guard handler.state.isComposing else { return }
+
+        let action = handler.rebuildCandidateList(
+            reading: reading,
+            azooKeyCandidates: candidates,
+            trigger: .whileTyping
+        )
+        if case .none = action { return }
+        applyAsyncAzooKeyCandidateAction(action: action, adapter: adapter)
+    }
+
+    func applyAsyncAzooKeyCandidateAction(action: CandidateAction, adapter: IMKTextInputAdapter) {
+        handler.candidateSession.apply(action)
+        applyCandidateWindowEffects(action: action, adapter: adapter)
+    }
+}

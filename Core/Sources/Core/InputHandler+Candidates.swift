@@ -15,6 +15,16 @@ extension InputHandler {
         buildCandidateListInternal(forReading: nil, trigger: trigger)
     }
 
+    /// `deferAzooKeyWhileTyping` が有効な `.whileTyping` だけ AzooKey を遅延し `pendingAzooKeyReading` をセットする。
+    mutating func buildCandidateListForTrigger(_ trigger: CandidateListTrigger) -> CandidateAction {
+        if trigger == .whileTyping, deferAzooKeyWhileTyping {
+            let (action, pending) = buildCandidateListWithoutAzooKey(trigger: trigger)
+            notePendingAzooKeyReading(pending)
+            return action
+        }
+        return buildCandidateList(trigger: trigger)
+    }
+
     /// AzooKey を呼ばず安価ソースだけで候補を組み立てる。
     /// AzooKey が必要な読み（非 ASCII かつ非空）なら `pendingReading` に読みを返す。
     public mutating func buildCandidateListWithoutAzooKey(

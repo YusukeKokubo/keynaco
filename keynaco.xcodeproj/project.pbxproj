@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		1E56EE2F7C8423BCA958B85A /* DebugSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C24D0073941540F51238C4 /* DebugSocketServer.swift */; };
 		D0A1B2C3D4E5F60718293A01 /* DebugSocketServer+Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */; };
+		A260612F60718293A4B5C6D05 /* DebugSocketServer+AzooKeyAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A260612F60718293A4B5C6D06 /* DebugSocketServer+AzooKeyAsync.swift */; };
+		A260612F60718293A4B5C6D01 /* AzooKeyAsyncScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A260612F60718293A4B5C6D02 /* AzooKeyAsyncScheduler.swift */; };
+		A260612F60718293A4B5C6D03 /* InputController+AzooKeyAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A260612F60718293A4B5C6D04 /* InputController+AzooKeyAsync.swift */; };
 		A1B2C3D4E5F6071829ABCD01 /* DebugPOSClassifierV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */; };
 		D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */; };
 		D0A1B2C3D4E5F60718293A05 /* SocketMockClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */; };
@@ -58,6 +61,9 @@
 		19DE79F93A3BDB8CDBC90A08 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		312B6C32AF05015A07740280 /* .gitattributes */ = {isa = PBXFileReference; path = .gitattributes; sourceTree = "<group>"; };
 		3A755C9097E561BF05FF3D11 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
+		A260612F60718293A4B5C6D02 /* AzooKeyAsyncScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyAsyncScheduler.swift; sourceTree = "<group>"; };
+		A260612F60718293A4B5C6D04 /* InputController+AzooKeyAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+AzooKeyAsync.swift"; sourceTree = "<group>"; };
+		A260612F60718293A4B5C6D06 /* DebugSocketServer+AzooKeyAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+AzooKeyAsync.swift"; sourceTree = "<group>"; };
 		8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+LLM.swift"; sourceTree = "<group>"; };
 		E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+IMKAdapter.swift"; sourceTree = "<group>"; };
 		4318ADEBBCDD0DFDD3DA6056 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -123,7 +129,9 @@
 				AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */,
 				B2C3D4E5F60718293A4B5C02 /* CandidatePanelModel.swift */,
 				022B67AD4C0C026C0F7A0564 /* Info.plist */,
+				A260612F60718293A4B5C6D02 /* AzooKeyAsyncScheduler.swift */,
 				3A755C9097E561BF05FF3D11 /* InputController.swift */,
+				A260612F60718293A4B5C6D04 /* InputController+AzooKeyAsync.swift */,
 				C3D4E5F60718293A4B5C6D02 /* InputController+Debug.swift */,
 				E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */,
 				8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */,
@@ -206,6 +214,7 @@
 			children = (
 				A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */,
 				D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */,
+				A260612F60718293A4B5C6D06 /* DebugSocketServer+AzooKeyAsync.swift */,
 				D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */,
 				65C24D0073941540F51238C4 /* DebugSocketServer.swift */,
 				C9289632F6594D9EE9A07926 /* IMESandboxWindow.swift */,
@@ -341,8 +350,11 @@
 				1FEE62AC67AF46B79608E006 /* HiraganaPreferredViewController.swift in Sources */,
 				26C771D4B3E9D9C5DFF4D044 /* HistoryViewController.swift in Sources */,
 				9D8C79D665B585F63D5695FF /* IMESandboxWindow.swift in Sources */,
+				A260612F60718293A4B5C6D01 /* AzooKeyAsyncScheduler.swift in Sources */,
 				E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */,
+				A260612F60718293A4B5C6D03 /* InputController+AzooKeyAsync.swift in Sources */,
 				C3D4E5F60718293A4B5C6D01 /* InputController+Debug.swift in Sources */,
+				A260612F60718293A4B5C6D05 /* DebugSocketServer+AzooKeyAsync.swift in Sources */,
 				E5F60718293A4B5C6D7E8F09 /* InputController+IMKAdapter.swift in Sources */,
 				7C3D2E1F4051627384A5B6C7 /* InputController+LLM.swift in Sources */,
 				9F5BA854FBF7AFBCE8215977 /* NSManualApplication.swift in Sources */,

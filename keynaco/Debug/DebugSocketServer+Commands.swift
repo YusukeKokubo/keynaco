@@ -8,6 +8,7 @@ import InputMethodKit
 extension DebugSocketServer {
     func handleReset(cmd: [String: Any]) -> [String: Any] {
     cleanupSnapshot()
+    cancelAzooKeyAsyncWork()
     let useRealDB = cmd["useRealDB"] as? Bool ?? false
     let converter = ZenzaiSettings.makeConverter()
     if useRealDB {
@@ -15,6 +16,7 @@ extension DebugSocketServer {
     } else {
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
     }
+    handler.deferAzooKeyWhileTyping = true
     InputHandler.isAsciiMode = false
     handler.candidateSession.reset()
     mockClient.reset()
@@ -101,7 +103,7 @@ extension DebugSocketServer {
     return finalizeLeftContextCommand(cmd: cmd)
     }
 
-    func handleTestSuite(cmd: [String: Any]) -> [String: Any] {
+    func handleTestSuite(cmd: [String: Any]) async -> [String: Any] {
     let suite = cmd["test_suite"] as! [[String: Any]]
     let defaultUseRealDB = cmd["useRealDB"] as? Bool ?? false
     let globalVars = cmd["vars"] as? [String: Any] ?? [:]
@@ -116,7 +118,7 @@ extension DebugSocketServer {
         let scenarioStart = Date()
         let name = scenario["name"] as? String ?? "scenario_\(idx + 1)"
         let useRealDB = scenario["useRealDB"] as? Bool ?? defaultUseRealDB
-        _ = processCommand(["reset": true, "useRealDB": useRealDB])
+        _ = await processCommandAsync(["reset": true, "useRealDB": useRealDB])
 
         guard let cmds = scenario["cmds"] as? [[String: Any]] else {
             scenarios.append([
@@ -159,7 +161,7 @@ extension DebugSocketServer {
             for (k, v) in localVars { scenarioVars[k] = v }
         }
         if !scenarioVars.isEmpty { seqCmd["vars"] = scenarioVars }
-        let seqResult = processCommand(seqCmd)
+        let seqResult = await processCommandAsync(seqCmd)
         let steps = seqResult["steps"] as? [[String: Any]] ?? []
         let failedSteps = steps.filter { $0["assertion_failed"] != nil }.count
         let last = seqResult["last"] as? [String: Any] ?? [:]
@@ -320,7 +322,7 @@ extension DebugSocketServer {
     return Self.finalize(["results": scenarios, "summary": summary], cmd: cmd)
     }
 
-    func handleSequence(cmd: [String: Any]) -> [String: Any] {
+    func handleSequence(cmd: [String: Any]) async -> [String: Any] {
     let seq = cmd["sequence"] as! [[String: Any]]
     let fields     = cmd["fields"]     as? [String]
     let assertions = cmd["assert"]     as? [String: Any]
@@ -344,7 +346,7 @@ extension DebugSocketServer {
         }
         let captureSpec = resolvedStep["capture"]
         resolvedStep.removeValue(forKey: "capture")
-        var result = processCommand(resolvedStep)
+        var result = await processCommandAsync(resolvedStep)
         let captured = Self.applyCapture(captureSpec, from: result, vars: &vars)
         if !captured.isEmpty {
             result["captured"] = captured
@@ -365,7 +367,7 @@ extension DebugSocketServer {
     return Self.applyDescribe(["steps": filteredSteps, "last": filteredLast, "vars": vars], describe: cmd["describe"])
     }
 
-    func handleTypeString(cmd: [String: Any]) -> [String: Any] {
+    func handleTypeString(cmd: [String: Any]) async -> [String: Any] {
     let text = cmd["type_string"] as! String
     let fields     = cmd["fields"]     as? [String]
     let assertions = cmd["assert"]     as? [String: Any]
@@ -374,10 +376,10 @@ extension DebugSocketServer {
     var steps: [[String: Any]] = []
     for ch in text {
         let s = String(ch)
-        steps.append(processCommand(["keyCode": 0, "chars": s, "base": s, "mods": 0]))
+        steps.append(await processCommandAsync(["keyCode": 0, "chars": s, "base": s, "mods": 0]))
     }
     if let thenKey = cmd["then"] as? String {
-        steps.append(processCommand(["key": thenKey, "mods": cmd["mods"] ?? 0]))
+        steps.append(await processCommandAsync(["key": thenKey, "mods": cmd["mods"] ?? 0]))
     }
     var result = Self.applyAssert(
         Self.applyFields(steps.last ?? [:], fields: fields),
@@ -394,7 +396,7 @@ extension DebugSocketServer {
     return Self.applyDescribe(result, describe: cmd["describe"])
     }
 
-    func handleKey(cmd: [String: Any]) -> [String: Any] {
+    func handleKey(cmd: [String: Any]) async -> [String: Any] {
     let keyName = cmd["key"] as! String
     guard let (resolvedKeyCode, resolvedChars) = Self.namedKeys[keyName] else {
         return Self.finalize(
@@ -418,7 +420,7 @@ extension DebugSocketServer {
     expanded["chars"]   = resolvedChars
     expanded["base"]    = resolvedChars
     expanded["mods"]    = mods.rawValue
-    return processCommand(expanded)
+    return await processCommandAsync(expanded)
     }
 
     func handleKeyEvent(cmd: [String: Any]) -> [String: Any] {
@@ -456,6 +458,7 @@ extension DebugSocketServer {
         && pendingRomajiWasEmpty
     ) ? handler.lastConfirmedContext?.output : nil
     syncLeftSideContext()
+    let generation = azooKeyScheduler.onKeyDown()
     let before = makeResponse(inserted: [])
     let (consumed, action) = handler.handle(
     keyCode: keyCode,
@@ -479,6 +482,7 @@ extension DebugSocketServer {
         composedHiraganaWasEmpty: composedHiraganaWasEmpty,
         didInsertText: mockClient.hasPendingInsertions
     )
+    scheduleSandboxAzooKeyIfNeeded(generation: generation, consumed: consumed)
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
         let reading = handler.lastConfirmedContext?.input ?? handler.lastCommittedReading ?? ""

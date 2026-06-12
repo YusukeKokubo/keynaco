@@ -93,7 +93,7 @@ public extension InputHandler {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         else { flushPendingRomaji() }
         state.composedHiragana += chars
-        return (true, buildCandidateList(trigger: .whileTyping))
+        return (true, buildCandidateListForTrigger(.whileTyping))
     }
 
     private mutating func handleNonAsciiChar(
@@ -117,7 +117,7 @@ public extension InputHandler {
               && state.composedHiragana.allSatisfy({ $0.isASCII }) else { return nil }
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         state.composedHiragana += chars
-        return (true, buildCandidateList(trigger: .whileTyping))
+        return (true, buildCandidateListForTrigger(.whileTyping))
     }
 
     private mutating func handleRomaji(
@@ -130,7 +130,7 @@ public extension InputHandler {
             lastCommittedOutput != nil && !state.composedHiragana.isEmpty
         let candidateAction: CandidateAction
         if needsRefresh || shouldRefreshWhileTypingAfterCommit {
-            candidateAction = buildCandidateList(trigger: .whileTyping)
+            candidateAction = buildCandidateListForTrigger(.whileTyping)
         } else {
             candidateAction = .dismiss
         }

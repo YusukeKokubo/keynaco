@@ -154,6 +154,18 @@ public struct InputHandler {
     /// | **set `true`** | `InputController.activateServer` のみ |
     /// | **clear `false`** | 英数/かなキーで echo 抑制消費時（`handleModeSwitchKey`）、それ以外の任意キー（`handle()` 本流） |
     public var ignoreNextModeSwitch = false
+    /// 本番 `InputController` のみ `true`。`.whileTyping` で AzooKey を同期呼ばず `pendingAzooKeyReading` を返す。
+    public var deferAzooKeyWhileTyping = false
+    /// 直近 `handle()` の AzooKey 非同期取得対象読み（`deferAzooKeyWhileTyping` 有効時のみ非 nil になり得る）。
+    public private(set) var pendingAzooKeyReading: String?
+
+    mutating func clearPendingAzooKeyReading() {
+        pendingAzooKeyReading = nil
+    }
+
+    mutating func notePendingAzooKeyReading(_ reading: String?) {
+        pendingAzooKeyReading = reading
+    }
     public var bracketCandidates: [String]? {
         get { candidateSession.bracketCandidates }
         set { candidateSession.bracketCandidates = newValue }
@@ -336,7 +348,7 @@ public struct InputHandler {
         guard handled else { return (false, .none) }
         let trigger: CandidateListTrigger =
             candidateSession.isVisible && !candidateSession.isExplicitlySelected ? .whileTyping : .explicit
-        let action: CandidateAction = needsRefresh ? buildCandidateList(trigger: trigger) : .dismiss
+        let action: CandidateAction = needsRefresh ? buildCandidateListForTrigger(trigger) : .dismiss
         return (true, action)
     }
 

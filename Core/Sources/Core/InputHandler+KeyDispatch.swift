@@ -12,6 +12,7 @@ extension InputHandler {
         candidate: CandidateContext,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
+        clearPendingAzooKeyReading()
         let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
         clearLastConfirmedContextUnlessBackspace(isBackspace: isBackspace)
 

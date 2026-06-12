@@ -8,7 +8,12 @@ import InputMethodKit
 @MainActor
 class InputController: IMKInputController, @unchecked Sendable {
 
-    lazy var handler: InputHandler = InputHandler(azooKeyConverter: ZenzaiSettings.makeConverter())
+    lazy var handler: InputHandler = {
+        var h = InputHandler(azooKeyConverter: ZenzaiSettings.makeConverter())
+        h.deferAzooKeyWhileTyping = true
+        return h
+    }()
+    let azooKeyScheduler = AzooKeyAsyncScheduler()
     /// Zenzai 設定変更時に `AzooKeyConverter` を差し替える（IMK の `init` は nonisolated のため `unsafe`）
     nonisolated(unsafe) private var zenzaiSettingsObserver: NSObjectProtocol?
     nonisolated(unsafe) private var hiraganaPreferredObserver: NSObjectProtocol?
@@ -70,6 +75,7 @@ class InputController: IMKInputController, @unchecked Sendable {
 
     @MainActor
     private func reloadAzooKeyConverterFromSettings() {
+        cancelAzooKeyAsyncWork()
         handler.azooKeyConverter = ZenzaiSettings.makeConverter()
     }
 
@@ -103,18 +109,21 @@ class InputController: IMKInputController, @unchecked Sendable {
         super.activateServer(sender)
         let ic = self
         MainActor.assumeIsolated {
+            ic.cancelAzooKeyAsyncWork()
             ic.handler.state = CompositionState()
             ic.handler.committedHistory = []
             ic.handler.sessionTextBuffer = ""
             LeftContextSource.resetCache(&ic.handler.leftContextIMKCache)
             ic.handler.leftContext = .empty
             ic.handler.ignoreNextModeSwitch = true
+            ic.handler.deferAzooKeyWhileTyping = true
             ic.handler.candidateSession.reset()
             ic.candidateWindow.dismiss()
         }
     }
 
     override func deactivateServer(_ sender: Any!) {
+        cancelAzooKeyAsyncWork()
         handler.flushDiaryBuffer()
         commitComposition(sender)
         super.deactivateServer(sender)
@@ -129,7 +138,7 @@ class InputController: IMKInputController, @unchecked Sendable {
 
     /// 候補ウィンドウ更新のみ。session / marked は `InputHandler.applyPostKeyDownCandidateAndIMK` が担当。
     @MainActor
-    private func applyCandidateWindowEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
+    func applyCandidateWindowEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
         let panel = CandidatePanelModel(session: handler.candidateSession)
         switch action {
         case .none:
@@ -204,6 +213,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             cache: &handler.leftContextIMKCache,
             cursorLocation: adapter.selectedRange().location
         )
+        let generation = azooKeyScheduler.onKeyDown()
         let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
         let ctx = handler.candidateSession.makeContext()
         let (consumed, action) = handler.handle(
@@ -220,6 +230,11 @@ class InputController: IMKInputController, @unchecked Sendable {
             adapter: adapter,
             composedHiraganaWasEmpty: composedHiraganaWasEmpty,
             imkSenderForSurrounding: imkSenderForSurrounding
+        )
+        scheduleAzooKeyReplacementIfNeeded(
+            generation: generation,
+            consumed: consumed,
+            adapter: adapter
         )
         return consumed
     }
@@ -279,6 +294,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         let adapter = IMKTextInputAdapter(sender)
         let ic = self
         MainActor.assumeIsolated {
+            ic.cancelAzooKeyAsyncWork()
             let session = ic.handler.candidateSession
             guard !(
                 session.isVisible

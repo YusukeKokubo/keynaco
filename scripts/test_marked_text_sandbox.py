@@ -43,18 +43,28 @@ MARKED_TEXT_SUITE: dict = {
         },
         {
             "name": "space-marked-follows-selection",
-            "cmds": [{"type_string": "kanzi"}, {"key": "space"}],
+            "cmds": [
+                {"type_string": "kanzi"},
+                {"wait_azoo_key": True},
+                {"key": "space"},
+            ],
             "assert": {"candidateVisible": True, "markedText": "感じ", "selectedText": "感じ"},
         },
         {
             "name": "down-syncs-selected-while-composing",
-            "cmds": [{"type_string": "kanzi"}, {"key": "space"}, {"key": "down"}],
+            "cmds": [
+                {"type_string": "kanzi"},
+                {"wait_azoo_key": True},
+                {"key": "space"},
+                {"key": "down"},
+            ],
             "assert": {"markedText": "漢字", "selectedText": "漢字", "isExplicitlySelected": True},
         },
         {
             "name": "kanzi-space-down-enter-kanji",
             "cmds": [
                 {"type_string": "kanzi"},
+                {"wait_azoo_key": True},
                 {"key": "space"},
                 {"key": "down"},
                 {"key": "enter"},
@@ -73,7 +83,9 @@ MARKED_TEXT_SUITE: dict = {
         {
             "name": "enter-matches-selected-candidate",
             "cmds": [
-                {"type_string": "kanzi", "then": "space", "capture": {"picked": "selectedText"}},
+                {"type_string": "kanzi"},
+                {"wait_azoo_key": True},
+                {"key": "space", "capture": {"picked": "selectedText"}},
                 {"key": "enter", "assert_contains": {"inserted": "{{picked}}"}},
             ],
         },
@@ -143,7 +155,9 @@ def run_integrity_checks(sock: socket.socket, buf: bytearray) -> int:
     failures: list[str] = []
     send(sock, buf, {"reset": True})
 
-    r_type = send(sock, buf, {"type_string": "kanzi"})
+    send(sock, buf, {"type_string": "kanzi"})
+    send(sock, buf, {"wait_azoo_key": True})
+    r_type = send(sock, buf, {"state": True})
     cands_before = list(r_type.get("candidates", []))
     r_space = send(sock, buf, {"key": "space"})
     cands_after = list(r_space.get("candidates", []))
