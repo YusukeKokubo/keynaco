@@ -15,6 +15,32 @@ extension InputHandler {
         buildCandidateListInternal(forReading: nil, trigger: trigger)
     }
 
+    /// AzooKey を呼ばず安価ソースだけで候補を組み立てる。
+    /// AzooKey が必要な読み（非 ASCII かつ非空）なら `pendingReading` に読みを返す。
+    public mutating func buildCandidateListWithoutAzooKey(
+        trigger: CandidateListTrigger
+    ) -> (action: CandidateAction, pendingReading: String?) {
+        let h = state.composedHiragana
+        let pendingReading: String? = (h.isEmpty || h.allSatisfy(\.isASCII)) ? nil : h
+        let cheap = collectCheapCandidateSources(readingOverride: h)
+        let sources = makeCandidateListSources(h: h, cheap: cheap, azooKeyCandidates: [])
+        let action = assembleCandidateList(from: sources, trigger: trigger)
+        return (action, pendingReading)
+    }
+
+    /// 非同期 AzooKey 結果の注入。`state.composedHiragana == reading` のときのみ有効。
+    public mutating func rebuildCandidateList(
+        reading: String,
+        azooKeyCandidates: [String],
+        trigger: CandidateListTrigger = .whileTyping
+    ) -> CandidateAction {
+        guard state.composedHiragana == reading else { return .none }
+        let filtered = azooKeyCandidates.filter { !KanaUtils.isScriptMixed($0) }
+        let cheap = collectCheapCandidateSources(readingOverride: reading)
+        let sources = makeCandidateListSources(h: reading, cheap: cheap, azooKeyCandidates: filtered)
+        return assembleCandidateList(from: sources, trigger: trigger)
+    }
+
     private mutating func buildCandidateListInternal(
         forReading reading: String?,
         trigger: CandidateListTrigger
@@ -34,6 +60,13 @@ extension InputHandler {
         return idx
     }
 
+    private struct CheapCandidateSources {
+        let userDictRaw: [String]
+        let highHistory: [String]
+        let highHistoryCount: Int
+        let historyOutputSet: Set<String>
+    }
+
     private struct CandidateListSources {
         let h: String
         let azooKeyCandidates: [String]
@@ -49,18 +82,16 @@ extension InputHandler {
         readingOverride: String? = nil
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
+        let cheap = collectCheapCandidateSources(readingOverride: readingOverride)
+        let azooKeyCandidates = fetchAzooKeyCandidates(reading: h, trigger: trigger)
+        return makeCandidateListSources(h: h, cheap: cheap, azooKeyCandidates: azooKeyCandidates)
+    }
+
+    private mutating func collectCheapCandidateSources(
+        readingOverride: String? = nil
+    ) -> CheapCandidateSources {
+        let h = readingOverride ?? state.composedHiragana
         let isAscii = h.allSatisfy({ $0.isASCII })
-        let azooKeyCandidates: [String]
-        if isAscii {
-            azooKeyCandidates = []
-        } else {
-            let raw = azooKeyConverter.requestCandidates(
-                hiragana: h,
-                leftSideContext: leftContext.azooKeyValue,
-                richCandidates: trigger == .explicit
-            )
-            azooKeyCandidates = raw.filter { !KanaUtils.isScriptMixed($0) }
-        }
         let historyKey = (!h.isEmpty && isAscii) ? h.lowercased() : h
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
@@ -73,7 +104,32 @@ extension InputHandler {
                 highHistory.append(row.output)
             }
         }
-        let highHistoryCount = highHistory.count
+        return CheapCandidateSources(
+            userDictRaw: userDictRaw,
+            highHistory: highHistory,
+            highHistoryCount: highHistory.count,
+            historyOutputSet: historyOutputSet
+        )
+    }
+
+    private mutating func fetchAzooKeyCandidates(
+        reading: String,
+        trigger: CandidateListTrigger
+    ) -> [String] {
+        guard !reading.allSatisfy({ $0.isASCII }) else { return [] }
+        let raw = azooKeyConverter.requestCandidates(
+            hiragana: reading,
+            leftSideContext: leftContext.azooKeyValue,
+            richCandidates: trigger == .explicit
+        )
+        return raw.filter { !KanaUtils.isScriptMixed($0) }
+    }
+
+    private func makeCandidateListSources(
+        h: String,
+        cheap: CheapCandidateSources,
+        azooKeyCandidates: [String]
+    ) -> CandidateListSources {
         let zenzaiPromoted: String? = {
             guard azooKeyConverter.isZenzaiEnabled,
                   leftContext.azooKeyValue != nil,
@@ -83,11 +139,11 @@ extension InputHandler {
         return CandidateListSources(
             h: h,
             azooKeyCandidates: azooKeyCandidates,
-            userDictRaw: userDictRaw,
-            highHistory: highHistory,
-            highHistoryCount: highHistoryCount,
+            userDictRaw: cheap.userDictRaw,
+            highHistory: cheap.highHistory,
+            highHistoryCount: cheap.highHistoryCount,
             zenzaiPromoted: zenzaiPromoted,
-            historyOutputSet: historyOutputSet
+            historyOutputSet: cheap.historyOutputSet
         )
     }
 

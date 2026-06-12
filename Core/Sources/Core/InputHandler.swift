@@ -79,7 +79,7 @@ public struct CandidateContext: Sendable {
 }
 
 /// `buildCandidateList` の呼び出し元。候補列の組み立てロジックは共通、UI 抑制だけ分岐する。
-enum CandidateListTrigger: Sendable {
+public enum CandidateListTrigger: Sendable {
     /// 打鍵中。候補ゼロ・機能語のみのときはパネルを出さない。
     case whileTyping
     /// Space（候補非表示時）・バックスペース更新など。候補があれば出す。
