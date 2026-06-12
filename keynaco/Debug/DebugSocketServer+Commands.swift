@@ -539,6 +539,92 @@ extension DebugSocketServer {
         ], cmd: cmd)
     }
 
+    // MARK: - benchmark
+
+    /// `{"benchmark": {"sequence": "kanzi", "repeat": 200, "leftContext": ""}}` →
+    /// `handler.handle()` を直接計時して p50/p95/p99/max/mean を返す。
+    ///
+    /// - `sequence`: 打鍵する文字列（デフォルト `"kanzi"`）
+    /// - `repeat`: 繰り返し回数（デフォルト 200）
+    /// - `leftContext`: AzooKey / Zenzai に渡す左文脈（デフォルト空 = 文脈なし）
+    func handleBenchmark(cmd: [String: Any]) -> [String: Any] {
+        let config = cmd["benchmark"] as! [String: Any]
+        let sequence = config["sequence"] as? String ?? "kanzi"
+        let repeatCount = config["repeat"] as? Int ?? 200
+        let leftContextStr = config["leftContext"] as? String ?? ""
+
+        var durations: [Double] = []
+        durations.reserveCapacity(sequence.count * repeatCount)
+
+        // converter は繰り返し間で使いまわす（辞書ロード済み状態を維持）
+        let converter = ZenzaiSettings.makeConverter()
+        handler.azooKeyConverter = converter
+
+        handler.leftContext = leftContextStr.isEmpty
+            ? .empty
+            : LeftContext(sessionBuffer: "", imkBefore: nil, combined: leftContextStr)
+
+        for _ in 0..<repeatCount {
+            handler.state = CompositionState()
+            handler.candidateSession.reset()
+            _ = mockClient.consume()
+            mockClient.reset()
+            InputHandler.isAsciiMode = false
+
+            for ch in sequence {
+                let s = String(ch)
+                let t0 = CFAbsoluteTimeGetCurrent()
+                let ctx = handler.candidateSession.makeContext()
+                let (consumed, action) = handler.handle(
+                    keyCode: 0,
+                    characters: s,
+                    baseCharacters: s,
+                    modifiers: [],
+                    candidate: ctx,
+                    client: mockClient
+                )
+                let dtMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000.0
+                durations.append(dtMs)
+                handler.applyPostKeyDownCandidateAndIMK(
+                    consumed: consumed,
+                    action: action,
+                    client: mockClient,
+                    composedHiraganaWasEmpty: false,
+                    didInsertText: mockClient.hasPendingInsertions
+                )
+                _ = mockClient.consume()
+            }
+        }
+
+        durations.sort()
+        let count = durations.count
+        guard count > 0 else {
+            return Self.finalize(Self.errorPayload(code: "BENCHMARK_EMPTY", message: "no durations"), cmd: cmd)
+        }
+
+        func pct(_ p: Int) -> Double {
+            let idx = min(count - 1, count * p / 100)
+            return round(durations[idx] * 10) / 10
+        }
+        let mean = round(durations.reduce(0, +) / Double(count) * 10) / 10
+
+        return Self.finalize([
+            "benchmark": [
+                "sequence": sequence,
+                "repeat": repeatCount,
+                "totalKeys": count,
+                "zenzaiEnabled": handler.azooKeyConverter.isZenzaiEnabled,
+                "leftContext": leftContextStr,
+                "meanMs": mean,
+                "p50Ms": pct(50),
+                "p95Ms": pct(95),
+                "p99Ms": pct(99),
+                "maxMs": pct(100),
+                "exceeds16ms": pct(95) > 16.0,
+            ]
+        ], cmd: cmd)
+    }
+
     /// InputController.schedulePOSClassification と同経路で POS 分類を行う。
     func schedulePOSClassification(output: String, reading: String) {
         guard HiraganaPreferredBuiltins.words[output] == nil else { return }

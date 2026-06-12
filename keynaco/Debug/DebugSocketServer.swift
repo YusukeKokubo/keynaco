@@ -760,6 +760,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "reset", "state", "get_log", "annotate",
         "wait_until", "assert_eventually", "seed_history",
         "set_surrounding", "set_left_context",
+        "benchmark",
         "test_suite", "sequence", "type_string", "key", "keyCode", "lint_suite",
         "capture", "vars", "schema", "with_examples", "explain",
     ]
@@ -1019,6 +1020,7 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["pos_backfill"] != nil { return handlePosBackfill(cmd: cmd) }
         if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
         if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
+        if cmd["benchmark"] is [String: Any] { return handleBenchmark(cmd: cmd) }
         if cmd["test_suite"] is [[String: Any]] { return handleTestSuite(cmd: cmd) }
         if cmd["sequence"] is [[String: Any]] { return handleSequence(cmd: cmd) }
         if cmd["type_string"] is String { return handleTypeString(cmd: cmd) }

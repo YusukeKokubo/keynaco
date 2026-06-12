@@ -1,5 +1,8 @@
 import Foundation
+import os
 import KanaKanjiConverterModuleWithDefaultDictionary
+
+private let spLog = OSLog(subsystem: "jp.leaner.keynaco", category: "AzooKey")
 
 /// `KanaKanjiConverter`（内部に Zenzai の `llama_context` を持つ）を NSLock で包み、
 /// **ロック保持中だけクロージャに貸し出す**ラッパー。
@@ -132,7 +135,12 @@ public final class AzooKeyConverter: @unchecked Sendable {
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
         let options = makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates)
         return locked.withLock { c in
+            os_signpost(.begin, log: spLog, name: "requestCandidates", "%{public}s", hiragana)
+            let t0 = CFAbsoluteTimeGetCurrent()
             let result = c.requestCandidates(text, options: options)
+            let elapsedMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
+            os_signpost(.end, log: spLog, name: "requestCandidates")
+            os_log(.debug, log: spLog, "requestCandidates %.1fms %{public}s zenzai=%d", elapsedMs, hiragana, zenzaiEnabled ? 1 : 0)
             insertCache(key: key, value: result.mainResults)
             return Self.candidateTexts(from: result.mainResults, inputLength: inputLength)
         }
