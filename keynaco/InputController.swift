@@ -157,7 +157,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         case .selectNext, .selectPrev:
             candidateWindow.apply(panel, layout: .selectionOnly)
         case .show, .replaceCandidates:
-            if preferInPlaceRefresh && candidateWindow.isPresented {
+            if preferInPlaceRefresh, candidateWindow.isPresented {
                 candidateWindow.apply(panel, layout: .refreshInPlace)
             } else {
                 candidateWindow.apply(panel, layout: .present(near: adapter.cursorRect()))

@@ -137,13 +137,39 @@ final class CandidateWindow: NSPanel {
                 dismiss()
                 return
             }
-            self.model = model
-            tableView.reloadData()
-            resizePreservingTop(toHeight: preferredHeight(for: model.candidates.count))
+            let oldSnapshot = self.model.map(CandidatePanelSnapshot.init(model:))
+            let newSnapshot = CandidatePanelSnapshot(model: model)
+            switch CandidateTablePatchPlanner.plan(old: oldSnapshot, new: newSnapshot) {
+            case .noop:
+                return
+            case .reloadAll:
+                self.model = model
+                tableView.reloadData()
+            case .incremental(let prefix, let removeTail, let insertTail, let reloadPrefix):
+                self.model = model
+                applyIncrementalTablePatch(
+                    prefixLength: prefix,
+                    removeTailCount: removeTail,
+                    insertTailCount: insertTail,
+                    reloadPrefixRows: reloadPrefix
+                )
+            }
+            let oldCount = oldSnapshot?.rows.count ?? 0
+            if oldCount != model.candidates.count {
+                resizePreservingTop(toHeight: preferredHeight(for: model.candidates.count))
+            }
+            let selectionChanged = oldSnapshot?.selectedRow != model.selectedRow
             syncTableSelection()
-            scrollSelectionIntoView()
+            if selectionChanged {
+                scrollSelectionIntoView()
+            }
         case .selectionOnly:
             guard model.isPresented else { return }
+            if let current = self.model,
+               current.selectedRow == model.selectedRow,
+               current.candidates == model.candidates {
+                return
+            }
             self.model = model
             syncTableSelection()
             tableView.scrollRowToVisible(model.selectedRow)
@@ -181,6 +207,37 @@ final class CandidateWindow: NSPanel {
         frame.origin.y = topY - height
         frame.size.height = height
         setFrame(frame, display: true)
+    }
+
+    private func applyIncrementalTablePatch(
+        prefixLength: Int,
+        removeTailCount: Int,
+        insertTailCount: Int,
+        reloadPrefixRows: [Int]
+    ) {
+        guard removeTailCount > 0 || insertTailCount > 0 || !reloadPrefixRows.isEmpty else { return }
+        let column = IndexSet(integer: 0)
+        if removeTailCount == 0, insertTailCount == 0 {
+            tableView.reloadData(forRowIndexes: IndexSet(reloadPrefixRows), columnIndexes: column)
+            return
+        }
+        tableView.beginUpdates()
+        if removeTailCount > 0 {
+            tableView.removeRows(
+                at: IndexSet(integersIn: prefixLength..<(prefixLength + removeTailCount)),
+                withAnimation: []
+            )
+        }
+        if insertTailCount > 0 {
+            tableView.insertRows(
+                at: IndexSet(integersIn: prefixLength..<(prefixLength + insertTailCount)),
+                withAnimation: []
+            )
+        }
+        if !reloadPrefixRows.isEmpty {
+            tableView.reloadData(forRowIndexes: IndexSet(reloadPrefixRows), columnIndexes: column)
+        }
+        tableView.endUpdates()
     }
 
     private func scrollSelectionIntoView() {
