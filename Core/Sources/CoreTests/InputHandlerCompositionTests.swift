@@ -11,6 +11,14 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
     // See: docs/domain/states.md#組成中
     // See: docs/domain/scenarios.md#s-01-基本的なローマ字変換
 
+    func testSyncMarkedText_skipsIdenticalPayload() {
+        handler.state.composedHiragana = "かんじ"
+        handler.syncMarkedText(client: client)
+        XCTAssertEqual(client.setMarkedTextCallCount, 1)
+        handler.syncMarkedText(client: client)
+        XCTAssertEqual(client.setMarkedTextCallCount, 1)
+    }
+
     func testTypingKaMarksHiragana() {
         type(chars: "k", base: "k")
         XCTAssertEqual(client.markedText, "k")

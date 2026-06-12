@@ -111,6 +111,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         MainActor.assumeIsolated {
             ic.cancelAzooKeyAsyncWork()
             ic.handler.state = CompositionState()
+            ic.handler.invalidateMarkedTextSyncCache()
             ic.handler.committedHistory = []
             ic.handler.sessionTextBuffer = ""
             LeftContextSource.resetCache(&ic.handler.leftContextIMKCache)
@@ -137,8 +138,14 @@ class InputController: IMKInputController, @unchecked Sendable {
     }
 
     /// 候補ウィンドウ更新のみ。session / marked は `InputHandler.applyPostKeyDownCandidateAndIMK` が担当。
+    ///
+    /// - Parameter preferInPlaceRefresh: 既に表示中なら `.present` せず内容だけ差し替える（AzooKey 非同期到着用）。
     @MainActor
-    func applyCandidateWindowEffects(action: CandidateAction, adapter: IMKTextInputAdapter) {
+    func applyCandidateWindowEffects(
+        action: CandidateAction,
+        adapter: IMKTextInputAdapter,
+        preferInPlaceRefresh: Bool = false
+    ) {
         let panel = CandidatePanelModel(session: handler.candidateSession)
         switch action {
         case .none:
@@ -150,7 +157,11 @@ class InputController: IMKInputController, @unchecked Sendable {
         case .selectNext, .selectPrev:
             candidateWindow.apply(panel, layout: .selectionOnly)
         case .show, .replaceCandidates:
-            candidateWindow.apply(panel, layout: .present(near: adapter.cursorRect()))
+            if preferInPlaceRefresh && candidateWindow.isPresented {
+                candidateWindow.apply(panel, layout: .refreshInPlace)
+            } else {
+                candidateWindow.apply(panel, layout: .present(near: adapter.cursorRect()))
+            }
         }
     }
 

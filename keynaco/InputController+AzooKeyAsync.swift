@@ -66,7 +66,24 @@ extension InputController {
     }
 
     func applyAsyncAzooKeyCandidateAction(action: CandidateAction, adapter: IMKTextInputAdapter) {
+        let wasVisible = handler.candidateSession.isVisible
+        let previousSelectedRow = handler.candidateSession.selectedRow
+        let previousSelectedText = handler.candidateSession.selectedText
+
         handler.candidateSession.apply(action)
-        applyCandidateWindowEffects(action: action, adapter: adapter)
+
+        if wasVisible,
+           !handler.candidateSession.isExplicitlySelected,
+           let text = previousSelectedText,
+           previousSelectedRow < handler.candidateSession.candidates.count,
+           handler.candidateSession.candidates[previousSelectedRow] == text {
+            handler.candidateSession.selectedRow = previousSelectedRow
+        }
+
+        applyCandidateWindowEffects(
+            action: action,
+            adapter: adapter,
+            preferInPlaceRefresh: wasVisible
+        )
     }
 }

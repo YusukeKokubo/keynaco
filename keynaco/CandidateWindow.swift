@@ -80,6 +80,9 @@ final class CandidateWindow: NSPanel {
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
     var onDelete: ((String, Int) -> Void)?
 
+    /// ウィンドウが画面上に出ており、候補モデルが載っている。
+    var isPresented: Bool { isVisible && model != nil }
+
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask,
                   backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(contentRect: contentRect, styleMask: [.borderless, .nonactivatingPanel],
@@ -136,7 +139,9 @@ final class CandidateWindow: NSPanel {
             }
             self.model = model
             tableView.reloadData()
+            resizePreservingTop(toHeight: preferredHeight(for: model.candidates.count))
             syncTableSelection()
+            scrollSelectionIntoView()
         case .selectionOnly:
             guard model.isPresented else { return }
             self.model = model
@@ -162,14 +167,37 @@ final class CandidateWindow: NSPanel {
         tableView.selectRowIndexes(IndexSet(integer: model.selectedRow), byExtendingSelection: false)
     }
 
+    private func preferredHeight(for candidateCount: Int) -> CGFloat {
+        let rowHeight = tableView.rowHeight + tableView.intercellSpacing.height
+        let maxVisibleRows = 8
+        let visibleCount = max(min(candidateCount, maxVisibleRows), 1)
+        return CGFloat(visibleCount) * rowHeight + 8
+    }
+
+    /// 上端を固定したまま高さだけ変える（非同期差し替えで位置が飛ばないようにする）。
+    private func resizePreservingTop(toHeight height: CGFloat) {
+        var frame = self.frame
+        let topY = frame.maxY
+        frame.origin.y = topY - height
+        frame.size.height = height
+        setFrame(frame, display: true)
+    }
+
+    private func scrollSelectionIntoView() {
+        guard let model else { return }
+        let rowHeight = tableView.rowHeight + tableView.intercellSpacing.height
+        let maxVisibleRows = 8
+        let scrollRow = model.candidates.count <= maxVisibleRows ? 0 : model.selectedRow
+        let scrollPoint = NSPoint(x: 0, y: CGFloat(scrollRow) * rowHeight)
+        scrollView.contentView.scroll(to: scrollPoint)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
     private func presentNear(_ rect: NSRect) {
         guard let model else { return }
         tableView.reloadData()
 
-        let rowHeight = tableView.rowHeight + tableView.intercellSpacing.height
-        let maxVisibleRows = 8
-        let visibleCount = max(min(model.candidates.count, maxVisibleRows), 1)
-        let height = CGFloat(visibleCount) * rowHeight + 8
+        let height = preferredHeight(for: model.candidates.count)
         let width: CGFloat = 300
 
         var origin = NSPoint(x: rect.origin.x, y: rect.origin.y - height - 4)
@@ -179,10 +207,7 @@ final class CandidateWindow: NSPanel {
 
         setFrame(NSRect(x: origin.x, y: origin.y, width: width, height: height), display: true)
         syncTableSelection()
-        let scrollRow = model.candidates.count <= maxVisibleRows ? 0 : model.selectedRow
-        let scrollPoint = NSPoint(x: 0, y: CGFloat(scrollRow) * rowHeight)
-        scrollView.contentView.scroll(to: scrollPoint)
-        scrollView.reflectScrolledClipView(scrollView.contentView)
+        scrollSelectionIntoView()
         orderFront(nil)
     }
 

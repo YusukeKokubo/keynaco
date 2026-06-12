@@ -156,6 +156,9 @@ public struct InputHandler {
     public var ignoreNextModeSwitch = false
     /// 本番 `InputController` のみ `true`。`.whileTyping` で AzooKey を同期呼ばず `pendingAzooKeyReading` を返す。
     public var deferAzooKeyWhileTyping = false
+    /// 直近 `syncMarkedText` で IMK に送った内容。同一なら `setMarkedText` をスキップしてちらつきを抑える。
+    private var lastSyncedMarkedText: String?
+    private var lastSyncedMarkedSelection: NSRange?
     /// 直近 `handle()` の AzooKey 非同期取得対象読み（`deferAzooKeyWhileTyping` 有効時のみ非 nil になり得る）。
     public private(set) var pendingAzooKeyReading: String?
 
@@ -277,6 +280,7 @@ public struct InputHandler {
         }
         pushCommitted(text)
         appendToSessionBuffer(text)
+        invalidateMarkedTextSyncCache()
         client.insertText(text)
         state = CompositionState()
     }
@@ -319,9 +323,15 @@ public struct InputHandler {
         syncMarkedText(client: client)
     }
 
+    /// `commitText` 後など、次の `syncMarkedText` で dedup しないようキャッシュを破棄する。
+    public mutating func invalidateMarkedTextSyncCache() {
+        lastSyncedMarkedText = nil
+        lastSyncedMarkedSelection = nil
+    }
+
     /// 組成バッファと `candidateSession` の選択行から marked text を組み立てる。
     /// 通常は `applyCandidateAction` 経由。キー外（候補 UI 削除など）は `syncMarkedText` を直接呼ぶ。
-    public func syncMarkedText(client: TextInputClient) {
+    public mutating func syncMarkedText(client: TextInputClient) {
         let session = candidateSession
         let text = MarkedTextSync.resolve(
             isBracketMode: isBracketMode,
@@ -332,7 +342,13 @@ public struct InputHandler {
             composingText: state.composingText,
             selectedCandidate: session.selectedText
         )
-        client.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
+        let selection = NSRange(location: text.count, length: 0)
+        if text == lastSyncedMarkedText, selection == lastSyncedMarkedSelection {
+            return
+        }
+        lastSyncedMarkedText = text
+        lastSyncedMarkedSelection = selection
+        client.setMarkedText(text, selectionRange: selection)
     }
 
     public mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
