@@ -33,6 +33,14 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
         XCTAssertEqual(stub.requestCount, 1)
     }
 
+    func testOnKeyDownRecordsInterKeyInterval() {
+        let scheduler = AzooKeyAsyncScheduler()
+        _ = scheduler.onKeyDown()
+        XCTAssertNil(scheduler.lastInterKeyIntervalMs)
+        _ = scheduler.onKeyDown()
+        XCTAssertNotNil(scheduler.lastInterKeyIntervalMs)
+    }
+
     func testStaleGenerationSkipsDetachedWork() async {
         let scheduler = AzooKeyAsyncScheduler()
         let stub = RichFlagStub()
@@ -58,6 +66,10 @@ private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {
         requestCount += 1
         lastRichCandidates = richCandidates
         return ["漢字"]
+    }
+
+    func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek? {
+        nil
     }
 
     func commit(reading: String, text: String) { _ = (reading, text) }

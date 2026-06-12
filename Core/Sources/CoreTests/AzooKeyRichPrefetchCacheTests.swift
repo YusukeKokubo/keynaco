@@ -38,5 +38,9 @@ private final class MockAzooKeyRichPrefetch: AzooKeyConverting, @unchecked Senda
         return result
     }
 
+    func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek? {
+        nil
+    }
+
     func commit(reading: String, text: String) { _ = (reading, text) }
 }

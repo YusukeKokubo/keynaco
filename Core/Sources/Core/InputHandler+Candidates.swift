@@ -37,15 +37,24 @@ extension InputHandler {
         return buildCandidateList(trigger: trigger)
     }
 
-    /// AzooKey を呼ばず安価ソースだけで候補を組み立てる。
-    /// AzooKey が必要な読み（非 ASCII かつ非空）なら `pendingReading` に読みを返す。
+    /// AzooKey を呼ばず安価ソースとキャッシュ済み辞書候補でリストを組み立てる。
+    /// 非同期取得がまだ必要な読みだけ `pendingReading` に載せる（完全一致キャッシュヒット時は `nil`）。
     public mutating func buildCandidateListWithoutAzooKey(
         trigger: CandidateListTrigger
     ) -> (action: CandidateAction, pendingReading: String?) {
         let h = state.composedHiragana
-        let pendingReading: String? = (h.isEmpty || h.allSatisfy(\.isASCII)) ? nil : h
+        let needsAzooKey = !h.isEmpty && !h.allSatisfy(\.isASCII)
+        let peek = needsAzooKey
+            ? azooKeyConverter.peekCachedCandidates(
+                hiragana: h,
+                leftSideContext: leftContext.azooKeyValue,
+                richCandidates: true
+            )
+            : nil
+        let azooKeyCandidates = peek?.candidates ?? []
+        let pendingReading: String? = needsAzooKey && peek?.needsAsyncFetch != false ? h : nil
         let cheap = collectCheapCandidateSources(readingOverride: h)
-        let sources = makeCandidateListSources(h: h, cheap: cheap, azooKeyCandidates: [])
+        let sources = makeCandidateListSources(h: h, cheap: cheap, azooKeyCandidates: azooKeyCandidates)
         let action = assembleCandidateList(from: sources, trigger: trigger)
         return (action, pendingReading)
     }

@@ -25,6 +25,12 @@ final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
         return result
     }
 
+    func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek? {
+        let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
+        guard let hit = cache[key] else { return nil }
+        return AzooKeyCachePeek(candidates: hit, match: .exact)
+    }
+
     func commit(reading: String, text: String) { _ = (reading, text) }
 }
 

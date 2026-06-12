@@ -14,6 +14,11 @@ class BaseAzooKeyStub: AzooKeyConverting, @unchecked Sendable {
         return []
     }
 
+    func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek? {
+        _ = (hiragana, leftSideContext, richCandidates)
+        return nil
+    }
+
     func commit(reading: String, text: String) {
         _ = (reading, text)
     }

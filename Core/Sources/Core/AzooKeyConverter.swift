@@ -134,6 +134,42 @@ public final class AzooKeyConverter: @unchecked Sendable {
         )
     }
 
+    public func peekCachedCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool = false
+    ) -> AzooKeyCachePeek? {
+        guard !hiragana.isEmpty else { return nil }
+        let exactKey = Self.cacheKey(
+            segment: hiragana,
+            leftSideContext: leftSideContext,
+            richCandidates: richCandidates
+        )
+        if let cached = candidateCache[exactKey] {
+            let texts = Self.candidateTexts(from: cached, inputLength: hiragana.count)
+            guard !texts.isEmpty else { return nil }
+            return AzooKeyCachePeek(candidates: texts, match: .exact)
+        }
+        let ctx = leftSideContext ?? ""
+        let keySuffix = richCandidates ? "|\(ctx)|rich" : "|\(ctx)"
+        var bestPrefix: String?
+        var bestCandidates: [Candidate]?
+        for key in candidateCacheKeys.reversed() {
+            guard key.hasSuffix(keySuffix) else { continue }
+            let segment = Self.cacheSegment(fromCacheKey: key)
+            guard segment.count < hiragana.count, hiragana.hasPrefix(segment) else { continue }
+            if let current = bestPrefix, segment.count <= current.count { continue }
+            bestPrefix = segment
+            bestCandidates = candidateCache[key]
+        }
+        if let segment = bestPrefix, let cached = bestCandidates {
+            let texts = Self.candidateTexts(from: cached, inputLength: segment.count)
+            guard !texts.isEmpty else { return nil }
+            return AzooKeyCachePeek(candidates: texts, match: .prefix(sourceReading: segment))
+        }
+        return nil
+    }
+
     public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [String] {
         let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         let inputLength = hiragana.count

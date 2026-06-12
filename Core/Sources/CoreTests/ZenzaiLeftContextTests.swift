@@ -19,6 +19,10 @@ private final class ZenzaiEnabledMockConverter: AzooKeyConverting, @unchecked Se
         }
     }
 
+    func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek? {
+        nil
+    }
+
     func commit(reading: String, text: String) {}
 }
 

@@ -61,6 +61,30 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
     }
 
     /// 打鍵中のかなプレースホルダ表示中に Space を押したら明示変換（辞書取得）へ昇格する。
+    func testDefer_exactCacheHitSkipsPendingAndShowsDictionary() {
+        let stub = CachePeekStub()
+        setUpWithConverter(stub)
+        handler.deferAzooKeyWhileTyping = true
+        _ = stub.requestCandidates(hiragana: "あい", leftSideContext: nil, richCandidates: true)
+        typeRomaji("ai")
+        XCTAssertNil(handler.pendingAzooKeyReading)
+        XCTAssertTrue(handler.candidateSession.candidates.contains("愛"))
+    }
+
+    func testDefer_prefixCacheShowsProvisionalDictionary() {
+        let stub = CachePeekStub()
+        setUpWithConverter(stub)
+        handler.deferAzooKeyWhileTyping = true
+        _ = stub.requestCandidates(hiragana: "かん", leftSideContext: nil, richCandidates: true)
+        handler.state.composedHiragana = "かんじ"
+        let (action, pending) = handler.buildCandidateListWithoutAzooKey(trigger: .whileTyping)
+        XCTAssertEqual(pending, "かんじ")
+        guard case .show(let show) = action else {
+            return XCTFail("expected show from prefix cache, got \(action)")
+        }
+        XCTAssertTrue(show.candidates.contains("漢"))
+    }
+
     func testDefer_spaceOnKanaPlaceholderUpgradesToExplicit() {
         let stub = SnapStub(["低頻度", "定頻度"])
         setUpWithConverter(stub)
@@ -106,6 +130,51 @@ extension InputHandlerTestCase {
             trigger: trigger
         )
         assertCandidateActionEqual(sync, inject, file: file, line: line)
+    }
+}
+
+/// `requestCandidates` で温めたキャッシュを `peekCachedCandidates` でも返すスタブ。
+private final class CachePeekStub: BaseAzooKeyStub, @unchecked Sendable {
+    private var cache: [String: [String]] = [:]
+
+    private func cacheKey(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> String {
+        let ctx = leftSideContext ?? ""
+        return richCandidates ? "\(hiragana)|\(ctx)|rich" : "\(hiragana)|\(ctx)"
+    }
+
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
+        if let hit = cache[key] { return hit }
+        let result: [String] = switch hiragana {
+        case "あい": ["愛", "合い"]
+        case "かん": ["漢", "感"]
+        case "かんじ": ["漢字", "感じ"]
+        default: ["候補"]
+        }
+        cache[key] = result
+        return result
+    }
+
+    override func peekCachedCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool
+    ) -> AzooKeyCachePeek? {
+        let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
+        if let exact = cache[key] {
+            return AzooKeyCachePeek(candidates: exact, match: .exact)
+        }
+        var best: (String, [String])?
+        for (segment, candidates) in cache {
+            let reading = String(segment.split(separator: "|", maxSplits: 1).first ?? "")
+            guard reading.count < hiragana.count, hiragana.hasPrefix(reading) else { continue }
+            if let current = best, reading.count <= current.0.count { continue }
+            best = (reading, candidates)
+        }
+        if let (reading, candidates) = best {
+            return AzooKeyCachePeek(candidates: candidates, match: .prefix(sourceReading: reading))
+        }
+        return nil
     }
 }
 

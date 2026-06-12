@@ -4,9 +4,11 @@ import KeynacoCore
 /// `.whileTyping` の AzooKey 取得を debounce 付きで背景実行する。`InputController` と Debug ソケットが共有。
 ///
 /// Phase 3: `richCandidates: true` で先読みし Space（`.explicit`）のキャッシュヒットを狙う。
+/// debounce 間隔は `AzooKeyDebouncePolicy` で打鍵速度・`pendingRomaji` に応じて 40–120ms。
 @MainActor
 final class AzooKeyAsyncScheduler {
-    static let debounceNanoseconds: UInt64 = 70_000_000
+    /// 後方互換・テスト用の固定 debounce（ポリシー未指定時のフォールバック）。
+    static let debounceNanoseconds: UInt64 = AzooKeyDebouncePolicy.defaultNanoseconds
 
     /// `Task.detached` から generation を読むためのスレッドセーフミラー。
     private final class LockedGeneration: @unchecked Sendable {
@@ -19,6 +21,8 @@ final class AzooKeyAsyncScheduler {
     private(set) var candidateGeneration = 0
     private let liveGeneration = LockedGeneration()
     private var pendingTask: Task<Void, Never>?
+    private var lastKeyDownInstant: ContinuousClock.Instant?
+    private(set) var lastInterKeyIntervalMs: Double?
 
     var hasPendingWork: Bool {
         guard let pendingTask else { return false }
@@ -28,6 +32,17 @@ final class AzooKeyAsyncScheduler {
     /// keyDown ごとに呼ぶ。直前タスクをキャンセルし、新しい generation を返す。
     @discardableResult
     func onKeyDown() -> Int {
+        let now = ContinuousClock.now
+        if let previous = lastKeyDownInstant {
+            let delta = now - previous
+            let seconds = Double(delta.components.seconds)
+            let attoseconds = Double(delta.components.attoseconds) / 1_000_000_000_000_000_000
+            lastInterKeyIntervalMs = (seconds + attoseconds) * 1_000
+        } else {
+            lastInterKeyIntervalMs = nil
+        }
+        lastKeyDownInstant = now
+
         candidateGeneration += 1
         liveGeneration.set(candidateGeneration)
         cancelPendingWork()
@@ -60,10 +75,11 @@ final class AzooKeyAsyncScheduler {
         reading: String,
         leftSideContext: String?,
         converter: any AzooKeyConverting,
+        debounceNanoseconds: UInt64 = AzooKeyDebouncePolicy.defaultNanoseconds,
         onComplete: @escaping @MainActor ([String]) -> Void
     ) {
         pendingTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: Self.debounceNanoseconds)
+            try? await Task.sleep(nanoseconds: debounceNanoseconds)
             guard !Task.isCancelled else { return }
             guard candidateGeneration == generation else { return }
 

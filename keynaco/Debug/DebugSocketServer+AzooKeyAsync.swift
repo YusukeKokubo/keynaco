@@ -25,11 +25,16 @@ extension DebugSocketServer {
         guard consumed, let reading = handler.pendingAzooKeyReading else { return }
         let leftContext = handler.leftContext.azooKeyValue
         let converter = handler.azooKeyConverter
+        let debounceNs = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
+            interKeyIntervalMs: azooKeyScheduler.lastInterKeyIntervalMs,
+            hasPendingRomaji: !handler.state.pendingRomaji.isEmpty
+        ))
         azooKeyScheduler.schedule(
             generation: generation,
             reading: reading,
             leftSideContext: leftContext,
-            converter: converter
+            converter: converter,
+            debounceNanoseconds: debounceNs
         ) { [self] candidates in
             applySandboxAzooKeyResult(
                 generation: generation,
