@@ -9,7 +9,7 @@ related_commit: 1bfe265
 2026-05-29 検証完了 — inferenceLimit=**非レバー（5 で最適）**／モデルサイズ=**small がベスト**。
 v3.2-small ドロップインは**低リスクな微positive（回帰0・微改善・約8%高速）だが任意**・本命の右文脈は AzooKey 更新前提。
 
-関連: [IDEA260529](../ideas/IDEA260529.md) #4 / 姉妹 POC [POC260529](POC260529.md)・[POC260529b](POC260529b.md)
+関連: [IDEA260529](../ideas/IDEA260529.md) #4 / 姉妹 POC [POC260529](POC260529-personalization-ngram.md)・[POC260529b](POC260529b-require-japanese-prediction.md)
 
 ## 仮説
 

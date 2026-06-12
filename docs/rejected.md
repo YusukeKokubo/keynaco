@@ -40,7 +40,7 @@
 
 **再検討するなら**: 1 モーラだけ DB 履歴では弱い（スコア閾値・件数上限）と判断した場合。macOS 側の類似 API との比較は [IDEA260529](../ideas/IDEA260529.md) 参照。
 
-> 関連: [observation.md](./observation.md)（経過観察リストから削除）、[POC260529b](../plans/POC260529b.md)
+> 関連: [observation.md](./observation.md)（経過観察リストから削除）、[POC260529b](../plans/POC260529b-require-japanese-prediction.md)
 
 ---
 
@@ -52,13 +52,13 @@
 
 - **利用場面がない**: 開発初期のデバッグ用途で導入したが、IME サンドボックス（デバッグソケット）に置き換わり、日常的に開く機会がなくなった
 - **機能重複**: キー入力の再現・内部状態の観察は `DebugSocketServer` + `/keynaco-ime-sandbox` スキルで十分。EventViewer は事後ログ閲覧に特化しており ROI が低い
-- **本番コードへの侵入**: `addCommit` だけ `#if DEBUG` なしで残っていた経緯があり（[PLAN260501c](../plans/PLAN260501c.md)）、デバッグ UI を維持するコストに見合わない
+- **本番コードへの侵入**: `addCommit` だけ `#if DEBUG` なしで残っていた経緯があり（[PLAN260501c](../plans/PLAN260501c-performance-improvements.md)）、デバッグ UI を維持するコストに見合わない
 
 **削除した周辺**: `EventViewerWindow.swift`、`InputController` / `InputController+IMKAdapter` 内の呼び出し、AppDelegate メニュー項目。
 
 **再検討するなら**: バグ報告用のセッション録画が必要になった場合。`DebugSocketServer` の JSONL 出力や `scripts/debug_ime.py` から派生させる方が、再現手順と一体化しやすい。
 
-> 関連: [PLAN260504c](../plans/PLAN260504c.md)、[PLAN260501](../plans/PLAN260501.md)
+> 関連: [PLAN260504c](../plans/PLAN260504c-debug-snapshot-log.md)、[PLAN260501](../plans/PLAN260501-performance-resources.md)
 
 ---
 
@@ -68,7 +68,7 @@
 
 **削除の理由**:
 
-- **利用場面がない**: 日記生成 POC（[PLAN260527](../plans/PLAN260527.md)）完了後、一度動作確認すれば十分なツールで、以降メニューから開く機会がなかった
+- **利用場面がない**: 日記生成 POC（[PLAN260527](../plans/PLAN260527-ai-diary-generation.md)）完了後、一度動作確認すれば十分なツールで、以降メニューから開く機会がなかった
 - **本番機能ではない**: IME サンドボックス内では Guided Generation は IME サンドボックス制約でハングする（[H-1](#h-1-foundationmodels-generable-構造化出力による品詞分類2026-05-25)）。本体アプリでの動作確認は POC 記録に残っており、常設 UI の必要がない
 - **日記タブも削除済み**: Guided Generation の唯一の本番利用先だった日記生成 UI（[J-1](#j-1-日記自動生成settings-タブ2026-06-05-削除)）を削除したため、テストウィンドウの存在意義も消えた
 
@@ -76,7 +76,7 @@
 
 **再検討するなら**: IME 本体で `@Generable` を本採用する機能が再浮上したとき。OS が IME Extension の XPC 制約を緩和する前は、Settings 等のサンドボックス外プロセスでの POC 用スクリプトで十分。
 
-> 関連: [H-1](#h-1-foundationmodels-generable-構造化出力による品詞分類2026-05-25)、[PLAN260527](../plans/PLAN260527.md)、[apple-intelligence.md](./apple-intelligence.md)
+> 関連: [H-1](#h-1-foundationmodels-generable-構造化出力による品詞分類2026-05-25)、[PLAN260527](../plans/PLAN260527-ai-diary-generation.md)、[apple-intelligence.md](./apple-intelligence.md)
 
 ---
 
@@ -104,7 +104,7 @@
 
 **概要**: `daily_log`（確定テキスト＋app_bundle_id）を素材に、Apple Intelligence（Foundation Models）で 1 日分の日記・日報を生成する Settings「日記」タブ。`DiaryViewController` + `DiaryGenerator` + `diary` テーブルへの保存。
 
-**試みたこと**: 日付選択 → 当日の `daily_log` 一覧表示 →「日記を生成」→ 生成結果の編集・保存・コピー。Guided Generation の動作確認は [PLAN260527](../plans/PLAN260527.md) で完了済み。
+**試みたこと**: 日付選択 → 当日の `daily_log` 一覧表示 →「日記を生成」→ 生成結果の編集・保存・コピー。Guided Generation の動作確認は [PLAN260527](../plans/PLAN260527-ai-diary-generation.md) で完了済み。
 
 **削除の理由**:
 
@@ -116,7 +116,7 @@
 
 **再検討するなら**: `daily_log` が数万字規模に育った後、日記生成ではなく personalization（[G-2](#g-2-tunerax-スクレイピング型-personalization-基盤の追加2026-05-29) 参照）の方が優先。日記 UI を復活させるなら独立アプリ or ショートカット連携の方が適切。
 
-> 関連: [PLAN260527](../plans/PLAN260527.md)、[apple-intelligence.md](./apple-intelligence.md)
+> 関連: [PLAN260527](../plans/PLAN260527-ai-diary-generation.md)、[apple-intelligence.md](./apple-intelligence.md)
 
 ---
 
@@ -137,7 +137,7 @@
 
 **再検討するなら**: 使い込みで「長文を一気に打って Space 1 回で部分確定」が本当に必要か POC から。AzooKey Desktop 追従そのものを目的にしない。
 
-> 関連: [POC260603](../plans/POC260603.md)、[PLAN260603](../plans/PLAN260603.md)、[C-1 セグメントモード内の読み修正](#c-1-セグメントモード内の読み修正2026-04-30)
+> 関連: [POC260603](../plans/POC260603-segment-boundary-suffix.md)、[PLAN260603](../plans/PLAN260603-azookey-desktop-selecting.md)、[C-1 セグメントモード内の読み修正](#c-1-セグメントモード内の読み修正2026-04-30)
 
 ---
 
@@ -145,7 +145,7 @@
 
 **概要**: Zenzai の `personalizationMode`（base/personal n-gram LM の補間）に渡す personal モデルを
 生成・データ蓄積する手段として、azooKey の **Tuner**（github.com/azooKey/Tuner, MIT）を keynaco に
-足すか検討した。Zenzai personalization 自体の効果検証は [POC260529](../plans/POC260529.md) で実施。
+足すか検討した。Zenzai personalization 自体の効果検証は [POC260529](../plans/POC260529-personalization-ngram.md) で実施。
 
 **調査した内容**: Tuner は SwiftPM ライブラリではなく**独立した macOS メニューバーアプリ**（`.xcodeproj`）。
 2層に分かれる:
@@ -156,14 +156,14 @@
 
 - **取得層がポジショニングと衝突**: keynaco は `app-sandbox: true`／concept.md「ローカル完結」「学習データはローカル SQLite に閉じる」。Tuner の取得層はサンドボックス解除＋Accessibility 権限＋閲覧内容の全収集を要求し、「入力を学習」から「画面で見た全テキストを収集」へ信頼契約が質的に変わる
 - **取得層がそもそも不要**: keynaco は IME なので `daily_log`（打鍵＋app_bundle_id）が privacy を守ったまま育つドメインコーパスになる。azooKey が AX スクレイピングをする理由（入力だけだとデータが貯まるのが遅い）は本 POC のデータ量律速の解決策だが、keynaco にとっては最も避けるべき取り方
-- **時期尚早**: personalization 自体が [POC260529](../plans/POC260529.md) でデータ量律速（2日で2470字）と判明し status=tested で保持中。Tuner を今組んでもデータが貯まるのを待つだけ
+- **時期尚早**: personalization 自体が [POC260529](../plans/POC260529-personalization-ngram.md) でデータ量律速（2日で2470字）と判明し status=tested で保持中。Tuner を今組んでもデータが貯まるのを待つだけ
 
 **判断**: Tuner アプリの追加（特に取得層）は不採用。**ただし personalization 機構そのものは棄却ではない**
 （POC260529 で「データ待ちで保持」）。将来 personalization を本採用するなら、Tuner 一式ではなく
 **dedup ロジックだけ MIT 流用**（MinHash／前方一致は実装の質が高い）し、`daily_log` からの増分学習に
 組み込む。取得層は捨てる。
 
-> 関連: [POC260529](../plans/POC260529.md)、[G-1 Zenzai 制御パラメーター](#g-1-zenzai-制御パラメーターtopic--style--preference-の-ui-公開2026-05-24)
+> 関連: [POC260529](../plans/POC260529-personalization-ngram.md)、[G-1 Zenzai 制御パラメーター](#g-1-zenzai-制御パラメーターtopic--style--preference-の-ui-公開2026-05-24)
 
 ---
 
@@ -187,9 +187,9 @@
 - クライアントプロセスに完了シグナルも例外も届かないままデッドロック
 - コードの問題ではなく **macOS 26 Beta のシステムバグ**。workaround なし
 
-**判断**: OS アップデートで修正されるまで利用不可。`respond(to:)` プレーンテキスト方式（現行 `LLMPOSClassifier`）は動作するため、プロンプト改善で精度向上を図る方針に切り替え（→ [PLAN260525b](../plans/PLAN260525b.md)）。将来 Apple が IME Extension のサンドボックスポリシーを緩和した場合に再評価する。
+**判断**: OS アップデートで修正されるまで利用不可。`respond(to:)` プレーンテキスト方式（現行 `LLMPOSClassifier`）は動作するため、プロンプト改善で精度向上を図る方針に切り替え（→ [PLAN260525b](../plans/PLAN260525b-candidate-filter-prompt.md)）。将来 Apple が IME Extension のサンドボックスポリシーを緩和した場合に再評価する。
 
-> 関連: [POC260525b](../plans/POC260525b.md)
+> 関連: [POC260525b](../plans/POC260525b-generable-pos-classification.md)
 
 ---
 
@@ -197,17 +197,17 @@
 
 **概要**: zenz-v3 の制御トークン `topic`・`style`・`preference` を設定 UI に追加し、ユーザーが文書の話題・文体・好みを手動設定できるようにした。また `DatabaseManager.recentProperNouns(limit:)` で history.db の固有名詞を自動推論して `topic` に補完する PoC も実施した。
 
-**試みたこと**: `ZenzaiViewController` に topic/style/preference の入力フィールドを追加。`ZenzaiSettings.makeConverter()` でこれらを制御トークンとして AzooKey API に渡す実装。topic 自動推論は `pos IN ('proper_noun/place', 'proper_noun/person', 'proper_noun/org')` かつ `pos_retry=0` のエントリを上位 5 件取得してカンマ区切りで渡す方式（詳細は `plans/POC260524.md`）。
+**試みたこと**: `ZenzaiViewController` に topic/style/preference の入力フィールドを追加。`ZenzaiSettings.makeConverter()` でこれらを制御トークンとして AzooKey API に渡す実装。topic 自動推論は `pos IN ('proper_noun/place', 'proper_noun/person', 'proper_noun/org')` かつ `pos_retry=0` のエントリを上位 5 件取得してカンマ区切りで渡す方式（詳細は `plans/POC260524-zenzai-topic-inference.md`）。
 
 **不採用の理由**:
 
 - **leftSideContext が支配的**: 同音異義語の disambiguation は `leftSideContext` だけで十分に機能する（`すいふと` + 技術文脈 → SWIFT プロモート、`じゃば` + 蛇文脈 → 蛇場/蛇ば など）。topic の追加効果を単独で確認できなかった
-- **zenz-v3.1-small では topic が無効**: `topic="Swift,GitHub,Xcode,Apple"` および `topic="IT,プログラミング,技術"` を設定しても、全テストケースで topic 空と差異なし。fixedEnd も変化しなかった（POC260524.md シミュレーション実測）
+- **zenz-v3.1-small では topic が無効**: `topic="Swift,GitHub,Xcode,Apple"` および `topic="IT,プログラミング,技術"` を設定しても、全テストケースで topic 空と差異なし。fixedEnd も変化しなかった（POC260524-zenzai-topic-inference.md シミュレーション実測）
 - **topic 自動推論はノイズが多い**: `LLMPOSClassifier` の誤分類率が高く、直近固有名詞の上位が common noun（`入力`・`固有名詞`）や助詞付き語彙（`情報が`）で占められる。有害なバイアスになる可能性がある
 
 **判断**: UI から topic/style/preference を削除し `profile` のみ残す。自動推論コード（`recentProperNouns`）は現状維持するが ROI を投じない。将来の zenz-v3 上位モデルで再評価する。
 
-> 関連: [POC260524](../plans/POC260524.md)
+> 関連: [POC260524](../plans/POC260524-zenzai-topic-inference.md)
 
 ---
 
@@ -242,7 +242,7 @@
 
 **判断**: `content_bigram` テーブル・`POSCommitSequencer`・`NounBigramViewController` をすべて削除（commit `5edf2bc`）。POS 分類自体（`LLMPOSClassifier`）はひらがな優先機能で引き続き使用するため維持。
 
-> 関連: [F-1 Successor モード](#f-1-successor-モード後続語サジェスト2026-05-25)、[PLAN260525](../plans/PLAN260525.md)
+> 関連: [F-1 Successor モード](#f-1-successor-モード後続語サジェスト2026-05-25)、[PLAN260525](../plans/PLAN260525-session-text-buffer.md)
 
 ---
 
@@ -272,11 +272,11 @@
 
 **概要**: 確定直後に Backspace を押すと、確定テキストを読み（ひらがな）に戻してセグメント変換モードへ移行する。
 
-**試みたこと**: IMK の `setMarkedText(_:selectionRange:replacementRange:)` で確定済みテキストをマークドテキストに置換する方式で実装し、動作することを確認した（`PLAN260429c.md` 参照）。
+**試みたこと**: IMK の `setMarkedText(_:selectionRange:replacementRange:)` で確定済みテキストをマークドテキストに置換する方式で実装し、動作することを確認した（`PLAN260429c-backspace-reconvert.md` 参照）。
 
 **不採用の理由**: 確定直後の Successor 候補表示（格助詞・bi-gram 予測）と競合する。候補を消そうとして押した Backspace が意図せず再変換を起動してしまい、操作感が悪い。確定後の自動候補表示を重視するこの IME の設計方針と根本的に相性が悪い。
 
-> 関連: [PLAN260429c](../plans/PLAN260429c.md)
+> 関連: [PLAN260429c](../plans/PLAN260429c-backspace-reconvert.md)
 
 ---
 

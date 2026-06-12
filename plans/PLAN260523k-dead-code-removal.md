@@ -1,7 +1,7 @@
 # Step 1: dead code 削除（`mostRecentContentWord*`）
 
 作成: 2026-05-23  
-親計画: [`PLAN260523j.md`](PLAN260523j.md)
+親計画: [`PLAN260523j-ime-simplification-phase3.md`](PLAN260523j-ime-simplification-phase3.md)
 
 ## ゴール
 
@@ -9,7 +9,7 @@ skip-bigram 廃止後に **本番コードから呼ばれなくなった** `most
 
 ## 背景
 
-- [`PLAN260503j.md`](PLAN260503j.md) で skip-bigram 多ホップ用に追加されたヘルパー
+- [`PLAN260503j-skip-bigram-multihop.md`](PLAN260503j-skip-bigram-multihop.md) で skip-bigram 多ホップ用に追加されたヘルパー
 - skip-bigram テーブルは起動時 DROP 済み（[`DatabaseManager.swift`](../Core/Sources/Core/DatabaseManager.swift)）
 - `rg mostRecentContentWord Core/Sources/Core` → **定義のみ**、呼び出しゼロ
 

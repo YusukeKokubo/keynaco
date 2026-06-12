@@ -124,7 +124,7 @@ send({"reset": True})
 | フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
 | インラインアサート | `{"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}}` |
 | 履歴シード | `{"seed_history": {"input": "かんじ", "output": "漢字", "times": 3}}` |
-| sessionTextBuffer 確認 | `{"state": true, "fields": ["sessionTextBuffer", "committedHistory"]}` — 文末後も buffer が残るか（[PLAN260525](../../plans/PLAN260525.md)） |
+| sessionTextBuffer 確認 | `{"state": true, "fields": ["sessionTextBuffer", "committedHistory"]}` — 文末後も buffer が残るか（[PLAN260525](../../plans/PLAN260525-session-text-buffer.md)） |
 | Zenzai 左コンテキスト固定 | `{"set_left_context": "申請書を"}` — レスポンスに `leftSideContext` が返る。空文字で解除 |
 | 周辺文脈設定 | `{"set_surrounding": {"before": "...", "after": "..."}}` — 同上（`sessionTextBuffer` も返る） |
 
@@ -390,7 +390,7 @@ print(r["composedHiragana"], r["pendingRomaji"])
 
 ### 罠4: Successor モードはインメモリ DB では起動しない
 
-Successor モードの起動には `leftSideContext` 末尾の名詞相当語と履歴前方一致が必要。content_bigram は 2026-05-25 に削除済み（[PLAN260525](../../plans/PLAN260525.md)）。
+Successor モードの起動には `leftSideContext` 末尾の名詞相当語と履歴前方一致が必要。content_bigram は 2026-05-25 に削除済み（[PLAN260525](../../plans/PLAN260525-session-text-buffer.md)）。
 
 Zenzai 左文脈は `sessionTextBuffer`（`set_left_context` または確定の積み重ね）で検証する。
 

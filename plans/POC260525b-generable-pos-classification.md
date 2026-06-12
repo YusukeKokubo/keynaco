@@ -6,7 +6,7 @@ related_rejected: H-1
 
 # POC260525b: FoundationModels @Generable による品詞分類の構造化出力検証
 
-**結果**: 失敗 → 代替方針確定（[PLAN260525b.md](PLAN260525b.md)）
+**結果**: 失敗 → 代替方針確定（[PLAN260525b-candidate-filter-prompt.md](PLAN260525b-candidate-filter-prompt.md)）
 
 ## 背景・動機
 
@@ -49,7 +49,7 @@ FoundationModels の `@Generable` を使った構造化出力（Guided Generatio
 ## 結論と次の方針
 
 構造化出力 POC は macOS 26 Beta の制約により現時点では実現不可能。
-以下の2施策に切り替える（→ [PLAN260525b.md](PLAN260525b.md)）：
+以下の2施策に切り替える（→ [PLAN260525b-candidate-filter-prompt.md](PLAN260525b-candidate-filter-prompt.md)）：
 
 **施策A（即効）: フィルターをブロックリスト方式に変更**
 - allowlist (`pos = 'noun' OR pos LIKE 'proper_noun%'`) → blocklist（`particle` / `conjunction` / `interjection` のみ除外）
@@ -61,6 +61,6 @@ FoundationModels の `@Generable` を使った構造化出力（Guided Generatio
 
 ## 関連
 
-- [POC260524.md](POC260524.md) - Zenzai プロモーション検証
-- [POC260525.md](POC260525.md) - leftSideContext 強化検証
-- [PLAN260525b.md](PLAN260525b.md) - 次の施策（ブロックリスト + プロンプト改善）
+- [POC260524-zenzai-topic-inference.md](POC260524-zenzai-topic-inference.md) - Zenzai プロモーション検証
+- [POC260525-left-context-enhancement.md](POC260525-left-context-enhancement.md) - leftSideContext 強化検証
+- [PLAN260525b-candidate-filter-prompt.md](PLAN260525b-candidate-filter-prompt.md) - 次の施策（ブロックリスト + プロンプト改善）

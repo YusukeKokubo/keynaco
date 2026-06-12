@@ -31,7 +31,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `keynacoTests/` | アプリ専用テスト（`SurroundingIMKContext` 等） |
 | `keynaco.xcodeproj` | Xcode プロジェクト（リポジトリ管理。ローカル SPM で `Core/` を参照） |
 | `docs/` | `concept.md`（差別化軸）・`retrospectives.md`（メタルール）・`rejected.md`（不採用機能）・`domain/`（用語・状態遷移・シナリオ） |
-| `plans/` | 設計・調査メモ（`PLAN<YYMMDD>.md` / `POC<YYMMDD>.md` 形式） |
+| `plans/` | 設計・調査メモ（`PLAN<YYMMDD>[-letter]-<slug>.md` / `POC<…>.md`。規約は `plans-audit/references/plan-frontmatter.md`） |
 | `scripts/` | 開発用スクリプト（下記参照） |
 | `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
 | `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
@@ -89,7 +89,7 @@ zenz-v3 は制御トークンを使って変換確率分布をバイアスする
 
 - **効果が出やすい**: 専門職（`医師`・`弁護士`）、特定分野（`競馬`・`アニメ`）、文体（`SNS`・`2ch`）。同音異義語の選択が変わる
 - **効果が出にくい**: 個人名（`田中太郎`）、挨拶文、汎用的すぎる語（`普通の人`）
-- keynaco は現在 `profile` のみ UI に露出。`topic`/`style`/`preference` は zenz-v3.1-small では測定可能な効果がないため UI から削除済み（`plans/POC260524.md` 参照）。AzooKey API 自体は引き続きサポートしているが、keynaco では使用しない。
+- keynaco は現在 `profile` のみ UI に露出。`topic`/`style`/`preference` は zenz-v3.1-small では測定可能な効果がないため UI から削除済み（`plans/POC260524-zenzai-topic-inference.md` 参照）。AzooKey API 自体は引き続きサポートしているが、keynaco では使用しない。
 
 ## テスト実行
 

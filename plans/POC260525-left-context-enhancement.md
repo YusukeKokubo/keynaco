@@ -6,7 +6,7 @@ related_commit: 86c163a
 
 # POC260525: leftSideContext 強化による Zenzai 変換品質の改善
 
-検証完了 → [PLAN260525.md](PLAN260525.md) で実装（コミット `5edf2bc`〜`86c163a`）
+検証完了 → [PLAN260525-session-text-buffer.md](PLAN260525-session-text-buffer.md) で実装（コミット `5edf2bc`〜`86c163a`）
 
 ## 背景・動機
 
@@ -213,4 +213,4 @@ var azooKeyLeftContext: String? {
 - 現状: 文末・改行直後は必ず fixedEnd=0（Zenzai 不発）
 - 提案: 文末・改行後も直前の文脈が残り fixedEnd=1（Zenzai プロモート）
 
-**本 POC はクローズ。実装は [PLAN260525.md](PLAN260525.md) に従い 2026-05-25 にマージ済み。**
+**本 POC はクローズ。実装は [PLAN260525-session-text-buffer.md](PLAN260525-session-text-buffer.md) に従い 2026-05-25 にマージ済み。**

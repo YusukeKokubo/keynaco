@@ -1,7 +1,7 @@
 # Step 3: domain docs の stale 記述整理
 
 作成: 2026-05-23  
-親計画: [`PLAN260523j.md`](PLAN260523j.md)（Phase 3 Step 3）
+親計画: [`PLAN260523j-ime-simplification-phase3.md`](PLAN260523j-ime-simplification-phase3.md)（Phase 3 Step 3）
 
 ## ゴール
 

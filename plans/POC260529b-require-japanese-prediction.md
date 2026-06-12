@@ -8,7 +8,7 @@ related_commit: 4c20187
 
 2026-06-05 卒業 — POC260529b' フィルタ付きで本採用。observation 卒業（sandbox E2E 検証済み）
 
-関連: [IDEA260529](../ideas/IDEA260529.md) #2 / 姉妹 POC [POC260529](POC260529.md)（personalization）
+関連: [IDEA260529](../ideas/IDEA260529.md) #2 / 姉妹 POC [POC260529](POC260529-personalization-ngram.md)（personalization）
 
 ---
 

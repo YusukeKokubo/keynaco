@@ -4,8 +4,8 @@ created: 2026-04-29
 related_commits:
   - 62ca888  # PLAN260603 完了後 triage: 履歴は境界を上書きしない
 references:
-  - plans/PLAN260603.md
-  - plans/PLAN260523g.md
+  - plans/PLAN260603-azookey-desktop-selecting.md
+  - plans/PLAN260523g-boundary-pref-removal.md
   - Core/Sources/Core/InputHandler+SegmentMode.swift
   - Core/Sources/CoreTests/InputHandlerSegmentTests.swift
   - scripts/check_segment_history_boundary.py
@@ -15,7 +15,7 @@ references:
 
 ## ステータス（2026-06-04 更新）
 
-**`deferred`** — 本 PLAN の `boundary_pref` 方式は一度実装されたが **2026-05 に削除**（[`PLAN260523g.md`](PLAN260523g.md)）。[`PLAN260603`](PLAN260603.md) 完了後の triage でも、**変換履歴が `engineClauseEnd` を上書きしない**ことを確認済み（コミット `62ca888`）。
+**`deferred`** — 本 PLAN の `boundary_pref` 方式は一度実装されたが **2026-05 に削除**（[`PLAN260523g-boundary-pref-removal.md`](PLAN260523g-boundary-pref-removal.md)）。[`PLAN260603`](PLAN260603-azookey-desktop-selecting.md) 完了後の triage でも、**変換履歴が `engineClauseEnd` を上書きしない**ことを確認済み（コミット `62ca888`）。
 
 | 判断 | 理由 |
 |------|------|
@@ -44,7 +44,7 @@ AzooKey の初期分割ではなく保存済みの境界を使って再現する
 次回「きょうはよいてんきです」を入力して Space を押すと、AzooKey は再び誤った境界でセグメント分割する。
 ユーザーは毎回同じ境界調整を繰り返す必要がある。
 
-**2026-06 補足**: 境界誤りは履歴では直らない。表層（今日）は履歴で出やすくなるが、切れ目はエンジン部分候補が決める（[`PLAN260603`](PLAN260603.md)）。
+**2026-06 補足**: 境界誤りは履歴では直らない。表層（今日）は履歴で出やすくなるが、切れ目はエンジン部分候補が決める（[`PLAN260603`](PLAN260603-azookey-desktop-selecting.md)）。
 
 ---
 
@@ -52,7 +52,7 @@ AzooKey の初期分割ではなく保存済みの境界を使って再現する
 
 1. テーブル名は `boundary_pref` でもよいが、**`engineClauseEnd` を上書きするのは `didExperienceSegmentEdition == true` の確定時のみ**
 2. `enterSegmentMode` では `defaultClauseEnd` のあと、保存値があれば `manualClauseEnd` 相当で初期化（AzooKey 結果より優先するかは POC 必須）
-3. 変換履歴（`history`）とは独立。`penalizeAll` / Backspace 連動は [`PLAN260503c`](PLAN260503c.md) を踏襲
+3. 変換履歴（`history`）とは独立。`penalizeAll` / Backspace 連動は [`PLAN260503c`](PLAN260503c-correction-signal-learning.md) を踏襲
 4. テスト: [`testHistoryDoesNotOverrideSegmentClauseEnd`](../Core/Sources/CoreTests/InputHandlerSegmentTests.swift) と併存する「pref あり時のみ境界が変わる」ケース
 
 検証コマンド（履歴非干渉の回帰）:
@@ -118,6 +118,6 @@ CREATE TABLE IF NOT EXISTS boundary_pref (
 
 ## 関連
 
-- 削除作業: [`PLAN260523g.md`](PLAN260523g.md)
-- 文節境界正本: [`PLAN260603.md`](PLAN260603.md)
-- LLM 境界保存案（同様に obsolete）: [`PLAN260503e.md`](PLAN260503e.md)
+- 削除作業: [`PLAN260523g-boundary-pref-removal.md`](PLAN260523g-boundary-pref-removal.md)
+- 文節境界正本: [`PLAN260603-azookey-desktop-selecting.md`](PLAN260603-azookey-desktop-selecting.md)
+- LLM 境界保存案（同様に obsolete）: [`PLAN260503e-boundary-pref-auto-save.md`](PLAN260503e-boundary-pref-auto-save.md)

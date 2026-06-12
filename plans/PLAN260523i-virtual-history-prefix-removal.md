@@ -1,7 +1,7 @@
 # Step 4: `virtualHistoryPrefix` 廃止
 
 作成: 2026-05-23  
-親計画: [`PLAN260523e.md`](PLAN260523e.md)
+親計画: [`PLAN260523e-ime-simplification-phase2.md`](PLAN260523e-ime-simplification-phase2.md)
 
 ## ゴール
 

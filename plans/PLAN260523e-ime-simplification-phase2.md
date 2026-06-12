@@ -8,11 +8,11 @@ related_commit: 6d8aec8
 
 ## 背景
 
-[`PLAN260523c.md`](PLAN260523c.md) / [`PLAN260523d.md`](PLAN260523d.md) で Phase 1（`LLMSuccessorFetcher` 層削除、`lowHistory` 廃止等）を実施した。
+[`PLAN260523c-ime-feature-audit.md`](PLAN260523c-ime-feature-audit.md) / [`PLAN260523d-ime-simplification-phase1.md`](PLAN260523d-ime-simplification-phase1.md) で Phase 1（`LLMSuccessorFetcher` 層削除、`lowHistory` 廃止等）を実施した。
 
 本 Phase 2 は **IME 入力・変換パイプライン** に限定し、前回の機能評価（2026-05-23 会話）で「有益性より削除メリットが大きい」と判断した項目の実装計画をまとめる。
 
-[`PLAN260523c.md`](PLAN260523c.md) では誤変換検出・`expandSuccessorPrefixes` 等を **維持** と判断していたが、本 Phase 2 では **削除・簡素化を再検討** する（理由は各 Step 計画書に記載）。
+[`PLAN260523c-ime-feature-audit.md`](PLAN260523c-ime-feature-audit.md) では誤変換検出・`expandSuccessorPrefixes` 等を **維持** と判断していたが、本 Phase 2 では **削除・簡素化を再検討** する（理由は各 Step 計画書に記載）。
 
 ## スコープ外（本 Phase 2 では触らない）
 
@@ -30,10 +30,10 @@ related_commit: 6d8aec8
 
 | Step | 計画書 | 内容 | 難度 | 依存 |
 |------|--------|------|------|------|
-| 1 | [`PLAN260523f.md`](PLAN260523f.md) | `LLMMisconversionChecker` 削除 | 中 | なし |
-| 2 | [`PLAN260523g.md`](PLAN260523g.md) | `boundary_pref` 削除 | 低 | なし |
-| 3 | [`PLAN260523h.md`](PLAN260523h.md) | Successor サブ経路の簡素化 | 高 | Step 2 不要。Step 1 と独立 PR 可 |
-| 4 | [`PLAN260523i.md`](PLAN260523i.md) | `virtualHistoryPrefix` 廃止 | 中 | **Step 3 後推奨**（pending 先読み削除で handle 前タイミングの理由が減る） |
+| 1 | [`PLAN260523f-misconversion-checker-removal.md`](PLAN260523f-misconversion-checker-removal.md) | `LLMMisconversionChecker` 削除 | 中 | なし |
+| 2 | [`PLAN260523g-boundary-pref-removal.md`](PLAN260523g-boundary-pref-removal.md) | `boundary_pref` 削除 | 低 | なし |
+| 3 | [`PLAN260523h-successor-simplification.md`](PLAN260523h-successor-simplification.md) | Successor サブ経路の簡素化 | 高 | Step 2 不要。Step 1 と独立 PR 可 |
+| 4 | [`PLAN260523i-virtual-history-prefix-removal.md`](PLAN260523i-virtual-history-prefix-removal.md) | `virtualHistoryPrefix` 廃止 | 中 | **Step 3 後推奨**（pending 先読み削除で handle 前タイミングの理由が減る） |
 
 ## 推奨実施順序
 
@@ -70,6 +70,6 @@ Step 1 (誤変換検出削除)
 
 ## 関連
 
-- 前提調査: [`PLAN260523c.md`](PLAN260523c.md)
-- Phase 1 実装: [`PLAN260523d.md`](PLAN260523d.md)
+- 前提調査: [`PLAN260523c-ime-feature-audit.md`](PLAN260523c-ime-feature-audit.md)
+- Phase 1 実装: [`PLAN260523d-ime-simplification-phase1.md`](PLAN260523d-ime-simplification-phase1.md)
 - prefix 展開の代替（将来）: [`ideas/IDEA260520b.md`](../ideas/IDEA260520b.md)（学習時分割記録）

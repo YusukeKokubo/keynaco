@@ -8,7 +8,7 @@ related_commit: 006f425
 
 2026-05-29 計測完了 — 機構は有効だが**データ量がボトルネック**。経過観察（データ蓄積）待ち。
 
-関連: [IDEA260529](../ideas/IDEA260529.md) #1 / 先行例 [POC260524](POC260524.md)（leftSideContext の効果実証）
+関連: [IDEA260529](../ideas/IDEA260529.md) #1 / 先行例 [POC260524](POC260524-zenzai-topic-inference.md)（leftSideContext の効果実証）
 
 ## 仮説
 

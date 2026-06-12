@@ -107,8 +107,8 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 
 ## 関連
 
-- 入力パイプライン簡素化: [`PLAN260523d.md`](PLAN260523d.md)（Step 4 `bracketOptions` 間引きは未着手）
-- パフォーマンス: [`PLAN260501.md`](PLAN260501.md)（AzooKey LRU は `AzooKeyConverter.candidateCache` に統合済み）
+- 入力パイプライン簡素化: [`PLAN260523d-ime-simplification-phase1.md`](PLAN260523d-ime-simplification-phase1.md)（Step 4 `bracketOptions` 間引きは未着手）
+- パフォーマンス: [`PLAN260501-performance-resources.md`](PLAN260501-performance-resources.md)（AzooKey LRU は `AzooKeyConverter.candidateCache` に統合済み）
 - メタルール: [`docs/retrospectives.md`](../docs/retrospectives.md)（フラグ横断・実機検証）
 
 ## 不確実性

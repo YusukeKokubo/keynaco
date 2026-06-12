@@ -10,7 +10,7 @@ related_commit: b8e059e
 
 ## 背景
 
-[POC260525b.md](POC260525b.md) で構造化出力（@Generable）が macOS 26 Beta の IME サンドボックス制限により使用不可であることを確認。
+[POC260525b-generable-pos-classification.md](POC260525b-generable-pos-classification.md) で構造化出力（@Generable）が macOS 26 Beta の IME サンドボックス制限により使用不可であることを確認。
 現実的な代替施策として以下の2つを実施する。
 
 ## 施策A: フィルターをブロックリスト方式に変更
@@ -134,4 +134,4 @@ let matched = validLabels.first { sanitized.hasPrefix($0) } ?? "other"
 
 ## 関連
 
-- [POC260525b.md](POC260525b.md) - @Generable POC 検証結果
+- [POC260525b-generable-pos-classification.md](POC260525b-generable-pos-classification.md) - @Generable POC 検証結果

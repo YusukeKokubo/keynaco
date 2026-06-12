@@ -2,7 +2,7 @@
 status: implemented
 created: 2026-06-03
 related_commit: 8f64dbe
-related_plan: plans/PLAN260603.md
+related_plan: plans/PLAN260603-azookey-desktop-selecting.md
 related_commits:
   - adc85ac  # Phase 1
   - e1ffa4a  # Phase 2
@@ -12,7 +12,7 @@ related_commits:
 
 # POC260603: 文節境界 — suffix 除去と部分候補供給
 
-親 PLAN: [`PLAN260603.md`](PLAN260603.md)（Phase 4・残タスクは PLAN 側で追跡）
+親 PLAN: [`PLAN260603-azookey-desktop-selecting.md`](PLAN260603-azookey-desktop-selecting.md)（Phase 4・残タスクは PLAN 側で追跡）
 
 ## Phase 1 — suffix / segmentize 境界フォールバック除去
 
@@ -102,4 +102,4 @@ related_commits:
 
 **#3 #4 の仮説成立。** 最長部分だけでは `私は:4` が勝つため、形態素境界（は/です）+ 読み一致が必要。表層の「艮一」は予測候補の先頭混入が原因で、文節モードのエンジン優先で解消。
 
-**残り（2026-06-04 時点）**: 上記は PLAN260603 で完了。履歴・`boundary_pref` triage → [`PLAN260603.md`](PLAN260603.md) フォローアップ節・[`PLAN260429e.md`](PLAN260429e.md)（deferred）。
+**残り（2026-06-04 時点）**: 上記は PLAN260603 で完了。履歴・`boundary_pref` triage → [`PLAN260603-azookey-desktop-selecting.md`](PLAN260603-azookey-desktop-selecting.md) フォローアップ節・[`PLAN260429e-segment-boundary-learning.md`](PLAN260429e-segment-boundary-learning.md)（deferred）。

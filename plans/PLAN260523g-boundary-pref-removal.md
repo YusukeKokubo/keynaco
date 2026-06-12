@@ -6,7 +6,7 @@ related_commit: 1644f7c
 
 # Step 2: `boundary_pref` 削除
 
-親計画: [`PLAN260523e.md`](PLAN260523e.md)
+親計画: [`PLAN260523e-ime-simplification-phase2.md`](PLAN260523e-ime-simplification-phase2.md)
 
 ## ゴール
 

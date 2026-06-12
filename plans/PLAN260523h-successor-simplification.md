@@ -1,7 +1,7 @@
 # Step 3: Successor サブ経路の簡素化
 
 作成: 2026-05-23  
-親計画: [`PLAN260523e.md`](PLAN260523e.md)
+親計画: [`PLAN260523e-ime-simplification-phase2.md`](PLAN260523e-ime-simplification-phase2.md)
 
 ## ゴール
 
@@ -25,10 +25,10 @@ Successor モード **本体**（名詞確定 → `pendingSuccessorCandidates` �
 
 ## 背景
 
-[`PLAN260523c.md`](PLAN260523c.md) では A を維持（「からの」→「から」ケース）。本 Step では **複雑さ対効果** で削除を再判断。
+[`PLAN260523c-ime-feature-audit.md`](PLAN260523c-ime-feature-audit.md) では A を維持（「からの」→「から」ケース）。本 Step では **複雑さ対効果** で削除を再判断。
 
 - A は [`ideas/IDEA260520.md`](../ideas/IDEA260520.md) の表示時パッチ。形態素解析なしの助詞ヒューリスティックで、根本原因（複合 bi-gram 蓄積）は [`ideas/IDEA260520b.md`](../ideas/IDEA260520b.md) 側
-- B と C は [`PLAN260428.md`](PLAN260428.md) 以降積み上がった **3 層の先読み/絞り込み**。同一モード内で状態フィールドが重複（`pendingSuccessorCandidates` vs `successorActiveCandidates`）
+- B と C は [`PLAN260428-successor-pending-romaji.md`](PLAN260428-successor-pending-romaji.md) 以降積み上がった **3 層の先読み/絞り込み**。同一モード内で状態フィールドが重複（`pendingSuccessorCandidates` vs `successorActiveCandidates`）
 
 ## A. prefix 展開削除
 
@@ -47,7 +47,7 @@ Successor モード **本体**（名詞確定 → `pendingSuccessorCandidates` �
 
 ### sandbox 回帰（削除前に記録推奨）
 
-[`PLAN260523c.md`](PLAN260523c.md) ケース: prev→「からの」bi-gram 登録後 `k` → `['からの', 'から']`  
+[`PLAN260523c-ime-feature-audit.md`](PLAN260523c-ime-feature-audit.md) ケース: prev→「からの」bi-gram 登録後 `k` → `['からの', 'から']`  
 削除後: `['からの']` のみ（**期待する退化**）
 
 ---

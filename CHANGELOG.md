@@ -6,7 +6,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 
 ## 2026-05-25 — sessionTextBuffer・content_bigram 廃止
 
-設計: [`plans/POC260525.md`](plans/POC260525.md) / 実装: [`plans/PLAN260525.md`](plans/PLAN260525.md)（`5edf2bc` → `86c163a`）
+設計: [`plans/POC260525-left-context-enhancement.md`](plans/POC260525-left-context-enhancement.md) / 実装: [`plans/PLAN260525-session-text-buffer.md`](plans/PLAN260525-session-text-buffer.md)（`5edf2bc` → `86c163a`）
 
 ### 追加
 - **sessionTextBuffer** — Zenzai 左文脈用インメモリバッファ（上限 50 字・文末 `。` でもリセットしない）。`resolvedLLMDocumentContextPrefix` の素材を `committedHistory.suffix(5)` から差し替え（`861bd8b`, `b66232e`）
@@ -224,7 +224,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - **F1 autoShow 対応** — `lastF1Eligible` から `!autoShow` 条件を撤廃し、文字入力中（autoShow）でも F1 が起動するように。`high` 確信度の場合のみ autoShow 中に `moveRow` を実行する
 - **テスト** — `parseChosenIndexWithConfidence` の境界例（スペース入り・大文字混在・`2:unknown`・コロンなし・範囲外）を追加
 
-> 関連: [PLAN260504a](plans/PLAN260504a.md)
+> 関連: [PLAN260504a](plans/PLAN260504a-homophone-auto-select.md)
 
 ---
 
@@ -236,7 +236,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - **`resolvedLLMDocumentContextPrefix`** — `LLMCandidateScorer` / `LLMSuccessorFetcher` に渡す文脈を「`before` 非空 → 末尾300字」「`before` 空 or `nil` → `committedHistory.suffix(5)`」の優先順で解決するヘルパーを追加
 - **テスト** — `MockIMKTextInputForSurrounding`（テストダブル）を使った境界テスト6件（`NSNotFound`・文頭・文頭付近・`totalLength == NSNotFound`・文末・通常ケース）を追加
 
-> 関連: [PLAN260504b](plans/PLAN260504b.md)
+> 関連: [PLAN260504b](plans/PLAN260504b-imk-surrounding-context.md)
 
 ---
 
@@ -310,7 +310,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - `DatabaseManager` に `saveBoundaryPref` / `fetchBoundaryPref` を追加
 - `performGCIfNeeded()` の対象に `boundary_pref` を追加（180日未使用で削除）
 
-> 関連: [PLAN260429e](plans/PLAN260429e.md)
+> 関連: [PLAN260429e](plans/PLAN260429e-segment-boundary-learning.md)
 
 ---
 
@@ -337,7 +337,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 ### 修正
 - `fetchHistoryPrefix` で同一出力が複数行返る重複候補を `GROUP BY output` で排除
 
-> 関連: [PLAN260429](plans/PLAN260429.md) · [PLAN260429b](plans/PLAN260429b.md) · [PLAN260429c](plans/PLAN260429c.md) · [IDEA260429](ideas/IDEA260429.md)
+> 関連: [PLAN260429](plans/PLAN260429-ime-quality-trio.md) · [PLAN260429b](plans/PLAN260429b-section-gc.md) · [PLAN260429c](plans/PLAN260429c-backspace-reconvert.md) · [IDEA260429](ideas/IDEA260429.md)
 
 ---
 
@@ -349,7 +349,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - **高信頼 bi-gram 即時表示** — 閾値（`successorImmediateThreshold` = 5回以上）を超えたペアを確定直後に即時表示
 - **pendingRomaji 先読み予測** — 組成前の1文字入力時に bi-gram/trigram/skip-bigram を先読みし、候補があれば Successor モードへ移行
 
-> 関連: [PLAN260428](plans/PLAN260428.md)
+> 関連: [PLAN260428](plans/PLAN260428-successor-pending-romaji.md)
 
 ---
 
@@ -371,7 +371,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - `nn` → `ん` 後の pending `n` を不可視化する標準 IME 準拠挙動（`hiddenPendingN`）
 - 入力ソースアイコンのキー名・フォーマット（TIFF）と、キーボード設定での表示名を修正
 
-> 関連: [PLAN260427](plans/PLAN260427.md) · [PLAN260427b](plans/PLAN260427b.md) · [PLAN260427c](plans/PLAN260427c.md) · [PLAN260427d](plans/PLAN260427d.md) · [PLAN260427e](plans/PLAN260427e.md)
+> 関連: [PLAN260427](plans/PLAN260427-trigram-extension.md) · [PLAN260427b](plans/PLAN260427b-codebase-refactor.md) · [PLAN260427c](plans/PLAN260427c-domain-docs-sync.md) · [PLAN260427d](plans/PLAN260427d-learning-keystroke-reduction.md) · [PLAN260427e](plans/PLAN260427e-phrase-learning-decay.md)
 
 ---
 
@@ -381,7 +381,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - 格助詞モード（`isParticleMode`）を **`isSuccessorMode`** にリネームし、格助詞に限らず全確定語の直後に bi-gram 予測を表示するよう拡張
 - 格助詞リストのフォールバック表示は名詞（漢字・カタカナ末尾）直後のみに制限
 
-> 関連: [PLAN260420](plans/PLAN260420.md)
+> 関連: [PLAN260420](plans/PLAN260420-prediction-type-reduction.md)
 
 ---
 
@@ -397,7 +397,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - `TISRegisterInputSource` による起動時の自動登録
 - 候補選択中の右矢印でひらがな組成に戻す（Electron 系アプリでの Enter 問題を回避）
 
-> 関連: [PLAN260418](plans/PLAN260418.md)
+> 関連: [PLAN260418](plans/PLAN260418-azookey-engine-migration.md)
 
 ---
 
@@ -416,7 +416,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - mozc システム辞書・ビルドスクリプト・okuri-ari 展開スクリプト
 - SKK-JISYO-L 関連ファイル
 
-> 関連: [PLAN260417](plans/PLAN260417.md)
+> 関連: [PLAN260417](plans/PLAN260417-mozc-dictionary.md)
 
 ---
 
@@ -429,7 +429,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - 組成中に句読点を入力したとき候補ウィンドウを開く
 - `InputHandler` を `InputController` から分離し XCTest によるユニットテストを可能にした
 
-> 関連: [PLAN260412](plans/PLAN260412.md) · [PLAN260412b](plans/PLAN260412b.md)
+> 関連: [PLAN260412](plans/PLAN260412-segment-split-conversion.md) · [PLAN260412b](plans/PLAN260412b-segment-dp-history-scoring.md)
 
 ---
 
@@ -439,7 +439,7 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 - Xcode scheme post-action によるビルド→`/Library/Input Methods/` への自動コピーとプロセス再起動
 - `CompositionState`（未確定文字列の状態）を `InputController` から分離しテスト可能に
 
-> 関連: [PLAN260411](plans/PLAN260411.md)
+> 関連: [PLAN260411](plans/PLAN260411-local-dev-improvements.md)
 
 ---
 

@@ -2,7 +2,7 @@
 status: draft
 created: 2026-05-28
 references:
-  - plans/PLAN260528b.md
+  - plans/PLAN260528b-history-phrase-recording.md
 ---
 
 # PLAN260528: 履歴候補を文節単位で記録し、助詞付きフレーズのノイズを除去

@@ -1,7 +1,7 @@
 # Step 3: 確定時 shadow segmentize 学習削除
 
 作成: 2026-05-23  
-親計画: [`PLAN260523j.md`](PLAN260523j.md)（Phase 3 Step 2）
+親計画: [`PLAN260523j-ime-simplification-phase3.md`](PLAN260523j-ime-simplification-phase3.md)（Phase 3 Step 2）
 
 ## ゴール
 

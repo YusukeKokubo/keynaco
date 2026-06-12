@@ -96,4 +96,4 @@ keynaco の IME 機能を棚卸しし、役割が不明瞭または削除する�
 
 アクション 2（`tryManualBisection`）・4（`expandSuccessorPrefixes`）は sandbox 確認の結果 **削除しない** と判断。コード変更なし。
 
-後続: [`PLAN260523d.md`](PLAN260523d.md) で IME 入力パイプライン簡素化（Step 1–3 完了、Step 4 未着手）。
+後続: [`PLAN260523d-ime-simplification-phase1.md`](PLAN260523d-ime-simplification-phase1.md) で IME 入力パイプライン簡素化（Step 1–3 完了、Step 4 未着手）。

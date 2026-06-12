@@ -2,7 +2,7 @@
 
 ## Context
 
-`PLAN260420.md` 案 3 を実装する。現状の予測入力は `bigram(prev, input, output)` で 1 語前のみを文脈化しているが、2 語前まで遡る `trigram(prev2, prev1, input, output)` を追加することで、案 1（Successor モード）の予測精度を底上げする。
+`PLAN260420-prediction-type-reduction.md` 案 3 を実装する。現状の予測入力は `bigram(prev, input, output)` で 1 語前のみを文脈化しているが、2 語前まで遡る `trigram(prev2, prev1, input, output)` を追加することで、案 1（Successor モード）の予測精度を底上げする。
 
 例: 「昨日 / 東京 / に」と続いたとき、bigram だけでは `行く` `住む` `戻る` が混在するが、trigram があれば `行った` を最上位に出せる。
 

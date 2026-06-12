@@ -1,7 +1,7 @@
 # Step 1: `LLMMisconversionChecker` 削除
 
 作成: 2026-05-23  
-親計画: [`PLAN260523e.md`](PLAN260523e.md)
+親計画: [`PLAN260523e-ime-simplification-phase2.md`](PLAN260523e-ime-simplification-phase2.md)
 
 ## ゴール
 
@@ -11,7 +11,7 @@
 
 - 確定のたびに 0.5 秒デバウンス後 `LanguageModelSession` を起動（`InputController+LLM.swift:62`）
 - IME 変換そのものには寄与せず、事後監査＋メニューバー `⌨!` / バナー通知のみ
-- [`PLAN260523c.md`](PLAN260523c.md) では通知改善で維持したが、**入力体験のコスト（LLM 競合・誤検知ノイズ）> 有益性** と再判断
+- [`PLAN260523c-ime-feature-audit.md`](PLAN260523c-ime-feature-audit.md) では通知改善で維持したが、**入力体験のコスト（LLM 競合・誤検知ノイズ）> 有益性** と再判断
 
 ## 削除対象
 

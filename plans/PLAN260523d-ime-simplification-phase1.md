@@ -10,7 +10,7 @@ Step 1–3 完了（`8a08ae1`）。Step 4（`bracketOptions` 間引き）は未�
 
 ## 背景
 
-[`PLAN260523c.md`](PLAN260523c.md) で IME 機能を棚卸しし、入力パイプライン（キー → 組成 → 候補 → 確定 → 次語予測）に限定して削除候補を洗い出した。
+[`PLAN260523c-ime-feature-audit.md`](PLAN260523c-ime-feature-audit.md) で IME 機能を棚卸しし、入力パイプライン（キー → 組成 → 候補 → 確定 → 次語予測）に限定して削除候補を洗い出した。
 
 本計画は **IME 入力機能のみ** を対象とする。設定画面・履歴メンテ・デバッグ UI・確定後通知系はスコープ外。
 
@@ -270,7 +270,7 @@ Step 1 (punctuationMap)
 |----------|------|
 | `8a08ae1` | Step 1–3 一括: `punctuationMap` / `handlePunctuation` 削除、`LLMSuccessorFetcher` 層削除、`lowHistory` 廃止、domain docs・sandbox スキル更新 |
 
-前提調査: [`PLAN260523c.md`](PLAN260523c.md)（`476e7f5` SegmentizeLRUCache 削除、`a981716` 誤変換通知改善 等）。
+前提調査: [`PLAN260523c-ime-feature-audit.md`](PLAN260523c-ime-feature-audit.md)（`476e7f5` SegmentizeLRUCache 削除、`a981716` 誤変換通知改善 等）。
 
 ## 見積もり
 

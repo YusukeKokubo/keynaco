@@ -100,6 +100,6 @@ Apple Intelligence は対応デバイス・言語設定が必要。使えない�
 ## 関連ドキュメント
 
 - `docs/rejected.md` — H-1: `@Generable` 構造化出力の不採用理由（IME サンドボックスによるハング）
-- `plans/PLAN260527.md` — Apple Intelligence を使った日記自動生成の実装計画
+- `plans/PLAN260527-ai-diary-generation.md` — Apple Intelligence を使った日記自動生成の実装計画
 - `scripts/poc_proper_noun_ai.swift` — 固有名詞検出 POC スクリプト（2026-05-27）
 - `keynaco/Debug/DebugGuidedGenerationTest.swift` — 本体アプリでの Guided Generation 動作確認ツール（2026-05-27）

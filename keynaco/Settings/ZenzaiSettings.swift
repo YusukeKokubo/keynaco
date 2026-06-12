@@ -5,7 +5,7 @@ enum ZenzaiSettings {
     static let enabledKey = "keynaco.zenzai.enabled"
     static let profileKey = "keynaco.zenzai.profile"
     static let inferenceLimitKey = "keynaco.zenzai.inferenceLimit"
-    // topic/style/preference は zenz-v3.1-small では効果なし（POC260524 参照: plans/POC260524.md）
+    // topic/style/preference は zenz-v3.1-small では効果なし（POC260524 参照: plans/POC260524-zenzai-topic-inference.md）
 
     static func makeConverter() -> AzooKeyConverter {
         let d = UserDefaults.standard

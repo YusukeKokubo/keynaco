@@ -4,7 +4,7 @@
 
 ## 背景
 
-Phase 2（[`PLAN260523e.md`](PLAN260523e.md)）完了後、2026-05-23 の IME 機能棚卸し会話で **残存する削除候補** を再評価した。
+Phase 2（[`PLAN260523e-ime-simplification-phase2.md`](PLAN260523e-ime-simplification-phase2.md)）完了後、2026-05-23 の IME 機能棚卸し会話で **残存する削除候補** を再評価した。
 
 会話中に以下は **削除候補から除外**（維持確定）:
 
@@ -23,9 +23,9 @@ Phase 2（[`PLAN260523e.md`](PLAN260523e.md)）完了後、2026-05-23 の IME �
 
 | Step | 計画書 | 内容 | 難度 | 依存 |
 |------|--------|------|------|------|
-| 1 | [`PLAN260523k.md`](PLAN260523k.md) | dead code 削除（`mostRecentContentWord*`） | 低 | なし |
-| 2 | [`PLAN260523m.md`](PLAN260523m.md) | 確定時 shadow segmentize 学習削除 | 中 | なし |
-| 3 | [`PLAN260523q.md`](PLAN260523q.md) | domain docs の stale 記述整理 | 低 | Step 1–2 後推奨 |
+| 1 | [`PLAN260523k-dead-code-removal.md`](PLAN260523k-dead-code-removal.md) | dead code 削除（`mostRecentContentWord*`） | 低 | なし |
+| 2 | [`PLAN260523m-shadow-segmentize-removal.md`](PLAN260523m-shadow-segmentize-removal.md) | 確定時 shadow segmentize 学習削除 | 中 | なし |
+| 3 | [`PLAN260523q-domain-docs-cleanup.md`](PLAN260523q-domain-docs-cleanup.md) | domain docs の stale 記述整理 | 低 | Step 1–2 後推奨 |
 
 ## 推奨実施順序
 
@@ -68,4 +68,4 @@ Step 1 (dead code)
 ## 関連
 
 - 前提調査: 2026-05-23 IME 機能棚卸し会話
-- Phase 2 完了: [`PLAN260523e.md`](PLAN260523e.md)（`4e3cbd1`–`6d8aec8`）
+- Phase 2 完了: [`PLAN260523e-ime-simplification-phase2.md`](PLAN260523e-ime-simplification-phase2.md)（`4e3cbd1`–`6d8aec8`）

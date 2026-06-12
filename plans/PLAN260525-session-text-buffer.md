@@ -6,7 +6,7 @@ related_commit: 86c163a
 
 # PLAN260525: sessionTextBuffer 導入による Zenzai 左文脈強化
 
-**前提 POC**: [POC260525.md](POC260525.md)
+**前提 POC**: [POC260525-left-context-enhancement.md](POC260525-left-context-enhancement.md)
 
 ## 実装コミット
 

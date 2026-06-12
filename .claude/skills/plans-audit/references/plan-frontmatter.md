@@ -2,6 +2,19 @@
 
 `plans/PLAN*.md` / `plans/POC*.md` 新規作成時はファイル冒頭に YAML frontmatter を付ける。
 
+## ファイル名
+
+```
+PLANYYMMDD[-letter]-<slug>.md
+POCYYMMDD[-letter]-<slug>.md
+```
+
+- **ID**（`PLAN260612` 等）: 本文見出し `# PLAN260612: …` と frontmatter の参照用。日付 + 同日複数なら末尾 letter。
+- **slug**: 英小文字 kebab-case の概要（2〜5 語）。Finder / `ls` で内容が分かるようにする。
+- 例: `PLAN260605-workarounds-audit.md`、`PLAN260612-async-candidate-pipeline.md`
+
+本文中の plan ID（`PLAN260612:`）はファイル名と独立してよい。リンク・`superseded_by` は **リネーム後のファイル名**（`.md` 付き）を使う。
+
 ## スキーマ
 
 ```yaml
@@ -10,7 +23,7 @@ status: draft | in-progress | implemented | abandoned | superseded
 created: 2026-MM-DD
 related_commit: <hash>           # status: implemented のとき
 related_rejected: F-1            # status: abandoned のとき（rejected.md のエントリ番号 / 見出し）
-superseded_by: PLAN260528.md     # status: superseded のとき
+superseded_by: PLAN260528-history-segment-noise.md  # status: superseded のとき
 ---
 ```
 
