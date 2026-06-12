@@ -171,6 +171,16 @@ final class CompositionStateTests: XCTestCase {
         XCTAssertEqual(s.finalizedText, "あ")
     }
 
+    // MARK: - composedHiraganaAfterAbsorbingPending
+
+    func testComposedHiraganaAfterAbsorbingPendingForceFinalizesPending() {
+        var s = CompositionState()
+        _ = s.addRomaji("k")
+        _ = s.addRomaji("a")
+        _ = s.addRomaji("n")
+        XCTAssertEqual(s.composedHiraganaAfterAbsorbingPending(), "かん")
+    }
+
     // MARK: - absorbPendingIntoComposed
 
     func testAbsorbPendingIntoComposedAfterNNDiscardsHiddenN() {

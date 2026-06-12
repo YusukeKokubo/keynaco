@@ -213,6 +213,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             cache: &handler.leftContextIMKCache,
             cursorLocation: adapter.selectedRange().location
         )
+        warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
         let generation = azooKeyScheduler.onKeyDown()
         let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
         let ctx = handler.candidateSession.makeContext()

@@ -38,6 +38,13 @@ public struct CompositionState {
         hiddenPendingN ? composedHiragana : composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
     }
 
+    /// Space 確定前など、`absorbPendingIntoComposed` 後の `composedHiragana` を非破壊で見積もる。
+    public func composedHiraganaAfterAbsorbingPending() -> String {
+        guard !pendingRomaji.isEmpty else { return composedHiragana }
+        if hiddenPendingN { return composedHiragana }
+        return composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
+    }
+
     /// `pendingRomaji` を `composedHiragana` へ取り込む。`hiddenPendingN` のときは `finalizedText` と同じく捨てるだけ。
     public mutating func absorbPendingIntoComposed() {
         guard !pendingRomaji.isEmpty else { return }

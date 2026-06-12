@@ -203,8 +203,14 @@ extension InputHandler {
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
-        if trigger == .whileTyping && sources.highHistoryCount == 0 && sources.azooKeyCandidates.isEmpty
-            && sources.userDictRaw.isEmpty && dateTimeCandidates.isEmpty && numberCandidates.isEmpty {
+        // defer 有効時は AzooKey 到着前でも読みのひらがな/カタカナを即時出す（空ウィンドウ充填ではない）。
+        if trigger == .whileTyping,
+           !deferAzooKeyWhileTyping,
+           sources.highHistoryCount == 0,
+           sources.azooKeyCandidates.isEmpty,
+           sources.userDictRaw.isEmpty,
+           dateTimeCandidates.isEmpty,
+           numberCandidates.isEmpty {
             return .dismiss
         }
 

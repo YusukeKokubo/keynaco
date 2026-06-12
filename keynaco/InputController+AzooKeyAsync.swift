@@ -8,6 +8,19 @@ extension InputController {
         azooKeyScheduler.cancelPendingWork()
     }
 
+    /// Space 押下で `onKeyDown` が debounce を潰す前に rich キャッシュを温める。
+    func warmRichCacheBeforeExplicitIfNeeded(keyCode: UInt16) {
+        guard keyCode == KeyCode.space else { return }
+        let state = handler.state
+        guard !state.composedHiragana.isEmpty || !state.pendingRomaji.isEmpty else { return }
+        let reading = state.composedHiraganaAfterAbsorbingPending()
+        azooKeyScheduler.warmRichCacheForExplicit(
+            reading: reading,
+            leftSideContext: handler.leftContext.azooKeyValue,
+            converter: handler.azooKeyConverter
+        )
+    }
+
     func scheduleAzooKeyReplacementIfNeeded(
         generation: Int,
         consumed: Bool,

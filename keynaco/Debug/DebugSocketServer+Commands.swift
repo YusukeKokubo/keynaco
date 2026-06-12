@@ -458,6 +458,7 @@ extension DebugSocketServer {
         && pendingRomajiWasEmpty
     ) ? handler.lastConfirmedContext?.output : nil
     syncLeftSideContext()
+    warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
     let generation = azooKeyScheduler.onKeyDown()
     let before = makeResponse(inserted: [])
     let (consumed, action) = handler.handle(
@@ -568,8 +569,11 @@ extension DebugSocketServer {
         let config = cmd["benchmark"] as! [String: Any]
         let includeAzooKey = config["includeAzooKey"] as? String
         let durations: [Double]
-        if includeAzooKey == "space" {
-            durations = await runSpaceKeyBenchmark(config: config)
+        if includeAzooKey == "space" || includeAzooKey == "space_immediate" {
+            durations = await runSpaceKeyBenchmark(
+                config: config,
+                waitForPrefetch: includeAzooKey == "space"
+            )
         } else {
             durations = runSyncKeyBenchmark(config: config)
         }
@@ -643,7 +647,10 @@ extension DebugSocketServer {
         return durations
     }
 
-    private func runSpaceKeyBenchmark(config: [String: Any]) async -> [Double] {
+    private func runSpaceKeyBenchmark(
+        config: [String: Any],
+        waitForPrefetch: Bool
+    ) async -> [Double] {
         let sequence = config["sequence"] as? String ?? "kanzi"
         let repeatCount = config["repeat"] as? Int ?? 50
         let leftContextStr = config["leftContext"] as? String ?? ""
@@ -658,7 +665,9 @@ extension DebugSocketServer {
             for ch in sequence {
                 benchmarkSimulateKey(characters: String(ch))
             }
-            _ = await azooKeyScheduler.waitUntilIdle()
+            if waitForPrefetch {
+                _ = await azooKeyScheduler.waitUntilIdle()
+            }
             let t0 = CFAbsoluteTimeGetCurrent()
             benchmarkSimulateKey(keyCode: KeyCode.space, characters: " ", baseCharacters: " ")
             let dtMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000.0

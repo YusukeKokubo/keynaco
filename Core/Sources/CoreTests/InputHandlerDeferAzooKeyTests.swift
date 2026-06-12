@@ -40,6 +40,17 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
     }
 
     /// Phase 3: 非同期経路は `richCandidates: true`（Space 先読みと同一キー）。
+    func testDefer_immediateFixedHiraganaWhileAzooKeyPending() {
+        typeRomaji("kanzi")
+        let (action, pending) = handler.buildCandidateListWithoutAzooKey(trigger: .whileTyping)
+        XCTAssertEqual(pending, "かんじ")
+        guard case .show(let show) = action else {
+            return XCTFail("expected show while AzooKey pending, got \(action)")
+        }
+        XCTAssertTrue(show.candidates.contains("かんじ"))
+        XCTAssertTrue(show.candidates.contains("カンジ"))
+    }
+
     func testDefer_injectPathMatchesSyncWhileTyping_withRichPrefetch() {
         let stub = RichCapturingStub(lines: ["漢字", "感じ"])
         setUpWithConverter(stub)

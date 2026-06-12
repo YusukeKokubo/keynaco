@@ -39,6 +39,22 @@ final class AzooKeyAsyncScheduler {
         pendingTask = nil
     }
 
+    /// Space 等の明示変換直前に呼ぶ。debounce 中の prefetch を止め、rich キャッシュを同期で温める。
+    /// 走行中の detached 呼び出しがあれば `AzooKeyConverter` の Lock で直列待ちする。
+    func warmRichCacheForExplicit(
+        reading: String,
+        leftSideContext: String?,
+        converter: any AzooKeyConverting
+    ) {
+        cancelPendingWork()
+        guard !reading.isEmpty, !reading.allSatisfy(\.isASCII) else { return }
+        _ = converter.requestCandidates(
+            hiragana: reading,
+            leftSideContext: leftSideContext,
+            richCandidates: true
+        )
+    }
+
     func schedule(
         generation: Int,
         reading: String,

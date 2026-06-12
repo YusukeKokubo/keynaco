@@ -21,6 +21,18 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
         XCTAssertEqual(stub.lastRichCandidates, true)
     }
 
+    func testWarmRichCacheForExplicitCallsConverter() {
+        let scheduler = AzooKeyAsyncScheduler()
+        let stub = RichFlagStub()
+        scheduler.warmRichCacheForExplicit(
+            reading: "かんじ",
+            leftSideContext: nil,
+            converter: stub
+        )
+        XCTAssertEqual(stub.lastRichCandidates, true)
+        XCTAssertEqual(stub.requestCount, 1)
+    }
+
     func testStaleGenerationSkipsDetachedWork() async {
         let scheduler = AzooKeyAsyncScheduler()
         let stub = RichFlagStub()
@@ -40,8 +52,10 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
 private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {
     var isZenzaiEnabled: Bool { false }
     private(set) var lastRichCandidates: Bool?
+    private(set) var requestCount = 0
 
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        requestCount += 1
         lastRichCandidates = richCandidates
         return ["漢字"]
     }
