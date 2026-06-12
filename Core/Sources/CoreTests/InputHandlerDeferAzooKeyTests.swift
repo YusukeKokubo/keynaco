@@ -38,6 +38,59 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
         typeRomaji("no")
         assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
     }
+
+    /// Phase 3: 非同期経路は `richCandidates: true`（Space 先読みと同一キー）。
+    func testDefer_injectPathMatchesSyncWhileTyping_withRichPrefetch() {
+        let stub = RichCapturingStub(lines: ["漢字", "感じ"])
+        setUpWithConverter(stub)
+        handler.deferAzooKeyWhileTyping = true
+        typeRomaji("ai")
+        assertInjectPathMatchesSyncRich(stub: stub, trigger: .whileTyping)
+        XCTAssertEqual(stub.lastRichCandidates, true)
+    }
+}
+
+extension InputHandlerTestCase {
+    /// 非同期 AzooKey（rich=true 先読み）と同期 `.whileTyping` の最終リスト一致。
+    func assertInjectPathMatchesSyncRich(
+        stub: any AzooKeyConverting,
+        trigger: CandidateListTrigger = .explicit,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let sync = handler.buildCandidateList(trigger: trigger)
+        let (_, pending) = handler.buildCandidateListWithoutAzooKey(trigger: trigger)
+        guard let reading = pending else {
+            XCTFail("expected pending reading", file: file, line: line)
+            return
+        }
+        let azooKey = stub.requestCandidates(
+            hiragana: reading,
+            leftSideContext: handler.leftContext.azooKeyValue,
+            richCandidates: true
+        )
+        let inject = handler.rebuildCandidateList(
+            reading: reading,
+            azooKeyCandidates: azooKey,
+            trigger: trigger
+        )
+        assertCandidateActionEqual(sync, inject, file: file, line: line)
+    }
+}
+
+private final class RichCapturingStub: BaseAzooKeyStub, @unchecked Sendable {
+    let lines: [String]
+    private(set) var lastRichCandidates: Bool?
+
+    init(lines: [String]) {
+        self.lines = lines
+        super.init()
+    }
+
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        lastRichCandidates = richCandidates
+        return lines
+    }
 }
 
 private final class CountingAzooKeyStub: BaseAzooKeyStub, @unchecked Sendable {

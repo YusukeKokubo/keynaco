@@ -36,6 +36,7 @@
 		9F5BA854FBF7AFBCE8215977 /* NSManualApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF84CE1FD39376C1BC2A710C /* NSManualApplication.swift */; };
 		B1F3B8643749DE7DAA9B3E40 /* InputSource@2x.tiff in Resources */ = {isa = PBXBuildFile; fileRef = AED425059C465687B7765B08 /* InputSource@2x.tiff */; };
 		B2ABABD46456BA4A8BC0BDA8 /* SurroundingIMKContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */; };
+		C3D4E5F60718293A4B5C6E01 /* AzooKeyAsyncSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F60718293A4B5C6E02 /* AzooKeyAsyncSchedulerTests.swift */; };
 		CC81B691B4422E5779491EE0 /* UserDictViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */; };
 		CF5D2357CC1B6C7209F9918F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC83CA0F9C13530D08702297 /* main.swift */; };
 		E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A755C9097E561BF05FF3D11 /* InputController.swift */; };
@@ -82,6 +83,7 @@
 		832F32ABB6EE507DA374CA3E /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		8EB7EDA4E75C67B6FFD6F9B6 /* ggml-model-Q5_K_M.gguf */ = {isa = PBXFileReference; path = "ggml-model-Q5_K_M.gguf"; sourceTree = "<group>"; };
 		A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundingIMKContextTests.swift; sourceTree = "<group>"; };
+		C3D4E5F60718293A4B5C6E02 /* AzooKeyAsyncSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyAsyncSchedulerTests.swift; sourceTree = "<group>"; };
 		AC5B60092B9315A5731AEF44 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		AED425059C465687B7765B08 /* InputSource@2x.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = "InputSource@2x.tiff"; sourceTree = "<group>"; };
 		AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
@@ -174,6 +176,7 @@
 		3EAA0BCEDB8E175E01567587 /* keynacoTests */ = {
 			isa = PBXGroup;
 			children = (
+				C3D4E5F60718293A4B5C6E02 /* AzooKeyAsyncSchedulerTests.swift */,
 				A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */,
 			);
 			path = keynacoTests;
@@ -331,6 +334,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C3D4E5F60718293A4B5C6E01 /* AzooKeyAsyncSchedulerTests.swift in Sources */,
 				B2ABABD46456BA4A8BC0BDA8 /* SurroundingIMKContextTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

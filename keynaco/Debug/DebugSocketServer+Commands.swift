@@ -551,82 +551,159 @@ extension DebugSocketServer {
     /// - `sequence`: 打鍵する文字列（デフォルト `"kanzi"`）
     /// - `repeat`: 繰り返し回数（デフォルト 200）
     /// - `leftContext`: AzooKey / Zenzai に渡す左文脈（デフォルト空 = 文脈なし）
+    /// - `includeAzooKey`: `"space"` — 各イテレーションで type → `wait_azoo_key` → Space `handle()` のみ計測
     func handleBenchmark(cmd: [String: Any]) -> [String: Any] {
         let config = cmd["benchmark"] as! [String: Any]
+        if config["includeAzooKey"] as? String == "space" {
+            return ["error": "includeAzooKey=space requires async benchmark; use processCommandAsync"]
+        }
+        return finalizeBenchmark(
+            cmd: cmd,
+            config: config,
+            durations: runSyncKeyBenchmark(config: config)
+        )
+    }
+
+    func handleBenchmarkAsync(cmd: [String: Any]) async -> [String: Any] {
+        let config = cmd["benchmark"] as! [String: Any]
+        let includeAzooKey = config["includeAzooKey"] as? String
+        let durations: [Double]
+        if includeAzooKey == "space" {
+            durations = await runSpaceKeyBenchmark(config: config)
+        } else {
+            durations = runSyncKeyBenchmark(config: config)
+        }
+        return finalizeBenchmark(cmd: cmd, config: config, durations: durations)
+    }
+
+    private func configureBenchmarkConverter(leftContextStr: String) {
+        let converter = ZenzaiSettings.makeConverter()
+        handler.azooKeyConverter = converter
+        handler.leftContext = leftContextStr.isEmpty
+            ? .empty
+            : LeftContext(sessionBuffer: "", imkBefore: nil, combined: leftContextStr)
+    }
+
+    private func resetBenchmarkIteration() {
+        handler.state = CompositionState()
+        handler.candidateSession.reset()
+        _ = mockClient.consume()
+        mockClient.reset()
+        InputHandler.isAsciiMode = false
+    }
+
+    private func benchmarkSimulateKey(
+        keyCode: UInt16 = 0,
+        characters: String,
+        baseCharacters: String? = nil
+    ) {
+        let base = baseCharacters ?? characters
+        syncLeftSideContext()
+        let generation = azooKeyScheduler.onKeyDown()
+        let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
+        let (consumed, action) = handler.handle(
+            keyCode: keyCode,
+            characters: characters,
+            baseCharacters: base,
+            modifiers: [],
+            candidate: handler.candidateSession.makeContext(),
+            client: mockClient
+        )
+        handler.applyPostKeyDownCandidateAndIMK(
+            consumed: consumed,
+            action: action,
+            client: mockClient,
+            composedHiraganaWasEmpty: composedHiraganaWasEmpty,
+            didInsertText: mockClient.hasPendingInsertions
+        )
+        scheduleSandboxAzooKeyIfNeeded(generation: generation, consumed: consumed)
+        _ = mockClient.consume()
+    }
+
+    private func runSyncKeyBenchmark(config: [String: Any]) -> [Double] {
         let sequence = config["sequence"] as? String ?? "kanzi"
         let repeatCount = config["repeat"] as? Int ?? 200
         let leftContextStr = config["leftContext"] as? String ?? ""
 
+        configureBenchmarkConverter(leftContextStr: leftContextStr)
+
         var durations: [Double] = []
         durations.reserveCapacity(sequence.count * repeatCount)
 
-        // converter は繰り返し間で使いまわす（辞書ロード済み状態を維持）
-        let converter = ZenzaiSettings.makeConverter()
-        handler.azooKeyConverter = converter
-
-        handler.leftContext = leftContextStr.isEmpty
-            ? .empty
-            : LeftContext(sessionBuffer: "", imkBefore: nil, combined: leftContextStr)
-
         for _ in 0..<repeatCount {
-            handler.state = CompositionState()
-            handler.candidateSession.reset()
-            _ = mockClient.consume()
-            mockClient.reset()
-            InputHandler.isAsciiMode = false
-
+            resetBenchmarkIteration()
             for ch in sequence {
                 let s = String(ch)
                 let t0 = CFAbsoluteTimeGetCurrent()
-                let ctx = handler.candidateSession.makeContext()
-                let (consumed, action) = handler.handle(
-                    keyCode: 0,
-                    characters: s,
-                    baseCharacters: s,
-                    modifiers: [],
-                    candidate: ctx,
-                    client: mockClient
-                )
+                benchmarkSimulateKey(characters: s)
                 let dtMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000.0
                 durations.append(dtMs)
-                handler.applyPostKeyDownCandidateAndIMK(
-                    consumed: consumed,
-                    action: action,
-                    client: mockClient,
-                    composedHiraganaWasEmpty: false,
-                    didInsertText: mockClient.hasPendingInsertions
-                )
-                _ = mockClient.consume()
             }
         }
+        return durations
+    }
 
-        durations.sort()
-        let count = durations.count
+    private func runSpaceKeyBenchmark(config: [String: Any]) async -> [Double] {
+        let sequence = config["sequence"] as? String ?? "kanzi"
+        let repeatCount = config["repeat"] as? Int ?? 50
+        let leftContextStr = config["leftContext"] as? String ?? ""
+
+        configureBenchmarkConverter(leftContextStr: leftContextStr)
+
+        var durations: [Double] = []
+        durations.reserveCapacity(repeatCount)
+
+        for _ in 0..<repeatCount {
+            resetBenchmarkIteration()
+            for ch in sequence {
+                benchmarkSimulateKey(characters: String(ch))
+            }
+            _ = await azooKeyScheduler.waitUntilIdle()
+            let t0 = CFAbsoluteTimeGetCurrent()
+            benchmarkSimulateKey(keyCode: KeyCode.space, characters: " ", baseCharacters: " ")
+            let dtMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000.0
+            durations.append(dtMs)
+        }
+        return durations
+    }
+
+    private func finalizeBenchmark(
+        cmd: [String: Any],
+        config: [String: Any],
+        durations: [Double]
+    ) -> [String: Any] {
+        let sequence = config["sequence"] as? String ?? "kanzi"
+        let repeatCount = config["repeat"] as? Int ?? 200
+        let leftContextStr = config["leftContext"] as? String ?? ""
+        let includeAzooKey = config["includeAzooKey"] as? String
+
+        let sorted = durations.sorted()
+        let count = sorted.count
         guard count > 0 else {
             return Self.finalize(Self.errorPayload(code: "BENCHMARK_EMPTY", message: "no durations"), cmd: cmd)
         }
 
         func pct(_ p: Int) -> Double {
             let idx = min(count - 1, count * p / 100)
-            return round(durations[idx] * 10) / 10
+            return round(sorted[idx] * 10) / 10
         }
-        let mean = round(durations.reduce(0, +) / Double(count) * 10) / 10
+        let mean = round(sorted.reduce(0, +) / Double(count) * 10) / 10
 
-        return Self.finalize([
-            "benchmark": [
-                "sequence": sequence,
-                "repeat": repeatCount,
-                "totalKeys": count,
-                "zenzaiEnabled": handler.azooKeyConverter.isZenzaiEnabled,
-                "leftContext": leftContextStr,
-                "meanMs": mean,
-                "p50Ms": pct(50),
-                "p95Ms": pct(95),
-                "p99Ms": pct(99),
-                "maxMs": pct(100),
-                "exceeds16ms": pct(95) > 16.0,
-            ]
-        ], cmd: cmd)
+        var benchmark: [String: Any] = [
+            "sequence": sequence,
+            "repeat": repeatCount,
+            "totalKeys": count,
+            "zenzaiEnabled": handler.azooKeyConverter.isZenzaiEnabled,
+            "leftContext": leftContextStr,
+            "meanMs": mean,
+            "p50Ms": pct(50),
+            "p95Ms": pct(95),
+            "p99Ms": pct(99),
+            "maxMs": pct(100),
+            "exceeds16ms": pct(95) > 16.0,
+        ]
+        if let includeAzooKey { benchmark["includeAzooKey"] = includeAzooKey }
+        return Self.finalize(["benchmark": benchmark], cmd: cmd)
     }
 
     /// InputController.schedulePOSClassification と同経路で POS 分類を行う。

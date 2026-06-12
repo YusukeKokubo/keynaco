@@ -2,11 +2,22 @@ import Foundation
 import KeynacoCore
 
 /// `.whileTyping` の AzooKey 取得を debounce 付きで背景実行する。`InputController` と Debug ソケットが共有。
+///
+/// Phase 3: `richCandidates: true` で先読みし Space（`.explicit`）のキャッシュヒットを狙う。
 @MainActor
 final class AzooKeyAsyncScheduler {
     static let debounceNanoseconds: UInt64 = 70_000_000
 
+    /// `Task.detached` から generation を読むためのスレッドセーフミラー。
+    private final class LockedGeneration: @unchecked Sendable {
+        private var value = 0
+        private let lock = NSLock()
+        func set(_ v: Int) { lock.withLock { value = v } }
+        func get() -> Int { lock.withLock { value } }
+    }
+
     private(set) var candidateGeneration = 0
+    private let liveGeneration = LockedGeneration()
     private var pendingTask: Task<Void, Never>?
 
     var hasPendingWork: Bool {
@@ -18,6 +29,7 @@ final class AzooKeyAsyncScheduler {
     @discardableResult
     func onKeyDown() -> Int {
         candidateGeneration += 1
+        liveGeneration.set(candidateGeneration)
         cancelPendingWork()
         return candidateGeneration
     }
@@ -42,12 +54,15 @@ final class AzooKeyAsyncScheduler {
             let capturedReading = reading
             let capturedContext = leftSideContext
             let conv = converter
+            let genSnapshot = generation
+            let liveGen = liveGeneration
 
             let candidates = await Task.detached {
-                conv.requestCandidates(
+                guard liveGen.get() == genSnapshot else { return [String]() }
+                return conv.requestCandidates(
                     hiragana: capturedReading,
                     leftSideContext: capturedContext,
-                    richCandidates: false
+                    richCandidates: true
                 )
             }.value
 

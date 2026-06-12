@@ -1023,7 +1023,7 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["pos_backfill"] != nil { return handlePosBackfill(cmd: cmd) }
         if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
         if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
-        if cmd["benchmark"] is [String: Any] { return handleBenchmark(cmd: cmd) }
+        if cmd["benchmark"] is [String: Any] { return await handleBenchmarkAsync(cmd: cmd) }
         if cmd["test_suite"] is [[String: Any]] { return await handleTestSuite(cmd: cmd) }
         if cmd["sequence"] is [[String: Any]] { return await handleSequence(cmd: cmd) }
         if cmd["type_string"] is String { return await handleTypeString(cmd: cmd) }
