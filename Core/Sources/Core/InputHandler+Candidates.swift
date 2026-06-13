@@ -62,7 +62,8 @@ extension InputHandler {
         let sources = makeCandidateListSources(
             h: h,
             cheap: cheap,
-            azooKeyCandidates: azooKeyCandidates
+            azooKeyCandidates: azooKeyCandidates,
+            azooKeyApiOrder: peekRaw
         )
         let action = assembleCandidateList(from: sources, trigger: trigger)
         return (action, pendingReading)
@@ -88,7 +89,8 @@ extension InputHandler {
         let sources = makeCandidateListSources(
             h: reading,
             cheap: cheap,
-            azooKeyCandidates: sorted
+            azooKeyCandidates: sorted,
+            azooKeyApiOrder: filtered
         )
         return assembleCandidateList(from: sources, trigger: trigger)
     }
@@ -116,6 +118,8 @@ extension InputHandler {
     private struct CandidateListSources {
         let h: String
         let azooKeyCandidates: [String]
+        /// LCID ソート前の AzooKey API 順序。Zenzai 順位表示用。
+        let azooKeyApiOrder: [String]
         let userDictRaw: [String]
         let exactMatchHighHistory: [String]
         let highHistory: [String]
@@ -130,11 +134,12 @@ extension InputHandler {
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
         let cheap = collectCheapCandidateSources(readingOverride: readingOverride)
-        let sorted = fetchAzooKeyCandidates(reading: h, trigger: trigger)
+        let fetch = fetchAzooKeyCandidates(reading: h, trigger: trigger)
         return makeCandidateListSources(
             h: h,
             cheap: cheap,
-            azooKeyCandidates: sorted
+            azooKeyCandidates: fetch.sorted,
+            azooKeyApiOrder: fetch.apiOrder
         )
     }
 
@@ -178,11 +183,17 @@ extension InputHandler {
         )
     }
 
+    private struct AzooKeyFetch {
+        let sorted: [String]
+        /// LCID ソート前の filtered 配列。各候補の AzooKey 内部順位を Zenzai 表示用に残す。
+        let apiOrder: [String]
+    }
+
     private mutating func fetchAzooKeyCandidates(
         reading: String,
         trigger: CandidateListTrigger
-    ) -> [String] {
-        guard !reading.allSatisfy({ $0.isASCII }) else { return [] }
+    ) -> AzooKeyFetch {
+        guard !reading.allSatisfy({ $0.isASCII }) else { return AzooKeyFetch(sorted: [], apiOrder: []) }
         let richCandidates = trigger == .explicit
         let raw = azooKeyConverter.requestCandidates(
             hiragana: reading,
@@ -190,7 +201,8 @@ extension InputHandler {
             richCandidates: richCandidates
         )
         let filtered = raw.filter { !KanaUtils.isScriptMixed($0) }
-        return sortAzooKeyCandidates(filtered, reading: reading, richCandidates: richCandidates)
+        let sorted = sortAzooKeyCandidates(filtered, reading: reading, richCandidates: richCandidates)
+        return AzooKeyFetch(sorted: sorted, apiOrder: filtered)
     }
 
     private func sortAzooKeyCandidates(
@@ -224,11 +236,13 @@ extension InputHandler {
     private func makeCandidateListSources(
         h: String,
         cheap: CheapCandidateSources,
-        azooKeyCandidates: [String]
+        azooKeyCandidates: [String],
+        azooKeyApiOrder: [String] = []
     ) -> CandidateListSources {
         CandidateListSources(
             h: h,
             azooKeyCandidates: azooKeyCandidates,
+            azooKeyApiOrder: azooKeyApiOrder,
             userDictRaw: cheap.userDictRaw,
             exactMatchHighHistory: cheap.exactMatchHighHistory,
             highHistory: cheap.highHistory,
@@ -342,11 +356,14 @@ extension InputHandler {
             return .dismiss
         }
 
+        let zenzaiActive = azooKeyConverter.isZenzaiEnabled && leftContext.azooKeyValue != nil
+        let apiOrder = zenzaiActive ? sources.azooKeyApiOrder : []
         return .show(
             candidates: layout.candidates,
             historyEnd: layout.historyEnd,
             initialRow: layout.initialRow,
             fixedEnd: layout.fixedEnd,
+            azooKeyApiOrder: apiOrder,
             initialIsExplicitlySelected: trigger == .explicit
         )
     }

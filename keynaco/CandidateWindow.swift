@@ -12,6 +12,7 @@ private class CandidateRowView: NSView {
     let deleteButton = FirstMouseButton(title: "\u{2715}", target: nil, action: nil)
     let sectionDivider = NSView()
     let sectionLabel = NSTextField(labelWithString: "")
+    let zenzaiRankLabel = NSTextField(labelWithString: "")
 
     var isHistory: Bool = false {
         didSet {
@@ -49,12 +50,19 @@ private class CandidateRowView: NSView {
         sectionLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(sectionLabel)
 
+        zenzaiRankLabel.font = .systemFont(ofSize: 9)
+        zenzaiRankLabel.textColor = .quaternaryLabelColor
+        zenzaiRankLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(zenzaiRankLabel)
+
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
             deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            label.trailingAnchor.constraint(lessThanOrEqualTo: sectionLabel.leadingAnchor, constant: -4),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: zenzaiRankLabel.leadingAnchor, constant: -4),
+            zenzaiRankLabel.trailingAnchor.constraint(equalTo: sectionLabel.leadingAnchor, constant: -4),
+            zenzaiRankLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             sectionLabel.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -4),
             sectionLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             sectionDivider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
@@ -303,6 +311,11 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
         let labelText = model.sectionLabel(for: row)
         rowView.sectionLabel.stringValue = labelText
         rowView.sectionLabel.textColor = .tertiaryLabelColor
+        if let rank = model.zenzaiRank(for: row) {
+            rowView.zenzaiRankLabel.stringValue = "Z\(rank)"
+        } else {
+            rowView.zenzaiRankLabel.stringValue = ""
+        }
         rowView.sectionDivider.isHidden = !model.showsSectionDivider(at: row)
 
         return rowView

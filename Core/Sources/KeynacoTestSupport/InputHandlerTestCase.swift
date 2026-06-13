@@ -199,6 +199,7 @@ class InputHandlerTestCase: XCTestCase {
             XCTAssertEqual(l.historyEnd, r.historyEnd, "historyEnd", file: file, line: line)
             XCTAssertEqual(l.fixedEnd, r.fixedEnd, "fixedEnd", file: file, line: line)
             XCTAssertEqual(l.initialRow, r.initialRow, "initialRow", file: file, line: line)
+            XCTAssertEqual(l.azooKeyApiOrder, r.azooKeyApiOrder, "azooKeyApiOrder", file: file, line: line)
             XCTAssertEqual(
                 l.initialIsExplicitlySelected,
                 r.initialIsExplicitlySelected,

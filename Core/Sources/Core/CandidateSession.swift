@@ -34,6 +34,9 @@ public struct CandidateSession: Sendable, Equatable {
     public var isExplicitlySelected = false
     public var historyEnd = 0
     public var fixedEnd = 0
+    /// AzooKey API が返した順序（LCID ソート前）。Zenzai 有効 + 左文脈ありの `.show` でのみ非空。
+    /// 候補ウィンドウで「Zenzai のソート順位」を小さく表示するための情報。
+    public var azooKeyApiOrder: [String] = []
     /// 非 `nil` のとき括弧モード。候補リストはこの配列と同期する。
     public var bracketCandidates: [String]? = nil
 
@@ -71,6 +74,7 @@ public struct CandidateSession: Sendable, Equatable {
         isExplicitlySelected = false
         historyEnd = 0
         fixedEnd = 0
+        azooKeyApiOrder = []
         bracketCandidates = nil
     }
 
@@ -92,12 +96,13 @@ public struct CandidateSession: Sendable, Equatable {
         switch action {
         case .none:
             break
-        case .show(let cands, let he, let initial, let fe, let initialExplicit):
+        case .show(let cands, let he, let initial, let fe, let apiOrder, let initialExplicit):
             candidates = cands
             isVisible = !cands.isEmpty
             selectedRow = cands.isEmpty ? 0 : min(initial, cands.count - 1)
             historyEnd = he
             fixedEnd = fe
+            azooKeyApiOrder = apiOrder
             isExplicitlySelected = initialExplicit
         case .dismiss:
             reset()
@@ -124,6 +129,7 @@ public struct CandidateSession: Sendable, Equatable {
             isVisible = !cands.isEmpty
             selectedRow = 0
             isExplicitlySelected = false
+            azooKeyApiOrder = []
         }
     }
 }

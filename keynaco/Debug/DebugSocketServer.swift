@@ -1058,7 +1058,8 @@ final class DebugSocketServer: @unchecked Sendable {
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,
                 fixedEnd: snap.fixedEnd,
-                historyEnd: snap.historyEnd
+                historyEnd: snap.historyEnd,
+                azooKeyApiOrder: handler.candidateSession.azooKeyApiOrder
             ),
             "pendingAzooKey":     azooKeyScheduler.hasPendingWork,
         ]
@@ -1069,10 +1070,17 @@ final class DebugSocketServer: @unchecked Sendable {
     static func makeCandidateEntries(
         candidates: [String],
         fixedEnd: Int,
-        historyEnd: Int
+        historyEnd: Int,
+        azooKeyApiOrder: [String] = []
     ) -> [[String: Any]] {
-        candidates.enumerated().map { idx, text in
-            [
+        let rankByText: [String: Int]
+        if azooKeyApiOrder.isEmpty {
+            rankByText = [:]
+        } else {
+            rankByText = Dictionary(azooKeyApiOrder.enumerated().map { ($0.element, $0.offset + 1) }, uniquingKeysWith: { first, _ in first })
+        }
+        return candidates.enumerated().map { idx, text in
+            var entry: [String: Any] = [
                 "index": idx,
                 "text": text,
                 "section": CandidateRowMetadata.section(
@@ -1081,6 +1089,8 @@ final class DebugSocketServer: @unchecked Sendable {
                     historyEnd: historyEnd
                 ).rawValue
             ]
+            if let rank = rankByText[text] { entry["zenzaiRank"] = rank }
+            return entry
         }
     }
 

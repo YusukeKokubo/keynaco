@@ -8,6 +8,9 @@ public enum CandidateAction: Sendable {
         historyEnd: Int,
         initialRow: Int,
         fixedEnd: Int,
+        /// AzooKey API が返した順序（LCID ソート前）。Zenzai 有効 + 左文脈ありのときのみ非空。
+        /// 各候補の AzooKey 内部順位（≒ Zenzai 込みのスコア順）を UI で表示するための情報。
+        azooKeyApiOrder: [String] = [],
         initialIsExplicitlySelected: Bool = false
     )
     case dismiss
@@ -24,10 +27,11 @@ extension CandidateAction {
         historyEnd: Int,
         initialRow: Int,
         fixedEnd: Int,
+        azooKeyApiOrder: [String],
         initialIsExplicitlySelected: Bool
     )? {
-        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let initialExplicit) = self {
-            return (candidates, historyEnd, initialRow, fixedEnd, initialExplicit)
+        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let apiOrder, let initialExplicit) = self {
+            return (candidates, historyEnd, initialRow, fixedEnd, apiOrder, initialExplicit)
         }
         return nil
     }

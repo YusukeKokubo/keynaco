@@ -16,6 +16,14 @@ struct CandidatePanelModel: Equatable {
     var historyEnd: Int { session.historyEnd }
     var isPresented: Bool { session.isVisible && !session.candidates.isEmpty }
 
+    /// 候補行に対応する Zenzai 内部順位（1 始まり）。Zenzai 非アクティブ時 / 該当行が AzooKey 候補でないときは nil。
+    func zenzaiRank(for row: Int) -> Int? {
+        guard !session.azooKeyApiOrder.isEmpty,
+              session.candidates.indices.contains(row) else { return nil }
+        let text = session.candidates[row]
+        return session.azooKeyApiOrder.firstIndex(of: text).map { $0 + 1 }
+    }
+
     func section(for row: Int) -> CandidateRowSection {
         CandidateRowMetadata.section(
             row: row,
