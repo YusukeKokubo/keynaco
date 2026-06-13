@@ -356,6 +356,11 @@ extension InputHandler {
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
         ))
+        let previewLayout = CandidateLayout(
+            sections: built.sections,
+            sectionOrder: built.sectionOrder,
+            initialRowPolicy: .afterFixed
+        )
         let policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
             reading: h,
             fixedSlot: fixedSlot,
@@ -363,7 +368,8 @@ extension InputHandler {
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             exactMatchHighHistory: sources.exactMatchHighHistory,
             userDictExact: sources.userDictExact,
-            azooKeyCandidates: sources.azooKeyCandidates
+            azooKeyCandidates: sources.azooKeyCandidates,
+            candidateList: previewLayout.candidates
         ))
         let layout = CandidateLayout(
             sections: built.sections,

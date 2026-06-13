@@ -17,6 +17,8 @@ struct InitialRowPolicyInput: Equatable, Sendable {
     let userDictExact: [String]
     /// AzooKey 辞書が返した候補（読み完全一致）。履歴・ユーザー辞書が無いとき先頭を初期選択。
     let azooKeyCandidates: [String]
+    /// セクション統合後の候補列（初期行判定用）。
+    let candidateList: [String]
 }
 
 enum InitialRowPolicyResolver {
@@ -31,11 +33,14 @@ enum InitialRowPolicyResolver {
             if let first = input.userDictExact.first {
                 return .firstMatching(first)
             }
+            if input.candidateList.first == input.reading {
+                return .firstMatching(input.reading)
+            }
             if let first = input.azooKeyCandidates.first {
                 if first != input.reading,
                    input.reading.hasPrefix(first),
                    first.count < input.reading.count,
-                   input.azooKeyCandidates.contains(input.reading) {
+                   input.candidateList.contains(input.reading) {
                     return .firstMatching(input.reading)
                 }
                 return .firstMatching(first)

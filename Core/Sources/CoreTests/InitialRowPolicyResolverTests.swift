@@ -10,7 +10,8 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         addsDefaultFixedHiragana: Bool = false,
         exactMatchHighHistory: [String] = [],
         userDictExact: [String] = [],
-        azooKeyCandidates: [String] = []
+        azooKeyCandidates: [String] = [],
+        candidateList: [String] = []
     ) -> InitialRowPolicy {
         InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
             reading: reading,
@@ -19,7 +20,8 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             exactMatchHighHistory: exactMatchHighHistory,
             userDictExact: userDictExact,
-            azooKeyCandidates: azooKeyCandidates
+            azooKeyCandidates: azooKeyCandidates,
+            candidateList: candidateList
         ))
     }
 
@@ -77,12 +79,25 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         )
     }
 
-    /// 組成読みが AzooKey 候補に含まれるとき、先頭の短い前方一致より読み完全一致を優先する。
-    func testAzooKeyPrefersFullReadingOverShorterPrefix() {
+    /// 統合候補の先頭が組成読みなら、AzooKey 先頭より優先する。
+    func testPrefersReadingWhenFirstInCandidateList() {
+        XCTAssertEqual(
+            resolve(
+                reading: "うおうお",
+                azooKeyCandidates: ["うお", "魚屋"],
+                candidateList: ["うおうお", "うお", "魚屋", "ウオ"]
+            ),
+            .firstMatching("うおうお")
+        )
+    }
+
+    /// 先頭が組成読みでないとき、AzooKey 短い前方一致より読み完全一致を優先する。
+    func testPrefersFullReadingOverAzooKeyShorterPrefix() {
         XCTAssertEqual(
             resolve(
                 reading: "これでは",
-                azooKeyCandidates: ["これで", "これでは", "コレデ"]
+                azooKeyCandidates: ["これで", "これでは", "コレデ"],
+                candidateList: ["これで", "これでは", "コレデ"]
             ),
             .firstMatching("これでは")
         )
