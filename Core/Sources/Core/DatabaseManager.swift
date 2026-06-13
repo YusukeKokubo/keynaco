@@ -18,13 +18,14 @@ public final class DatabaseManager: @unchecked Sendable {
     func nowEpoch() -> Int64 { clock() }
 
     private static let hiraganaPreferredSeededKey = "hiragana_preferred_seeded_v1"
-    static let schemaVersionLatest = 4
+    static let schemaVersionLatest = 5
 
     private enum SchemaMigration: Int, CaseIterable {
         case dropDeprecatedNgramTables = 1
         case ensureHistoryPOSColumn = 2
         case dropDeprecatedHistoryColumns = 3
         case ensureDailyLogAppColumn = 4
+        case ensureHistoryLcidColumn = 5
     }
 
     private init() {
@@ -95,6 +96,7 @@ public final class DatabaseManager: @unchecked Sendable {
             count   INTEGER NOT NULL DEFAULT 1,
             used_at INTEGER NOT NULL,
             pos TEXT DEFAULT NULL,
+            lcid INTEGER DEFAULT NULL,
             UNIQUE(input, output)
         );
         CREATE INDEX IF NOT EXISTS idx_input ON history(input);
@@ -158,6 +160,7 @@ public final class DatabaseManager: @unchecked Sendable {
         case .ensureHistoryPOSColumn: ensureHistoryPOSColumn()
         case .dropDeprecatedHistoryColumns: dropDeprecatedHistoryColumns()
         case .ensureDailyLogAppColumn: ensureDailyLogAppColumn()
+        case .ensureHistoryLcidColumn: ensureHistoryLcidColumn()
         }
     }
 
@@ -205,6 +208,10 @@ public final class DatabaseManager: @unchecked Sendable {
 
     func ensureDailyLogAppColumn() {
         sqlite3_exec(db, "ALTER TABLE daily_log ADD COLUMN app_bundle_id TEXT DEFAULT NULL", nil, nil, nil)
+    }
+
+    func ensureHistoryLcidColumn() {
+        sqlite3_exec(db, "ALTER TABLE history ADD COLUMN lcid INTEGER DEFAULT NULL", nil, nil, nil)
     }
 
     private func historyHasColumn(_ name: String) -> Bool {
@@ -307,6 +314,7 @@ public final class DatabaseManager: @unchecked Sendable {
         public let output: String
         public let count: Int
         public let pos: String?
+        public let lcid: Int?
         public let usedAt: Int64
 
         public func score(now: Int64 = Int64(Date().timeIntervalSince1970)) -> Double {

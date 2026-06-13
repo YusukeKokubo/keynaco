@@ -239,6 +239,7 @@ extension HistoryViewController: NSTableViewDelegate {
         case "proper_noun/work":     return "固有名詞（作品）"
         case "verb":                return "動詞"
         case "adjective":           return "形容詞"
+        case "particle":            return "助詞"
         case "other":               return "その他"
         case "other/conjunction":   return "その他（接続詞）"
         case "other/interjection":  return "その他（感動詞）"

@@ -513,7 +513,9 @@ extension DebugSocketServer {
         let map = Dictionary(grouping: entries, by: \.output)
         let results: [[String: Any]] = outputs.map { output in
             if let entry = map[output]?.first {
-                return ["output": output, "pos": entry.pos ?? "(nil)"]
+                var row: [String: Any] = ["output": output, "pos": entry.pos ?? "(nil)"]
+                if let lcid = entry.lcid { row["lcid"] = lcid }
+                return row
             }
             return ["output": output, "pos": "(not in db)"]
         }
@@ -721,7 +723,7 @@ extension DebugSocketServer {
         guard let c = AzooKeyPOSClassifier.classify(
             output: output, reading: reading, converter: posLookupConverter
         ) else { return }
-        handler.db.updatePOS(output: output, pos: c.pos)
+        handler.db.updatePOSClassification(output: output, pos: c.pos, lcid: c.lcid)
     }
 
 }

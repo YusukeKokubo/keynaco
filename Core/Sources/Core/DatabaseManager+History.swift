@@ -2,6 +2,13 @@ import Foundation
 import SQLite3
 
 extension DatabaseManager {
+    /// backfill 対象 output の SQL 条件（`pos` 未設定・旧 `other`・`lcid` 欠落）。
+    /// 接続詞・感動詞は `lcid` を持たないため除外する。
+    fileprivate static let posBackfillOutputFilter = """
+    pos IS NULL OR pos = 'other'
+    OR (lcid IS NULL AND pos NOT IN ('other/conjunction', 'other/interjection'))
+    """
+
     // MARK: - 検索
 
     /// 読みに完全一致する履歴候補を使用頻度順で返す。
@@ -100,21 +107,52 @@ extension DatabaseManager {
         }
     }
 
-    /// `output` に対応する全履歴行の pos を更新する。
-    public func updatePOS(output: String, pos: String) {
+    /// `output` に対応する履歴行の代表 `lcid` を返す。未設定なら nil。
+    public func lcidForOutput(_ output: String) -> Int? {
+        dbQueue.sync {
+            let sql = "SELECT lcid FROM history WHERE output = ? AND lcid IS NOT NULL LIMIT 1"
+            guard let stmt = self.cachedStmt(for: sql) else { return nil }
+            self.bindText(stmt, 1, output)
+            defer { sqlite3_reset(stmt) }
+            guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+            return Int(sqlite3_column_int(stmt, 0))
+        }
+    }
+
+    /// `output` に対応する全履歴行の pos / lcid を更新する。`nil` のフィールドは既存値を維持。
+    public func updatePOSClassification(output: String, pos: String?, lcid: Int?) {
+        guard pos != nil || lcid != nil else { return }
         dispatchWrite {
-            self.executeOnQueue("UPDATE history SET pos = ? WHERE output = ?") {
-                self.bindText($0, 1, pos)
-                self.bindText($0, 2, output)
+            self.executeOnQueue("""
+            UPDATE history SET
+                pos = COALESCE(?, pos),
+                lcid = COALESCE(?, lcid)
+            WHERE output = ?
+            """) {
+                if let pos {
+                    self.bindText($0, 1, pos)
+                } else {
+                    sqlite3_bind_null($0, 1)
+                }
+                if let lcid {
+                    sqlite3_bind_int($0, 2, Int32(lcid))
+                } else {
+                    sqlite3_bind_null($0, 2)
+                }
+                self.bindText($0, 3, output)
             }
         }
     }
 
-    /// 未分類（pos IS NULL）の出力語を最大 `limit` 件返す（重複排除）。
+    /// 未分類・`lcid` 欠落の出力語を最大 `limit` 件返す（重複排除）。
     func fetchUnclassifiedHistory(limit: Int) -> [String] {
         dbQueue.sync {
             var results: [String] = []
-            let sql = "SELECT DISTINCT output FROM history WHERE pos IS NULL LIMIT ?"
+            let sql = """
+            SELECT DISTINCT output FROM history
+            WHERE \(Self.posBackfillOutputFilter)
+            LIMIT ?
+            """
             guard let stmt = self.cachedStmt(for: sql) else { return results }
             sqlite3_bind_int(stmt, 1, Int32(limit))
             while sqlite3_step(stmt) == SQLITE_ROW {
@@ -124,12 +162,13 @@ extension DatabaseManager {
         }
     }
 
-    /// 未分類 output 件数（`pos IS NULL`、output 単位）。
+    /// backfill 対象 output 件数（output 単位）。
     public func countUnclassifiedHistoryOutputs() -> Int {
         dbQueue.sync {
             let sql = """
             SELECT COUNT(*) FROM (
-                SELECT DISTINCT output FROM history WHERE pos IS NULL
+                SELECT DISTINCT output FROM history
+                WHERE \(Self.posBackfillOutputFilter)
             )
             """
             guard let stmt = self.cachedStmt(for: sql) else { return 0 }
@@ -138,7 +177,7 @@ extension DatabaseManager {
         }
     }
 
-    /// 未分類エントリを output 単位で返す。reading は同一 output の中で count 最大の input。
+    /// backfill 対象エントリを output 単位で返す。reading は同一 output の中で count 最大の input。
     /// `limit` 省略時は全件。
     func fetchUnclassifiedHistoryEntries(limit: Int? = nil) -> [(output: String, reading: String)] {
         dbQueue.sync {
@@ -149,7 +188,7 @@ extension DatabaseManager {
                 SELECT output, input,
                        ROW_NUMBER() OVER (PARTITION BY output ORDER BY count DESC, used_at DESC) AS rn
                 FROM history
-                WHERE pos IS NULL
+                WHERE \(Self.posBackfillOutputFilter)
             )
             WHERE rn = 1
             \(limitClause)
@@ -175,7 +214,10 @@ extension DatabaseManager {
 
     public func fetchAllHistory() -> [HistoryEntry] {
         dbQueue.sync {
-            let sql = "SELECT input, output, count, pos, used_at FROM history ORDER BY count DESC, used_at DESC LIMIT 1000"
+            let sql = """
+            SELECT input, output, count, pos, lcid, used_at FROM history
+            ORDER BY count DESC, used_at DESC LIMIT 1000
+            """
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -184,10 +226,12 @@ extension DatabaseManager {
                 guard let i = sqlite3_column_text(stmt, 0),
                       let o = sqlite3_column_text(stmt, 1) else { continue }
                 let pos = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
-                let usedAt = sqlite3_column_int64(stmt, 4)
+                let lcid = sqlite3_column_type(stmt, 4) == SQLITE_NULL
+                    ? nil : Int(sqlite3_column_int(stmt, 4))
+                let usedAt = sqlite3_column_int64(stmt, 5)
                 results.append(HistoryEntry(
                     input: String(cString: i), output: String(cString: o),
-                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, usedAt: usedAt
+                    count: Int(sqlite3_column_int(stmt, 2)), pos: pos, lcid: lcid, usedAt: usedAt
                 ))
             }
             return results

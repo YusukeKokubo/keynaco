@@ -7,13 +7,19 @@ extension InputController {
     /// 確定語の品詞を AzooKey 辞書で判定し、DB の pos を更新する。
     func schedulePOSClassification(output: String, reading: String) {
         guard HiraganaPreferredBuiltins.words[output] == nil else { return }
-        guard DatabaseManager.shared.posForOutput(output) == nil else { return }
+        if let pos = DatabaseManager.shared.posForOutput(output),
+           pos.hasPrefix("other/") { return }
+        if let pos = DatabaseManager.shared.posForOutput(output),
+           pos != "other",
+           DatabaseManager.shared.lcidForOutput(output) != nil { return }
         let converter = handler.azooKeyConverter
         Task { @MainActor in
             guard let c = AzooKeyPOSClassifier.classify(
                 output: output, reading: reading, converter: converter
             ) else { return }
-            DatabaseManager.shared.updatePOS(output: output, pos: c.pos)
+            DatabaseManager.shared.updatePOSClassification(
+                output: output, pos: c.pos, lcid: c.lcid
+            )
         }
     }
 

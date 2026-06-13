@@ -33,7 +33,7 @@ public enum AzooKeyPOSBackfill {
                 skipped += 1
                 continue
             }
-            db.updatePOS(output: entry.output, pos: c.pos)
+            db.updatePOSClassification(output: entry.output, pos: c.pos, lcid: c.lcid)
             classified += 1
         }
         return POSBackfillResult(classified: classified, skipped: skipped, total: entries.count)

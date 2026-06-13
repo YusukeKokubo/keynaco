@@ -14,6 +14,7 @@ final class AzooKeyPOSBackfillTests: XCTestCase {
         let entries = db.fetchAllHistory()
         let settings = entries.first { $0.output == "設定" }
         XCTAssertEqual(settings?.pos, "noun")
+        XCTAssertEqual(settings?.lcid, 1283)
     }
 
     func testBackfillRespectsLimit() {
@@ -25,5 +26,19 @@ final class AzooKeyPOSBackfillTests: XCTestCase {
 
         XCTAssertEqual(result.total, 1)
         XCTAssertEqual(db.countUnclassifiedHistoryOutputs(), 1)
+    }
+
+    func testBackfillReclassifiesStaleOther() {
+        let db = DatabaseManager(inMemory: true)
+        db.record(input: "しらべる", output: "調べる")
+        db.updatePOSClassification(output: "調べる", pos: "other", lcid: nil)
+
+        let result = AzooKeyPOSBackfill.run(db: db, converter: AzooKeyConverter())
+
+        XCTAssertEqual(result.total, 1)
+        XCTAssertEqual(result.classified, 1)
+        let entry = db.fetchAllHistory().first { $0.output == "調べる" }
+        XCTAssertEqual(entry?.pos, "verb")
+        XCTAssertEqual(entry?.lcid, 619)
     }
 }

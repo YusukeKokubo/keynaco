@@ -24,6 +24,18 @@ final class AzooKeyPOSClassifierTests: XCTestCase {
         XCTAssertEqual(c?.pos, "proper_noun/place")
     }
 
+    func testVerbFromDictionary() {
+        let c = AzooKeyPOSClassifier.classify(output: "調べる", reading: "しらべる", converter: converter)
+        XCTAssertEqual(c?.pos, "verb")
+        XCTAssertEqual(c?.lcid, 619)
+    }
+
+    func testAdjectiveFromDictionary() {
+        let c = AzooKeyPOSClassifier.classify(output: "難しい", reading: "むずかしい", converter: converter)
+        XCTAssertEqual(c?.pos, "adjective")
+        XCTAssertEqual(c?.lcid, 43)
+    }
+
     func testUnknownWithoutReadingReturnsNil() {
         XCTAssertNil(AzooKeyPOSClassifier.classify(output: "設定", reading: "", converter: converter))
     }

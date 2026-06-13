@@ -17,7 +17,11 @@ public enum AzooKeyPOSClassifier {
               let lcid = converter.lcidForCommitted(reading: reading, output: output) else {
             return nil
         }
-        return AzooKeyLcidMapper.classification(for: lcid)
+        let pos = AzooKeyLcidMapper.classification(for: lcid)?.pos
+        if let pos {
+            return POSClassification(pos: pos, lcid: lcid)
+        }
+        return POSClassification(lcid: lcid)
     }
 
     private static let conjunctions: Set<String> = [
