@@ -45,8 +45,22 @@ created: 2026-06-13
 
 1. **セクション順**（`CandidateLayout`）: 固定枠 → ユーザー辞書 → Zenzai → 履歴 → AzooKey 辞書 → カタカナ。ランク無関係
 2. **履歴**（`fetchHistoryScoredMerged`）: 時間減衰スコア降順。接続詞・感動詞のみ SQL で除外
-3. **AzooKey 辞書**（`azooKeyDict` セクション）: AzooKey/Zenzai の返却順のまま。`Candidate.data[].lcid` は取得済みだが並び替えに未使用
-4. **DB**: `history.pos`（表示用）+ `history.lcid`（ロジック用）を保存。設定画面に両列表示
+3. **AzooKey 辞書**（`azooKeyDict` セクション）: AzooKey/Zenzai の返却順のまま。`candidateCache` 内の `[Candidate].data[].lcid` は保持されるが、`requestCandidates` は `[String]` のみ返すため並び替えに未使用
+4. **DB**: `history.pos`（表示用）+ `history.lcid`（ロジック用）を保存。設定画面に両列表示。`lcid` は `recordPrefixes` 同期ではなく `schedulePOSClassification` の非同期 Task で後追い保存（直後の候補では NULL の行があり得る）
+
+## 実装ギャップ（コードレビュー追記 2026-06-13）
+
+着手前に解消すべき API / データのずれ。Step 2・3 に反映済み。
+
+| ギャップ | 現状 | 対応方針 |
+|---------|------|---------|
+| Phase A: `lcid` が API から落ちる | `AzooKeyConverter.candidateTexts` が `Candidate` → `String` に変換して捨てる | キャッシュ済み `[Candidate]` から text→lcid を構築する API を追加（下記 Step 2） |
+| Phase A: 代表 `lcid` の選び方 | 複合語候補は末尾トークンが助詞のことがある | `lcidForCommitted` と同じ `primaryLcid(from:)`（助詞・EOS を除く最初の content 語）を使う |
+| Phase B: `fetchHistoryScoredMerged` に `lcid` なし | 戻り値は `(output, score)` のみ | SQL で `lcid` を一緒に返す（`MAX(used_at)` 行の lcid 等）。N+1 の `lcidForOutput` は避ける |
+| Phase B: 履歴 `lcid` の非同期 | 確定直後は `lcid IS NULL` のままのことがある | `from(pos:)` フォールバックは **NULL 行限定**。backfill 完了後は通常パスで `lcid` のみ |
+| `LcidRank` と mapper の二重管理 | `AzooKeyLcidMapper` にレンジ定義あり | rank も mapper に集約（`rank(for:)`）。`LcidRank` enum は薄い Comparable ラッパーで可 |
+| ソート適用位置 | `CandidateSectionBuilder` は `zenzaiPromoted` を先に抜く | `fetchAzooKeyCandidates` 直後（`InputHandler+Candidates`）。Zenzai はソート前の `first` を固定 |
+| Phase B の実効箇所 | 全履歴行ではなく枠争い | 主に `maxHighHistoryCount=3` の 2 パス目（前方一致以外の highHistory 選別）に効く |
 
 ## 設計方針
 
@@ -94,6 +108,8 @@ created: 2026-06-13
 
 ### Step 1: `LcidRank` ユーティリティ（`Core/`）— **未着手**
 
+**正本は `AzooKeyLcidMapper.rank(for:)`**。レンジ定義は mapper に集約し、二重管理を避ける。`LcidRank` enum は Comparable ラッパーとして薄く置くか、mapper が `LcidRank` を直接返してもよい。
+
 ```swift
 enum LcidRank: Int, Comparable, Sendable {
     case properNoun = 0
@@ -112,12 +128,26 @@ enum LcidRank: Int, Comparable, Sendable {
 }
 ```
 
-- lcid レンジ定義は `AzooKeyLcidMapper` と共有（二重管理を避けるため mapper に `rank(for lcid:)` を置くか、単一の lcid 定数ファイルに集約）
-- テスト: `LcidRankTests`（619 vs 625 で verb 同 rank、1283 vs 1293 で properNoun vs noun 等）
+- テスト: `AzooKeyLcidMapperTests` に rank ケースを追加（619 vs 625 で verb 同 rank、1283 vs 1293 で properNoun vs noun、460 で auxiliary・148 で particle 等）
 
 ### Step 2: AzooKey 候補の lcid ソート（Phase A）
 
-`requestCandidates` 返却時に `Candidate` 配列から text→lcid マップを構築し、安定ソート:
+#### 2a. API 拡張（`AzooKeyConverter` / `AzooKeyConverting`）
+
+現状 `requestCandidates` → `[String]` だけでは lcid が届かない。`candidateCache` の `[Candidate]` からマップを構築して返す。
+
+```swift
+// 案: requestCandidates の直後にキャッシュから引く（変換は再実行しない）
+func primaryLcidByText(
+    hiragana: String, leftSideContext: String?, richCandidates: Bool
+) -> [String: Int]
+```
+
+- 各 `Candidate` について `AzooKeyConverter.primaryLcid(from: candidate.data)` で代表 lcid を決める（`lcidForCommitted` と同一ロジック）
+- `filterCandidatesForDisplay` 適用後のテキスト列とマップのキーを揃える
+- プロトコル `AzooKeyConverting` とスタブ（`BaseAzooKeyStub`・各テスト mock）も更新
+
+#### 2b. ソート（`InputHandler+Candidates.fetchAzooKeyCandidates` 直後）
 
 ```swift
 candidates.sorted { a, b in
@@ -128,22 +158,49 @@ candidates.sorted { a, b in
 }
 ```
 
-- Zenzai top-1（`azooKeyCandidates.first`）はソート前を維持
+- **Zenzai top-1**（`makeCandidateListSources` 内の `azooKeyCandidates.first`）はソート**前**の配列から決める（現行フロー維持）
 - `lcidForCommitted` の逐次ルックアップは使わない（N 回変換は重い）
+- `CandidateSectionBuilder` 側は変更不要（ソート済み `[String]` を渡すだけ）
 
 ### Step 3: 履歴タイブレーカー（Phase B）
 
-`fetchHistoryScoredMerged` 結果を Swift 側で二次ソート。`history.lcid` を優先:
+#### 3a. API 拡張（`fetchHistoryScoredMerged`）
+
+戻り値に `lcid` を含める（N+1 回避）:
+
+```swift
+func fetchHistoryScoredMerged(reading: String) -> [(output: String, score: Double, lcid: Int?)]
+```
+
+SQL 例（`GROUP BY output` 維持）:
+
+```sql
+SELECT output, SUM(...) AS s,
+       (SELECT lcid FROM history h2
+        WHERE h2.output = history.output AND h2.lcid IS NOT NULL
+        ORDER BY used_at DESC LIMIT 1) AS lcid
+...
+ORDER BY s DESC, MAX(used_at) DESC
+```
+
+（サブクエリの代わりに `MAX(used_at)` と同じ行の lcid を取る実装でも可。要: output ごとに代表 lcid が 1 つ）
+
+#### 3b. 二次ソート（`collectCheapCandidateSources` 内、または `fetchHistoryScoredMerged` 直後）
 
 ```swift
 results.sorted {
-    if $0.score != $1.score { return $0.score > $1.score }
-    return LcidRank.from(lcid: $0.lcid) < LcidRank.from(lcid: $1.lcid)
+    if abs($0.score - $1.score) > epsilon { return $0.score > $1.score }
+    let ra = rankForHistoryRow($0)  // lcid 優先、NULL 時のみ pos フォールバック（任意）
+    let rb = rankForHistoryRow($1)
+    if ra != rb { return ra < rb }
+    return $0.score > $1.score
 }
 ```
 
-- `lcid` が NULL の行は `LcidRank.unknown`（または `from(pos:)` フォールバック）
-- スコア差が `epsilon`（例: 0.01）以内のときだけ rank で並べ替える制約も検討可
+- **`epsilon = 0.01` を採用**（スコア差が明確なときは rank で入れ替えない）
+- `lcid` が NULL の行は `LcidRank.unknown`。`pos` フォールバックは **NULL 行に限定**し、必要なら `posForOutput` で引く（戻り値 tuple に `pos` を載せない設計でも可）
+- 確定直後は `pos` / `lcid` とも NULL のことがある → その間はタイブレーカー無効（`unknown` 同士）
+- 実効箇所: `maxHighHistoryCount=3` の枠争い（exact 一致枠は別パスで先に埋まる）
 
 ### Step 4: DB・表示基盤（Phase D）— **実装済み**
 
@@ -160,14 +217,16 @@ results.sorted {
 
 | ファイル | 変更内容 | 状態 |
 |---------|---------|------|
-| `AzooKeyLcidMapper.swift` | lcid レンジ + `pos` 派生 | 済 |
+| `AzooKeyLcidMapper.swift` | lcid レンジ + `pos` 派生（済）、`rank(for:)` 追加（未） | 一部済 |
 | `DatabaseManager.swift` / `+History.swift` | `lcid` 列、backfill | 済 |
 | `HistoryViewController.swift` | `lcid` 列表示 | 済 |
-| `LcidRank.swift`（新規） | lcid → rank（ロジック正本） | 未 |
-| `AzooKeyConverter.swift` | 候補返却時 text→lcid マップ | 未 |
-| `InputHandler+Candidates.swift` | AzooKey セクション内 lcid ソート | 未 |
-| `DatabaseManager+History.swift` | 履歴タイブレーカー（`lcid` 使用） | 未 |
-| `LcidRankTests.swift`（新規） | rank 変換テスト | 未 |
+| `LcidRank.swift`（新規、任意） | Comparable ラッパー | 未 |
+| `AzooKeyConverter.swift` | `primaryLcidByText`（キャッシュから text→lcid） | 未 |
+| `AzooKeyConverting.swift` | プロトコルに `primaryLcidByText` 追加 | 未 |
+| `BaseAzooKeyStub.swift` 等 | テストスタブ更新 | 未 |
+| `InputHandler+Candidates.swift` | `fetchAzooKeyCandidates` 直後の lcid ソート | 未 |
+| `DatabaseManager+History.swift` | `fetchHistoryScoredMerged` に `lcid` + epsilon タイブレーカー | 未 |
+| `AzooKeyLcidMapperTests.swift` | rank 変換テスト追加 | 未 |
 
 ## 検証
 
@@ -175,8 +234,10 @@ results.sorted {
 
 - 同一 rank 内は元の順序を維持（安定ソート）
 - Zenzai top-1 はソート前 first を維持
-- 履歴: スコア差が大きいとき `lcid` rank で順序が入れ替わらない
+- 履歴: スコア差が `epsilon` 超のとき `lcid` rank で順序が入れ替わらない
+- 履歴: スコア差が `epsilon` 以内のときのみ rank で枠（`maxHighHistoryCount`）が変わる
 - 619（調べる）と 625（調べて）は同 verb rank、辞書形が先なら現状順維持でよい
+- 460（です）→ `auxiliary` rank、148（が）→ `particle` rank（助動詞は表示 `pos` が verb でも rank は分離）
 
 ### sandbox 手動確認（`/keynaco-ime-sandbox`）
 
