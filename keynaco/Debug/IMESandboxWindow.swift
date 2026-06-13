@@ -701,8 +701,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
     // MARK: - コピー用フォーマット
 
     private nonisolated static func formatForCopy(_ entry: LogEntry) -> String {
-        let base = "\(entry.tag)\(entry.timestamp)  \(entry.summary)"
-        return base + candidateEventSuffix(from: entry.snapshotDict)
+        "\(entry.tag)\(entry.timestamp)  \(entry.summary)"
     }
 
     private nonisolated static func candidateEventSuffix(from dict: [String: Any]) -> String {

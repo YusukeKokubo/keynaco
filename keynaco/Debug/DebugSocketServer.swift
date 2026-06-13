@@ -1064,7 +1064,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "pendingAzooKey":     azooKeyScheduler.hasPendingWork,
         ]
         if let st = snap.selectedText { dict["selectedText"] = st }
-        if let build = handler.lastCandidateBuildDiagnostics {
+        if let build = snap.candidateBuild {
             dict["candidateBuild"] = build.asDictionary()
         }
         return dict

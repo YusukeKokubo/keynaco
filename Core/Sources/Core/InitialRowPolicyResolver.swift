@@ -32,6 +32,12 @@ enum InitialRowPolicyResolver {
                 return .firstMatching(first)
             }
             if let first = input.azooKeyCandidates.first {
+                if first != input.reading,
+                   input.reading.hasPrefix(first),
+                   first.count < input.reading.count,
+                   input.azooKeyCandidates.contains(input.reading) {
+                    return .firstMatching(input.reading)
+                }
                 return .firstMatching(first)
             }
             if input.addsDefaultFixedHiragana {

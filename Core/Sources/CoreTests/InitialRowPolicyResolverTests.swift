@@ -76,4 +76,23 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             .firstMatching("愛")
         )
     }
+
+    /// 組成読みが AzooKey 候補に含まれるとき、先頭の短い前方一致より読み完全一致を優先する。
+    func testAzooKeyPrefersFullReadingOverShorterPrefix() {
+        XCTAssertEqual(
+            resolve(
+                reading: "これでは",
+                azooKeyCandidates: ["これで", "これでは", "コレデ"]
+            ),
+            .firstMatching("これでは")
+        )
+    }
+
+    /// 先頭候補が短い前方一致でなければ、従来どおり AzooKey 先頭を選ぶ。
+    func testAzooKeyFirstUnchangedWhenNotPrefixOfReading() {
+        XCTAssertEqual(
+            resolve(reading: "あい", azooKeyCandidates: ["愛", "あい"]),
+            .firstMatching("愛")
+        )
+    }
 }
