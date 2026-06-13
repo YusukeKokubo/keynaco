@@ -120,12 +120,15 @@ public extension InputHandler {
         return (true, buildCandidateListForTrigger(.whileTyping))
     }
 
+    private static let vowelKeys: Set<Character> = ["a", "i", "u", "e", "o", "n"]
+
     private mutating func handleRomaji(
         base: String, wasExplicitlySelected: Bool, candidate: CandidateContext, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         let needsRefresh = state.addRomaji(base)
-        let candidateAction: CandidateAction = needsRefresh
+        let isVowelKey = base.count == 1 && Self.vowelKeys.contains(base.lowercased().first!)
+        let candidateAction: CandidateAction = (needsRefresh && isVowelKey)
             ? buildCandidateListForTrigger(.whileTyping)
             : .dismiss
         return (true, candidateAction)
