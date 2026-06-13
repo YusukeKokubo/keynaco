@@ -96,7 +96,27 @@ memory・ドキュメントに書かれた識別子（関数名・フラグ名�
 
 **なぜ**: 自作ハーネスは本体を不完全に模すため、失敗が crash ではなく**サイレントな嘘の数字**として出る。質の悪いのは「もっともらしく見えて根拠が間違っている結論」——たまたま正しい判断に近い値が出ると気づけず、間違った理由で正しい結論を出してしまう（後から前提が崩れると総崩れになる）。桁の sanity check は frontでフルスイープを回す前に1回分で済むので安い。
 
-*由来: POC260529c で inferenceLimit を計測した初回、ZenzaiCache 短絡で全 limit が 5-8ms 一定・候補不変になり「非レバー（何も効かない）」と結論しかけた。「70MB モデルの推論が 5ms はあり得ない」で気づき、fresh converter で測り直したら実際は難ケースで cap が効いていた（結論は「5 で十分」と同じでも理由は真逆）。同セッションでもう1度、予測候補の composingCount を測る harness が `ComposingCount.composite` ケースを落として全候補 count=0 を返し、「フィルタで全部 strip される」と誤判定しかけた（本番が動いている＝0 はあり得ない、で発覚）*
+*由来: POC260529c で inferenceLimit を計測した初回、ZenzaiCache 短絡で全 limit が 5-8ms 一定・候補不変になり「非レバー（何も効かない）」と結論しかけた。「70MB モデルの推論が 5-8ms はあり得ない」で気づき、fresh converter で測り直したら実際は難ケースで cap が効いていた（結論は「5 で十分」と同じでも理由は真逆）。同セッションでもう1度、予測候補の composingCount を測る harness が `ComposingCount.composite` ケースを落として全候補 count=0 を返し、「フィルタで全部 strip される」と誤判定しかけた（本番が動いている＝0 はあり得ない、で発覚）*
+
+---
+
+## 候補リストの振る舞いはユニットテストを正本にし、sandbox は手順付きで補助する
+
+`CandidateSectionBuilder`・履歴枠・辞書重複排除のような**リスト組み立て**の変更は、まず `CandidateSectionBuilderTests`（stub 入力）で再現ケースを書く。sandbox は E2E の補助で、`seed_history` → 変換 → `candidateEntries.section` の確認に使う。
+
+**なぜ**: リスト組み立ては純粋関数に近く、ユニットテストが速くて決定的。sandbox は AzooKey 実辞書・非同期 prefetch・Zenzai に依存し、手順を誤ると「実装バグ」に見える嘘（辞書候補が 2 件だけ等）を返す。正本と補助の役割を分けないと、修正が正しくても sandbox だけ失敗し続ける。
+
+*由来: 前方一致履歴の top3 漏れ語が辞書から消える修正（`c73e8d9`）。ユニットテストは即 PASS だが、sandbox では `then: "space"` 一発＋存在しない検証語（`感情`）で誤 FAIL。`wait_azoo_key` 挟み＋辞書存在確認後に再測で PASS*
+
+---
+
+## Debug sandbox で辞書候補が桁違いに少ないときは実装より非同期手順を疑う
+
+`keynaco-ime-sandbox` で `len(candidates)` がベースライン（シードなし）と比べて極端に少ない（例: 十数件 → 2 件）とき、まず `type_string` → `wait_azoo_key` → `key: space` の順になっているか確認する。Debug ソケットは `deferAzooKeyWhileTyping = true` のため、`seed_history` 直後の `then: "space"` 一発は prefetch 未完了のまま Space が走りうる。
+
+**なぜ**: 件数の桁は「フィルタが厳しすぎる」実装バグと「計測が早すぎる」手順バグの両方で起きうる。retrospectives の「桁の sanity check」と同型で、安い確認（待ちを挟む）を先にやると誤った revert を防げる。
+
+*由来: 上記 `c73e8d9` の sandbox 検証。`seed_history` 後に `type_string`+`space` 一発だと辞書が `カンジ` 1 件だけに見えたが、`wait_azoo_key` 後は 19 件に復帰*
 
 ---
 

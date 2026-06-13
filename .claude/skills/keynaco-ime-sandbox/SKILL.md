@@ -420,6 +420,60 @@ send({"seed_history": {"input": "じっそう", "output": "実装", "times": 3}}
 r = send({"type_string": "jissou", "then": "space"})  # jissou → じっそう ✓
 ```
 
+### 罠7: `seed_history` 後の `then: "space"` 一発は辞書候補を潰す
+
+Debug ソケットは `deferAzooKeyWhileTyping = true`。`seed_history` のあと `{"type_string":"kanzi","then":"space"}` を**1 コマンドで**送ると、打鍵中の AzooKey prefetch が Space より先に完了せず、辞書セクションが極端に少なくなる（例: 19 件 → 2 件）。**実装バグではなく手順の問題**に見える。
+
+**対策**: 履歴シードありの候補検証は必ず次の順序にする。
+
+```python
+send({"reset": True})
+send({"seed_history": {"input": "かんじゃ", "output": "幹事", "times": 5}})
+send({"type_string": "kanzi"})                    # 打鍵のみ
+send({"wait_azoo_key": {"timeoutMs": 3000}})      # prefetch 完了待ち
+r = send({"key": "space", "fields": ["candidates", "historyEnd", "candidateEntries"]})
+```
+
+**健全性チェック**: ベースライン（シードなし）と比べて `len(candidates)` が桁違いに少ないときは、まず `wait_azoo_key` を挟んで再測する。
+
+### 罠8: 検証語は AzooKey 辞書に存在することを先に確認する
+
+履歴・辞書の出し分けを検証するとき、期待する output が AzooKey 辞書に無いと「どちらにも出ない」が**正しい挙動**に見える。例: `かんじ` 読みの `感情` は辞書候補に載らない。
+
+```python
+send({"reset": True})
+r = send({"type_string": "kanzi", "then": "space", "fields": ["candidates"]})
+assert "感じ" in r["candidates"]  # 検証語をここで確認してからシード設計
+```
+
+top3 漏れケースは `times` でスコア差をつけ、4 件目は**辞書にもある語**（例: `かんじめ`→`感じ`）にする。assert は `candidateEntries` の `section`（`history` / `dictionary`）で書く。
+
+---
+
+## 候補リスト変更の検証ワークフロー（推奨）
+
+`CandidateSectionBuilder` や履歴枠の変更後は、次の順で確認する。
+
+1. **ユニットテスト** — `Core/Sources/CoreTests/CandidateSectionBuilderTests.swift` に再現ケースを足す（正本）
+2. **sandbox ベースライン** — シードなしで検証語が AzooKey に出ることを確認（罠8）
+3. **sandbox シナリオ** — `seed_history` → `type_string` → `wait_azoo_key` → `key: space`（罠7）
+4. **assert** — `assert_contains` より `candidateEntries` の `section` と `historyEnd` 境界
+
+```python
+# top3 漏れ → 辞書に残る（c73e8d9 以降の代表例）
+send({"reset": True})
+for inp, out, n in [("かんじゃ","幹事",5), ("かんじゃく","弱点",5), ("かんじる","感じる",5), ("かんじめ","感じ",1)]:
+    for _ in range(n):
+        send({"seed_history": {"input": inp, "output": out, "times": 1}})
+send({"type_string": "kanzi"})
+send({"wait_azoo_key": {"timeoutMs": 3000}})
+r = send({"key": "space", "fields": ["candidates", "historyEnd", "candidateEntries"]})
+he = r["historyEnd"]
+entries = {e["text"]: e["section"] for e in r["candidateEntries"]}
+assert "感じ" not in r["candidates"][:he]
+assert entries.get("感じ") == "dictionary"
+```
+
 ---
 
 ## 典型的な調査パターン
@@ -437,11 +491,15 @@ for i, step in enumerate(r["steps"]):
 
 ### 2. Space で変換して候補を確認
 
+シードなしの簡易確認:
+
 ```python
 r = send({"type_string": "kanzi", "then": "space"})
 print(f"candidates: {r['candidates'][:10]}")
 print(f"historyEnd={r['historyEnd']}, fixedEnd={r['fixedEnd']}")
 ```
+
+`seed_history` あり・辞書セクションの件数も見るときは罠7の手順（`wait_azoo_key` 挟み）を使う。
 
 ### 3. 候補を選択して確定
 
