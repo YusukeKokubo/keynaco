@@ -39,7 +39,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let result = type(chars: ".", base: ".")
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ。")
+        XCTAssertEqual(handler.state.composedHiragana, "あ。")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
         }
@@ -49,7 +49,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let result = type(chars: ",", base: ",")
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ、")
+        XCTAssertEqual(handler.state.composedHiragana, "あ、")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
         }
@@ -70,7 +70,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
         _ = handleAndApply(keyCode: 0, characters: ".", baseCharacters: ".", candidate: ctx)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ。")
+        XCTAssertEqual(handler.state.composedHiragana, "あ。")
     }
 
     func testCommaDoesNotCommitSelectedCandidate() {
@@ -78,7 +78,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: "阿", isExplicitlySelected: true)
         _ = handleAndApply(keyCode: 0, characters: ",", baseCharacters: ",", candidate: ctx)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ、")
+        XCTAssertEqual(handler.state.composedHiragana, "あ、")
     }
 
     // MARK: - Shift+句読点キー → 全角記号候補ウィンドウ
@@ -109,7 +109,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "<", base: ",", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ＜")
+        XCTAssertEqual(handler.state.composedHiragana, "あ＜")
     }
 
     func testCommaWithoutShiftShowsCandidateWindow() {
@@ -200,7 +200,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let result = type(chars: "[", base: "[")
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ「")
+        XCTAssertEqual(handler.state.composedHiragana, "あ「")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
         }
@@ -210,7 +210,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let result = type(chars: "(", base: "9", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ（")
+        XCTAssertEqual(handler.state.composedHiragana, "あ（")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
         }
@@ -351,7 +351,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let result = type(chars: "?", base: "/", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ？")
+        XCTAssertEqual(handler.state.composedHiragana, "あ？")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show but got \(result.candidateAction)")
         }
@@ -375,7 +375,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let result = type(chars: "?", base: "?", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ？")
+        XCTAssertEqual(handler.state.composedHiragana, "あ？")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show but got \(result.candidateAction)")
         }
@@ -385,7 +385,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         let result = type(chars: "!", base: "!", modifiers: .shift)
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "あ！")
+        XCTAssertEqual(handler.state.composedHiragana, "あ！")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show but got \(result.candidateAction)")
         }

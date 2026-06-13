@@ -47,11 +47,10 @@ final class InputHandlerZSequenceTests: InputHandlerTestCase {
 
     func testZDash_appendsToComposition() {
         typeRomaji("ka")
-        XCTAssertEqual(client.markedText, "か")
         type(chars: "z", base: "z")
         type(chars: "-", base: "-")
         XCTAssertEqual(client.inserted, [])
-        XCTAssertTrue(client.markedText.hasPrefix("か〜"))
+        XCTAssertEqual(handler.state.composedHiragana, "か〜")
     }
 
     func testZRightArrow_appendsToComposition() {
@@ -59,7 +58,7 @@ final class InputHandlerZSequenceTests: InputHandlerTestCase {
         type(chars: "z", base: "z")
         press(keyCode: KeyCode.rightArrow)
         XCTAssertEqual(client.inserted, [])
-        XCTAssertTrue(client.markedText.hasPrefix("か→"))
+        XCTAssertEqual(handler.state.composedHiragana, "か→")
     }
 
     // MARK: - z 以外の pending では無効

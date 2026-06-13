@@ -50,8 +50,8 @@ private class CandidateRowView: NSView {
         sectionLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(sectionLabel)
 
-        zenzaiRankLabel.font = .systemFont(ofSize: 9)
-        zenzaiRankLabel.textColor = .quaternaryLabelColor
+        zenzaiRankLabel.font = .systemFont(ofSize: 10, weight: .medium)
+        zenzaiRankLabel.textColor = NSColor.systemPurple.withAlphaComponent(0.7)
         zenzaiRankLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(zenzaiRankLabel)
 

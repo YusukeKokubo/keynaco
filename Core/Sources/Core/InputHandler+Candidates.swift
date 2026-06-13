@@ -108,6 +108,8 @@ extension InputHandler {
 
     private struct CheapCandidateSources {
         let userDictRaw: [String]
+        /// `userDictRaw` のうち読み完全一致だけを抜き出した配列。初期選択行の判定に使う。
+        let userDictExact: [String]
         let exactMatchHighHistory: [String]
         let highHistory: [String]
         let highHistoryCount: Int
@@ -121,6 +123,8 @@ extension InputHandler {
         /// LCID ソート前の AzooKey API 順序。Zenzai 順位表示用。
         let azooKeyApiOrder: [String]
         let userDictRaw: [String]
+        /// 読み完全一致のユーザー辞書（初期選択行判定用）。
+        let userDictExact: [String]
         let exactMatchHighHistory: [String]
         let highHistory: [String]
         let highHistoryCount: Int
@@ -175,6 +179,7 @@ extension InputHandler {
         }
         return CheapCandidateSources(
             userDictRaw: userDictRaw,
+            userDictExact: userDictExact,
             exactMatchHighHistory: exactMatchHighHistory,
             highHistory: highHistory,
             highHistoryCount: exactMatchHighHistory.count + highHistory.count,
@@ -244,6 +249,7 @@ extension InputHandler {
             azooKeyCandidates: azooKeyCandidates,
             azooKeyApiOrder: azooKeyApiOrder,
             userDictRaw: cheap.userDictRaw,
+            userDictExact: cheap.userDictExact,
             exactMatchHighHistory: cheap.exactMatchHighHistory,
             highHistory: cheap.highHistory,
             highHistoryCount: cheap.highHistoryCount,
@@ -343,7 +349,9 @@ extension InputHandler {
                 fixedSlot: fixedSlot,
                 hiraganaInHistory: hiraganaInHistory,
                 addsDefaultFixedHiragana: addsDefaultFixedHiragana,
-                exactMatchHighHistory: sources.exactMatchHighHistory
+                exactMatchHighHistory: sources.exactMatchHighHistory,
+                userDictExact: sources.userDictExact,
+                azooKeyCandidates: sources.azooKeyCandidates
             ))
         )
         guard !layout.candidates.isEmpty else { return .dismiss }

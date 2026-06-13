@@ -177,9 +177,10 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub(["辞書A", "辞書B"]))
         handler.db.addUserDict(input: "あい", output: "Acme")
         typeRomaji("ai")
+        // ユーザー辞書 exact は履歴 exact と同等扱いで初期選択される。
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "辞書A", "辞書B", "アイ"],
-                     historyEnd: 1, fixedEnd: 1, initialRow: 1)
+                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
