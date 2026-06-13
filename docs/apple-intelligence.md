@@ -33,7 +33,7 @@ IME Extension（Input Method Extension）は通常アプリより厳しいサン
 
 ### 日本語分類タスクへの適性
 
-2026-05-27 の固有名詞検出 POC（`scripts/poc_proper_noun_ai.swift`）の結果：
+2026-05-27 の固有名詞検出 POC（`scripts/poc_proper_noun_ai.swift`、現在は削除済み）の結果：
 
 | 期待 | 実際の判定 | 件数 |
 |------|-----------|------|
@@ -101,5 +101,5 @@ Apple Intelligence は対応デバイス・言語設定が必要。使えない�
 
 - `docs/rejected.md` — H-1: `@Generable` 構造化出力の不採用理由（IME サンドボックスによるハング）
 - `plans/PLAN260527-ai-diary-generation.md` — Apple Intelligence を使った日記自動生成の実装計画
-- `scripts/poc_proper_noun_ai.swift` — 固有名詞検出 POC スクリプト（2026-05-27）
-- `keynaco/Debug/DebugGuidedGenerationTest.swift` — 本体アプリでの Guided Generation 動作確認ツール（2026-05-27）
+- 固有名詞検出 POC スクリプト（2026-05-27 に `scripts/poc_proper_noun_ai.swift` で実施、結果記録後に削除済み）
+- 本体アプリでの Guided Generation 動作確認ツール（2026-05-27 に `keynaco/Debug/DebugGuidedGenerationTest.swift` で実施、検証後に削除済み）

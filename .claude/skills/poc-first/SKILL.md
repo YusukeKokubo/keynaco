@@ -44,7 +44,7 @@ description: |
 | IME の変換・候補の動き | `keynaco-ime-sandbox` スキル |
 | 入力ロジックの単体動作 | `cd Core && swift test` |
 | 履歴候補の出方 | sandbox で `seed_history` + 入力シーケンス |
-| 括弧・Successor など特殊モード | sandbox で `isBracketMode` / `isSuccessorCandidateActive` を確認 |
+| 括弧モードなど特殊モード | sandbox で `isBracketMode` を確認 |
 
 **検証の合否基準を先に決める**: 「〇〇が確認できれば実装する、△△なら実装しない」を言葉にしてから検証を始める。
 
