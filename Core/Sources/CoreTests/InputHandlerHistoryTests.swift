@@ -388,4 +388,71 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         press(keyCode: 36)
         XCTAssertEqual(handler.sessionTextBuffer, "")
     }
+
+    // MARK: - 前方一致の初期フォーカス（名詞 lcid / 2 モーラ以上 / whileTyping のみ）
+
+    func testWhileTyping_prefixHistoryFocusesNoun() {
+        setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
+        handler.db.recordPrefixes(reading: "だけんすうげん", output: "打鍵数削減")
+        handler.db.updatePOSClassification(output: "打鍵数削減", pos: "noun", lcid: 1285)
+
+        typeRomaji("dakensu")
+        guard let payload = handler.buildCandidateList(trigger: .whileTyping).showPayload else {
+            XCTFail("候補を出すはず"); return
+        }
+        XCTAssertEqual(
+            payload.candidates[payload.initialRow],
+            "打鍵数削減",
+            "前方一致履歴の名詞に初期フォーカスするはず: \(payload.candidates)"
+        )
+    }
+
+    func testExplicit_prefixFocusDoesNotApply() {
+        setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
+        handler.db.recordPrefixes(reading: "だけんすうげん", output: "打鍵数削減")
+        handler.db.updatePOSClassification(output: "打鍵数削減", pos: "noun", lcid: 1285)
+
+        typeRomaji("dakensu")
+        guard let payload = handler.buildCandidateList(trigger: .explicit).showPayload else {
+            XCTFail("候補を出すはず"); return
+        }
+        XCTAssertEqual(
+            payload.candidates[payload.initialRow],
+            "ダケンス",
+            "Space（explicit）では従来どおり AzooKey 先頭を選ぶ: \(payload.candidates)"
+        )
+    }
+
+    func testWhileTyping_userDictPrefixFocusesNoun() {
+        setUpWithConverter(LcidOutputStub(["ダケンス"], lcidByOutput: ["カスタム語": 1285]))
+        handler.db.addUserDict(input: "だけん", output: "カスタム語")
+
+        typeRomaji("dakensu")
+        guard let payload = handler.buildCandidateList(trigger: .whileTyping).showPayload else {
+            XCTFail("候補を出すはず"); return
+        }
+        XCTAssertEqual(
+            payload.candidates[payload.initialRow],
+            "カスタム語",
+            "ユーザー辞書 prefix の名詞に初期フォーカスするはず: \(payload.candidates)"
+        )
+    }
+}
+
+private final class LcidOutputStub: BaseAzooKeyStub, @unchecked Sendable {
+    private let lines: [String]
+    private let lcidByOutput: [String: Int]
+
+    init(_ lines: [String], lcidByOutput: [String: Int]) {
+        self.lines = lines
+        self.lcidByOutput = lcidByOutput
+    }
+
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        lines
+    }
+
+    override func lcidForCommitted(reading: String, output: String) -> Int? {
+        lcidByOutput[output]
+    }
 }

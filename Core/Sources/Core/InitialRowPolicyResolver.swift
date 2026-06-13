@@ -15,6 +15,8 @@ struct InitialRowPolicyInput: Equatable, Sendable {
     let exactMatchHighHistory: [String]
     /// 読み完全一致のユーザー辞書エントリ。履歴より弱く、AzooKey 辞書より強い。
     let userDictExact: [String]
+    /// 打鍵中のみ: 前方一致履歴/ユーザー辞書のうち名詞・固有名詞（lcid）で初期フォーカスする候補。
+    let prefixFocusCandidate: String?
     /// AzooKey 辞書が返した候補（読み完全一致）。履歴・ユーザー辞書が無いとき先頭を初期選択。
     let azooKeyCandidates: [String]
     /// セクション統合後の候補列（初期行判定用）。
@@ -22,6 +24,23 @@ struct InitialRowPolicyInput: Equatable, Sendable {
 }
 
 enum InitialRowPolicyResolver {
+    /// 2 モーラ以上のとき、前方一致履歴 → ユーザー辞書 prefix の順で名詞/固有名詞（`lcid`）の先頭を返す。
+    static func prefixFocusCandidate(
+        reading: String,
+        prefixHistory: [String],
+        userDictPrefix: [String],
+        lcidForOutput: (String) -> Int?
+    ) -> String? {
+        guard KanaUtils.moraCount(in: reading) >= 2 else { return nil }
+        for text in prefixHistory {
+            if isNounOrProperNoun(lcidForOutput(text)) { return text }
+        }
+        for text in userDictPrefix {
+            if isNounOrProperNoun(lcidForOutput(text)) { return text }
+        }
+        return nil
+    }
+
     static func resolve(_ input: InitialRowPolicyInput) -> InitialRowPolicy {
         switch input.fixedSlot {
         case .hiragana:
@@ -32,6 +51,9 @@ enum InitialRowPolicyResolver {
             }
             if let first = input.userDictExact.first {
                 return .firstMatching(first)
+            }
+            if let focus = input.prefixFocusCandidate {
+                return .firstMatching(focus)
             }
             if input.candidateList.first == input.reading {
                 return .firstMatching(input.reading)
@@ -49,6 +71,13 @@ enum InitialRowPolicyResolver {
                 return .firstMatching(input.reading)
             }
             return .afterFixed
+        }
+    }
+
+    private static func isNounOrProperNoun(_ lcid: Int?) -> Bool {
+        switch LcidRank.from(lcid: lcid) {
+        case .noun, .properNoun: return true
+        default: return false
         }
     }
 }

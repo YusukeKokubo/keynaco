@@ -110,6 +110,8 @@ extension InputHandler {
         let userDictRaw: [String]
         /// `userDictRaw` のうち読み完全一致だけを抜き出した配列。初期選択行の判定に使う。
         let userDictExact: [String]
+        /// 読み前方一致のユーザー辞書（初期フォーカス判定用）。
+        let userDictPrefix: [String]
         let exactMatchHighHistory: [String]
         let highHistory: [String]
         let highHistoryCount: Int
@@ -125,6 +127,8 @@ extension InputHandler {
         let userDictRaw: [String]
         /// 読み完全一致のユーザー辞書（初期選択行判定用）。
         let userDictExact: [String]
+        /// 読み前方一致のユーザー辞書（初期フォーカス判定用）。
+        let userDictPrefix: [String]
         let exactMatchHighHistory: [String]
         let highHistory: [String]
         let highHistoryCount: Int
@@ -180,6 +184,7 @@ extension InputHandler {
         return CheapCandidateSources(
             userDictRaw: userDictRaw,
             userDictExact: userDictExact,
+            userDictPrefix: userDictPrefix,
             exactMatchHighHistory: exactMatchHighHistory,
             highHistory: highHistory,
             highHistoryCount: exactMatchHighHistory.count + highHistory.count,
@@ -250,6 +255,7 @@ extension InputHandler {
             azooKeyApiOrder: azooKeyApiOrder,
             userDictRaw: cheap.userDictRaw,
             userDictExact: cheap.userDictExact,
+            userDictPrefix: cheap.userDictPrefix,
             exactMatchHighHistory: cheap.exactMatchHighHistory,
             highHistory: cheap.highHistory,
             highHistoryCount: cheap.highHistoryCount,
@@ -361,6 +367,17 @@ extension InputHandler {
             sectionOrder: built.sectionOrder,
             initialRowPolicy: .afterFixed
         )
+        let prefixFocusCandidate = trigger == .whileTyping
+            ? InitialRowPolicyResolver.prefixFocusCandidate(
+                reading: h,
+                prefixHistory: sources.highHistory,
+                userDictPrefix: sources.userDictPrefix,
+                lcidForOutput: { output in
+                    db.lcidForOutput(output)
+                        ?? azooKeyConverter.lcidForCommitted(reading: h, output: output)
+                }
+            )
+            : nil
         let policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
             reading: h,
             fixedSlot: fixedSlot,
@@ -368,6 +385,7 @@ extension InputHandler {
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             exactMatchHighHistory: sources.exactMatchHighHistory,
             userDictExact: sources.userDictExact,
+            prefixFocusCandidate: prefixFocusCandidate,
             azooKeyCandidates: sources.azooKeyCandidates,
             candidateList: previewLayout.candidates
         ))

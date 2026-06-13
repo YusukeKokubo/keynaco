@@ -35,6 +35,18 @@ enum KanaUtils {
         return false
     }
 
+    /// 小書き仮名（拗音・促音以外の縮み仮名）。モーラ数カウントでは 1 モーラに含めない。
+    private static let moraSmallKana: Set<Character> = [
+        "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "ゃ", "ゅ", "ょ", "ゎ", "ゕ", "ゖ",
+    ]
+
+    /// ひらがな読みのモーラ数（小書き仮名を直前音に吸収。`っ` は 1 モーラ）。
+    static func moraCount(in hiragana: String) -> Int {
+        hiragana.reduce(into: 0) { count, ch in
+            if !moraSmallKana.contains(ch) { count += 1 }
+        }
+    }
+
     /// ひらがな → 全角カタカナ。U+3041〜U+3096 を +0x60 シフト。
     static func hiraganaToKatakana(_ text: String) -> String {
         String(text.unicodeScalars.map { scalar in

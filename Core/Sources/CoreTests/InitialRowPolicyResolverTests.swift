@@ -10,6 +10,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         addsDefaultFixedHiragana: Bool = false,
         exactMatchHighHistory: [String] = [],
         userDictExact: [String] = [],
+        prefixFocusCandidate: String? = nil,
         azooKeyCandidates: [String] = [],
         candidateList: [String] = []
     ) -> InitialRowPolicy {
@@ -20,6 +21,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             exactMatchHighHistory: exactMatchHighHistory,
             userDictExact: userDictExact,
+            prefixFocusCandidate: prefixFocusCandidate,
             azooKeyCandidates: azooKeyCandidates,
             candidateList: candidateList
         ))
@@ -109,5 +111,78 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             resolve(reading: "あい", azooKeyCandidates: ["愛", "あい"]),
             .firstMatching("愛")
         )
+    }
+
+    /// 前方一致フォーカスは AzooKey 先頭より優先する。
+    func testPrefixFocusBeatsAzooKeyFirst() {
+        XCTAssertEqual(
+            resolve(
+                reading: "だけんす",
+                prefixFocusCandidate: "打鍵数削減",
+                azooKeyCandidates: ["ダケンス", "打鍵末"],
+                candidateList: ["打鍵数削減", "ダケンス", "だけんす", "打鍵末"]
+            ),
+            .firstMatching("打鍵数削減")
+        )
+    }
+
+    /// 完全一致履歴は前方一致フォーカスより優先する。
+    func testExactMatchHistoryBeatsPrefixFocus() {
+        XCTAssertEqual(
+            resolve(
+                exactMatchHighHistory: ["感じ"],
+                prefixFocusCandidate: "漢字",
+                azooKeyCandidates: ["愛"]
+            ),
+            .firstMatching("感じ")
+        )
+    }
+
+    func testPrefixFocusCandidate_nounLcidAccepted() {
+        let focus = InitialRowPolicyResolver.prefixFocusCandidate(
+            reading: "だけんす",
+            prefixHistory: ["打鍵数削減", "動詞"],
+            userDictPrefix: [],
+            lcidForOutput: { text in
+                switch text {
+                case "打鍵数削減": return 1285
+                case "動詞": return 100
+                default: return nil
+                }
+            }
+        )
+        XCTAssertEqual(focus, "打鍵数削減")
+    }
+
+    func testPrefixFocusCandidate_skipsVerb() {
+        let focus = InitialRowPolicyResolver.prefixFocusCandidate(
+            reading: "だけんす",
+            prefixHistory: ["出る"],
+            userDictPrefix: [],
+            lcidForOutput: { _ in 100 }
+        )
+        XCTAssertNil(focus)
+    }
+
+    func testPrefixFocusCandidate_requiresTwoMorae() {
+        let focus = InitialRowPolicyResolver.prefixFocusCandidate(
+            reading: "だ",
+            prefixHistory: ["打鍵数削減"],
+            userDictPrefix: [],
+            lcidForOutput: { _ in 1285 }
+        )
+        XCTAssertNil(focus)
+    }
+
+    func testPrefixFocusCandidate_userDictPrefixAfterHistory() {
+        let focus = InitialRowPolicyResolver.prefixFocusCandidate(
+            reading: "だけんす",
+            prefixHistory: ["出る"],
+            userDictPrefix: ["打鍵数削減"],
+            lcidForOutput: { text in
+                text == "打鍵数削減" ? 1285 : 100
+            }
+        )
+        XCTAssertEqual(focus, "打鍵数削減")
     }
 }
