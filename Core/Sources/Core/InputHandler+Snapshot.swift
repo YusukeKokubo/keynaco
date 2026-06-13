@@ -21,7 +21,8 @@ public extension InputHandler {
             fixedEnd: session.fixedEnd,
             candidates: session.candidates,
             committedHistory: Array(committedHistory.suffix(5)),
-            sessionTextBuffer: sessionTextBuffer
+            sessionTextBuffer: sessionTextBuffer,
+            candidateBuild: lastCandidateBuildDiagnostics
         )
     }
 }

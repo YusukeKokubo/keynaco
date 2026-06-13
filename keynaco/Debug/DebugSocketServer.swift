@@ -1064,6 +1064,9 @@ final class DebugSocketServer: @unchecked Sendable {
             "pendingAzooKey":     azooKeyScheduler.hasPendingWork,
         ]
         if let st = snap.selectedText { dict["selectedText"] = st }
+        if let build = handler.lastCandidateBuildDiagnostics {
+            dict["candidateBuild"] = build.asDictionary()
+        }
         return dict
     }
 
@@ -1099,7 +1102,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "isAsciiMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
         "historyEnd", "fixedEnd", "candidates", "committedHistory",
-        "candidateEntries"
+        "candidateEntries", "candidateBuild"
     ]
 
     static func computeChangedFields(

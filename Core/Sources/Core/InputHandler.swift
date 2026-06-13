@@ -163,6 +163,10 @@ public struct InputHandler {
     private var lastSyncedMarkedSelection: NSRange?
     /// 直近 `handle()` の AzooKey 非同期取得対象読み（`deferAzooKeyWhileTyping` 有効時のみ非 nil になり得る）。
     public private(set) var pendingAzooKeyReading: String?
+    #if DEBUG
+    /// 直近の `assembleCandidateList` で初期行を決めたときの診断情報。
+    var lastCandidateBuildDiagnostics: CandidateBuildDiagnostics?
+    #endif
 
     mutating func clearPendingAzooKeyReading() {
         pendingAzooKeyReading = nil

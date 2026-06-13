@@ -21,6 +21,8 @@ public struct InputHandlerSnapshot: Sendable {
 
     public var committedHistory: [String]
     public var sessionTextBuffer: String
+
+    public var candidateBuild: CandidateBuildDiagnostics?
 }
 
 #endif

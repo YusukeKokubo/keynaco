@@ -250,7 +250,8 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         let candStr   = candVis ? "[\(row)] \(selText ?? "(nil)")" : "hidden"
         let insertStr = inserted.isEmpty ? "" : "  確定:「\(inserted.joined())」"
 
-        let summary = "組=「\(hiragana)」romaji=「\(romaji)」  cand:\(candStr)\(insertStr)"
+        var summary = "組=「\(hiragana)」romaji=「\(romaji)」  cand:\(candStr)\(insertStr)"
+        summary += Self.candidateEventSuffix(from: dict)
         let detail  = Self.formatDetailFromDict(dict, inserted: inserted, timestamp: ts)
 
         push(LogEntry(
@@ -701,15 +702,24 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
 
     private nonisolated static func formatForCopy(_ entry: LogEntry) -> String {
         let base = "\(entry.tag)\(entry.timestamp)  \(entry.summary)"
-        let dict = entry.snapshotDict
-        guard dict["candidateVisible"] as? Bool == true else { return base }
+        return base + candidateEventSuffix(from: entry.snapshotDict)
+    }
+
+    private nonisolated static func candidateEventSuffix(from dict: [String: Any]) -> String {
+        guard dict["candidateVisible"] as? Bool == true else { return "" }
 
         let hEnd = dict["historyEnd"] as? Int ?? 0
         let fEnd = dict["fixedEnd"]   as? Int ?? 0
         let cands = dict["candidates"] as? [String] ?? []
         let top   = cands.prefix(5).joined(separator: " ")
         let ellipsis = cands.count > 5 ? " …" : ""
-        return "\(base)  hEnd:\(hEnd) fEnd:\(fEnd)  [\(top)\(ellipsis)]"
+        var suffix = "  hEnd:\(hEnd) fEnd:\(fEnd)  [\(top)\(ellipsis)]"
+
+        if let build = dict["candidateBuild"] as? [String: Any],
+           let logSuffix = build["logSuffix"] as? String {
+            suffix += logSuffix
+        }
+        return suffix
     }
 
     // MARK: - エクスポートヘルパ
@@ -762,6 +772,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             "sessionTextBuffer":   s.sessionTextBuffer,
         ]
         if let st = s.selectedText { dict["selectedText"] = st }
+        if let build = s.candidateBuild { dict["candidateBuild"] = build.asDictionary() }
         return dict
     }
 
@@ -773,7 +784,9 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         ].compactMap { $0 }.joined(separator: ",")
         let mode = modeFlags.isEmpty ? "-" : modeFlags
         let cand = s.candidateVisible ? "[\(s.selectedRow)] \(s.selectedText ?? "(nil)")" : "hidden"
-        return "組=「\(s.composedHiragana)」romaji=「\(s.pendingRomaji)」  mode:\(mode)  cand:\(cand)"
+        var summary = "組=「\(s.composedHiragana)」romaji=「\(s.pendingRomaji)」  mode:\(mode)  cand:\(cand)"
+        summary += candidateEventSuffix(from: snapshotToDict(s))
+        return summary
     }
 
     private nonisolated static func formatDetailFromSnapshot(_ s: InputHandlerSnapshot, timestamp: String) -> String {
@@ -797,6 +810,33 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("fixedEnd     : \(s.fixedEnd)")
         for (i, c) in s.candidates.enumerated() {
             lines.append("  [\(i)] \(c)\(i == s.selectedRow ? " ★" : "")")
+        }
+        if let build = s.candidateBuild {
+            lines.append("")
+            lines.append("【初期行決定】")
+            lines.append("trigger                  : \(build.trigger)")
+            lines.append("outcome                  : \(build.outcome.rawValue)")
+            lines.append("fixedSlot                : \(build.fixedSlot)")
+            lines.append("hiraganaPreferred(DB)    : \(build.hiraganaPreferred)")
+            lines.append("hiraganaBuiltin          : \(build.hiraganaBuiltin)")
+            lines.append("hiraganaInHistory        : \(build.hiraganaInHistory)")
+            lines.append("addsDefaultFixedHiragana : \(build.addsDefaultFixedHiragana)")
+            lines.append("exactMatchHighHistory    : \(build.exactMatchHighHistory)")
+            lines.append("highHistory              : \(build.highHistory)")
+            lines.append("userDictExact            : \(build.userDictExact)")
+            lines.append("azooKeyCandidates        : \(build.azooKeyCandidates)")
+            lines.append("azooKeyApiOrder          : \(build.azooKeyApiOrder)")
+            lines.append("initialRowPolicy         : \(build.initialRowPolicy)")
+            lines.append("initialRow               : \(build.initialRow)")
+            lines.append("initialText              : \(build.initialText ?? "(nil)")")
+            if s.candidateVisible, build.initialRow != s.selectedRow {
+                lines.append("selectedRow≠initialRow   : \(s.selectedRow) (ユーザー操作または再構築後)")
+            }
+            lines.append("deferAzooKeyWhileTyping  : \(build.deferAzooKeyWhileTyping)")
+            lines.append("sections                 :")
+            for section in build.sections {
+                lines.append("  \(section)")
+            }
         }
         lines.append("")
         lines.append("【確定履歴】")
@@ -843,6 +883,52 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         let selRow = int("selectedRow")
         for (i, c) in cands.enumerated() {
             lines.append("  [\(i)] \(c)\(i == selRow ? " ★" : "")")
+        }
+        if let build = dict["candidateBuild"] as? [String: Any] {
+            lines.append("")
+            lines.append("【初期行決定】")
+            func buildStr(_ key: String) -> String {
+                if let s = build[key] as? String { return s }
+                if let b = build[key] as? Bool { return String(b) }
+                if let i = build[key] as? Int { return String(i) }
+                if let a = build[key] as? [String] { return a.isEmpty ? "[]" : a.joined(separator: ", ") }
+                return ""
+            }
+            for key in [
+                "trigger", "outcome", "fixedSlot", "initialRowPolicy", "initialText",
+            ] {
+                let val = buildStr(key)
+                if !val.isEmpty { lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(val)") }
+            }
+            for key in [
+                "hiraganaPreferred", "hiraganaBuiltin", "hiraganaInHistory",
+                "addsDefaultFixedHiragana", "deferAzooKeyWhileTyping",
+            ] {
+                lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(buildStr(key))")
+            }
+            lines.append("initialRow               : \(buildStr("initialRow"))")
+            for key in [
+                "exactMatchHighHistory", "highHistory", "userDictExact",
+                "azooKeyCandidates", "azooKeyApiOrder",
+            ] {
+                lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(buildStr(key))")
+            }
+            if let sections = build["sections"] as? [String], !sections.isEmpty {
+                lines.append("sections                 :")
+                for section in sections { lines.append("  \(section)") }
+            }
+            if let entries = dict["candidateEntries"] as? [[String: Any]], !entries.isEmpty {
+                lines.append("")
+                lines.append("【候補セクション】")
+                for entry in entries.prefix(12) {
+                    let idx = entry["index"] as? Int ?? -1
+                    let text = entry["text"] as? String ?? "?"
+                    let section = entry["section"] as? String ?? "?"
+                    var line = "  [\(idx)] \(text) (\(section))"
+                    if let rank = entry["zenzaiRank"] as? Int { line += " zenzai#\(rank)" }
+                    lines.append(line)
+                }
+            }
         }
         lines.append("")
         lines.append("【確定履歴】")

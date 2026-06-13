@@ -293,7 +293,7 @@ extension InputHandler {
             && dateTimeCandidates.isEmpty
     }
 
-    private func assembleCandidateList(
+    private mutating func assembleCandidateList(
         from sources: CandidateListSources,
         trigger: CandidateListTrigger
     ) -> CandidateAction {
@@ -309,6 +309,20 @@ extension InputHandler {
            sources.userDictRaw.isEmpty,
            dateTimeCandidates.isEmpty,
            numberCandidates.isEmpty {
+            #if DEBUG
+            recordCandidateBuildDiagnostics(
+                trigger: trigger,
+                reading: h,
+                outcome: .dismissedEmpty,
+                fixedSlot: .none,
+                hiraganaInHistory: false,
+                addsDefaultFixedHiragana: false,
+                sources: sources,
+                built: nil,
+                policy: .afterFixed,
+                layout: nil
+            )
+            #endif
             return .dismiss
         }
 
@@ -342,31 +356,76 @@ extension InputHandler {
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
         ))
+        let policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
+            reading: h,
+            fixedSlot: fixedSlot,
+            hiraganaInHistory: hiraganaInHistory,
+            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
+            exactMatchHighHistory: sources.exactMatchHighHistory,
+            userDictExact: sources.userDictExact,
+            azooKeyCandidates: sources.azooKeyCandidates
+        ))
         let layout = CandidateLayout(
             sections: built.sections,
             sectionOrder: built.sectionOrder,
-            initialRowPolicy: InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
+            initialRowPolicy: policy
+        )
+        guard !layout.candidates.isEmpty else {
+            #if DEBUG
+            recordCandidateBuildDiagnostics(
+                trigger: trigger,
                 reading: h,
+                outcome: .dismissedEmpty,
                 fixedSlot: fixedSlot,
                 hiraganaInHistory: hiraganaInHistory,
                 addsDefaultFixedHiragana: addsDefaultFixedHiragana,
-                exactMatchHighHistory: sources.exactMatchHighHistory,
-                userDictExact: sources.userDictExact,
-                azooKeyCandidates: sources.azooKeyCandidates
-            ))
-        )
-        guard !layout.candidates.isEmpty else { return .dismiss }
+                sources: sources,
+                built: built,
+                policy: policy,
+                layout: layout
+            )
+            #endif
+            return .dismiss
+        }
 
         // 打鍵中のみ: 第一候補が機能語（助詞・助動詞等）ならサジェスト UI を出さない。
         // 明示トリガ（Space・未表示時）は候補を出す。
         if trigger == .whileTyping,
            layout.initialRow < layout.candidates.count,
            HiraganaPreferredBuiltins.words[layout.candidates[layout.initialRow]] != nil {
+            #if DEBUG
+            recordCandidateBuildDiagnostics(
+                trigger: trigger,
+                reading: h,
+                outcome: .dismissedFunctionalWord,
+                fixedSlot: fixedSlot,
+                hiraganaInHistory: hiraganaInHistory,
+                addsDefaultFixedHiragana: addsDefaultFixedHiragana,
+                sources: sources,
+                built: built,
+                policy: policy,
+                layout: layout
+            )
+            #endif
             return .dismiss
         }
 
         let zenzaiActive = azooKeyConverter.isZenzaiEnabled && leftContext.azooKeyValue != nil
         let apiOrder = zenzaiActive ? sources.azooKeyApiOrder : []
+        #if DEBUG
+        recordCandidateBuildDiagnostics(
+            trigger: trigger,
+            reading: h,
+            outcome: .shown,
+            fixedSlot: fixedSlot,
+            hiraganaInHistory: hiraganaInHistory,
+            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
+            sources: sources,
+            built: built,
+            policy: policy,
+            layout: layout
+        )
+        #endif
         return .show(
             candidates: layout.candidates,
             historyEnd: layout.historyEnd,
@@ -376,4 +435,46 @@ extension InputHandler {
             initialIsExplicitlySelected: trigger == .explicit
         )
     }
+
+    #if DEBUG
+    private mutating func recordCandidateBuildDiagnostics(
+        trigger: CandidateListTrigger,
+        reading: String,
+        outcome: CandidateBuildDiagnostics.Outcome,
+        fixedSlot: CandidateFixedSlot,
+        hiraganaInHistory: Bool,
+        addsDefaultFixedHiragana: Bool,
+        sources: CandidateListSources,
+        built: CandidateSectionBuildResult?,
+        policy: InitialRowPolicy,
+        layout: CandidateLayout?
+    ) {
+        let initialRow = layout?.initialRow ?? 0
+        let initialText = layout.flatMap { l in
+            l.candidates.indices.contains(initialRow) ? l.candidates[initialRow] : nil
+        }
+        lastCandidateBuildDiagnostics = CandidateBuildDiagnostics(
+            trigger: CandidateBuildDiagnosticsSupport.triggerLabel(trigger),
+            reading: reading,
+            outcome: outcome,
+            fixedSlot: CandidateBuildDiagnosticsSupport.fixedSlotLabel(fixedSlot),
+            hiraganaPreferred: hiraganaPreferredSet.contains(reading),
+            hiraganaBuiltin: HiraganaPreferredBuiltins.words[reading] != nil,
+            hiraganaInHistory: hiraganaInHistory,
+            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
+            exactMatchHighHistory: sources.exactMatchHighHistory,
+            highHistory: sources.highHistory,
+            userDictExact: sources.userDictExact,
+            azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8)),
+            azooKeyApiOrder: Array(sources.azooKeyApiOrder.prefix(8)),
+            initialRowPolicy: CandidateBuildDiagnosticsSupport.policyLabel(policy),
+            initialRow: initialRow,
+            initialText: initialText,
+            fixedEnd: layout?.fixedEnd ?? 0,
+            historyEnd: layout?.historyEnd ?? 0,
+            sections: built.map { CandidateBuildDiagnosticsSupport.sectionLabels($0.sections) } ?? [],
+            deferAzooKeyWhileTyping: deferAzooKeyWhileTyping
+        )
+    }
+    #endif
 }
