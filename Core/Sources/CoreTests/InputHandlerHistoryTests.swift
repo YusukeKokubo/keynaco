@@ -65,6 +65,33 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(results.map(\.output).contains("東京"), "前方一致で「東京」がヒットするはず")
     }
 
+    func testHighHistorySlotsPreferHigherLcidRankWithinScoreBand() {
+        let base: Int64 = 1_700_000_000
+        handler.db.clock = { base }
+        handler.db.record(input: "かんじゃ", output: "幹事")
+        handler.db.updatePOSClassification(output: "幹事", pos: "noun", lcid: 1283)
+        handler.db.record(input: "かんじゃく", output: "弱点")
+        handler.db.updatePOSClassification(output: "弱点", pos: "noun", lcid: 1283)
+        handler.db.record(input: "かんじょう", output: "感情")
+        handler.db.updatePOSClassification(output: "感情", pos: "noun", lcid: 1283)
+        handler.db.record(input: "かんじる", output: "感じる")
+        handler.db.updatePOSClassification(output: "感じる", pos: "verb", lcid: 619)
+
+        typeRomaji("kanzi")
+        let (_, action) = press(keyCode: 49)
+        guard let payload = action.showPayload else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        let history = Array(payload.candidates.prefix(payload.historyEnd))
+        XCTAssertTrue(history.contains("幹事"))
+        XCTAssertTrue(history.contains("弱点"))
+        XCTAssertTrue(history.contains("感情"))
+        XCTAssertFalse(
+            history.contains("感じる"),
+            "同スコア帯では名詞3件が枠を占め、動詞は highHistory に入らない: \(history)"
+        )
+    }
+
     func testNonParticleEndingPreserved() {
         // 非格助詞末尾の output はそのまま記録
         handler.db.recordPrefixes(reading: "わたしたち", output: "私たち")

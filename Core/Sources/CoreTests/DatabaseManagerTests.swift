@@ -197,6 +197,46 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertLessThan(idxNew, idxOld, "count=4 / score=4.0 が count=10 / score≈3.33 より上位")
     }
 
+    // MARK: - fetchHistoryScoredMerged lcid / タイブレーカー
+
+    func testFetchHistoryScoredMergedReturnsLcid() {
+        db.record(input: "ひょうじ", output: "表示")
+        db.updatePOSClassification(output: "表示", pos: "noun", lcid: 1283)
+        let row = db.fetchHistoryScoredMerged(reading: "ひょう").first { $0.output == "表示" }
+        XCTAssertEqual(row?.lcid, 1283)
+    }
+
+    func testFetchHistoryScoredMergedLcidTiebreakerWithinEpsilon() {
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.record(input: "かんじる", output: "感じる")
+        db.updatePOSClassification(output: "感じる", pos: "verb", lcid: 619)
+        db.record(input: "かんじゃ", output: "幹事")
+        db.updatePOSClassification(output: "幹事", pos: "noun", lcid: 1283)
+        let outputs = db.fetchHistoryScoredMerged(reading: "かんじ").map(\.output)
+        guard let idxKanji = outputs.firstIndex(of: "幹事"),
+              let idxKanjiru = outputs.firstIndex(of: "感じる") else {
+            return XCTFail("両方ヒットするはず: \(outputs)")
+        }
+        XCTAssertLessThan(idxKanji, idxKanjiru, "同スコア帯では名詞 lcid が動詞より上位")
+    }
+
+    func testFetchHistoryScoredMergedScoreDominatesOverLcidRank() {
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        db.record(input: "かんじゃ", output: "幹事")
+        db.updatePOSClassification(output: "幹事", pos: "noun", lcid: 1283)
+        db.record(input: "かんじる", output: "感じる")
+        db.updatePOSClassification(output: "感じる", pos: "verb", lcid: 619)
+        for _ in 0..<2 { db.record(input: "かんじる", output: "感じる") }
+        let outputs = db.fetchHistoryScoredMerged(reading: "かんじ").map(\.output)
+        guard let idxKanji = outputs.firstIndex(of: "幹事"),
+              let idxKanjiru = outputs.firstIndex(of: "感じる") else {
+            return XCTFail("両方ヒットするはず: \(outputs)")
+        }
+        XCTAssertLessThan(idxKanjiru, idxKanji, "スコア差が大きいときは rank で入れ替えない")
+    }
+
     // MARK: - GC
 
     func testGCDeletesOldSingleCountEntries() {

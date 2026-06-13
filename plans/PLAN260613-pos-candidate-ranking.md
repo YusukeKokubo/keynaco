@@ -93,7 +93,7 @@ created: 2026-06-13
 | Phase | 対象 | リスク | 期待効果 |
 |-------|------|--------|---------|
 | **A** | AzooKey 辞書セクション内の `lcid` ソート | 低 | 辞書候補のノイズ削減。候補の `lcid` を直接使用 | **実装済み**（`4095039`） |
-| **B** | 履歴のタイブレーカー（`score` 同値帯、`history.lcid` 使用） | 低 | `maxHighHistoryCount=3` の枠争いを改善 |
+| **B** | 履歴のタイブレーカー（`score` 同値帯、`history.lcid` 使用） | 低 | `maxHighHistoryCount=3` の枠争いを改善 | **実装済み** |
 | **C** | 長文フレーズペナルティ（`output.count > 10` かつ `lcid IS NULL`） | 極低 | 辞書外フレーズ履歴のノイズ削減 |
 | **D** | `history.lcid` 保存 + `pos` 表示タグ + backfill | — | **実装済み** |
 
@@ -227,7 +227,7 @@ results.sorted {
 | `InputHandler+Candidates.swift` | `fetchAzooKeyCandidates` 直後の lcid ソート | 済 |
 | `InputHandlerAzooKeyLcidSortTests.swift` | ソート・Zenzai 先頭固定テスト | 済 |
 | `AzooKeyLcidMapperTests.swift` | rank 変換テスト | 済 |
-| `DatabaseManager+History.swift` | `fetchHistoryScoredMerged` に `lcid` + epsilon タイブレーカー | 未 |
+| `DatabaseManager+History.swift` | `fetchHistoryScoredMerged` に `lcid` + epsilon タイブレーカー | 済 |
 
 ## 検証
 
@@ -288,5 +288,5 @@ results.sorted {
 1. ~~Phase D（`lcid` 保存・`pos` 表示・backfill・設定 UI）~~ **完了**
 2. ~~`LcidRank` + テスト（lcid レンジ正本）~~ **完了**（`50efb07`）
 3. ~~Phase A（AzooKey 候補の lcid ソート）~~ **完了**（`4095039`）— sandbox 確認済み（上記）
-4. Phase B（履歴タイブレーカー、`history.lcid` 使用）
+4. ~~Phase B（履歴タイブレーカー、`history.lcid` 使用）~~ **完了**
 5. Phase C（長文ペナルティ、任意）
