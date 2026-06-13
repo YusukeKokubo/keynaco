@@ -19,6 +19,7 @@ final class HistoryViewController: NSViewController {
         ColumnDef(id: "input",     title: "読み",         minWidth: 60,  defaultWidth: 150, sortKey: "input"),
         ColumnDef(id: "output",    title: "確定テキスト", minWidth: 60,  defaultWidth: 200, sortKey: "output"),
         ColumnDef(id: "pos",       title: "品詞",         minWidth: 60,  defaultWidth: 90,  sortKey: "pos"),
+        ColumnDef(id: "lcid",      title: "lcid",         minWidth: 44,  defaultWidth: 56,  sortKey: "lcid"),
         ColumnDef(id: "count",     title: "回数",         minWidth: 40,  defaultWidth: 60,  sortKey: "count"),
         ColumnDef(id: "used_at",   title: "最終変換",     minWidth: 80,  defaultWidth: 110, sortKey: "used_at"),
         ColumnDef(id: "score",     title: "スコア",       minWidth: 50,  defaultWidth: 70,  sortKey: "score"),
@@ -63,7 +64,7 @@ final class HistoryViewController: NSViewController {
             bottomBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bottomBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             bottomBar.heightAnchor.constraint(equalToConstant: 44),
-            view.widthAnchor.constraint(greaterThanOrEqualToConstant: 500),
+            view.widthAnchor.constraint(greaterThanOrEqualToConstant: 560),
             view.heightAnchor.constraint(greaterThanOrEqualToConstant: 300),
         ])
     }
@@ -123,6 +124,11 @@ final class HistoryViewController: NSViewController {
         case "input":     data.sort { asc ? $0.input < $1.input : $0.input > $1.input }
         case "output":    data.sort { asc ? $0.output < $1.output : $0.output > $1.output }
         case "pos":       data.sort { asc ? Self.posLabel($0.pos) < Self.posLabel($1.pos) : Self.posLabel($0.pos) > Self.posLabel($1.pos) }
+        case "lcid":
+            data.sort {
+                let l = $0.lcid ?? -1, r = $1.lcid ?? -1
+                return asc ? l < r : l > r
+            }
         case "count":     data.sort { asc ? $0.count < $1.count : $0.count > $1.count }
         case "used_at":   data.sort { asc ? $0.usedAt < $1.usedAt : $0.usedAt > $1.usedAt }
         case "score":     data.sort { asc ? $0.score() < $1.score() : $0.score() > $1.score() }
@@ -193,6 +199,7 @@ extension HistoryViewController: NSTableViewDelegate {
         case "input":     text = entry.input
         case "output":    text = entry.output
         case "pos":       text = Self.posLabel(entry.pos)
+        case "lcid":      text = entry.lcid.map(String.init) ?? "―"
         case "count":     text = "\(entry.count)"
         case "used_at":   text = Self.formatDate(entry.usedAt)
         case "score":     text = String(format: "%.2f", entry.score())
