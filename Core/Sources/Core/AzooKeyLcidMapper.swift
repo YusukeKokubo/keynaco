@@ -6,6 +6,34 @@ import KanaKanjiConverterModuleWithDefaultDictionary
 /// lcid レンジの根拠: AzooKey `DicdataStore`（助詞 147…368、助動詞 369…554）と
 /// IPADic 系の接続 ID 帯。形容詞は 11…52、動詞は 53…1280（名詞帯を除く）。
 enum AzooKeyLcidMapper {
+    /// `lcid` から候補並び替えランクを返す。`classification(for:)` とは独立（助動詞は表示上 `verb` だが rank は `auxiliary`）。
+    static func rank(for lcid: Int?) -> LcidRank {
+        guard let lcid else { return .unknown }
+        switch lcid {
+        case 1288...1293:
+            return .properNoun
+        case 1281...1287, 1285, 1294, 1295, 1296, 1297...1305, 1314:
+            return .noun
+        case 11..<53:
+            return .adjective
+        default:
+            break
+        }
+        if CIDData.isJoshi(cid: lcid) {
+            return .particle
+        }
+        if (369...554).contains(lcid) {
+            return .auxiliary
+        }
+        if (557...560).contains(lcid) {
+            return .unknown
+        }
+        if (53..<1281).contains(lcid) {
+            return .verb
+        }
+        return .unknown
+    }
+
     static func classification(for lcid: Int) -> POSClassification? {
         switch lcid {
         case 1289, 1290, 1291:
