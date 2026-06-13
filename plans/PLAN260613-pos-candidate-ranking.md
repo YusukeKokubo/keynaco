@@ -3,11 +3,29 @@ status: in-progress
 created: 2026-06-13
 ---
 
-# PLAN260613: 品詞による候補ウィンドウ表示優先度
+# PLAN260613: lcid による候補ウィンドウ表示優先度
 
 ## 目的
 
-候補ウィンドウ内の並びを品詞で調整し、**内容語（名詞・固有名詞）を優先**、**機能語（助詞・接続詞等）を下げる。`docs/concept.md` 指針 1「機能語と内容語でサジェスト価値が違う」を候補表示に反映する。
+候補ウィンドウ内の並びを **AzooKey 接続 ID（`lcid`）** で調整し、内容語を優先・機能語を下げる。`docs/concept.md` 指針 1「機能語と内容語でサジェスト価値が違う」を候補表示に反映する。
+
+## `pos` と `lcid` の役割分担
+
+| 列 / 概念 | 役割 | 使う場所 |
+|-----------|------|---------|
+| **`lcid`** | ロジックの正本。AzooKey 辞書と同じ接続 ID（細分類・活用形・接続制約を含む） | 候補並び替え、履歴タイブレーカー、blocklist 判定 |
+| **`pos`** | 人間向け表示ラベル。`lcid` から派生した粗い品詞名 | 設定画面「変換履歴」、デバッグ表示、将来の UI |
+
+**方針**: ランキング・フィルタは `lcid`（または `lcid` から導く rank）のみで行い、`pos` 文字列でのソート・判定はしない。`pos` は `AzooKeyLcidMapper` が `lcid` → 表示用タグに写像する層として維持する。
+
+### 同じ `pos` で `lcid` が違う理由（参考）
+
+`lcid` は品詞大分類ではなく IPADic 系の接続 ID。例:
+
+- 名詞: 1283（一般）、1287（形容動詞語幹）、1314（副詞的名詞）→ いずれも UI 上 `noun`
+- 動詞: 619（辞書形）、625（て形）、817（別活用帯）→ いずれも UI 上 `verb`
+
+候補ランキングで差をつけたいときは `pos` ではなく `lcid` が必要。
 
 ## 背景
 
@@ -16,152 +34,140 @@ created: 2026-06-13
 | 語種 | サジェスト価値 | 現状 |
 |------|--------------|------|
 | 名詞・固有名詞 | 高い | AzooKey 辞書順・履歴スコアのみで並ぶ |
-| 動詞・形容詞 | 文脈依存 | `pos IS NULL` として区別なし |
-| 助詞・接続詞 | 低い（リズム入力） | 履歴取得時に接続詞・感動詞のみ除外 |
+| 動詞・形容詞 | 文脈依存 | 並び替え未適用（DB には `lcid` 保存済み） |
+| 助詞・接続詞 | 低い（リズム入力） | 履歴取得時に接続詞・感動詞のみ SQL で除外 |
 
-### 実 DB 調査（2026-06-13、`~/Library/Application Support/keynaco/history.db`）
+### 実 DB 調査（2026-06-13）
 
-| pos | 語数（distinct output） | 使用回数 |
-|-----|------------------------|---------|
-| noun | 2,198 | 7,509 |
-| **(NULL)** | **1,596** | **3,775** |
-| proper_noun 系 | 436 | 1,317 |
-| other 系 | 69 | 239 |
-
-- 使用回数ベース: 名詞+固有名詞 **約 69%**、NULL **約 29%**
-- NULL の **75%** は 5 文字以下の短語。長いフレーズ（>10 文字）は 7 語 / 39 回のみ
-- NULL 上位: 欲しい(24)、今(22)、難しい(20)、調べて(19)、見て(13)、思う(13) — 動詞・形容詞が多い
-- 同一読みで名詞 vs NULL が競合（各 5 回以上）するケースは **ほぼ無い**（7 読みのみ）
-- 旧 LLM 由来の `other` 誤分類が残存（教えて・嬉しい・今は 等、計 239 回）
-
-### NULL の意味（重要）
-
-`AzooKeyLcidMapper` は名詞・固有名詞**のみ** `pos` を返す設計。動詞・形容詞は意図的に `nil` → DB 上 `pos IS NULL`。
-
-```swift
-// AzooKeyLcidMapper.swift
-/// 名詞・固有名詞のみ返す。動詞・形容詞等は keynaco 上の価値が低いため `nil`。
-```
-
-**NULL ≠ 分類失敗**。NULL を一律で下げると、履歴で高頻度の動詞・形容詞（見て・思う・欲しい）まで落ちるリスクがある。
+調査時点では `pos IS NULL` が 29% あったが、Phase D 実装後は backfill で `pos` / `lcid` が埋まる。NULL 残存は辞書にないフレーズ・接続詞リスト由来のみ。
 
 ### 現状の候補パイプライン
 
-1. **セクション順**（`CandidateLayout`）: 固定枠 → ユーザー辞書 → Zenzai → 履歴 → AzooKey 辞書 → カタカナ。POS 無関係
-2. **履歴**（`fetchHistoryScoredMerged`）: 時間減衰スコア降順。接続詞・感動詞のみ SQL で除外（[`PLAN260525b`](PLAN260525b-candidate-filter-prompt.md) の blocklist 化済み）
+1. **セクション順**（`CandidateLayout`）: 固定枠 → ユーザー辞書 → Zenzai → 履歴 → AzooKey 辞書 → カタカナ。ランク無関係
+2. **履歴**（`fetchHistoryScoredMerged`）: 時間減衰スコア降順。接続詞・感動詞のみ SQL で除外
 3. **AzooKey 辞書**（`azooKeyDict` セクション）: AzooKey/Zenzai の返却順のまま。`Candidate.data[].lcid` は取得済みだが並び替えに未使用
+4. **DB**: `history.pos`（表示用）+ `history.lcid`（ロジック用）を保存。設定画面に両列表示
 
 ## 設計方針
 
 ### 原則
 
 1. **履歴の主ソートはスコア優先** — ユーザーが実際に選んだ頻度を最優先
-2. **POS はセクション内の二次ソート** — 同スコア帯・辞書候補の並び替えに使う
-3. **NULL の一律降格はしない** — 動詞・形容詞の履歴を殺さない
-4. **lcid ベース** — 候補取得時点で分類可能。DB の `pos` 列に依存しない（未確定語・辞書のみ候補にも効く）
+2. **`lcid` はセクション内の二次ソート** — 同スコア帯・辞書候補の並び替えに使う
+3. **`pos` は表示専用** — ランキングロジックからは参照しない（`lcid` 欠落時のみ `pos` でフォールバック可）
+4. **候補取得時は辞書の `lcid` を優先** — DB 未登録の語でも AzooKey 候補に即効
 
-### POS ランク定義（案）
+### `LcidRank` 定義（案）
 
-| rank | 対象 | 例 |
-|------|------|-----|
-| 0 | proper_noun/* | 東京、IME |
-| 1 | noun, noun/suffix | 表示、設定 |
-| 2 | verb, adjective（新規 lcid 分類） | 調べる、難しい |
-| 3 | NULL（lcid 不明・未分類） | — |
-| 4 | particle, other/conjunction, other/interjection | が、しかし |
+`pos` 文字列ではなく **lcid レンジ** で定義する。根拠は `AzooKeyLcidMapper` / AzooKey `DicdataStore`（助詞 147…368、助動詞 369…554）。
 
-`other`（旧 LLM 残存）は backfill で再分類し、上記に吸収させる。
+| rank | lcid 帯 / 条件 | UI 上の `pos` 相当 | 例 |
+|------|---------------|-------------------|-----|
+| 0 | 1288–1293（固有名詞系） | proper_noun/* | 東京 |
+| 1 | 1281–1296, 1314, 1297–1305 | noun, noun/suffix | 表示、設定 |
+| 2 | 11–52（形容詞） | adjective | 難しい |
+| 3 | 53–1280（動詞・活用形。名詞帯除く） | verb | 調べる(619)、調べて(625) |
+| 4 | lcid 不明 | — | 辞書外フレーズ |
+| 5 | 147–368（助詞） | particle | が(148) |
+| 6 | 369–554（助動詞） | verb（表示上） | です(460) |
+| — | 接続詞・感動詞リスト | other/conjunction 等 | しかし（`lcid` なし） |
+
+接続詞・感動詞は `lcid` を持たない。blocklist は従来どおり `pos` 静的リスト or 出力文字列マッチで足りる（ランキング対象外）。
 
 ### 適用範囲（段階的）
 
 | Phase | 対象 | リスク | 期待効果 |
 |-------|------|--------|---------|
-| **A** | AzooKey 辞書セクション内の並び替え | 低 | 辞書候補のノイズ削減。lcid が取れるので即効 |
-| **B** | 履歴のタイブレーカー（`score` 同値帯のみ） | 低 | `maxHighHistoryCount=3` の枠争いを改善 |
-| **C** | 長文 NULL ペナルティ（`output.count > 10`） | 極低 | フレーズ履歴のノイズ削減（7 語のみだが害なし） |
-| **D** | lcid から verb/adjective/particle を明示タグ化 | 中 | NULL 意味の明確化。backfill・将来の blocklist 拡張に使える |
+| **A** | AzooKey 辞書セクション内の `lcid` ソート | 低 | 辞書候補のノイズ削減。候補の `lcid` を直接使用 |
+| **B** | 履歴のタイブレーカー（`score` 同値帯、`history.lcid` 使用） | 低 | `maxHighHistoryCount=3` の枠争いを改善 |
+| **C** | 長文フレーズペナルティ（`output.count > 10` かつ `lcid IS NULL`） | 極低 | 辞書外フレーズ履歴のノイズ削減 |
+| **D** | `history.lcid` 保存 + `pos` 表示タグ + backfill | — | **実装済み** |
 
 **やらないこと**
 
-- 履歴の主ソートを POS に置き換える
-- NULL の一律非表示（allowlist 復活。`PLAN260525b` で棄却済みの問題が再発）
-- Zenzai top-1 プロモート行の POS による差し替え
+- 履歴の主ソートを rank に置き換える
+- `pos` 文字列での候補ソート（情報が粗すぎる）
+- `lcid` 欠落語の一律非表示
+- Zenzai top-1 プロモート行の rank による差し替え
 
 ## 実装ステップ
 
-### Step 1: `POSRank` ユーティリティ（`Core/`）
+### Step 1: `LcidRank` ユーティリティ（`Core/`）— **未着手**
 
 ```swift
-enum POSRank: Int, Comparable, Sendable {
+enum LcidRank: Int, Comparable, Sendable {
     case properNoun = 0
     case noun = 1
-    case verbOrAdjective = 2
-    case unknown = 3
-    case functionWord = 4
+    case adjective = 2
+    case verb = 3
+    case unknown = 4
+    case particle = 5
+    case auxiliary = 6
 
-    static func from(lcid: Int) -> POSRank { ... }
-    static func from(pos: String?) -> POSRank { ... }  // 履歴用
+    /// 候補・履歴の正本。AzooKey 接続 ID から rank を返す。
+    static func from(lcid: Int?) -> LcidRank { ... }
+
+    /// `lcid` 欠落時のフォールバックのみ。通常パスでは使わない。
+    static func from(pos: String?) -> LcidRank { ... }
 }
 ```
 
-- `AzooKeyLcidMapper` を拡張し、動詞・形容詞・助詞の lcid レンジを追加（Step 4 と同時でも可）
-- テスト: `AzooKeyLcidMapperTests` / 新規 `POSRankTests`
+- lcid レンジ定義は `AzooKeyLcidMapper` と共有（二重管理を避けるため mapper に `rank(for lcid:)` を置くか、単一の lcid 定数ファイルに集約）
+- テスト: `LcidRankTests`（619 vs 625 で verb 同 rank、1283 vs 1293 で properNoun vs noun 等）
 
-### Step 2: AzooKey 候補の POS ソート（Phase A）
+### Step 2: AzooKey 候補の lcid ソート（Phase A）
 
-`AzooKeyConverter.requestCandidates` の返却、または `fetchAzooKeyCandidates` 直後で `[String]` を安定ソート:
+`requestCandidates` 返却時に `Candidate` 配列から text→lcid マップを構築し、安定ソート:
 
 ```swift
 candidates.sorted { a, b in
-    let ra = posRank(for: a, reading: h)
-    let rb = posRank(for: b, reading: h)
+    let ra = LcidRank.from(lcid: lcidMap[a])
+    let rb = LcidRank.from(lcid: lcidMap[b])
     if ra != rb { return ra < rb }
-    return originalIndex(a) < originalIndex(b)  // 安定ソート
+    return originalIndex(a) < originalIndex(b)
 }
 ```
 
-- `posRank` はキャッシュ済み `[Candidate]` から `lcid` を引く（`lcidForCommitted` の辞書ルックアップは候補リスト全体には重いので、`requestCandidates` 内で `Candidate` 配列を保持してテキスト→lcid マップを作る）
-- Zenzai top-1 プロモート対象（`azooKeyCandidates.first`）はソート前の top-1 を維持
+- Zenzai top-1（`azooKeyCandidates.first`）はソート前を維持
+- `lcidForCommitted` の逐次ルックアップは使わない（N 回変換は重い）
 
 ### Step 3: 履歴タイブレーカー（Phase B）
 
-`fetchHistoryScoredMerged` の `ORDER BY` を拡張:
-
-```sql
-ORDER BY s DESC, pos_rank ASC, MAX(used_at) DESC
-```
-
-`pos_rank` は Swift 側でソートする方が SQL 拡張を避けられる（`pos` 文字列→rank の CASE 式は保守コスト高）:
+`fetchHistoryScoredMerged` 結果を Swift 側で二次ソート。`history.lcid` を優先:
 
 ```swift
 results.sorted {
     if $0.score != $1.score { return $0.score > $1.score }
-    return POSRank.from(pos: $0.pos) < POSRank.from(pos: $1.pos)
+    return LcidRank.from(lcid: $0.lcid) < LcidRank.from(lcid: $1.lcid)
 }
 ```
 
-スコア差が `epsilon`（例: 0.01）以内のときだけ POS で並べ替える、という制約も検討可。
+- `lcid` が NULL の行は `LcidRank.unknown`（または `from(pos:)` フォールバック）
+- スコア差が `epsilon`（例: 0.01）以内のときだけ rank で並べ替える制約も検討可
 
-### Step 4: lcid 分類拡張 + backfill（Phase D）— **実装済み**
+### Step 4: DB・表示基盤（Phase D）— **実装済み**
 
-`AzooKeyLcidMapper` に verb / adjective / particle レンジを追加。`history.lcid INTEGER` 列を追加し、分類時に生 lcid も保存。backfill は `pos IS NULL` / `other` / `lcid IS NULL`（接続詞・感動詞除く）を再分類。
+- `history.lcid INTEGER` 列 + schema v5 マイグレーション
+- 確定時 / backfill で `pos`（表示）+ `lcid`（生 ID）を同時保存
+- `AzooKeyLcidMapper` に verb / adjective / particle レンジ追加
+- 設定画面: 品詞列（`pos`）+ `lcid` 列
 
 ### Step 5: 長文ペナルティ（Phase C、任意）
 
-履歴ソート時に `output.count > 10` な NULL を rank 3.5 相当で下げる。実データ上 7 語のみだが実装コスト極小。
+`lcid IS NULL` かつ `output.count > 10` を `LcidRank` 内で微減点。
 
 ## 変更ファイル（想定）
 
-| ファイル | 変更内容 |
-|---------|---------|
-| `Core/Sources/Core/AzooKeyLcidMapper.swift` | verb/adjective/particle lcid レンジ追加 |
-| `Core/Sources/Core/POSRank.swift`（新規） | lcid / pos 文字列 → rank 変換 |
-| `Core/Sources/Core/AzooKeyConverter.swift` | 候補返却時に lcid マップ保持、またはソート済みテキスト返却 |
-| `Core/Sources/Core/InputHandler+Candidates.swift` | AzooKey 候補の二次ソート（Converter 側でやらない場合） |
-| `Core/Sources/Core/DatabaseManager+History.swift` | 履歴結果のタイブレーカーソート |
-| `Core/Sources/Core/AzooKeyPOSBackfill.swift` | `other` 再分類対象の追加 |
-| `Core/Sources/CoreTests/POSRankTests.swift`（新規） | rank 変換のユニットテスト |
-| `Core/Sources/CoreTests/CandidateSectionBuilderTests.swift` | AzooKey セクション並びの回帰テスト |
+| ファイル | 変更内容 | 状態 |
+|---------|---------|------|
+| `AzooKeyLcidMapper.swift` | lcid レンジ + `pos` 派生 | 済 |
+| `DatabaseManager.swift` / `+History.swift` | `lcid` 列、backfill | 済 |
+| `HistoryViewController.swift` | `lcid` 列表示 | 済 |
+| `LcidRank.swift`（新規） | lcid → rank（ロジック正本） | 未 |
+| `AzooKeyConverter.swift` | 候補返却時 text→lcid マップ | 未 |
+| `InputHandler+Candidates.swift` | AzooKey セクション内 lcid ソート | 未 |
+| `DatabaseManager+History.swift` | 履歴タイブレーカー（`lcid` 使用） | 未 |
+| `LcidRankTests.swift`（新規） | rank 変換テスト | 未 |
 
 ## 検証
 
@@ -169,48 +175,38 @@ results.sorted {
 
 - 同一 rank 内は元の順序を維持（安定ソート）
 - Zenzai top-1 はソート前 first を維持
-- 履歴: スコア差が大きいとき POS で順序が入れ替わらない
+- 履歴: スコア差が大きいとき `lcid` rank で順序が入れ替わらない
+- 619（調べる）と 625（調べて）は同 verb rank、辞書形が先なら現状順維持でよい
 
 ### sandbox 手動確認（`/keynaco-ime-sandbox`）
 
 | 読み | 確認点 |
 |------|--------|
-| `かんじ` | 名詞「感じ」が動詞系より上か |
-| `きょう` | 固有名詞「東京」が助詞付きより上か |
-| `しらべ` | 履歴「調べて」（動詞）がスコア優先で残るか |
-| `ひょうじ` | 名詞「表示」が辞書候補の上位か |
-
-### DB ドライラン（任意）
-
-```sql
--- POS ソート導入後に highHistory 枠の構成変化を比較
-SELECT output, pos, SUM(count) AS s FROM history
-WHERE input LIKE 'かんじ%'
-GROUP BY output ORDER BY s DESC LIMIT 5;
-```
+| `かんじ` | lcid 名詞帯の候補が動詞帯より上か |
+| `きょう` | lcid 1293（地名）が助詞帯より上か |
+| `しらべ` | 履歴「調べて」（lcid 625）がスコア優先で残るか |
+| `ひょうじ` | lcid 1283 系が辞書候補の上位か |
 
 ## 関連 plan
 
 | plan | 関係 |
 |------|------|
-| [`PLAN260525b-candidate-filter-prompt.md`](PLAN260525b-candidate-filter-prompt.md) | 履歴 blocklist（接続詞・感動詞除外）済み。本 plan は並び替え層 |
-| [`PLAN260524-pos-tag-taxonomy.md`](PLAN260524-pos-tag-taxonomy.md) | pos タグ体系。lcid 拡張時に参照 |
+| [`PLAN260525b-candidate-filter-prompt.md`](PLAN260525b-candidate-filter-prompt.md) | 履歴 blocklist 済み。本 plan は `lcid` 並び替え層 |
+| [`PLAN260524-pos-tag-taxonomy.md`](PLAN260524-pos-tag-taxonomy.md) | `pos` 表示タグ体系（ロジックには使わない） |
 | [`PLAN260519-candidate-section-declaration.md`](PLAN260519-candidate-section-declaration.md) | セクション構造。セクション**間**順序は変えない |
-| [`PLAN260520c-noun-bigram.md`](PLAN260520c-noun-bigram.md) | 名詞 bigram（未実装）。POS 分類精度は共通基盤 |
 
 ## 判断基準（POC 後）
 
 | 結果 | 判断 |
 |------|------|
-| AzooKey セクションで名詞が目視で上位に来る | Phase A をマージ |
-| 履歴でよく使う動詞（見て・思う）が消える | Phase B を弱める or 撤回 |
-| lcid 分類拡張で NULL が 50% 以下に | Phase D を継続 |
+| AzooKey セクションで名詞帯 lcid が上位に来る | Phase A をマージ |
+| 履歴でよく使う動詞（lcid 625 等）が消える | Phase B を弱める or 撤回 |
 | sandbox で体感改善なし | Phase A のみ留保、B/C は見送り |
 
 ## 実装順序
 
-1. ~~`POSRank` + lcid 拡張 + テスト~~ → **Phase D 完了**（`AzooKeyLcidMapper` に verb/adjective/particle、backfill が `other` も再分類）
-2. Phase A（AzooKey ソート）→ sandbox 確認
-3. Phase B（履歴タイブレーカー）→ 回帰テスト
-4. ~~Phase D（backfill 拡張）~~
+1. ~~Phase D（`lcid` 保存・`pos` 表示・backfill・設定 UI）~~ **完了**
+2. `LcidRank` + テスト（lcid レンジ正本）
+3. Phase A（AzooKey 候補の lcid ソート）→ sandbox 確認
+4. Phase B（履歴タイブレーカー、`history.lcid` 使用）
 5. Phase C（長文ペナルティ、任意）
