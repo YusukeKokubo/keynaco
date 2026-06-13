@@ -27,4 +27,9 @@ class BaseAzooKeyStub: AzooKeyConverting, @unchecked Sendable {
         _ = (reading, output)
         return nil
     }
+
+    func primaryLcidByText(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String: Int] {
+        _ = (hiragana, leftSideContext, richCandidates)
+        return [:]
+    }
 }

@@ -51,10 +51,21 @@ extension InputHandler {
                 richCandidates: true
             )
             : nil
-        let azooKeyCandidates = peek?.candidates ?? []
+        let peekRaw = peek?.candidates ?? []
+        let azooKeyFetch = sortAzooKeyCandidates(
+            peekRaw,
+            reading: h,
+            richCandidates: true
+        )
+        let azooKeyCandidates = azooKeyFetch.sorted
         let pendingReading: String? = needsAzooKey && peek?.needsAsyncFetch != false ? h : nil
         let cheap = collectCheapCandidateSources(readingOverride: h)
-        let sources = makeCandidateListSources(h: h, cheap: cheap, azooKeyCandidates: azooKeyCandidates)
+        let sources = makeCandidateListSources(
+            h: h,
+            cheap: cheap,
+            azooKeyCandidates: azooKeyCandidates,
+            azooKeyPreSortFirst: azooKeyFetch.preSortFirst
+        )
         let action = assembleCandidateList(from: sources, trigger: trigger)
         return (action, pendingReading)
     }
@@ -70,8 +81,18 @@ extension InputHandler {
     ) -> CandidateAction {
         guard state.composedHiragana == reading else { return .none }
         let filtered = azooKeyCandidates.filter { !KanaUtils.isScriptMixed($0) }
+        let azooKeyFetch = sortAzooKeyCandidates(
+            filtered,
+            reading: reading,
+            richCandidates: true
+        )
         let cheap = collectCheapCandidateSources(readingOverride: reading)
-        let sources = makeCandidateListSources(h: reading, cheap: cheap, azooKeyCandidates: filtered)
+        let sources = makeCandidateListSources(
+            h: reading,
+            cheap: cheap,
+            azooKeyCandidates: azooKeyFetch.sorted,
+            azooKeyPreSortFirst: azooKeyFetch.preSortFirst
+        )
         return assembleCandidateList(from: sources, trigger: trigger)
     }
 
@@ -121,8 +142,13 @@ extension InputHandler {
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
         let cheap = collectCheapCandidateSources(readingOverride: readingOverride)
-        let azooKeyCandidates = fetchAzooKeyCandidates(reading: h, trigger: trigger)
-        return makeCandidateListSources(h: h, cheap: cheap, azooKeyCandidates: azooKeyCandidates)
+        let azooKeyFetch = fetchAzooKeyCandidates(reading: h, trigger: trigger)
+        return makeCandidateListSources(
+            h: h,
+            cheap: cheap,
+            azooKeyCandidates: azooKeyFetch.sorted,
+            azooKeyPreSortFirst: azooKeyFetch.preSortFirst
+        )
     }
 
     private mutating func collectCheapCandidateSources(
@@ -165,29 +191,72 @@ extension InputHandler {
         )
     }
 
+    private struct AzooKeyCandidateFetch {
+        let sorted: [String]
+        /// ソート前の先頭。Zenzai top-1 プロモートは API 返却順の first を維持する。
+        let preSortFirst: String?
+    }
+
     private mutating func fetchAzooKeyCandidates(
         reading: String,
         trigger: CandidateListTrigger
-    ) -> [String] {
-        guard !reading.allSatisfy({ $0.isASCII }) else { return [] }
+    ) -> AzooKeyCandidateFetch {
+        guard !reading.allSatisfy({ $0.isASCII }) else {
+            return AzooKeyCandidateFetch(sorted: [], preSortFirst: nil)
+        }
+        let richCandidates = trigger == .explicit
         let raw = azooKeyConverter.requestCandidates(
             hiragana: reading,
             leftSideContext: leftContext.azooKeyValue,
-            richCandidates: trigger == .explicit
+            richCandidates: richCandidates
         )
-        return raw.filter { !KanaUtils.isScriptMixed($0) }
+        let filtered = raw.filter { !KanaUtils.isScriptMixed($0) }
+        return sortAzooKeyCandidates(filtered, reading: reading, richCandidates: richCandidates)
+    }
+
+    private func sortAzooKeyCandidates(
+        _ candidates: [String],
+        reading: String,
+        richCandidates: Bool
+    ) -> AzooKeyCandidateFetch {
+        let preSortFirst = candidates.first
+        guard candidates.count > 1 else {
+            return AzooKeyCandidateFetch(sorted: candidates, preSortFirst: preSortFirst)
+        }
+        let lcidByText = azooKeyConverter.primaryLcidByText(
+            hiragana: reading,
+            leftSideContext: leftContext.azooKeyValue,
+            richCandidates: richCandidates
+        )
+        let sorted = Self.sortAzooKeyCandidatesByLcidRank(candidates, lcidByText: lcidByText)
+        return AzooKeyCandidateFetch(sorted: sorted, preSortFirst: preSortFirst)
+    }
+
+    /// AzooKey 辞書セクション内の lcid 安定ソート。`lcidByText` が空なら入力順を維持。
+    static func sortAzooKeyCandidatesByLcidRank(
+        _ candidates: [String],
+        lcidByText: [String: Int]
+    ) -> [String] {
+        guard candidates.count > 1, !lcidByText.isEmpty else { return candidates }
+        return candidates.enumerated().sorted { lhs, rhs in
+            let leftRank = LcidRank.from(lcid: lcidByText[lhs.element])
+            let rightRank = LcidRank.from(lcid: lcidByText[rhs.element])
+            if leftRank != rightRank { return leftRank < rightRank }
+            return lhs.offset < rhs.offset
+        }.map(\.element)
     }
 
     private func makeCandidateListSources(
         h: String,
         cheap: CheapCandidateSources,
-        azooKeyCandidates: [String]
+        azooKeyCandidates: [String],
+        azooKeyPreSortFirst: String? = nil
     ) -> CandidateListSources {
         let zenzaiPromoted: String? = {
             guard azooKeyConverter.isZenzaiEnabled,
-                  leftContext.azooKeyValue != nil,
-                  let top1 = azooKeyCandidates.first else { return nil }
-            return top1
+                  leftContext.azooKeyValue != nil else { return nil }
+            if let preSortFirst = azooKeyPreSortFirst { return preSortFirst }
+            return azooKeyCandidates.first
         }()
         return CandidateListSources(
             h: h,

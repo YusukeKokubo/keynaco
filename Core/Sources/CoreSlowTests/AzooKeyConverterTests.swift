@@ -42,6 +42,17 @@ final class AzooKeyConverterTests: XCTestCase {
                        "richCandidates が異なれば別キーとしてキャッシュする")
     }
 
+    func testPrimaryLcidByTextReadsFromCacheAfterRequest() {
+        let converter = AzooKeyConverter()
+        XCTAssertTrue(converter.primaryLcidByText(hiragana: "かんじ", leftSideContext: nil).isEmpty)
+        _ = converter.requestCandidates(hiragana: "かんじ", leftSideContext: nil, richCandidates: false)
+        let map = converter.primaryLcidByText(hiragana: "かんじ", leftSideContext: nil, richCandidates: false)
+        XCTAssertFalse(map.isEmpty, "requestCandidates 後は text→lcid が取れるはず")
+        for (_, lcid) in map {
+            XCTAssertNotNil(AzooKeyLcidMapper.rank(for: lcid))
+        }
+    }
+
     // MARK: - requestCandidates の候補に残余ひらがなが混入しない
 
     func testRequestCandidatesDoesNotProduceDanglingHiraganaCandidates() {
