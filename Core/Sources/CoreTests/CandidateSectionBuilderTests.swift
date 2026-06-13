@@ -84,17 +84,33 @@ final class CandidateSectionBuilderTests: XCTestCase {
         XCTAssertLessThan(l.candidates.firstIndex(of: "感じ")!, l.candidates.firstIndex(of: "Zen先頭")!)
     }
 
-    func testPrefixOnlyHistoryStillSuppressedFromAzooKey() {
+    func testPrefixOnlyHistoryBeyondSlotsRemainsInAzooKey() {
         let input = baseInput(
             reading: "かんじ",
             hiragana: "かんじ",
             azooKeyCandidates: ["漢字", "感じる"],
             highHistory: ["漢字"],
             historyOutputSet: ["漢字", "感じる"],
-            exactMatchHistoryOutputs: ["漢字"]
+            exactMatchHistoryOutputs: []
         )
         let l = layout(from: input)
-        XCTAssertFalse(l.candidates.contains("感じる"), "前方一致のみの履歴は辞書から除外する")
+        XCTAssertTrue(l.candidates.contains("感じる"), "top3 漏れの前方一致履歴は辞書に残す")
+        XCTAssertFalse(l.candidates.prefix(l.historyEnd).contains("感じる"))
+        XCTAssertEqual(l.candidates.filter { $0 == "漢字" }.count, 1, "履歴表示済みは辞書と重複しない")
+    }
+
+    func testPrefixOnlyHistoryInHighSlotsSuppressedFromAzooKey() {
+        let input = baseInput(
+            reading: "かんじ",
+            hiragana: "かんじ",
+            azooKeyCandidates: ["漢字", "感じる"],
+            highHistory: ["漢字", "感じる"],
+            historyOutputSet: ["漢字", "感じる"]
+        )
+        let l = layout(from: input)
+        XCTAssertEqual(l.candidates.filter { $0 == "感じる" }.count, 1, "履歴に載る語は辞書と重複しない")
+        XCTAssertTrue(l.candidates.prefix(l.historyEnd).contains("感じる"))
+        XCTAssertEqual(l.candidates.filter { $0 == "漢字" }.count, 1)
     }
 
     func testZenzaiTop1NotDuplicatedInAzooKey() {

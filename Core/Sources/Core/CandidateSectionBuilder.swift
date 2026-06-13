@@ -30,12 +30,8 @@ enum CandidateSectionBuilder {
         let allHighHistory = input.exactMatchHighHistory + input.highHistory
         let azooKeyUniq = input.azooKeyCandidates.filter { candidate in
             guard candidate != input.zenzaiPromoted else { return false }
+            // 履歴セクションに載る語は辞書と二重表示しない（top3 漏れの前方一致は辞書に残す）。
             if allHighHistory.contains(candidate) { return false }
-            // 前方一致のみの履歴は表示されないので辞書からも除外。読み完全一致は top3 外でも選べるよう残す。
-            if input.historyOutputSet.contains(candidate),
-               !input.exactMatchHistoryOutputs.contains(candidate) {
-                return false
-            }
             return true
         }
 
