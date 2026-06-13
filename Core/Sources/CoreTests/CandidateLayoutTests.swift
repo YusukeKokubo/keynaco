@@ -159,6 +159,44 @@ final class CandidateLayoutTests: XCTestCase {
         XCTAssertEqual(l.initialRow, 0)  // fixedEnd=0
     }
 
+    // MARK: - adjustedInitialRow
+
+    func testAdjustedInitialRow_singleNonFixed() {
+        XCTAssertEqual(
+            CandidateLayout.adjustedInitialRow(
+                candidates: ["あい", "愛"],
+                fixedEnd: 1,
+                computedRow: 0,
+                appliesDefaultFixedHiragana: true
+            ),
+            1
+        )
+    }
+
+    func testAdjustedInitialRow_multipleNonFixedUnchanged() {
+        XCTAssertEqual(
+            CandidateLayout.adjustedInitialRow(
+                candidates: ["あい", "愛", "アイ"],
+                fixedEnd: 1,
+                computedRow: 0,
+                appliesDefaultFixedHiragana: true
+            ),
+            0
+        )
+    }
+
+    func testAdjustedInitialRow_skippedWithoutDefaultFixedHiragana() {
+        XCTAssertEqual(
+            CandidateLayout.adjustedInitialRow(
+                candidates: ["カスタム語", "ダケンス"],
+                fixedEnd: 1,
+                computedRow: 0,
+                appliesDefaultFixedHiragana: false
+            ),
+            0
+        )
+    }
+
     // MARK: - カスタム sectionOrder
 
     func testCustomSectionOrderWithoutFixedSections() {

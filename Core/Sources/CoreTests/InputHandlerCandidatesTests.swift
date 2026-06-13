@@ -188,6 +188,21 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertTrue(payload.candidates.contains("ぐろとすく"), "ひらがなも表示されるはず")
     }
 
+    func testSingleNonFixedCandidateFocusesBeyondFixedEnd() {
+        setUpWithConverter(SnapStub(["今回のことは誤解である", "コンカイノコトハゴカイデアル"]))
+        handler.state.composedHiragana = "こんかいのことはごかいである"
+        handler.state.pendingRomaji = ""
+        let action = handler.buildCandidateList(trigger: .whileTyping)
+        guard let payload = action.showPayload else {
+            XCTFail(".show を返すはず"); return
+        }
+        XCTAssertEqual(payload.fixedEnd, 1)
+        XCTAssertEqual(payload.candidates.count - payload.fixedEnd, 1,
+                       "固定枠以外は変換候補1件のみのはず: \(payload.candidates)")
+        XCTAssertEqual(payload.initialRow, 1)
+        XCTAssertEqual(payload.candidates[payload.initialRow], "今回のことは誤解である")
+    }
+
     func testKnownWordWithZenzaiDoesNotShowKatakanaInMainList() {
         // 実質的な変換候補がある場合: カタカナは主要リストに出ない（既存の仕様を保護）
         setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: true))

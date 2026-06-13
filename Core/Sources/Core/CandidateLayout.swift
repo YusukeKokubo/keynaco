@@ -108,4 +108,19 @@ struct CandidateLayout: Sendable {
             self.initialRow = fixedEndAcc < result.count ? fixedEndAcc : 0
         }
     }
+
+    /// `addsDefaultFixedHiragana` で先頭に読みを固定したとき、固定枠以外が1件だけならその行にフォーカスする。
+    static func adjustedInitialRow(
+        candidates: [String],
+        fixedEnd: Int,
+        computedRow: Int,
+        appliesDefaultFixedHiragana: Bool
+    ) -> Int {
+        guard appliesDefaultFixedHiragana,
+              fixedEnd > 0,
+              candidates.count - fixedEnd == 1 else {
+            return computedRow
+        }
+        return fixedEnd
+    }
 }

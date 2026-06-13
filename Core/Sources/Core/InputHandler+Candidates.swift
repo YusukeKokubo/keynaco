@@ -394,6 +394,12 @@ extension InputHandler {
             sectionOrder: built.sectionOrder,
             initialRowPolicy: policy
         )
+        let initialRow = CandidateLayout.adjustedInitialRow(
+            candidates: layout.candidates,
+            fixedEnd: layout.fixedEnd,
+            computedRow: layout.initialRow,
+            appliesDefaultFixedHiragana: addsDefaultFixedHiragana
+        )
         guard !layout.candidates.isEmpty else {
             #if DEBUG
             recordCandidateBuildDiagnostics(
@@ -415,8 +421,8 @@ extension InputHandler {
         // 打鍵中のみ: 第一候補が機能語（助詞・助動詞等）ならサジェスト UI を出さない。
         // 明示トリガ（Space・未表示時）は候補を出す。
         if trigger == .whileTyping,
-           layout.initialRow < layout.candidates.count,
-           HiraganaPreferredBuiltins.words[layout.candidates[layout.initialRow]] != nil {
+           initialRow < layout.candidates.count,
+           HiraganaPreferredBuiltins.words[layout.candidates[initialRow]] != nil {
             #if DEBUG
             recordCandidateBuildDiagnostics(
                 trigger: trigger,
@@ -453,7 +459,7 @@ extension InputHandler {
         return .show(
             candidates: layout.candidates,
             historyEnd: layout.historyEnd,
-            initialRow: layout.initialRow,
+            initialRow: initialRow,
             fixedEnd: layout.fixedEnd,
             azooKeyApiOrder: apiOrder,
             initialIsExplicitlySelected: trigger == .explicit
