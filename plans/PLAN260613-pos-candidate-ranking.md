@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: implemented
 created: 2026-06-13
 ---
 
@@ -94,7 +94,7 @@ created: 2026-06-13
 |-------|------|--------|---------|
 | **A** | AzooKey 辞書セクション内の `lcid` ソート | 低 | 辞書候補のノイズ削減。候補の `lcid` を直接使用 | **実装済み**（`4095039`） |
 | **B** | 履歴のタイブレーカー（`score` 同値帯、`history.lcid` 使用） | 低 | `maxHighHistoryCount=3` の枠争いを改善 | **実装済み** |
-| **C** | 長文フレーズペナルティ（`output.count > 10` かつ `lcid IS NULL`） | 極低 | 辞書外フレーズ履歴のノイズ削減 |
+| **C** | 長文フレーズペナルティ（`output.count > 10` かつ `lcid IS NULL`） | 極低 | 辞書外フレーズ履歴のノイズ削減 | **実装済み** |
 | **D** | `history.lcid` 保存 + `pos` 表示タグ + backfill | — | **実装済み** |
 
 **やらないこと**
@@ -220,7 +220,7 @@ results.sorted {
 | `AzooKeyLcidMapper.swift` | lcid レンジ + `pos` 派生 + `rank(for:)` | 済 |
 | `DatabaseManager.swift` / `+History.swift` | `lcid` 列、backfill | 済 |
 | `HistoryViewController.swift` | `lcid` 列表示 | 済 |
-| `LcidRank.swift` | Comparable ラッパー + `from(lcid:)` / `from(pos:)` | 済 |
+| `LcidRank.swift` | Comparable ラッパー + `from(lcid:)` / `from(pos:)` / `forHistory` | 済 |
 | `AzooKeyConverter.swift` | `primaryLcidByText`（キャッシュから text→lcid） | 済 |
 | `AzooKeyConverting.swift` | プロトコルに `primaryLcidByText` 追加 | 済 |
 | `BaseAzooKeyStub.swift` 等 | テストスタブ更新 | 済 |
@@ -289,4 +289,4 @@ results.sorted {
 2. ~~`LcidRank` + テスト（lcid レンジ正本）~~ **完了**（`50efb07`）
 3. ~~Phase A（AzooKey 候補の lcid ソート）~~ **完了**（`4095039`）— sandbox 確認済み（上記）
 4. ~~Phase B（履歴タイブレーカー、`history.lcid` 使用）~~ **完了**
-5. Phase C（長文ペナルティ、任意）
+5. ~~Phase C（長文ペナルティ、任意）~~ **完了**

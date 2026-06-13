@@ -87,16 +87,19 @@ extension DatabaseManager {
             if abs(lhs.element.score - rhs.element.score) > Self.historyScoreTieEpsilon {
                 return lhs.element.score > rhs.element.score
             }
-            let leftRank = Self.historyLcidRank(lcid: lhs.element.lcid, pos: lhs.element.pos)
-            let rightRank = Self.historyLcidRank(lcid: rhs.element.lcid, pos: rhs.element.pos)
+            let leftRank = Self.historyLcidRank(
+                output: lhs.element.output, lcid: lhs.element.lcid, pos: lhs.element.pos
+            )
+            let rightRank = Self.historyLcidRank(
+                output: rhs.element.output, lcid: rhs.element.lcid, pos: rhs.element.pos
+            )
             if leftRank != rightRank { return leftRank < rightRank }
             return lhs.offset < rhs.offset
         }.map { ($0.element.output, $0.element.score, $0.element.lcid) }
     }
 
-    private static func historyLcidRank(lcid: Int?, pos: String?) -> LcidRank {
-        if let lcid { return LcidRank.from(lcid: lcid) }
-        return LcidRank.from(pos: pos)
+    private static func historyLcidRank(output: String, lcid: Int?, pos: String?) -> LcidRank {
+        LcidRank.forHistory(output: output, lcid: lcid, pos: pos)
     }
 
     /// 全 history を時間減衰スコアで集計して上位 N 件の (reading, output) を返す。

@@ -11,6 +11,8 @@ enum LcidRank: Int, Comparable, Sendable {
     case unknown = 4
     case particle = 5
     case auxiliary = 6
+    /// 辞書外の長文フレーズ（`lcid` 欠落かつ `output.count > 10`）。履歴タイブレーカー専用。
+    case longPhrase = 7
 
     static func < (lhs: LcidRank, rhs: LcidRank) -> Bool {
         lhs.rawValue < rhs.rawValue
@@ -31,4 +33,14 @@ enum LcidRank: Int, Comparable, Sendable {
         if pos == "verb" || pos.hasPrefix("verb/") { return .verb }
         return .unknown
     }
+
+    /// 履歴行のタイブレーカー用。`lcid` 欠落の長文は `longPhrase` に落とす。
+    static func forHistory(output: String, lcid: Int?, pos: String?) -> LcidRank {
+        if lcid == nil, output.count > historyLongPhraseThreshold { return .longPhrase }
+        if let lcid { return from(lcid: lcid) }
+        return from(pos: pos)
+    }
+
+    /// `forHistory` の長文判定閾値（文字数。`output.count` と比較）。
+    static let historyLongPhraseThreshold = 10
 }

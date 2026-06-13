@@ -237,6 +237,38 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertLessThan(idxKanjiru, idxKanji, "スコア差が大きいときは rank で入れ替えない")
     }
 
+    func testFetchHistoryScoredMergedLongNullLcidPhrasePenalizedWithinScoreBand() {
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        let short = "短い未分類"
+        let long = "これは辞書にない長いフレーズ文"
+        XCTAssertGreaterThan(long.count, LcidRank.historyLongPhraseThreshold)
+        db.record(input: "てすとろんぐ", output: long)
+        db.record(input: "てすとしょ", output: short)
+        let outputs = db.fetchHistoryScoredMerged(reading: "てすと").map(\.output)
+        guard let idxShort = outputs.firstIndex(of: short),
+              let idxLong = outputs.firstIndex(of: long) else {
+            return XCTFail("両方ヒットするはず: \(outputs)")
+        }
+        XCTAssertLessThan(idxShort, idxLong, "lcid 欠落の長文は同スコア帯で後ろに回る")
+    }
+
+    func testFetchHistoryScoredMergedLongPhraseWithLcidNotPenalized() {
+        let base: Int64 = 1_700_000_000
+        db.clock = { base }
+        let long = "これは辞書に登録された長い表示文"
+        XCTAssertGreaterThan(long.count, LcidRank.historyLongPhraseThreshold)
+        db.record(input: "てすとろんぐ", output: long)
+        db.updatePOSClassification(output: long, pos: "noun", lcid: 1283)
+        db.record(input: "てすとしょ", output: "短い未分類")
+        let outputs = db.fetchHistoryScoredMerged(reading: "てすと").map(\.output)
+        guard let idxShort = outputs.firstIndex(of: "短い未分類"),
+              let idxLong = outputs.firstIndex(of: long) else {
+            return XCTFail("両方ヒットするはず: \(outputs)")
+        }
+        XCTAssertLessThan(idxLong, idxShort, "lcid ありの長文は longPhrase ペナルティ対象外")
+    }
+
     // MARK: - GC
 
     func testGCDeletesOldSingleCountEntries() {
