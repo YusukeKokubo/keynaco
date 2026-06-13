@@ -34,7 +34,6 @@ public struct CandidateSession: Sendable, Equatable {
     public var isExplicitlySelected = false
     public var historyEnd = 0
     public var fixedEnd = 0
-    public var zenzaiRow: Int? = nil
     /// 非 `nil` のとき括弧モード。候補リストはこの配列と同期する。
     public var bracketCandidates: [String]? = nil
 
@@ -72,7 +71,6 @@ public struct CandidateSession: Sendable, Equatable {
         isExplicitlySelected = false
         historyEnd = 0
         fixedEnd = 0
-        zenzaiRow = nil
         bracketCandidates = nil
     }
 
@@ -94,13 +92,12 @@ public struct CandidateSession: Sendable, Equatable {
         switch action {
         case .none:
             break
-        case .show(let cands, let he, let initial, let fe, let zRow, let initialExplicit):
+        case .show(let cands, let he, let initial, let fe, let initialExplicit):
             candidates = cands
             isVisible = !cands.isEmpty
             selectedRow = cands.isEmpty ? 0 : min(initial, cands.count - 1)
             historyEnd = he
             fixedEnd = fe
-            zenzaiRow = zRow
             isExplicitlySelected = initialExplicit
         case .dismiss:
             reset()
@@ -127,7 +124,6 @@ public struct CandidateSession: Sendable, Equatable {
             isVisible = !cands.isEmpty
             selectedRow = 0
             isExplicitlySelected = false
-            zenzaiRow = nil
         }
     }
 }

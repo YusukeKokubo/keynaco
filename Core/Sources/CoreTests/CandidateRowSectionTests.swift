@@ -5,23 +5,16 @@ final class CandidateRowSectionTests: XCTestCase {
 
     func testSectionFixedHistoryDictionary() {
         XCTAssertEqual(
-            CandidateRowMetadata.section(row: 0, fixedEnd: 2, historyEnd: 4, zenzaiRow: nil),
+            CandidateRowMetadata.section(row: 0, fixedEnd: 2, historyEnd: 4),
             .fixed
         )
         XCTAssertEqual(
-            CandidateRowMetadata.section(row: 2, fixedEnd: 2, historyEnd: 4, zenzaiRow: nil),
+            CandidateRowMetadata.section(row: 2, fixedEnd: 2, historyEnd: 4),
             .history
         )
         XCTAssertEqual(
-            CandidateRowMetadata.section(row: 4, fixedEnd: 2, historyEnd: 4, zenzaiRow: nil),
+            CandidateRowMetadata.section(row: 4, fixedEnd: 2, historyEnd: 4),
             .dictionary
-        )
-    }
-
-    func testZenzaiRowOverridesFixed() {
-        XCTAssertEqual(
-            CandidateRowMetadata.section(row: 1, fixedEnd: 2, historyEnd: 4, zenzaiRow: 1),
-            .zenzai
         )
     }
 

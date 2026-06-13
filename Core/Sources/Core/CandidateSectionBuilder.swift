@@ -12,7 +12,6 @@ struct CandidateSectionBuildInput: Sendable {
     let historyOutputSet: Set<String>
     /// 組成読み（marked ひらがな）と `input` が完全一致する履歴 output。
     let exactMatchHistoryOutputs: Set<String>
-    let zenzaiPromoted: String?
     let fixedSlot: CandidateFixedSlot
     let addsDefaultFixedHiragana: Bool
     let numberCandidates: [String]
@@ -29,10 +28,8 @@ enum CandidateSectionBuilder {
         let allCandidatesSeen = input.historyOutputSet.union(Set(input.azooKeyCandidates))
         let allHighHistory = input.exactMatchHighHistory + input.highHistory
         let azooKeyUniq = input.azooKeyCandidates.filter { candidate in
-            guard candidate != input.zenzaiPromoted else { return false }
             // 履歴セクションに載る語は辞書と二重表示しない（top3 漏れの前方一致は辞書に残す）。
-            if allHighHistory.contains(candidate) { return false }
-            return true
+            !allHighHistory.contains(candidate)
         }
 
         var sections: [CandidateSection] = []
@@ -49,10 +46,6 @@ enum CandidateSectionBuilder {
         }
 
         addSection(.userDict, from: input.userDictRaw, seen: &seen, into: &sections)
-
-        if let top1 = input.zenzaiPromoted, seen.insert(top1).inserted {
-            sections.append(CandidateSection(kind: .zenzaiTop1, items: [top1]))
-        }
 
         let azooKeyItems = azooKeyUniq.filter { candidate in
             guard input.addsDefaultFixedHiragana && candidate == input.katakana else { return true }
@@ -82,17 +75,9 @@ enum CandidateSectionBuilder {
             sections.append(CandidateSection(kind: .katakana, items: [input.katakana]))
         }
 
-        let hasExactMatchHistory = !input.exactMatchHighHistory.isEmpty
-        let sectionOrder: [CandidateSection.Kind]
-        if hasExactMatchHistory {
-            sectionOrder = input.addsDefaultFixedHiragana && input.zenzaiPromoted != nil
-                ? CandidateLayout.exactMatchZenzaiFirstSectionOrder
-                : CandidateLayout.exactMatchFirstSectionOrder
-        } else {
-            sectionOrder = input.addsDefaultFixedHiragana && input.zenzaiPromoted != nil
-                ? CandidateLayout.zenzaiFirstSectionOrder
-                : CandidateLayout.defaultSectionOrder
-        }
+        let sectionOrder: [CandidateSection.Kind] = input.exactMatchHighHistory.isEmpty
+            ? CandidateLayout.defaultSectionOrder
+            : CandidateLayout.exactMatchFirstSectionOrder
 
         return CandidateSectionBuildResult(sections: sections, sectionOrder: sectionOrder)
     }

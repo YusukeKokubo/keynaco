@@ -8,7 +8,6 @@ public enum CandidateAction: Sendable {
         historyEnd: Int,
         initialRow: Int,
         fixedEnd: Int,
-        zenzaiRow: Int? = nil,
         initialIsExplicitlySelected: Bool = false
     )
     case dismiss
@@ -25,11 +24,10 @@ extension CandidateAction {
         historyEnd: Int,
         initialRow: Int,
         fixedEnd: Int,
-        zenzaiRow: Int?,
         initialIsExplicitlySelected: Bool
     )? {
-        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let zenzaiRow, let initialExplicit) = self {
-            return (candidates, historyEnd, initialRow, fixedEnd, zenzaiRow, initialExplicit)
+        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let initialExplicit) = self {
+            return (candidates, historyEnd, initialRow, fixedEnd, initialExplicit)
         }
         return nil
     }

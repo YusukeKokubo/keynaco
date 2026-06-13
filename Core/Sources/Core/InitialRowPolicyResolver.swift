@@ -11,8 +11,7 @@ struct InitialRowPolicyInput: Equatable, Sendable {
     let fixedSlot: CandidateFixedSlot
     let hiraganaInHistory: Bool
     let addsDefaultFixedHiragana: Bool
-    let zenzaiPromoted: String?
-    /// 読み完全一致の履歴（スコア順）。非空なら Zenzai より先に初期選択する。
+    /// 読み完全一致の履歴（スコア順）。非空なら初期選択する。
     let exactMatchHighHistory: [String]
 }
 
@@ -26,13 +25,8 @@ enum InitialRowPolicyResolver {
                 return .firstMatching(first)
             }
             if input.addsDefaultFixedHiragana {
-                if input.zenzaiPromoted != nil { return .atZero }
                 return .firstMatching(input.reading)
             }
-            if input.hiraganaInHistory, input.zenzaiPromoted != nil {
-                return .firstMatching(input.reading)
-            }
-            if input.zenzaiPromoted != nil { return .atZero }
             return .afterFixed
         }
     }

@@ -5,7 +5,7 @@ final class CandidateSessionTests: XCTestCase {
 
     func testShowAndDismiss() {
         var s = CandidateSession()
-        s.apply(.show(candidates: ["a", "b"], historyEnd: 0, initialRow: 1, fixedEnd: 0, zenzaiRow: nil))
+        s.apply(.show(candidates: ["a", "b"], historyEnd: 0, initialRow: 1, fixedEnd: 0))
         XCTAssertTrue(s.isVisible)
         XCTAssertEqual(s.selectedRow, 1)
         XCTAssertEqual(s.selectedText, "b")

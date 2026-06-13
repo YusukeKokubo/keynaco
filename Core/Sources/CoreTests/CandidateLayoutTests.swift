@@ -54,27 +54,18 @@ final class CandidateLayoutTests: XCTestCase {
         XCTAssertEqual(l.initialRow, 2)  // afterFixed → fixedEnd=2
     }
 
-    func testZenzaiTop1Alone() {
-        let l = layout((.zenzaiTop1, ["Zen"]), (.azooKeyDict, ["辞書A"]))
-        XCTAssertEqual(l.candidates, ["Zen", "辞書A"])
-        XCTAssertEqual(l.fixedEnd, 1)
-        XCTAssertEqual(l.historyEnd, 1)
-        XCTAssertEqual(l.initialRow, 1)
-    }
-
     func testAllBoundaries() {
-        // fixedEnd=4, historyEnd=6
+        // fixedEnd=3, historyEnd=5
         let l = layout(
             (.fixedHiragana, ["の"]),
             (.userDict, ["UD1", "UD2"]),
-            (.zenzaiTop1, ["Zen"]),
             (.highHistory, ["H1", "H2"]),
             (.azooKeyDict, ["A1", "A2"])
         )
-        XCTAssertEqual(l.candidates, ["の", "UD1", "UD2", "Zen", "H1", "H2", "A1", "A2"])
-        XCTAssertEqual(l.fixedEnd, 4)
-        XCTAssertEqual(l.historyEnd, 6)
-        XCTAssertEqual(l.initialRow, 4)
+        XCTAssertEqual(l.candidates, ["の", "UD1", "UD2", "H1", "H2", "A1", "A2"])
+        XCTAssertEqual(l.fixedEnd, 3)
+        XCTAssertEqual(l.historyEnd, 5)
+        XCTAssertEqual(l.initialRow, 3)
     }
 
     func testNumberAndDateTimeBeforeAzooKey() {
@@ -151,11 +142,6 @@ final class CandidateLayoutTests: XCTestCase {
     func testPolicyFirstMatchingNotFoundEmptyFallsToZero() {
         let l = layout(policy: .firstMatching("存在しない"))
         XCTAssertEqual(l.initialRow, 0)  // candidates empty → 0
-    }
-
-    func testPolicyAtZero() {
-        let l = layout((.highHistory, ["履歴A"]), policy: .atZero)
-        XCTAssertEqual(l.initialRow, 0)
     }
 
     func testPolicyAfterFixed() {

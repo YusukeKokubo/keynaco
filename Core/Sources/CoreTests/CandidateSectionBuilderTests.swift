@@ -21,7 +21,6 @@ final class CandidateSectionBuilderTests: XCTestCase {
         highHistory: [String] = [],
         historyOutputSet: Set<String> = [],
         exactMatchHistoryOutputs: Set<String> = [],
-        zenzaiPromoted: String? = nil,
         fixedSlot: CandidateFixedSlot = .none,
         addsDefaultFixedHiragana: Bool = false
     ) -> CandidateSectionBuildInput {
@@ -35,7 +34,6 @@ final class CandidateSectionBuilderTests: XCTestCase {
             highHistory: highHistory,
             historyOutputSet: historyOutputSet,
             exactMatchHistoryOutputs: exactMatchHistoryOutputs,
-            zenzaiPromoted: zenzaiPromoted,
             fixedSlot: fixedSlot,
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             numberCandidates: [],
@@ -69,19 +67,18 @@ final class CandidateSectionBuilderTests: XCTestCase {
         XCTAssertEqual(l.candidates.filter { $0 == "漢字" }.count, 1, "履歴表示済みは辞書と重複しない")
     }
 
-    func testExactMatchHistoryPlacedBeforeZenzai() {
+    func testExactMatchHistoryPlacedBeforeAzooKey() {
         let input = baseInput(
             reading: "かんじ",
             hiragana: "かんじ",
-            azooKeyCandidates: ["Zen先頭", "漢字"],
+            azooKeyCandidates: ["漢字候補", "漢字"],
             exactMatchHighHistory: ["感じ"],
-            highHistory: ["漢字"],
-            zenzaiPromoted: "Zen先頭"
+            highHistory: ["漢字"]
         )
         let built = CandidateSectionBuilder.build(input)
         XCTAssertEqual(built.sectionOrder, CandidateLayout.exactMatchFirstSectionOrder)
         let l = layout(from: input)
-        XCTAssertLessThan(l.candidates.firstIndex(of: "感じ")!, l.candidates.firstIndex(of: "Zen先頭")!)
+        XCTAssertLessThan(l.candidates.firstIndex(of: "感じ")!, l.candidates.firstIndex(of: "漢字候補")!)
     }
 
     func testPrefixOnlyHistoryBeyondSlotsRemainsInAzooKey() {
@@ -113,16 +110,6 @@ final class CandidateSectionBuilderTests: XCTestCase {
         XCTAssertEqual(l.candidates.filter { $0 == "漢字" }.count, 1)
     }
 
-    func testZenzaiTop1NotDuplicatedInAzooKey() {
-        let input = baseInput(
-            azooKeyCandidates: ["Zen先頭", "辞書B"],
-            zenzaiPromoted: "Zen先頭"
-        )
-        let l = layout(from: input)
-        XCTAssertEqual(l.candidates.filter { $0 == "Zen先頭" }.count, 1)
-        XCTAssertEqual(l.candidates[0], "Zen先頭")
-    }
-
     func testHiraganaPreferredWithHiraganaInHistorySkipsFixedSlot() {
         let input = baseInput(
             reading: "の",
@@ -136,19 +123,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
         XCTAssertEqual(l.candidates, ["の", "辞書A", "辞書B", "ノ"])
     }
 
-    func testWhileTypingZenzaiFirstWithDefaultFixedHiragana() {
-        let input = baseInput(
-            azooKeyCandidates: ["Zen先頭", "辞書B"],
-            zenzaiPromoted: "Zen先頭",
-            addsDefaultFixedHiragana: true
-        )
-        let built = CandidateSectionBuilder.build(input)
-        XCTAssertEqual(built.sectionOrder, CandidateLayout.zenzaiFirstSectionOrder)
-        let l = layout(from: input)
-        XCTAssertEqual(l.candidates, ["Zen先頭", "あい", "辞書B", "アイ"])
-    }
-
-    func testWhileTypingDefaultFixedWithoutZenzai() {
+    func testWhileTypingDefaultFixed() {
         let input = baseInput(addsDefaultFixedHiragana: true)
         let built = CandidateSectionBuilder.build(input)
         XCTAssertEqual(built.sectionOrder, CandidateLayout.defaultSectionOrder)

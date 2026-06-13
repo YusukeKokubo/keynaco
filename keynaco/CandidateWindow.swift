@@ -302,9 +302,7 @@ extension CandidateWindow: NSTableViewDataSource, NSTableViewDelegate {
 
         let labelText = model.sectionLabel(for: row)
         rowView.sectionLabel.stringValue = labelText
-        rowView.sectionLabel.textColor = model.section(for: row) == .zenzai
-            ? .systemPurple
-            : .tertiaryLabelColor
+        rowView.sectionLabel.textColor = .tertiaryLabelColor
         rowView.sectionDivider.isHidden = !model.showsSectionDivider(at: row)
 
         return rowView

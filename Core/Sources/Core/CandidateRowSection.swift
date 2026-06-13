@@ -5,19 +5,16 @@ public enum CandidateRowSection: String, Equatable, Sendable {
     case fixed
     case history
     case dictionary
-    case zenzai
 }
 
-/// 候補行のセクション判定と UI メタデータ。`CandidateSession` の `fixedEnd` / `historyEnd` / `zenzaiRow` を入力とする。
+/// 候補行のセクション判定と UI メタデータ。`CandidateSession` の `fixedEnd` / `historyEnd` を入力とする。
 public enum CandidateRowMetadata {
 
     public static func section(
         row: Int,
         fixedEnd: Int,
-        historyEnd: Int,
-        zenzaiRow: Int?
+        historyEnd: Int
     ) -> CandidateRowSection {
-        if zenzaiRow == row { return .zenzai }
         if row < fixedEnd { return .fixed }
         if row < historyEnd { return .history }
         return .dictionary

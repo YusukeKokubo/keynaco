@@ -1058,8 +1058,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,
                 fixedEnd: snap.fixedEnd,
-                historyEnd: snap.historyEnd,
-                zenzaiRow: handler.candidateSession.zenzaiRow
+                historyEnd: snap.historyEnd
             ),
             "pendingAzooKey":     azooKeyScheduler.hasPendingWork,
         ]
@@ -1070,8 +1069,7 @@ final class DebugSocketServer: @unchecked Sendable {
     static func makeCandidateEntries(
         candidates: [String],
         fixedEnd: Int,
-        historyEnd: Int,
-        zenzaiRow: Int?
+        historyEnd: Int
     ) -> [[String: Any]] {
         candidates.enumerated().map { idx, text in
             [
@@ -1080,8 +1078,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 "section": CandidateRowMetadata.section(
                     row: idx,
                     fixedEnd: fixedEnd,
-                    historyEnd: historyEnd,
-                    zenzaiRow: zenzaiRow
+                    historyEnd: historyEnd
                 ).rawValue
             ]
         }

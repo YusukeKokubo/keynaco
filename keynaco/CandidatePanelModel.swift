@@ -14,15 +14,13 @@ struct CandidatePanelModel: Equatable {
     var isExplicitlySelected: Bool { session.isExplicitlySelected }
     var fixedEnd: Int { session.fixedEnd }
     var historyEnd: Int { session.historyEnd }
-    var zenzaiRow: Int? { session.zenzaiRow }
     var isPresented: Bool { session.isVisible && !session.candidates.isEmpty }
 
     func section(for row: Int) -> CandidateRowSection {
         CandidateRowMetadata.section(
             row: row,
             fixedEnd: fixedEnd,
-            historyEnd: historyEnd,
-            zenzaiRow: zenzaiRow
+            historyEnd: historyEnd
         )
     }
 
@@ -42,11 +40,9 @@ struct CandidatePanelModel: Equatable {
         )
     }
 
-    /// 行右端のセクションラベル。境界行と Zenzai 行のみ非空。
+    /// 行右端のセクションラベル。セクション境界行のみ非空。
     func sectionLabel(for row: Int) -> String {
         switch section(for: row) {
-        case .zenzai:
-            return "Zenzai"
         case .history where row == fixedEnd:
             return "履歴"
         case .dictionary where row == historyEnd && row < candidates.count:

@@ -204,78 +204,6 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertInjectPathMatchesSync(stub: stub)
     }
 
-    // MARK: - F: Zenzai top-1 プロモート
-
-    func testSnap_F1_ZenzaiPromotedWithContext() {
-        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftContext = .testing(combined: "prefix")
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
-        assertInjectPathMatchesSync(stub: stub)
-    }
-
-    func testSnap_F2_ZenzaiNoContext() {
-        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
-        assertInjectPathMatchesSync(stub: stub)
-    }
-
-    func testSnap_F3_ZenzaiDisabled() {
-        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: false))
-        handler.leftContext = .testing(combined: "prefix")
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
-        assertInjectPathMatchesSync(stub: stub)
-    }
-
-    func testSnap_F4_ZenzaiTop1AlreadyInHistory() {
-        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftContext = .testing(combined: "prefix")
-        handler.db.record(input: "あい", output: "Zen先頭")
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
-        assertInjectPathMatchesSync(stub: stub)
-    }
-
-    func testSnap_F5_ZenzaiWithUserDict() {
-        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftContext = .testing(combined: "prefix")
-        handler.db.addUserDict(input: "あい", output: "UD合い")
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["UD合い", "Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 2, fixedEnd: 2, initialRow: 0)
-        assertInjectPathMatchesSync(stub: stub)
-    }
-
-    func testSnap_F6_ZenzaiFirstWithAutoShow() {
-        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        handler.leftContext = .testing(combined: "prefix")
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(trigger: .whileTyping),
-                     candidates: ["Zen先頭", "あい", "辞書B", "アイ"],
-                     historyEnd: 2, fixedEnd: 2, initialRow: 0)
-        assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
-    }
-
-    func testSnap_F7_ZenzaiFirstAutoShowNoContext() {
-        useStub(SnapStub(["Zen先頭", "辞書B"], zenzai: true))
-        typeRomaji("ai")
-        assertLayout(handler.buildCandidateList(trigger: .whileTyping),
-                     candidates: ["あい", "Zen先頭", "辞書B", "アイ"],
-                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
-        assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
-    }
-
     // MARK: - G: 数値・日時候補
 
     func testSnap_G1_NumberCandidates() {
@@ -331,27 +259,16 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     func testSnap_I1_AllSectionsCombined() {
         let t = Int64(1_000_000_000)
-        useStub(SnapStub(["辞書A"], zenzai: true))
+        useStub(SnapStub(["辞書A"]))
         handler.db.clock = { t }
         handler.db.record(input: "あい", output: "哀")
         handler.db.clock = { t + 40 * 86400 }
         handler.db.record(input: "あい", output: "愛")
-        handler.leftContext = .testing(combined: "prefix")
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "愛", "辞書A", "アイ"],
                      historyEnd: 2, fixedEnd: 1, initialRow: 1)
-        assertInjectPathMatchesSync(stub: stub)
-    }
-
-    func testSnap_I2_HiraganaPreferredWithZenzai() {
-        useStub(SnapStub(["Zen先頭"], zenzai: true))
-        handler.leftContext = .testing(combined: "prefix")
-        typeRomaji("no")
-        assertLayout(handler.buildCandidateList(),
-                     candidates: ["の", "Zen先頭", "ノ"],
-                     historyEnd: 2, fixedEnd: 2, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 }

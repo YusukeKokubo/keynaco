@@ -8,7 +8,6 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         fixedSlot: CandidateFixedSlot = .none,
         hiraganaInHistory: Bool = false,
         addsDefaultFixedHiragana: Bool = false,
-        zenzaiPromoted: String? = nil,
         exactMatchHighHistory: [String] = []
     ) -> InitialRowPolicy {
         InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
@@ -16,7 +15,6 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             fixedSlot: fixedSlot,
             hiraganaInHistory: hiraganaInHistory,
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
-            zenzaiPromoted: zenzaiPromoted,
             exactMatchHighHistory: exactMatchHighHistory
         ))
     }
@@ -25,38 +23,20 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         XCTAssertEqual(resolve(reading: "の", fixedSlot: .hiragana), .firstMatching("の"))
     }
 
-    func testDefaultFixedWithZenzai() {
-        XCTAssertEqual(
-            resolve(addsDefaultFixedHiragana: true, zenzaiPromoted: "Zen"),
-            .atZero
-        )
-    }
-
-    func testDefaultFixedWithoutZenzai() {
+    func testDefaultFixed() {
         XCTAssertEqual(
             resolve(reading: "あい", addsDefaultFixedHiragana: true),
             .firstMatching("あい")
         )
     }
 
-    func testHiraganaInHistoryWithZenzai() {
-        XCTAssertEqual(
-            resolve(reading: "したい", hiraganaInHistory: true, zenzaiPromoted: "Zen"),
-            .firstMatching("したい")
-        )
-    }
-
-    func testZenzaiWithoutDefaultFixed() {
-        XCTAssertEqual(resolve(zenzaiPromoted: "Zen"), .atZero)
-    }
-
     func testAfterFixedDefault() {
         XCTAssertEqual(resolve(), .afterFixed)
     }
 
-    func testExactMatchHistoryOverridesZenzai() {
+    func testExactMatchHistorySelectedFirst() {
         XCTAssertEqual(
-            resolve(zenzaiPromoted: "Zen", exactMatchHighHistory: ["感じ"]),
+            resolve(exactMatchHighHistory: ["感じ"]),
             .firstMatching("感じ")
         )
     }

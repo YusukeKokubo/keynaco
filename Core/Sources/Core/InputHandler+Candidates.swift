@@ -52,19 +52,17 @@ extension InputHandler {
             )
             : nil
         let peekRaw = peek?.candidates ?? []
-        let azooKeyFetch = sortAzooKeyCandidates(
+        let azooKeyCandidates = sortAzooKeyCandidates(
             peekRaw,
             reading: h,
             richCandidates: true
         )
-        let azooKeyCandidates = azooKeyFetch.sorted
         let pendingReading: String? = needsAzooKey && peek?.needsAsyncFetch != false ? h : nil
         let cheap = collectCheapCandidateSources(readingOverride: h)
         let sources = makeCandidateListSources(
             h: h,
             cheap: cheap,
-            azooKeyCandidates: azooKeyCandidates,
-            azooKeyPreSortFirst: azooKeyFetch.preSortFirst
+            azooKeyCandidates: azooKeyCandidates
         )
         let action = assembleCandidateList(from: sources, trigger: trigger)
         return (action, pendingReading)
@@ -81,7 +79,7 @@ extension InputHandler {
     ) -> CandidateAction {
         guard state.composedHiragana == reading else { return .none }
         let filtered = azooKeyCandidates.filter { !KanaUtils.isScriptMixed($0) }
-        let azooKeyFetch = sortAzooKeyCandidates(
+        let sorted = sortAzooKeyCandidates(
             filtered,
             reading: reading,
             richCandidates: true
@@ -90,8 +88,7 @@ extension InputHandler {
         let sources = makeCandidateListSources(
             h: reading,
             cheap: cheap,
-            azooKeyCandidates: azooKeyFetch.sorted,
-            azooKeyPreSortFirst: azooKeyFetch.preSortFirst
+            azooKeyCandidates: sorted
         )
         return assembleCandidateList(from: sources, trigger: trigger)
     }
@@ -105,14 +102,6 @@ extension InputHandler {
             readingOverride: reading
         )
         return assembleCandidateList(from: sources, trigger: trigger)
-    }
-
-    /// 候補リスト中の Zenzai top-1 行を特定する。`assembleCandidateList` の副作用ではなく
-    /// その結果から事後計算することで、リスト構築ロジックを純粋に保つ。
-    private func resolveZenzaiRow(candidates: [String], zenzaiPromoted: String?) -> Int? {
-        guard let top1 = zenzaiPromoted,
-              let idx = candidates.firstIndex(of: top1) else { return nil }
-        return idx
     }
 
     private struct CheapCandidateSources {
@@ -131,7 +120,6 @@ extension InputHandler {
         let exactMatchHighHistory: [String]
         let highHistory: [String]
         let highHistoryCount: Int
-        let zenzaiPromoted: String?
         let historyOutputSet: Set<String>
         let exactMatchHistoryOutputs: Set<String>
     }
@@ -142,12 +130,11 @@ extension InputHandler {
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
         let cheap = collectCheapCandidateSources(readingOverride: readingOverride)
-        let azooKeyFetch = fetchAzooKeyCandidates(reading: h, trigger: trigger)
+        let sorted = fetchAzooKeyCandidates(reading: h, trigger: trigger)
         return makeCandidateListSources(
             h: h,
             cheap: cheap,
-            azooKeyCandidates: azooKeyFetch.sorted,
-            azooKeyPreSortFirst: azooKeyFetch.preSortFirst
+            azooKeyCandidates: sorted
         )
     }
 
@@ -191,19 +178,11 @@ extension InputHandler {
         )
     }
 
-    private struct AzooKeyCandidateFetch {
-        let sorted: [String]
-        /// ソート前の先頭。Zenzai top-1 プロモートは API 返却順の first を維持する。
-        let preSortFirst: String?
-    }
-
     private mutating func fetchAzooKeyCandidates(
         reading: String,
         trigger: CandidateListTrigger
-    ) -> AzooKeyCandidateFetch {
-        guard !reading.allSatisfy({ $0.isASCII }) else {
-            return AzooKeyCandidateFetch(sorted: [], preSortFirst: nil)
-        }
+    ) -> [String] {
+        guard !reading.allSatisfy({ $0.isASCII }) else { return [] }
         let richCandidates = trigger == .explicit
         let raw = azooKeyConverter.requestCandidates(
             hiragana: reading,
@@ -218,18 +197,14 @@ extension InputHandler {
         _ candidates: [String],
         reading: String,
         richCandidates: Bool
-    ) -> AzooKeyCandidateFetch {
-        let preSortFirst = candidates.first
-        guard candidates.count > 1 else {
-            return AzooKeyCandidateFetch(sorted: candidates, preSortFirst: preSortFirst)
-        }
+    ) -> [String] {
+        guard candidates.count > 1 else { return candidates }
         let lcidByText = azooKeyConverter.primaryLcidByText(
             hiragana: reading,
             leftSideContext: leftContext.azooKeyValue,
             richCandidates: richCandidates
         )
-        let sorted = Self.sortAzooKeyCandidatesByLcidRank(candidates, lcidByText: lcidByText)
-        return AzooKeyCandidateFetch(sorted: sorted, preSortFirst: preSortFirst)
+        return Self.sortAzooKeyCandidatesByLcidRank(candidates, lcidByText: lcidByText)
     }
 
     /// AzooKey 辞書セクション内の lcid 安定ソート。`lcidByText` が空なら入力順を維持。
@@ -249,23 +224,15 @@ extension InputHandler {
     private func makeCandidateListSources(
         h: String,
         cheap: CheapCandidateSources,
-        azooKeyCandidates: [String],
-        azooKeyPreSortFirst: String? = nil
+        azooKeyCandidates: [String]
     ) -> CandidateListSources {
-        let zenzaiPromoted: String? = {
-            guard azooKeyConverter.isZenzaiEnabled,
-                  leftContext.azooKeyValue != nil else { return nil }
-            if let preSortFirst = azooKeyPreSortFirst { return preSortFirst }
-            return azooKeyCandidates.first
-        }()
-        return CandidateListSources(
+        CandidateListSources(
             h: h,
             azooKeyCandidates: azooKeyCandidates,
             userDictRaw: cheap.userDictRaw,
             exactMatchHighHistory: cheap.exactMatchHighHistory,
             highHistory: cheap.highHistory,
             highHistoryCount: cheap.highHistoryCount,
-            zenzaiPromoted: zenzaiPromoted,
             historyOutputSet: cheap.historyOutputSet,
             exactMatchHistoryOutputs: cheap.exactMatchHistoryOutputs
         )
@@ -349,7 +316,6 @@ extension InputHandler {
             highHistory: sources.highHistory,
             historyOutputSet: sources.historyOutputSet,
             exactMatchHistoryOutputs: sources.exactMatchHistoryOutputs,
-            zenzaiPromoted: sources.zenzaiPromoted,
             fixedSlot: fixedSlot,
             addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             numberCandidates: numberCandidates,
@@ -363,7 +329,6 @@ extension InputHandler {
                 fixedSlot: fixedSlot,
                 hiraganaInHistory: hiraganaInHistory,
                 addsDefaultFixedHiragana: addsDefaultFixedHiragana,
-                zenzaiPromoted: sources.zenzaiPromoted,
                 exactMatchHighHistory: sources.exactMatchHighHistory
             ))
         )
@@ -377,16 +342,11 @@ extension InputHandler {
             return .dismiss
         }
 
-        let zRow = resolveZenzaiRow(
-            candidates: layout.candidates,
-            zenzaiPromoted: sources.zenzaiPromoted
-        )
         return .show(
             candidates: layout.candidates,
             historyEnd: layout.historyEnd,
             initialRow: layout.initialRow,
             fixedEnd: layout.fixedEnd,
-            zenzaiRow: zRow,
             initialIsExplicitlySelected: trigger == .explicit
         )
     }

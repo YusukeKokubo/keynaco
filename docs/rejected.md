@@ -4,6 +4,24 @@
 
 ---
 
+## P-3 Zenzai top-1 プロモート（2026-06-13 削除）
+
+**概要**: 左文脈ありかつ Zenzai 有効のとき、AzooKey が返す `mainResults[0]`（Zenzai 推論込みのスコアで最上位の候補）を `.zenzaiTop1` という独立セクションに切り出し、候補リストの先頭で固定表示していた。`CandidateSession.zenzaiRow` で行番号を保持し、Shift+Delete から保護、紫ラベルで視覚的に区別、初期選択行も Zenzai 行に固定。
+
+**削除の理由**:
+
+- **コードを薄く広く複雑にしていた**: production 5 ファイル（`CandidateLayout` / `CandidateSectionBuilder` / `InitialRowPolicyResolver` / `CandidateRowSection` / `InputHandler+Candidates`）に `zenzaiPromoted: String?` をバケツリレー。セクション順序が 4 パターン（左文脈 × 完全一致履歴の有無）に分岐していて、候補リスト構築の認知負荷の主因だった
+- **Zenzai 自体は残せる**: Zenzai 推論結果は `AzooKey` の `requestCandidates` 内部でスコアに反映され、`mainResults` 全体の並びに効いている。プロモート枠を消しても Zenzai のスコアリングはそのまま AzooKey 辞書セクションに混ざる
+- **UX 上の判断**: Zenzai が他の候補ソース（履歴・ユーザー辞書）に押し負けることを許容する設計に振った。履歴・ユーザー辞書は「ユーザー個人の正解」、Zenzai は「文脈から推論した一般的な正解」で、前者を優先する
+
+**残すもの**: Zenzai 推論そのもの（`AzooKeyConverter.isZenzaiEnabled` / `zenzaiProfile` / 左文脈の `set_left_context`）、Zenzai 設定タブ、`zenz-v3.2-small-gguf` submodule、`sessionTextBuffer` 由来の左文脈構築。Zenzai は今や AzooKey 辞書セクションの一員。
+
+**消えたもの**: `.zenzaiTop1` セクション、セクション順序 4 パターン → 2 パターン（`defaultSectionOrder` / `exactMatchFirstSectionOrder`）、`InitialRowPolicy.atZero`、`CandidateRowSection.zenzai`、`CandidateSession.zenzaiRow`、紫ラベル、preSortFirst を維持する分岐。
+
+**再検討するなら**: 「Zenzai 推論結果を UI で明示的に優先したい」要件が再浮上したときに、セクション順序の複雑化を伴わない形（例: 紫ラベルだけを付ける、辞書セクション内のソート優先度に組み込む）を先に POC する。
+
+---
+
 ## P-2 履歴 lcid タイブレーカー（Phase B/C、2026-06-13 削除）
 
 **概要**: `fetchHistoryScoredMerged` でスコア同値帯（`epsilon=0.01`）のとき `LcidRank` で履歴候補を並べ替え。Phase C は `lcid` 欠落かつ 11 文字超を `longPhrase` rank に落とす。
