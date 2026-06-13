@@ -128,9 +128,14 @@ public extension InputHandler {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         let needsRefresh = state.addRomaji(base)
         let isVowelKey = base.count == 1 && Self.vowelKeys.contains(base.lowercased().first!)
-        let candidateAction: CandidateAction = (needsRefresh && isVowelKey)
-            ? buildCandidateListForTrigger(.whileTyping)
-            : .dismiss
+        let candidateAction: CandidateAction
+        if needsRefresh {
+            candidateAction = isVowelKey
+                ? buildCandidateListForTrigger(.whileTyping)
+                : .none
+        } else {
+            candidateAction = .dismiss
+        }
         return (true, candidateAction)
     }
 }
