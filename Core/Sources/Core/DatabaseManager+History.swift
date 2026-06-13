@@ -307,8 +307,8 @@ extension DatabaseManager {
         return nil
     }
 
-    /// フル読みのみ記録する。前方一致検索は `fetchHistoryScoredMerged` の LIKE クエリが担うため
-    /// プレフィックスを個別に記録する必要はない。
+    /// 確定時の読みを1行だけ記録する。同一 output で読みが前方一致関係のときは最長読みに統合し、
+    /// 短い読みの行は作らない。前方一致検索は `fetchHistoryScoredMerged` の LIKE が担う。
     /// output 末尾が格助詞・係助詞の場合（例: 「東京が」）、助詞を除いた文節単位（「東京」）で記録する。
     /// reading も同じ助詞文字列分だけ末尾を除去する（全ひらがな reading の場合は維持）。
     func recordPrefixes(reading: String, output: String) {
@@ -323,17 +323,93 @@ extension DatabaseManager {
         }
         guard !Self.isHiraganaPassthrough(reading: r, output: o) else { return }
         dispatchWrite {
-            let t = self.nowEpoch()
-            self.executeOnQueue("""
-            INSERT INTO history (input, output, count, used_at)
-            VALUES (?, ?, 1, ?)
-            ON CONFLICT(input, output) DO UPDATE SET
-                count   = count + 1,
-                used_at = excluded.used_at;
-            """) {
-                self.bindText($0, 1, r); self.bindText($0, 2, o)
-                sqlite3_bind_int64($0, 3, t)
-            }
+            self.recordPrefixesOnQueue(reading: r, output: o, now: self.nowEpoch())
         }
+    }
+
+    /// `short` が `long` の厳密前方一致か。ラテン文字を含む場合は大文字小文字を無視する。
+    static func isReadingPrefix(_ short: String, of long: String) -> Bool {
+        guard short != long, short.count < long.count else { return false }
+        let hasLatin = short.contains(where: { $0.isASCII && $0.isLetter })
+            || long.contains(where: { $0.isASCII && $0.isLetter })
+        if hasLatin {
+            return long.range(of: short, options: [.caseInsensitive, .anchored]) != nil
+        }
+        return long.hasPrefix(short)
+    }
+
+    /// 同一 output の既存読みのうち、`reading` で確定したときに更新すべき input を返す。
+    func resolveHistoryInputOnQueue(reading: String, output: String) -> String {
+        let rows = fetchHistoryInputsForOutputOnQueue(output: output)
+        if rows.contains(where: { $0.input == reading }) { return reading }
+        if let longer = rows
+            .filter({ Self.isReadingPrefix(reading, of: $0.input) })
+            .max(by: { $0.input.count < $1.input.count }) {
+            return longer.input
+        }
+        return reading
+    }
+
+    private struct HistoryInputRow {
+        let input: String
+        let count: Int
+        let usedAt: Int64
+    }
+
+    private func fetchHistoryInputsForOutputOnQueue(output: String) -> [HistoryInputRow] {
+        let sql = "SELECT input, count, used_at FROM history WHERE output = ?"
+        guard let stmt = prepareUncachedStmt(sql) else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, output)
+        var rows: [HistoryInputRow] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let inputPtr = sqlite3_column_text(stmt, 0) else { continue }
+            rows.append(HistoryInputRow(
+                input: String(cString: inputPtr),
+                count: Int(sqlite3_column_int(stmt, 1)),
+                usedAt: sqlite3_column_int64(stmt, 2)
+            ))
+        }
+        return rows
+    }
+
+    private func deleteHistoryEntryOnQueue(input: String, output: String) {
+        executeOnQueue("DELETE FROM history WHERE input = ? AND output = ?") {
+            self.bindText($0, 1, input); self.bindText($0, 2, output)
+        }
+    }
+
+    private func upsertHistoryOnQueue(input: String, output: String, addCount: Int, usedAt: Int64) {
+        executeOnQueue("""
+        INSERT INTO history (input, output, count, used_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(input, output) DO UPDATE SET
+            count   = count + excluded.count,
+            used_at = excluded.used_at;
+        """) {
+            self.bindText($0, 1, input); self.bindText($0, 2, output)
+            sqlite3_bind_int($0, 3, Int32(addCount))
+            sqlite3_bind_int64($0, 4, usedAt)
+        }
+    }
+
+    /// dbQueue 上で同一 output の前方一致読みを最長1行に統合して記録する。
+    func recordPrefixesOnQueue(reading: String, output: String, now: Int64) {
+        let rows = fetchHistoryInputsForOutputOnQueue(output: output)
+        if let longer = rows
+            .filter({ Self.isReadingPrefix(reading, of: $0.input) })
+            .max(by: { $0.input.count < $1.input.count }) {
+            upsertHistoryOnQueue(input: longer.input, output: output, addCount: 1, usedAt: now)
+            return
+        }
+
+        var addCount = 1
+        var usedAt = now
+        for short in rows where Self.isReadingPrefix(short.input, of: reading) {
+            addCount += short.count
+            usedAt = max(usedAt, short.usedAt)
+            deleteHistoryEntryOnQueue(input: short.input, output: output)
+        }
+        upsertHistoryOnQueue(input: reading, output: output, addCount: addCount, usedAt: usedAt)
     }
 }

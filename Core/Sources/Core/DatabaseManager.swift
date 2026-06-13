@@ -327,12 +327,13 @@ public final class DatabaseManager: @unchecked Sendable {
         fullReading: String?
     ) {
         dispatchWrite {
+            let canonical = self.resolveHistoryInputOnQueue(reading: input, output: output)
             self.executeOnQueue("BEGIN")
             self.executeOnQueue("UPDATE history SET count = count - 1 WHERE input = ? AND output = ?") {
-                self.bindText($0, 1, input); self.bindText($0, 2, output)
+                self.bindText($0, 1, canonical); self.bindText($0, 2, output)
             }
             self.executeOnQueue("DELETE FROM history WHERE input = ? AND output = ? AND count <= 0") {
-                self.bindText($0, 1, input); self.bindText($0, 2, output)
+                self.bindText($0, 1, canonical); self.bindText($0, 2, output)
             }
             self.executeOnQueue("COMMIT")
         }

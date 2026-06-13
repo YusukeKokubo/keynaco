@@ -77,9 +77,7 @@ final class DatabaseManagerTests: XCTestCase {
     }
 
     func testFetchHistoryPrefixNoDuplicatesWhenMultiplePrefixRowsExist() {
-        // recordPrefixes は "えくすぽーと" → "えく"/"えくす"/"えくすぽ"/"えくすぽー"/"えくすぽーと" を全て記録する。
-        // fetchHistoryPrefix("え") はこれら全行が LIKE "え%" にマッチするが、
-        // GROUP BY output により "エクスポート" は1件だけ返される。
+        // 1 回の確定で最長読みのみ記録。LIKE 前方一致で短い読みからもヒットする。
         db.recordPrefixes(reading: "えくすぽーと", output: "エクスポート")
         let results = db.fetchHistoryPrefix(reading: "え")
         let count = results.filter { $0 == "エクスポート" }.count
@@ -103,6 +101,55 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertTrue(db.fetchHistoryPrefix(reading: "かい").contains("会議"))
         // フル読みは exact で返る
         XCTAssertTrue(db.fetchHistoryExact(reading: "かいぎ").contains("会議"))
+    }
+
+    func testRecordPrefixesConsolidatesToLongestReading() {
+        db.recordPrefixes(reading: "しゅ", output: "種類")
+        db.recordPrefixes(reading: "しゅる", output: "種類")
+        db.recordPrefixes(reading: "しゅるい", output: "種類")
+
+        let entries = db.fetchAllHistory().filter { $0.output == "種類" }
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.first?.input, "しゅるい")
+        XCTAssertEqual(entries.first?.count, 3)
+        XCTAssertTrue(db.fetchHistoryScoredMerged(reading: "しゅ").map(\.output).contains("種類"))
+    }
+
+    func testRecordPrefixesShortConfirmBumpsLongerExisting() {
+        db.recordPrefixes(reading: "しゅるい", output: "種類")
+        db.recordPrefixes(reading: "しゅ", output: "種類")
+
+        let entries = db.fetchAllHistory().filter { $0.output == "種類" }
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.first?.input, "しゅるい")
+        XCTAssertEqual(entries.first?.count, 2)
+    }
+
+    func testRecordPrefixesKeepsUnrelatedReadingsForSameOutput() {
+        db.recordPrefixes(reading: "とうきょう", output: "東京")
+        db.recordPrefixes(reading: "tokyo", output: "東京")
+
+        let inputs = Set(db.fetchAllHistory().filter { $0.output == "東京" }.map(\.input))
+        XCTAssertEqual(inputs, ["とうきょう", "tokyo"])
+    }
+
+    func testIsReadingPrefixAsciiCaseInsensitive() {
+        XCTAssertTrue(DatabaseManager.isReadingPrefix("fs", of: "FS、"))
+        XCTAssertFalse(DatabaseManager.isReadingPrefix("FS、", of: "fs"))
+    }
+
+    func testPenalizeResolvesCanonicalLongerReading() {
+        db.recordPrefixes(reading: "しゅるい", output: "種類")
+        db.recordPrefixes(reading: "しゅ", output: "種類")
+        XCTAssertEqual(
+            db.fetchAllHistory().first(where: { $0.output == "種類" })?.count, 2
+        )
+
+        db.penalizeAll(input: "しゅ", output: "種類", fullReading: nil)
+        XCTAssertEqual(
+            db.fetchAllHistory().first(where: { $0.output == "種類" })?.count, 1,
+            "短い読みで確定しても最長読みの行をペナルティする"
+        )
     }
 
     // MARK: - 時間減衰スコアリング（改善 G）

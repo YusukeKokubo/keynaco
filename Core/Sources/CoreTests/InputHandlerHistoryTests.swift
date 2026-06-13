@@ -129,9 +129,8 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
                       "前回確定した「東京」が次回変換で履歴候補として現れるはず")
     }
 
-    // MARK: - 読み前方一致による履歴ヒット（recordPrefixes はフル読みのみ記録）
+    // MARK: - 読み前方一致による履歴ヒット（recordPrefixes は最長読み1行に統合）
     // 前方一致検索は fetchHistoryScoredMerged の LIKE クエリが担う。
-    // See: docs/domain/glossary.md#databasemanager
 
     func testPrefixRecord() {
         handler.db.recordPrefixes(reading: "とうきょう", output: "東京")

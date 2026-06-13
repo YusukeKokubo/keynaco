@@ -125,7 +125,7 @@ fast + slow 両方（CI・リリース前）:
 
 アプリ層（`keynaco/`）が `InputMethodKit` を通じてキーイベントを受け取り、`KeynacoCore`（`Core/`）の `InputHandler` struct（Swift 6 strict concurrency）でロジックを処理。変換は AzooKey API（`AzooKeyConverter`）+ Zenzai 経由、履歴は SQLite（`DatabaseManager`）、候補ウィンドウは自作 `NSWindow`（`CandidateWindow.swift`）。
 
-各クラス・関数・主要変数の振る舞いと不変条件は `///` ドキュメントコメントが正本（`fetchHistoryScoredMerged` の SUM 集計禁止、`recordPrefixes` のフル読みのみ記録、`isExplicitlySelected` の意味、`hiddenPendingN` の不可視化規則など）。
+各クラス・関数・主要変数の振る舞いと不変条件は `///` ドキュメントコメントが正本（`fetchHistoryScoredMerged` の SUM 集計禁止、`recordPrefixes` の同一 output 最長読み統合、`isExplicitlySelected` の意味、`hiddenPendingN` の不可視化規則など）。
 
 ### 候補表示の優先順位（`buildCandidateList`）
 
