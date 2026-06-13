@@ -5,6 +5,8 @@ struct CandidateSectionBuildInput: Sendable {
     let hiragana: String
     let katakana: String
     let azooKeyCandidates: [String]
+    /// Zenzai 込みの AzooKey 内部順序。`exactMatchHighHistory` の並べ替えに使う。
+    let azooKeyApiOrder: [String]
     let userDictRaw: [String]
     let exactMatchHighHistory: [String]
     let highHistory: [String]
@@ -26,7 +28,18 @@ struct CandidateSectionBuildResult: Sendable {
 enum CandidateSectionBuilder {
     static func build(_ input: CandidateSectionBuildInput) -> CandidateSectionBuildResult {
         let allCandidatesSeen = input.historyOutputSet.union(Set(input.azooKeyCandidates))
-        let allHighHistory = input.exactMatchHighHistory + input.highHistory
+        let zenzaiRankByText: [String: Int] = input.azooKeyApiOrder.isEmpty ? [:] :
+            Dictionary(input.azooKeyApiOrder.enumerated().map { ($0.element, $0.offset) },
+                       uniquingKeysWith: { first, _ in first })
+        let sortedExactHistory = input.exactMatchHighHistory.sorted { a, b in
+            switch (zenzaiRankByText[a], zenzaiRankByText[b]) {
+            case let (ra?, rb?): return ra < rb
+            case (.some, nil):   return true
+            case (nil, .some):   return false
+            case (nil, nil):     return false
+            }
+        }
+        let allHighHistory = sortedExactHistory + input.highHistory
         let azooKeyUniq = input.azooKeyCandidates.filter { candidate in
             // 履歴セクションに載る語は辞書と二重表示しない（top3 漏れの前方一致は辞書に残す）。
             !allHighHistory.contains(candidate)
@@ -59,8 +72,8 @@ enum CandidateSectionBuilder {
             sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
         }
 
-        if !input.exactMatchHighHistory.isEmpty {
-            sections.append(CandidateSection(kind: .exactMatchHistory, items: input.exactMatchHighHistory))
+        if !sortedExactHistory.isEmpty {
+            sections.append(CandidateSection(kind: .exactMatchHistory, items: sortedExactHistory))
         }
 
         if !input.highHistory.isEmpty {
@@ -75,7 +88,7 @@ enum CandidateSectionBuilder {
             sections.append(CandidateSection(kind: .katakana, items: [input.katakana]))
         }
 
-        let sectionOrder: [CandidateSection.Kind] = input.exactMatchHighHistory.isEmpty
+        let sectionOrder: [CandidateSection.Kind] = sortedExactHistory.isEmpty
             ? CandidateLayout.defaultSectionOrder
             : CandidateLayout.exactMatchFirstSectionOrder
 

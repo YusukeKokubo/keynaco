@@ -16,6 +16,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
         reading: String = "あい",
         hiragana: String = "あい",
         azooKeyCandidates: [String] = ["辞書A", "辞書B"],
+        azooKeyApiOrder: [String] = [],
         userDictRaw: [String] = [],
         exactMatchHighHistory: [String] = [],
         highHistory: [String] = [],
@@ -29,6 +30,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
             hiragana: hiragana,
             katakana: KanaUtils.hiraganaToKatakana(hiragana),
             azooKeyCandidates: azooKeyCandidates,
+            azooKeyApiOrder: azooKeyApiOrder,
             userDictRaw: userDictRaw,
             exactMatchHighHistory: exactMatchHighHistory,
             highHistory: highHistory,
@@ -140,6 +142,41 @@ final class CandidateSectionBuilderTests: XCTestCase {
         let l = layout(from: input)
         XCTAssertEqual(l.candidates, ["の", "辞書A", "辞書B", "ノ"])
         XCTAssertEqual(l.fixedEnd, 1)
+    }
+
+    func testExactMatchHistorySortedByZenzaiRank() {
+        // 履歴頻度: 漢字(5x) > 幹事(3x) > 感じ(2x)
+        // Zenzai 順: 感じ(1位) > 幹事(2位) > 漢字(4位)
+        // 期待: Zenzai 順が優先されて 感じ → 幹事 → 漢字
+        let input = baseInput(
+            reading: "かんじ",
+            hiragana: "かんじ",
+            azooKeyCandidates: ["感じ", "幹事", "完治", "漢字"],
+            azooKeyApiOrder: ["感じ", "幹事", "完治", "漢字"],
+            exactMatchHighHistory: ["漢字", "幹事", "感じ"],
+            historyOutputSet: ["漢字", "幹事", "感じ"],
+            exactMatchHistoryOutputs: ["漢字", "幹事", "感じ"]
+        )
+        let l = layout(from: input)
+        let historySlice = Array(l.candidates.prefix(l.historyEnd))
+        XCTAssertEqual(historySlice, ["感じ", "幹事", "漢字"])
+    }
+
+    func testExactMatchHistoryNoRankGoesLast() {
+        // azooKeyApiOrder にない履歴候補はランクなし → 末尾に落ちる
+        let input = baseInput(
+            reading: "かんじ",
+            hiragana: "かんじ",
+            azooKeyCandidates: ["感じ", "漢字"],
+            azooKeyApiOrder: ["感じ", "漢字"],
+            exactMatchHighHistory: ["幹事", "感じ", "漢字"],
+            historyOutputSet: ["幹事", "感じ", "漢字"],
+            exactMatchHistoryOutputs: ["幹事", "感じ", "漢字"]
+        )
+        let l = layout(from: input)
+        let historySlice = Array(l.candidates.prefix(l.historyEnd))
+        XCTAssertEqual(historySlice.first, "感じ")
+        XCTAssertEqual(historySlice.last,  "幹事")
     }
 
     private func builtSectionsContainKind(

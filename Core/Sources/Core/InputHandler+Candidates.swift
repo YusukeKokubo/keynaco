@@ -331,6 +331,7 @@ extension InputHandler {
             hiragana: hiragana,
             katakana: katakana,
             azooKeyCandidates: sources.azooKeyCandidates,
+            azooKeyApiOrder: sources.azooKeyApiOrder,
             userDictRaw: sources.userDictRaw,
             exactMatchHighHistory: sources.exactMatchHighHistory,
             highHistory: sources.highHistory,

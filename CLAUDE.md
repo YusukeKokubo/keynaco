@@ -131,12 +131,11 @@ fast + slow 両方（CI・リリース前）:
 
 1. ひらがな / カタカナ固定（`hiraganaPreferred`・外来語記号）
 2. ユーザー辞書（完全一致）
-3. Zenzai top-1（`isZenzaiEnabled` かつ左文脈ありのみ）
-4. 履歴（`fetchHistoryScoredMerged`: `LIKE 'reading%'` で SUM 集計、時間減衰スコア閾値以上）
-5. 数字候補 / 日時候補
-6. AzooKey 辞書候補（Zenzai プロモート済みは除外）
+3. 履歴（`fetchHistoryScoredMerged`: `LIKE 'reading%'` で SUM 集計、時間減衰スコア閾値以上）。読み完全一致履歴（`exactMatchHighHistory`）は Zenzai の `azooKeyApiOrder` で内部ソートされる
+4. 数字候補 / 日時候補
+5. AzooKey 辞書候補（Zenzai 推論結果はこのセクション内のスコアに込み）
 
-`fixedEnd <= row < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能（ユーザー辞書・Zenzai プロモート行は保護）。
+`fixedEnd <= row < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能（ユーザー辞書行は保護）。
 
 ## テスト方針
 
