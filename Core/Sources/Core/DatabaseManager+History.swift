@@ -50,20 +50,11 @@ extension DatabaseManager {
     /// **設計不変条件**: `LIKE 'reading%'` で exact + 前方一致を一括取得し `GROUP BY output` の
     /// `SUM` で集計する。exact / prefix を別クエリに分割し `MAX` で合計する設計に書き換えると、
     /// 異なる読み長で確定した回数が合算されなくなり履歴ランキングが壊れる。
-    ///
-    /// 主ソートはスコア降順。スコア差が `historyScoreTieEpsilon` 以内のときだけ `lcid` rank でタイブレークする。
-    func fetchHistoryScoredMerged(reading: String) -> [(output: String, score: Double, lcid: Int?)] {
+    func fetchHistoryScoredMerged(reading: String) -> [(output: String, score: Double)] {
         return dbQueue.sync {
             let now = self.nowEpoch()
-            let rows = self.queryHistoryScoredMergedOnQueue("""
-            SELECT output, SUM((\(Self.recencyExpr))) AS s,
-                   (SELECT h2.lcid FROM history h2
-                    WHERE h2.output = history.output AND h2.lcid IS NOT NULL
-                    ORDER BY h2.used_at DESC LIMIT 1) AS lcid,
-                   (SELECT h2.pos FROM history h2
-                    WHERE h2.output = history.output AND h2.pos IS NOT NULL
-                    ORDER BY h2.used_at DESC LIMIT 1) AS pos
-            FROM history
+            return self.queryOutputScorePairsOnQueue("""
+            SELECT output, SUM((\(Self.recencyExpr))) AS s FROM history
             WHERE input LIKE ?
               AND (pos IS NULL OR pos NOT IN ('other/conjunction', 'other/interjection'))
             GROUP BY output
@@ -73,33 +64,7 @@ extension DatabaseManager {
                 self.bindRecency($0, at: 1, now: now)
                 self.bindText($0, 3, reading + "%")
             }
-            return self.sortHistoryScoredWithLcidTiebreaker(rows)
         }
-    }
-
-    /// スコア同値帯でのみ `LcidRank` を適用する。差が `historyScoreTieEpsilon` を超えるときはスコア優先。
-    private static let historyScoreTieEpsilon = 0.01
-
-    private func sortHistoryScoredWithLcidTiebreaker(
-        _ rows: [(output: String, score: Double, lcid: Int?, pos: String?)]
-    ) -> [(output: String, score: Double, lcid: Int?)] {
-        rows.enumerated().sorted { lhs, rhs in
-            if abs(lhs.element.score - rhs.element.score) > Self.historyScoreTieEpsilon {
-                return lhs.element.score > rhs.element.score
-            }
-            let leftRank = Self.historyLcidRank(
-                output: lhs.element.output, lcid: lhs.element.lcid, pos: lhs.element.pos
-            )
-            let rightRank = Self.historyLcidRank(
-                output: rhs.element.output, lcid: rhs.element.lcid, pos: rhs.element.pos
-            )
-            if leftRank != rightRank { return leftRank < rightRank }
-            return lhs.offset < rhs.offset
-        }.map { ($0.element.output, $0.element.score, $0.element.lcid) }
-    }
-
-    private static func historyLcidRank(output: String, lcid: Int?, pos: String?) -> LcidRank {
-        LcidRank.forHistory(output: output, lcid: lcid, pos: pos)
     }
 
     /// 全 history を時間減衰スコアで集計して上位 N 件の (reading, output) を返す。

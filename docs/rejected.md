@@ -4,6 +4,24 @@
 
 ---
 
+## P-2 履歴 lcid タイブレーカー（Phase B/C、2026-06-13 削除）
+
+**概要**: `fetchHistoryScoredMerged` でスコア同値帯（`epsilon=0.01`）のとき `LcidRank` で履歴候補を並べ替え。Phase C は `lcid` 欠落かつ 11 文字超を `longPhrase` rank に落とす。
+
+**試みたこと**: SQL 相関サブクエリで `lcid`/`pos` 取得 + `sortHistoryScoredWithLcidTiebreaker` + `LcidRank.forHistory`。ユニットテスト・sandbox で動作確認済み（[PLAN260613](../plans/PLAN260613-pos-candidate-ranking.md)）。
+
+**削除の理由**:
+
+- **体感できる改善は Phase A のみ**: 辞書セクションの lcid ソートは sandbox で確認できるが、履歴タイブレークは出口が `maxHighHistoryCount=3` の前方一致枠争いに限られ体感しにくい
+- **常時コスト**: タイブレーク発火の有無に関わらず、毎クエリで lcid/pos サブクエリ2本を実行（DB 単体は軽いが設計上の無駄）
+- **`forHistory` / `from(lcid:)` の二系統**: 読めるが意図の説明が要る
+
+**残すもの**: Phase A（AzooKey 辞書 lcid ソート）、Phase D（`history.lcid` 列・backfill・設定 UI）。`LcidRank` は辞書ソート専用に継続。
+
+**再検討するなら**: 同スコア帯の行だけ lcid を遅延取得する、または履歴枠を広げて効果を体感できるか先に POC する。
+
+---
+
 ## P-1 `.whileTyping` 短読み AzooKey スキップ（2026-06-12 不採用）
 
 **概要**: `collectCandidateSources` の入口で「`.whileTyping` かつ `composedHiragana.count <= 2`」のとき AzooKey を呼ばず空配列を返す。「かん」段階（2 文字）の AzooKey 呼び出しを省いて「かんじ」（3 文字）まで待つ狙い。

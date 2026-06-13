@@ -94,11 +94,4 @@ final class AzooKeyLcidMapperTests: XCTestCase {
         XCTAssertEqual(LcidRank.from(pos: "other/conjunction"), .unknown)
         XCTAssertEqual(LcidRank.from(pos: nil), .unknown)
     }
-
-    func testLcidRankForHistoryLongNullLcidPhrase() {
-        let long = String(repeating: "あ", count: 11)
-        XCTAssertEqual(LcidRank.forHistory(output: long, lcid: nil, pos: nil), .longPhrase)
-        XCTAssertEqual(LcidRank.forHistory(output: "短い", lcid: nil, pos: nil), .unknown)
-        XCTAssertEqual(LcidRank.forHistory(output: long, lcid: 1283, pos: nil), .noun)
-    }
 }

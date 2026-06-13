@@ -301,24 +301,6 @@ public final class DatabaseManager: @unchecked Sendable {
         return results
     }
 
-    func queryHistoryScoredMergedOnQueue(
-        _ sql: String,
-        bind: ((OpaquePointer?) -> Void)? = nil
-    ) -> [(output: String, score: Double, lcid: Int?, pos: String?)] {
-        guard let stmt = cachedStmt(for: sql) else { return [] }
-        bind?(stmt)
-        var results: [(String, Double, Int?, String?)] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let ptr = sqlite3_column_text(stmt, 0) else { continue }
-            let lcid = sqlite3_column_type(stmt, 2) == SQLITE_NULL
-                ? nil
-                : Int(sqlite3_column_int(stmt, 2))
-            let pos = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
-            results.append((String(cString: ptr), sqlite3_column_double(stmt, 1), lcid, pos))
-        }
-        return results
-    }
-
     func executeOnQueue(_ sql: String, bind: ((OpaquePointer?) -> Void)? = nil) {
         guard let stmt = cachedStmt(for: sql) else { return }
         bind?(stmt)
