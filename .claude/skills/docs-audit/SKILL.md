@@ -87,6 +87,7 @@ description: |
 
 - [ ] 手動運用で 2〜3 回実走し、月次ペースが本当に必要か（変更頻度に対して過剰でないか）を確かめる
 - [ ] 各 Step の誤検出率が安定して低いか確認（skip-identifiers.txt のチューニング余地）
+- [ ] **実験記録ディレクトリの除外**: `poc-first-workspace/**/iteration-*/**/output.md` のような POC 実験ログを Step 1 の走査対象から外す。2026-06-13 の実走では Step 1 の欠落 12 件のうち過半がこれら eval 出力由来の誤検出だった（本物 drift は全 28 指摘中 3 件）。前処理で除外しないと自動化時に誤検出が支配的になり notification fatigue 対策（下記）が成立しない
 - [ ] 通知先と運用フロー: drift 発見時に誰が・いつ修正するか
 - [ ] notification fatigue 対策: 「変更なし」のときはサイレント、本物の drift だけ通知する仕組み
 
