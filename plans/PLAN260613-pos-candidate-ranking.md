@@ -92,7 +92,7 @@ created: 2026-06-13
 
 | Phase | 対象 | リスク | 期待効果 |
 |-------|------|--------|---------|
-| **A** | AzooKey 辞書セクション内の `lcid` ソート | 低 | 辞書候補のノイズ削減。候補の `lcid` を直接使用 |
+| **A** | AzooKey 辞書セクション内の `lcid` ソート | 低 | 辞書候補のノイズ削減。候補の `lcid` を直接使用 | **実装済み**（`4095039`） |
 | **B** | 履歴のタイブレーカー（`score` 同値帯、`history.lcid` 使用） | 低 | `maxHighHistoryCount=3` の枠争いを改善 |
 | **C** | 長文フレーズペナルティ（`output.count > 10` かつ `lcid IS NULL`） | 極低 | 辞書外フレーズ履歴のノイズ削減 |
 | **D** | `history.lcid` 保存 + `pos` 表示タグ + backfill | — | **実装済み** |
@@ -106,7 +106,7 @@ created: 2026-06-13
 
 ## 実装ステップ
 
-### Step 1: `LcidRank` ユーティリティ（`Core/`）— **未着手**
+### Step 1: `LcidRank` ユーティリティ（`Core/`）— **実装済み**（`50efb07`）
 
 **正本は `AzooKeyLcidMapper.rank(for:)`**。レンジ定義は mapper に集約し、二重管理を避ける。`LcidRank` enum は Comparable ラッパーとして薄く置くか、mapper が `LcidRank` を直接返してもよい。
 
@@ -130,7 +130,7 @@ enum LcidRank: Int, Comparable, Sendable {
 
 - テスト: `AzooKeyLcidMapperTests` に rank ケースを追加（619 vs 625 で verb 同 rank、1283 vs 1293 で properNoun vs noun、460 で auxiliary・148 で particle 等）
 
-### Step 2: AzooKey 候補の lcid ソート（Phase A）
+### Step 2: AzooKey 候補の lcid ソート（Phase A）— **実装済み**（`4095039`）
 
 #### 2a. API 拡張（`AzooKeyConverter` / `AzooKeyConverting`）
 
@@ -217,16 +217,17 @@ results.sorted {
 
 | ファイル | 変更内容 | 状態 |
 |---------|---------|------|
-| `AzooKeyLcidMapper.swift` | lcid レンジ + `pos` 派生（済）、`rank(for:)` 追加（未） | 一部済 |
+| `AzooKeyLcidMapper.swift` | lcid レンジ + `pos` 派生 + `rank(for:)` | 済 |
 | `DatabaseManager.swift` / `+History.swift` | `lcid` 列、backfill | 済 |
 | `HistoryViewController.swift` | `lcid` 列表示 | 済 |
-| `LcidRank.swift`（新規、任意） | Comparable ラッパー | 未 |
-| `AzooKeyConverter.swift` | `primaryLcidByText`（キャッシュから text→lcid） | 未 |
-| `AzooKeyConverting.swift` | プロトコルに `primaryLcidByText` 追加 | 未 |
-| `BaseAzooKeyStub.swift` 等 | テストスタブ更新 | 未 |
-| `InputHandler+Candidates.swift` | `fetchAzooKeyCandidates` 直後の lcid ソート | 未 |
+| `LcidRank.swift` | Comparable ラッパー + `from(lcid:)` / `from(pos:)` | 済 |
+| `AzooKeyConverter.swift` | `primaryLcidByText`（キャッシュから text→lcid） | 済 |
+| `AzooKeyConverting.swift` | プロトコルに `primaryLcidByText` 追加 | 済 |
+| `BaseAzooKeyStub.swift` 等 | テストスタブ更新 | 済 |
+| `InputHandler+Candidates.swift` | `fetchAzooKeyCandidates` 直後の lcid ソート | 済 |
+| `InputHandlerAzooKeyLcidSortTests.swift` | ソート・Zenzai 先頭固定テスト | 済 |
+| `AzooKeyLcidMapperTests.swift` | rank 変換テスト | 済 |
 | `DatabaseManager+History.swift` | `fetchHistoryScoredMerged` に `lcid` + epsilon タイブレーカー | 未 |
-| `AzooKeyLcidMapperTests.swift` | rank 変換テスト追加 | 未 |
 
 ## 検証
 
@@ -244,9 +245,27 @@ results.sorted {
 | 読み | 確認点 |
 |------|--------|
 | `かんじ` | lcid 名詞帯の候補が動詞帯より上か |
-| `きょう` | lcid 1293（地名）が助詞帯より上か |
-| `しらべ` | 履歴「調べて」（lcid 625）がスコア優先で残るか |
+| `きょう` | lcid 1293（地名）が助詞帯より上か（※ `kyou` は日付変換の罠。`toukyou` で代替可） |
+| `しらべ` | 履歴「調べて」（lcid 625）がスコア優先で残るか（Phase B 後） |
 | `ひょうじ` | lcid 1283 系が辞書候補の上位か |
+
+#### Phase A sandbox 結果（2026-06-13）
+
+環境: Debug ビルド `4095039`（初回は `ef2aed0` が走っており stale → 再ビルド・再起動後に検証）。コマンドは `{"reset":true}` → `{"type_string":"<romaji>","then":"space"}`。
+
+| 読み | 辞書セクション先頭（`candidates` 先頭付近） | 判定 | メモ |
+|------|---------------------------------------------|------|------|
+| `hyouji` | `ヒョウジ`, `ひょうじ`, `兵司`, `表情`, `標準`, `表示`, … | ✅ | `AzooKeyConverter` の lcid ソート後順序と **完全一致** |
+| `toukyou` | `東京都`, `東京市`, `東京`, `東京府`, … | ✅ | 固有名詞帯（lcid 1293 等）が先頭。`きょう` の代替 |
+| `kanzi` | `完治`, `カンジ`, `寛治`, …, `感じ`, `漢字`, … | ✅ | 固有名詞帯が名詞帯（感じ・漢字）より前。AzooKey 生順（`感じ` 先頭）とは異なりソート生效 |
+
+**観察メモ**
+
+- `感じ` / `漢字` はいずれも lcid 1285（noun rank）→ 安定ソートで API 返却順を維持（`感じ` → `漢字`）。名詞 vs 動詞の分離テストには不向き
+- `完治` / `カンジ` は同 rank（properNoun）内の順序はキャッシュ時の生順に依存（インスタンス間で入れ替わり得る）
+- ユニットテスト: `InputHandlerAzooKeyLcidSortTests`（4件）・`InputHandlerZenzaiPromoteTests`（既存4件）パス
+
+**Phase A 判断**: sandbox で体感改善あり → 判断基準どおり **Phase A は採用**。次は Phase B。
 
 ## 関連 plan
 
@@ -260,14 +279,14 @@ results.sorted {
 
 | 結果 | 判断 |
 |------|------|
-| AzooKey セクションで名詞帯 lcid が上位に来る | Phase A をマージ |
+| AzooKey セクションで名詞帯 lcid が上位に来る | Phase A をマージ — **2026-06-13 sandbox で確認済み** |
 | 履歴でよく使う動詞（lcid 625 等）が消える | Phase B を弱める or 撤回 |
 | sandbox で体感改善なし | Phase A のみ留保、B/C は見送り |
 
 ## 実装順序
 
 1. ~~Phase D（`lcid` 保存・`pos` 表示・backfill・設定 UI）~~ **完了**
-2. `LcidRank` + テスト（lcid レンジ正本）
-3. Phase A（AzooKey 候補の lcid ソート）→ sandbox 確認
+2. ~~`LcidRank` + テスト（lcid レンジ正本）~~ **完了**（`50efb07`）
+3. ~~Phase A（AzooKey 候補の lcid ソート）~~ **完了**（`4095039`）— sandbox 確認済み（上記）
 4. Phase B（履歴タイブレーカー、`history.lcid` 使用）
 5. Phase C（長文ペナルティ、任意）
