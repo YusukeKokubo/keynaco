@@ -69,6 +69,8 @@ flowchart LR
 | 候補フェーズ | `CandidatePanelInteraction` | `isVisible × isExplicitlySelected` から導出される3状態（`.hidden` / `.passive` / `.explicit`）。パネルの表示有無と操作種別を一元化する |
 | 行セクション | `CandidateRowSection` | 候補リストを `fixedEnd` / `historyEnd` で3ゾーンに分割した区分（`.fixed` / `.history` / `.dictionary`）。Shift+Delete 可否と区切り線描画の基準 |
 | 構築トリガー | `CandidateListTrigger` | `buildCandidateList` の呼び出し起因（`.whileTyping` / `.explicit`）。候補フェーズとは別概念 |
+| 候補先行表示 | `AzooKeyCachePeek` | AzooKey の非同期変換結果が届く前に、直前のキャッシュ（完全一致 or 短い読みの prefix）を暫定候補として即時表示する仕組み。完全一致ヒット時は非同期リクエストを省略する |
+| 候補ランキング | `azooKeyApiOrder` | Zenzai（zenz-v3）が推論した候補の並び順。AzooKey が候補テキストを生成し、Zenzai がその順位を決めるという役割分担を指す。keynaco 側では「AzooKey からもらった順番列」として扱い、`CandidateSectionBuilder` が exactMatchHistory のソートと azooKeyDict の並びに適用する |
 
 ## 候補フェーズの詳細
 
