@@ -1063,6 +1063,18 @@ final class DebugSocketServer: @unchecked Sendable {
             ),
             "pendingAzooKey":     azooKeyScheduler.hasPendingWork,
         ]
+        if let footer = AzooKeyFooterStatus.resolve(
+            session: handler.candidateSession,
+            isAzooKeyPending: AzooKeyFooterStatus.isAzooKeyPending(
+                pendingReading: handler.pendingAzooKeyReading,
+                schedulerPending: azooKeyScheduler.hasPendingWork
+            ),
+            isZenzaiRankingActive: handler.azooKeyConverter.isZenzaiEnabled
+                && handler.leftContext.azooKeyValue != nil
+                && !handler.candidateSession.azooKeyApiOrder.isEmpty
+        ) {
+            dict["azooKeyFooter"] = footer.rawValue
+        }
         if let st = snap.selectedText { dict["selectedText"] = st }
         if let build = snap.candidateBuild {
             dict["candidateBuild"] = build.asDictionary()

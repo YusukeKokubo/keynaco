@@ -37,7 +37,7 @@ class InputController: IMKInputController, @unchecked Sendable {
                     ic.handler.db.deleteHistory(output: text)
                     ic.handler.candidateSession.removeCandidate(at: row)
                     ic.candidateWindow.apply(
-                        CandidatePanelModel(session: ic.handler.candidateSession),
+                        ic.makeCandidatePanelModel(),
                         layout: .refreshInPlace
                     )
                     ic.syncMarkedTextToActiveClient()
@@ -141,12 +141,30 @@ class InputController: IMKInputController, @unchecked Sendable {
     ///
     /// - Parameter preferInPlaceRefresh: 既に表示中なら `.present` せず内容だけ差し替える（AzooKey 非同期到着用）。
     @MainActor
+    func makeCandidatePanelModel() -> CandidatePanelModel {
+        let session = handler.candidateSession
+        return CandidatePanelModel(
+            session: session,
+            azooKeyFooter: AzooKeyFooterStatus.resolve(
+                session: session,
+                isAzooKeyPending: AzooKeyFooterStatus.isAzooKeyPending(
+                    pendingReading: handler.pendingAzooKeyReading,
+                    schedulerPending: azooKeyScheduler.hasPendingWork
+                ),
+                isZenzaiRankingActive: handler.azooKeyConverter.isZenzaiEnabled
+                    && handler.leftContext.azooKeyValue != nil
+                    && !session.azooKeyApiOrder.isEmpty
+            )
+        )
+    }
+
+    @MainActor
     func applyCandidateWindowEffects(
         action: CandidateAction,
         adapter: IMKTextInputAdapter,
         preferInPlaceRefresh: Bool = false
     ) {
-        let panel = CandidatePanelModel(session: handler.candidateSession)
+        let panel = makeCandidatePanelModel()
         switch action {
         case .none:
             break

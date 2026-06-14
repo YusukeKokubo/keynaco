@@ -92,7 +92,9 @@ extension InputHandler {
             azooKeyCandidates: sorted,
             azooKeyApiOrder: filtered
         )
-        return assembleCandidateList(from: sources, trigger: trigger)
+        let action = assembleCandidateList(from: sources, trigger: trigger)
+        clearPendingAzooKeyReading()
+        return action
     }
 
     private mutating func buildCandidateListInternal(

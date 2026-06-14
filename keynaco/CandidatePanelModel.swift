@@ -4,9 +4,11 @@ import KeynacoCore
 /// `CandidateSession` から導出する候補パネル描画用 view model。mutable 状態は持たない。
 struct CandidatePanelModel: Equatable {
     let session: CandidateSession
+    let azooKeyFooter: AzooKeyFooterStatus?
 
-    init(session: CandidateSession) {
+    init(session: CandidateSession, azooKeyFooter: AzooKeyFooterStatus? = nil) {
         self.session = session
+        self.azooKeyFooter = azooKeyFooter
     }
 
     var candidates: [String] { session.candidates }

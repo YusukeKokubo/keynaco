@@ -80,9 +80,15 @@ private class CandidateRowView: NSView {
 @MainActor
 final class CandidateWindow: NSPanel {
 
+    private let effectView = NSVisualEffectView()
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
+    private let footerSeparator = NSView()
+    private let footerLabel = NSTextField(labelWithString: "")
+    private var footerHeightConstraint: NSLayoutConstraint!
     private var model: CandidatePanelModel?
+
+    private static let footerHeight: CGFloat = 20
 
     var onSelect: ((String) -> Void)?
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
@@ -104,11 +110,11 @@ final class CandidateWindow: NSPanel {
     }
 
     private func setupViews() {
-        let effect = NSVisualEffectView()
-        effect.material = .popover
-        effect.state = .active
-        effect.wantsLayer = true
-        effect.layer?.cornerRadius = 6
+        effectView.material = .popover
+        effectView.state = .active
+        effectView.wantsLayer = true
+        effectView.layer?.cornerRadius = 6
+        effectView.translatesAutoresizingMaskIntoConstraints = false
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("candidate"))
         column.width = 280
@@ -125,13 +131,47 @@ final class CandidateWindow: NSPanel {
         scrollView.hasVerticalScroller = true
         scrollView.scrollerStyle = .overlay
         scrollView.drawsBackground = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        effect.frame = NSRect(x: 0, y: 0, width: 300, height: 200)
-        scrollView.frame = effect.bounds
-        scrollView.autoresizingMask = [.width, .height]
-        effect.addSubview(scrollView)
+        footerSeparator.wantsLayer = true
+        footerSeparator.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.5).cgColor
+        footerSeparator.translatesAutoresizingMaskIntoConstraints = false
 
-        contentView = effect
+        footerLabel.font = .systemFont(ofSize: 10)
+        footerLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        effectView.addSubview(scrollView)
+        effectView.addSubview(footerSeparator)
+        effectView.addSubview(footerLabel)
+
+        footerHeightConstraint = footerLabel.heightAnchor.constraint(equalToConstant: 0)
+
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: effectView.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: effectView.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: effectView.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: footerSeparator.topAnchor),
+
+            footerSeparator.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 4),
+            footerSeparator.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -4),
+            footerSeparator.heightAnchor.constraint(equalToConstant: 1),
+            footerSeparator.bottomAnchor.constraint(equalTo: footerLabel.topAnchor),
+
+            footerLabel.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 8),
+            footerLabel.trailingAnchor.constraint(lessThanOrEqualTo: effectView.trailingAnchor, constant: -8),
+            footerLabel.bottomAnchor.constraint(equalTo: effectView.bottomAnchor, constant: -2),
+            footerHeightConstraint,
+        ])
+
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+        container.addSubview(effectView)
+        NSLayoutConstraint.activate([
+            effectView.topAnchor.constraint(equalTo: container.topAnchor),
+            effectView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            effectView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+        contentView = container
     }
 
     // MARK: - Public API
@@ -145,10 +185,20 @@ final class CandidateWindow: NSPanel {
                 dismiss()
                 return
             }
+            let oldFooter = self.model?.azooKeyFooter
+            let oldCount = self.model?.candidates.count ?? 0
+            syncFooter(from: model)
             let oldSnapshot = self.model.map(CandidatePanelSnapshot.init(model:))
             let newSnapshot = CandidatePanelSnapshot(model: model)
             switch CandidateTablePatchPlanner.plan(old: oldSnapshot, new: newSnapshot) {
             case .noop:
+                self.model = model
+                syncTableSelection()
+                resizeIfFooterOrCountChanged(
+                    oldFooter: oldFooter,
+                    newModel: model,
+                    oldCount: oldCount
+                )
                 return
             case .reloadAll:
                 self.model = model
@@ -162,10 +212,11 @@ final class CandidateWindow: NSPanel {
                     reloadPrefixRows: reloadPrefix
                 )
             }
-            let oldCount = oldSnapshot?.rows.count ?? 0
-            if oldCount != model.candidates.count {
-                resizePreservingTop(toHeight: preferredHeight(for: model.candidates.count))
-            }
+            resizeIfFooterOrCountChanged(
+                oldFooter: oldFooter,
+                newModel: model,
+                oldCount: oldCount
+            )
             let selectionChanged = oldSnapshot?.selectedRow != model.selectedRow
             syncTableSelection()
             if selectionChanged {
@@ -173,21 +224,64 @@ final class CandidateWindow: NSPanel {
             }
         case .selectionOnly:
             guard model.isPresented else { return }
+            let oldFooter = self.model?.azooKeyFooter
+            let oldCount = self.model?.candidates.count ?? 0
+            syncFooter(from: model)
             if let current = self.model,
                current.selectedRow == model.selectedRow,
-               current.candidates == model.candidates {
+               current.candidates == model.candidates,
+               current.azooKeyFooter == model.azooKeyFooter {
                 return
             }
             self.model = model
             syncTableSelection()
             tableView.scrollRowToVisible(model.selectedRow)
+            resizeIfFooterOrCountChanged(
+                oldFooter: oldFooter,
+                newModel: model,
+                oldCount: oldCount
+            )
         case .present(let rect):
             guard model.isPresented else {
                 dismiss()
                 return
             }
             self.model = model
+            syncFooter(from: model)
             presentNear(rect)
+        }
+    }
+
+    private func syncFooter(from model: CandidatePanelModel) {
+        guard let status = model.azooKeyFooter else {
+            footerLabel.stringValue = ""
+            footerSeparator.isHidden = true
+            footerLabel.isHidden = true
+            footerHeightConstraint.constant = 0
+            return
+        }
+        footerLabel.stringValue = status.labelText
+        footerSeparator.isHidden = false
+        footerLabel.isHidden = false
+        footerHeightConstraint.constant = Self.footerHeight
+        switch status {
+        case .fetching:
+            footerLabel.textColor = .secondaryLabelColor
+        case .dictionary:
+            footerLabel.textColor = .tertiaryLabelColor
+        case .zenzai:
+            footerLabel.textColor = NSColor.systemPurple.withAlphaComponent(0.7)
+        }
+    }
+
+    private func resizeIfFooterOrCountChanged(
+        oldFooter: AzooKeyFooterStatus?,
+        newModel: CandidatePanelModel,
+        oldCount: Int
+    ) {
+        guard isVisible else { return }
+        if oldFooter != newModel.azooKeyFooter || oldCount != newModel.candidates.count {
+            resizePreservingTop(toHeight: preferredHeight(for: newModel))
         }
     }
 
@@ -201,11 +295,13 @@ final class CandidateWindow: NSPanel {
         tableView.selectRowIndexes(IndexSet(integer: model.selectedRow), byExtendingSelection: false)
     }
 
-    private func preferredHeight(for candidateCount: Int) -> CGFloat {
+    private func preferredHeight(for model: CandidatePanelModel) -> CGFloat {
         let rowHeight = tableView.rowHeight + tableView.intercellSpacing.height
         let maxVisibleRows = 8
-        let visibleCount = max(min(candidateCount, maxVisibleRows), 1)
-        return CGFloat(visibleCount) * rowHeight + 8
+        let visibleCount = max(min(model.candidates.count, maxVisibleRows), 1)
+        let tableHeight = CGFloat(visibleCount) * rowHeight + 8
+        let footerHeight = model.azooKeyFooter != nil ? Self.footerHeight : 0
+        return tableHeight + footerHeight
     }
 
     /// 上端を固定したまま高さだけ変える（非同期差し替えで位置が飛ばないようにする）。
@@ -262,7 +358,7 @@ final class CandidateWindow: NSPanel {
         guard let model else { return }
         tableView.reloadData()
 
-        let height = preferredHeight(for: model.candidates.count)
+        let height = preferredHeight(for: model)
         let width: CGFloat = 300
 
         var origin = NSPoint(x: rect.origin.x, y: rect.origin.y - height - 4)
