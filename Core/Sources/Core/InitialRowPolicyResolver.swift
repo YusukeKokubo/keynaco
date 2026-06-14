@@ -153,7 +153,8 @@ enum InitialRowPolicyResolver {
         switch rank {
         case .noun, .properNoun: return MoraThreshold.noun
         case .verb: return MoraThreshold.verb
-        case .adjective, .unknown: return MoraThreshold.other
+        case .adjective: return MoraThreshold.verb
+        case .unknown: return MoraThreshold.other
         case .particle, .auxiliary: return nil
         }
     }

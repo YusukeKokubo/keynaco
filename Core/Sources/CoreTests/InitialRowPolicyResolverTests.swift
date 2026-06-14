@@ -170,20 +170,20 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         XCTAssertNil(focus)
     }
 
-    func testPrefixFocusCandidate_acceptsAdjectiveAtFiveMorae() {
+    func testPrefixFocusCandidate_acceptsAdjectiveAtThreeMorae() {
         let focus = InitialRowPolicyResolver.prefixFocusCandidate(
-            reading: "おもしろい",
-            prefixHistory: ["面白い"],
+            reading: "おいし",
+            prefixHistory: ["おいしい"],
             userDictPrefix: [],
             rankForOutput: { _ in .adjective }
         )
-        XCTAssertEqual(focus, "面白い")
+        XCTAssertEqual(focus, "おいしい")
     }
 
-    func testPrefixFocusCandidate_skipsAdjectiveBelowFiveMorae() {
+    func testPrefixFocusCandidate_skipsAdjectiveBelowThreeMorae() {
         let focus = InitialRowPolicyResolver.prefixFocusCandidate(
-            reading: "おもし",
-            prefixHistory: ["面白い"],
+            reading: "おい",
+            prefixHistory: ["おいしい"],
             userDictPrefix: [],
             rankForOutput: { _ in .adjective }
         )
