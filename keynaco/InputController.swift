@@ -150,10 +150,7 @@ class InputController: IMKInputController, @unchecked Sendable {
                 isAzooKeyPending: AzooKeyFooterStatus.isAzooKeyPending(
                     pendingReading: handler.pendingAzooKeyReading,
                     schedulerPending: azooKeyScheduler.hasPendingWork
-                ),
-                isZenzaiRankingActive: handler.azooKeyConverter.isZenzaiEnabled
-                    && handler.leftContext.azooKeyValue != nil
-                    && !session.azooKeyApiOrder.isEmpty
+                )
             )
         )
     }

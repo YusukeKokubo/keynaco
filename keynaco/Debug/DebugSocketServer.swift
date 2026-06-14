@@ -1068,10 +1068,7 @@ final class DebugSocketServer: @unchecked Sendable {
             isAzooKeyPending: AzooKeyFooterStatus.isAzooKeyPending(
                 pendingReading: handler.pendingAzooKeyReading,
                 schedulerPending: azooKeyScheduler.hasPendingWork
-            ),
-            isZenzaiRankingActive: handler.azooKeyConverter.isZenzaiEnabled
-                && handler.leftContext.azooKeyValue != nil
-                && !handler.candidateSession.azooKeyApiOrder.isEmpty
+            )
         ) {
             dict["azooKeyFooter"] = footer.rawValue
         }

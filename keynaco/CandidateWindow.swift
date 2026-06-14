@@ -83,12 +83,8 @@ final class CandidateWindow: NSPanel {
     private let effectView = NSVisualEffectView()
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
-    private let footerSeparator = NSView()
-    private let footerLabel = NSTextField(labelWithString: "")
-    private var footerHeightConstraint: NSLayoutConstraint!
+    private let progressIndicator = NSProgressIndicator()
     private var model: CandidatePanelModel?
-
-    private static let footerHeight: CGFloat = 20
 
     var onSelect: ((String) -> Void)?
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
@@ -133,34 +129,23 @@ final class CandidateWindow: NSPanel {
         scrollView.drawsBackground = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        footerSeparator.wantsLayer = true
-        footerSeparator.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.5).cgColor
-        footerSeparator.translatesAutoresizingMaskIntoConstraints = false
-
-        footerLabel.font = .systemFont(ofSize: 10)
-        footerLabel.translatesAutoresizingMaskIntoConstraints = false
+        progressIndicator.style = .spinning
+        progressIndicator.controlSize = .small
+        progressIndicator.isIndeterminate = true
+        progressIndicator.isDisplayedWhenStopped = false
+        progressIndicator.translatesAutoresizingMaskIntoConstraints = false
 
         effectView.addSubview(scrollView)
-        effectView.addSubview(footerSeparator)
-        effectView.addSubview(footerLabel)
-
-        footerHeightConstraint = footerLabel.heightAnchor.constraint(equalToConstant: 0)
+        effectView.addSubview(progressIndicator)
 
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: effectView.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: effectView.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: effectView.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: footerSeparator.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: effectView.bottomAnchor),
 
-            footerSeparator.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 4),
-            footerSeparator.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -4),
-            footerSeparator.heightAnchor.constraint(equalToConstant: 1),
-            footerSeparator.bottomAnchor.constraint(equalTo: footerLabel.topAnchor),
-
-            footerLabel.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 8),
-            footerLabel.trailingAnchor.constraint(lessThanOrEqualTo: effectView.trailingAnchor, constant: -8),
-            footerLabel.bottomAnchor.constraint(equalTo: effectView.bottomAnchor, constant: -2),
-            footerHeightConstraint,
+            progressIndicator.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -6),
+            progressIndicator.bottomAnchor.constraint(equalTo: effectView.bottomAnchor, constant: -6),
         ])
 
         let container = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
@@ -185,20 +170,15 @@ final class CandidateWindow: NSPanel {
                 dismiss()
                 return
             }
-            let oldFooter = self.model?.azooKeyFooter
             let oldCount = self.model?.candidates.count ?? 0
-            syncFooter(from: model)
+            syncSpinner(from: model)
             let oldSnapshot = self.model.map(CandidatePanelSnapshot.init(model:))
             let newSnapshot = CandidatePanelSnapshot(model: model)
             switch CandidateTablePatchPlanner.plan(old: oldSnapshot, new: newSnapshot) {
             case .noop:
                 self.model = model
                 syncTableSelection()
-                resizeIfFooterOrCountChanged(
-                    oldFooter: oldFooter,
-                    newModel: model,
-                    oldCount: oldCount
-                )
+                resizeIfCountChanged(newModel: model, oldCount: oldCount)
                 return
             case .reloadAll:
                 self.model = model
@@ -212,11 +192,7 @@ final class CandidateWindow: NSPanel {
                     reloadPrefixRows: reloadPrefix
                 )
             }
-            resizeIfFooterOrCountChanged(
-                oldFooter: oldFooter,
-                newModel: model,
-                oldCount: oldCount
-            )
+            resizeIfCountChanged(newModel: model, oldCount: oldCount)
             let selectionChanged = oldSnapshot?.selectedRow != model.selectedRow
             syncTableSelection()
             if selectionChanged {
@@ -224,9 +200,8 @@ final class CandidateWindow: NSPanel {
             }
         case .selectionOnly:
             guard model.isPresented else { return }
-            let oldFooter = self.model?.azooKeyFooter
             let oldCount = self.model?.candidates.count ?? 0
-            syncFooter(from: model)
+            syncSpinner(from: model)
             if let current = self.model,
                current.selectedRow == model.selectedRow,
                current.candidates == model.candidates,
@@ -236,53 +211,29 @@ final class CandidateWindow: NSPanel {
             self.model = model
             syncTableSelection()
             tableView.scrollRowToVisible(model.selectedRow)
-            resizeIfFooterOrCountChanged(
-                oldFooter: oldFooter,
-                newModel: model,
-                oldCount: oldCount
-            )
+            resizeIfCountChanged(newModel: model, oldCount: oldCount)
         case .present(let rect):
             guard model.isPresented else {
                 dismiss()
                 return
             }
             self.model = model
-            syncFooter(from: model)
+            syncSpinner(from: model)
             presentNear(rect)
         }
     }
 
-    private func syncFooter(from model: CandidatePanelModel) {
-        guard let status = model.azooKeyFooter else {
-            footerLabel.stringValue = ""
-            footerSeparator.isHidden = true
-            footerLabel.isHidden = true
-            footerHeightConstraint.constant = 0
-            return
-        }
-        footerLabel.stringValue = status.labelText
-        footerSeparator.isHidden = false
-        footerLabel.isHidden = false
-        footerHeightConstraint.constant = Self.footerHeight
-        switch status {
-        case .fetching:
-            footerLabel.textColor = .secondaryLabelColor
-        case .dictionary:
-            footerLabel.textColor = .tertiaryLabelColor
-        case .zenzai:
-            footerLabel.textColor = NSColor.systemPurple.withAlphaComponent(0.7)
+    private func syncSpinner(from model: CandidatePanelModel) {
+        if model.azooKeyFooter == .fetching {
+            progressIndicator.startAnimation(nil)
+        } else {
+            progressIndicator.stopAnimation(nil)
         }
     }
 
-    private func resizeIfFooterOrCountChanged(
-        oldFooter: AzooKeyFooterStatus?,
-        newModel: CandidatePanelModel,
-        oldCount: Int
-    ) {
-        guard isVisible else { return }
-        if oldFooter != newModel.azooKeyFooter || oldCount != newModel.candidates.count {
-            resizePreservingTop(toHeight: preferredHeight(for: newModel))
-        }
+    private func resizeIfCountChanged(newModel: CandidatePanelModel, oldCount: Int) {
+        guard isVisible, oldCount != newModel.candidates.count else { return }
+        resizePreservingTop(toHeight: preferredHeight(for: newModel))
     }
 
     func dismiss() {
@@ -299,9 +250,7 @@ final class CandidateWindow: NSPanel {
         let rowHeight = tableView.rowHeight + tableView.intercellSpacing.height
         let maxVisibleRows = 8
         let visibleCount = max(min(model.candidates.count, maxVisibleRows), 1)
-        let tableHeight = CGFloat(visibleCount) * rowHeight + 8
-        let footerHeight = model.azooKeyFooter != nil ? Self.footerHeight : 0
-        return tableHeight + footerHeight
+        return CGFloat(visibleCount) * rowHeight + 8
     }
 
     /// 上端を固定したまま高さだけ変える（非同期差し替えで位置が飛ばないようにする）。
