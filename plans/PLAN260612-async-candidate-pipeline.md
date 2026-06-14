@@ -253,6 +253,56 @@ Phase 3 後の残ギャップ:
 | 打鍵中ひらがな/カタカナ即時表示 | ✅ Phase 3.5 |
 | Zenzai on rich 等価性 | ✅ hosted test |
 
+## 追記: 母音限定 whileTyping の副作用対策（2026-06-14）
+
+`deferAzooKeyWhileTyping` 導入後、`handleRomaji` に **母音/`n` キーだけ** `buildCandidateListForTrigger(.whileTyping)` を呼ぶ最適化を追加した（子音は `.none` で候補据え置き）。AzooKey 非同期スケジュールも母音/`n` のみ。
+
+### 症状（ユーザー報告・sandbox 再現）
+
+打鍵中に「入力を受け付けなくなる」ことがある。調査の結果、キーは常に `consumed: true` で、**見た目と確定の不整合**が原因だった。
+
+| 操作 | 修正前の挙動 |
+|------|-------------|
+| 候補表示中に子音連打 | `markedText` は凍結、`pendingRomaji` だけ増加 |
+| 上記のまま Enter | `selectedText`（かなプレースホルダ）で確定し **pending が消失** |
+| 例 `kanzi` + `b` + Enter | `marked='かんじ'` のまま → `inserted=['かんじ']` |
+
+3 要因の重なり:
+
+1. 子音打鍵 → `CandidateAction.none`（候補 visible のまま）
+2. `MarkedTextSync` が passive 時のローマ字尾を marked から隠す（**候補非表示時も同ルールが走っていた**）
+3. Enter → `doConfirmSelection` が候補語を優先し pending を捨てる
+
+### 判断: 母音限定は残し、子音時は dismiss
+
+| 案 | 採否 | 理由 |
+|----|------|------|
+| 母音限定を削除 | 不採用 | `buildCandidateListWithoutAzooKey` の読みは `composedHiragana` のみ。毎キー再構築しても pending 中はリストが変わらず、marked 凍結は `MarkedTextSync` 側が残る |
+| 子音 + `needsRefresh` → `.dismiss` | **採用** | 候補を閉じれば marked に `composingText` が出る。差分最小で AzooKey debounce 方針も維持 |
+| Enter 時 pending 保護 | **採用** | passive + `pendingRomaji` / `hiddenPendingN` なら `commitComposition(.hidden)` で `finalizedText` を確定 |
+
+### 実装（`380456c`）
+
+| ファイル | 変更 |
+|---------|------|
+| `InputHandler+NormalInput.swift` | 子音 + `needsRefresh` → `.dismiss`（`.none` 廃止） |
+| `MarkedTextSync.swift` | ローマ字尾の非表示は **`candidateVisible` 時のみ** |
+| `InputHandler+CandidateInput.swift` | passive + trailing romaji 時の Enter は候補語ではなく組成確定 |
+
+### 検証
+
+- `./scripts/test_core.sh` — `InputHandlerCompositionTests`・`VowelKeyRegressionTests`・`MarkedTextSyncTests` 追加/更新
+- sandbox（`/deploy` 後 `380456c`）— 13/13 checks:
+  - `ai` 候補中 `k` → `visible=false`, `marked='あいk'`
+  - `kanzi` + `b` + Enter → `inserted=['かんじb']`
+  - `かんじ` + `su` → 候補再表示
+
+### 残る UX 論点（観察）
+
+- 候補の on/off チラつき（`あい` → `k` で閉じ → `ku` で再表示）。許容かは実運用で判断
+- `n` を母音キー扱いするルールは [PLAN260428](PLAN260428-successor-pending-romaji.md) 由来。本件とは独立だが説明コストは残る
+- Electron の Enter 経路は sandbox では再現しない（[PLAN260605](PLAN260605-workarounds-audit.md) C-1）。実機確認は別途
+
 ## Phase 4（別トラック・任意）: AzooKey 上流への貢献
 
 `SetAlgebra.init(arr...)` のホットスポットは AzooKeyKanaKanjiConverter（OSS）内部。Release 計測（Phase 0）でもこれが支配的なら、upstream の該当箇所（`kana2lattice` 系）をプロファイルして PR を出す選択肢がある。keynaco 側の構造改善とは独立に進められるが、効果の不確実性と往復コストを考えると Phase 2 完了後の余力次第。
@@ -275,4 +325,4 @@ Phase 3 後の残ギャップ:
 
 - Phase 0 で Release の p95 が閾値未満 → status: abandoned、計測結果を IDEA260612 へ追記
 - Phase 2 完了でこの plan の主目的は達成。Phase 3 / 4 は計測結果を見て個別判断
-- **実機 smoke 未記録**: `/deploy` 後の連打・`isExplicitlySelected` 後のすり替え抑制は sandbox では一部のみ検証。リリース前に実機確認を推奨
+- **実機 smoke**: 子音 dismiss 修正は sandbox 13/13（2026-06-14）。Electron Enter・連打チラつきは未記録
