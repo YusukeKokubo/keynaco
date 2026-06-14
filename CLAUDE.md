@@ -49,6 +49,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `test_marked_text_sandbox.sh` | marked text 同期・候補 Space/Shift+Delete のソケット回帰（`test_marked_text_sandbox.py` の薄いラッパー） |
 | `cleanup_history_db.py` | history.db の重複読み統合・助詞行削除（ドライランあり。`--apply` で実行・自動バックアップ） |
+| `test_prefix_focus.py` | 打鍵中 prefix focus の品詞別モーラ閾値回帰（形容詞 3 / 動詞 3 / 名詞 2 / 拗音 mora_count） |
 
 ### 起動チェーン（IMK ブートストラップ）
 
