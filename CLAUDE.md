@@ -48,6 +48,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `test_core_all.sh` | Core fast + slow 両方 |
 | `debug_ime.py` | デバッグソケット（`$TMPDIR/keynaco-debug.sock`）クライアント（キーシーケンス手動送信） |
 | `test_marked_text_sandbox.sh` | marked text 同期・候補 Space/Shift+Delete のソケット回帰（`test_marked_text_sandbox.py` の薄いラッパー） |
+| `cleanup_history_db.py` | history.db の重複読み統合・助詞行削除（ドライランあり。`--apply` で実行・自動バックアップ） |
 
 ### 起動チェーン（IMK ブートストラップ）
 
