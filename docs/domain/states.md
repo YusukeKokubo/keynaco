@@ -65,6 +65,7 @@ flowchart LR
 | 確定テキスト | `CompositionState.finalizedText` | Enter 確定時に送出するテキスト。pending "n" は "ん" に強制変換 |
 | ひらがな部分 | `CompositionState.composedHiragana` | ローマ字変換済み部分。AzooKey へ渡す読みはこちら |
 | 未確定ローマ字 | `CompositionState.pendingRomaji` | まだひらがなに変換されていないローマ字（例: `k`・`sh` 途中） |
+| 確定経路 | `CommitTrigger` | 確定の起因（`.enter`・`.rightArrow`・`.modeSwitch`・`.deactivate`）。`commitComposition` の呼び出し側が明示する |
 
 ## 注意点
 
