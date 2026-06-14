@@ -11,10 +11,11 @@ import AppKit
 /// | **clear `false`** | `absorbPendingIntoComposed`、`addRomaji` の hidden-n 分岐、`backspace`、`reset` |
 public struct CompositionState {
 
-    /// "nn" 後の hidden n を保持すべき入力（y / n のみ）
-    /// 母音が続く場合は hidden n を破棄して、"hanni" → "はんい" になるようにする。
-    /// y は "nyu/nya" 等の拗音を拾うために保持する。
-    private static let hiddenNKeepFollowers: Set<Character> = ["y", "n"]
+    /// "nn" 後の hidden n を保持すべき入力。
+    /// 母音: "na/ni/nu/ne/no" になるよう n と組み合わせる（標準IME準拠: kanna→かんな、hanni→はんに）。
+    /// y: "nyu/nya" 等の拗音を拾うため。
+    /// n: 3つ目の n を新しい pending として受ける。
+    private static let hiddenNKeepFollowers: Set<Character> = ["a", "i", "u", "e", "o", "y", "n"]
 
     public init() {}
 

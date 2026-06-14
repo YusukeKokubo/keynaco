@@ -268,9 +268,9 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
     }
 
     func testNNThenVowelFinalizesN() {
-        // "nn" 後に母音が来ると hidden n は破棄され母音単体になる
+        // 標準IME準拠: "nn" 後に母音が来ると hidden n と組んでナ行になる
         typeRomaji("nna")
-        XCTAssertEqual(client.markedText, "んあ")
+        XCTAssertEqual(client.markedText, "んな")
     }
 
     func testKonnnaProducesKonna() {
@@ -280,11 +280,9 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
     }
 
     func testKonnichiwa() {
-        // "konnichiwa": nn→ん（hidden n破棄）+ i→い。"こんいちわ" になる。
-        // "こんにちわ" を入力するには "ko" + "n" + "ni" + "chi" + "wa" ではなく
-        // "konnichiwa" で "こんいちわ" となることに注意。
+        // 標準IME準拠: "konnichiwa" → "こんにちわ"（hidden n が i と組んで「に」になる）
         typeRomaji("konnichiwa")
-        XCTAssertEqual(client.markedText, "こんいちわ")
+        XCTAssertEqual(client.markedText, "こんにちわ")
     }
 
     func testNBeforeVowelDoesNotProduceN() {
