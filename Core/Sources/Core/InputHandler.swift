@@ -234,9 +234,9 @@ public struct InputHandler {
 
     // MARK: - 公開インターフェース（`handle` は InputHandler+KeyDispatch.swift）
 
-    /// deactivateServer / commitComposition から呼ばれる未確定テキストの強制確定。
-    /// candidate に明示的な選択（selectedRow > 0）がある場合はそちらを確定する。
-    public mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden) {
+    /// 未確定テキストを確定する。candidate に明示的な選択がある場合はそちらを確定する。
+    /// - Parameter trigger: 呼び出し元の確定経路（`CommitTrigger`）
+    public mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden, trigger: CommitTrigger = .enter) {
         guard state.isComposing else { return }
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey

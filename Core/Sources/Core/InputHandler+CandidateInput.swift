@@ -9,7 +9,7 @@ extension InputHandler {
         guard state.isComposing else { return .none }
         let hasTrailingRomaji = !state.pendingRomaji.isEmpty || state.hiddenPendingN
         if !candidate.isExplicitlySelected, hasTrailingRomaji {
-            commitComposition(client: client, candidate: .hidden)
+            commitComposition(client: client, candidate: .hidden, trigger: .enter)
             return .dismiss
         }
         let inputKey = state.finalizedText
@@ -25,7 +25,7 @@ extension InputHandler {
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
             commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
         } else {
-            commitComposition(client: client)
+            commitComposition(client: client, trigger: .enter)
         }
         return .dismiss
     }
@@ -60,7 +60,7 @@ extension InputHandler {
         case KeyCode.escape:
             return doEscape(client: client)
         case KeyCode.rightArrow:
-            commitComposition(client: client)
+            commitComposition(client: client, trigger: .rightArrow)
             return (true, .dismiss)
         case KeyCode.backspace where modifiers.contains(.shift):
             let row = candidate.selectedRow

@@ -328,7 +328,7 @@ class InputController: IMKInputController, @unchecked Sendable {
                     && ic.handler.state.composedHiragana.isEmpty
                     && !session.isBracketMode
             ) else { return }
-            ic.handler.commitComposition(client: adapter, candidate: session.makeContext())
+            ic.handler.commitComposition(client: adapter, candidate: session.makeContext(), trigger: .deactivate)
             ic.handler.candidateSession.reset()
             LeftContextSource.resetCache(&ic.handler.leftContextIMKCache)
             ic.handler.leftContext = .empty

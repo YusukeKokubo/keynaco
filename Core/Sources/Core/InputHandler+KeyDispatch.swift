@@ -95,7 +95,7 @@ extension InputHandler {
             return (true, .none)
         }
         if keyCode == KeyCode.eisu {
-            if state.isComposing { commitComposition(client: client) }
+            if state.isComposing { commitComposition(client: client, trigger: .modeSwitch) }
             Self.isAsciiMode = true
         } else {
             Self.isAsciiMode = false
@@ -131,7 +131,7 @@ extension InputHandler {
                 resetContextOnEnter()
                 return (false, .none)
             }
-            commitComposition(client: client)
+            commitComposition(client: client, trigger: .enter)
             return (true, .dismiss)
         case .escape:
             return doEscape(client: client)
