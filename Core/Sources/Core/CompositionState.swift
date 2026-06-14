@@ -24,7 +24,8 @@ public struct CompositionState {
     // 標準IME準拠: "nn" 後は "ん" のみ表示し、続けて "ni" と打てば "んに" になる。
     public var hiddenPendingN = false
 
-    /// マークドテキストに表示する未確定文字列
+    /// ユーザーが現在打っている読み全体。マークドテキストの表示にも使う。
+    /// `hiddenPendingN` のときは非表示の pending "n" を除いた `composedHiragana` のみを返す。
     public var composingText: String {
         hiddenPendingN ? composedHiragana : composedHiragana + pendingRomaji
     }

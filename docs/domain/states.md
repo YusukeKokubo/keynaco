@@ -57,6 +57,15 @@ flowchart LR
     MT --> IMK[IMK client]
 ```
 
+## 主要な語彙と対応するコード概念
+
+| 用語 | コード上の名前 | 意味 |
+|------|--------------|------|
+| 読み全体 | `CompositionState.composingText` | `composedHiragana + pendingRomaji`（`hiddenPendingN` 時は pending "n" を除く）。ユーザーが打っている途中の読み。マークドテキストの表示にも使う |
+| 確定テキスト | `CompositionState.finalizedText` | Enter 確定時に送出するテキスト。pending "n" は "ん" に強制変換 |
+| ひらがな部分 | `CompositionState.composedHiragana` | ローマ字変換済み部分。AzooKey へ渡す読みはこちら |
+| 未確定ローマ字 | `CompositionState.pendingRomaji` | まだひらがなに変換されていないローマ字（例: `k`・`sh` 途中） |
+
 ## 注意点
 
 - **`isAsciiMode` は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
