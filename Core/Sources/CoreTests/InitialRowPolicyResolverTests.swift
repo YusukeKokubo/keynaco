@@ -154,12 +154,52 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         XCTAssertEqual(focus, "打鍵数削減")
     }
 
-    func testPrefixFocusCandidate_skipsVerb() {
+    func testPrefixFocusCandidate_acceptsVerbAtThreeMorae() {
         let focus = InitialRowPolicyResolver.prefixFocusCandidate(
             reading: "だけんす",
             prefixHistory: ["出る"],
             userDictPrefix: [],
             lcidForOutput: { _ in 100 }
+        )
+        XCTAssertEqual(focus, "出る")
+    }
+
+    func testPrefixFocusCandidate_skipsVerbBelowThreeMorae() {
+        let focus = InitialRowPolicyResolver.prefixFocusCandidate(
+            reading: "かん",
+            prefixHistory: ["出る"],
+            userDictPrefix: [],
+            lcidForOutput: { _ in 100 }
+        )
+        XCTAssertNil(focus)
+    }
+
+    func testPrefixFocusCandidate_acceptsAdjectiveAtFiveMorae() {
+        let focus = InitialRowPolicyResolver.prefixFocusCandidate(
+            reading: "おもしろい",
+            prefixHistory: ["面白い"],
+            userDictPrefix: [],
+            lcidForOutput: { _ in 20 }
+        )
+        XCTAssertEqual(focus, "面白い")
+    }
+
+    func testPrefixFocusCandidate_skipsAdjectiveBelowFiveMorae() {
+        let focus = InitialRowPolicyResolver.prefixFocusCandidate(
+            reading: "おもし",
+            prefixHistory: ["面白い"],
+            userDictPrefix: [],
+            lcidForOutput: { _ in 20 }
+        )
+        XCTAssertNil(focus)
+    }
+
+    func testPrefixFocusCandidate_skipsParticle() {
+        let focus = InitialRowPolicyResolver.prefixFocusCandidate(
+            reading: "だけんす",
+            prefixHistory: ["だけ"],
+            userDictPrefix: [],
+            lcidForOutput: { _ in 147 }
         )
         XCTAssertNil(focus)
     }
@@ -177,10 +217,10 @@ final class InitialRowPolicyResolverTests: XCTestCase {
     func testPrefixFocusCandidate_userDictPrefixAfterHistory() {
         let focus = InitialRowPolicyResolver.prefixFocusCandidate(
             reading: "だけんす",
-            prefixHistory: ["出る"],
+            prefixHistory: ["だけ"],
             userDictPrefix: ["打鍵数削減"],
             lcidForOutput: { text in
-                text == "打鍵数削減" ? 1285 : 100
+                text == "打鍵数削減" ? 1285 : 147
             }
         )
         XCTAssertEqual(focus, "打鍵数削減")

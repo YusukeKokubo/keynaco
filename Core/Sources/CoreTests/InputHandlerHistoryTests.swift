@@ -389,7 +389,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertEqual(handler.sessionTextBuffer, "")
     }
 
-    // MARK: - 前方一致の初期フォーカス（名詞 lcid / 2 モーラ以上 / whileTyping のみ）
+    // MARK: - 前方一致の初期フォーカス（品詞別モーラ閾値 / whileTyping のみ）
 
     func testWhileTyping_prefixHistoryFocusesNoun() {
         setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))

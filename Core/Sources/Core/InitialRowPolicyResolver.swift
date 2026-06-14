@@ -15,7 +15,7 @@ struct InitialRowPolicyInput: Equatable, Sendable {
     let exactMatchHighHistory: [String]
     /// 読み完全一致のユーザー辞書エントリ。履歴より弱く、AzooKey 辞書より強い。
     let userDictExact: [String]
-    /// 打鍵中のみ: 前方一致履歴/ユーザー辞書のうち名詞・固有名詞（lcid）で初期フォーカスする候補。
+    /// 打鍵中のみ: 前方一致履歴/ユーザー辞書のうち品詞・モーラ数条件を満たす初期フォーカス候補。
     let prefixFocusCandidate: String?
     /// AzooKey 辞書が返した候補（読み完全一致）。履歴・ユーザー辞書が無いとき先頭を初期選択。
     let azooKeyCandidates: [String]
@@ -24,19 +24,29 @@ struct InitialRowPolicyInput: Equatable, Sendable {
 }
 
 enum InitialRowPolicyResolver {
-    /// 2 モーラ以上のとき、前方一致履歴 → ユーザー辞書 prefix の順で名詞/固有名詞（`lcid`）の先頭を返す。
+    /// 前方一致履歴 → ユーザー辞書 prefix の順で、品詞ごとの最低モーラ数を満たす先頭を返す。
+    ///
+    /// - 名詞・固有名詞: 2 モーラ以上
+    /// - 動詞: 3 モーラ以上
+    /// - その他（形容詞・未分類等）: 5 モーラ以上
+    /// - 助詞・助動詞: 対象外
     static func prefixFocusCandidate(
         reading: String,
         prefixHistory: [String],
         userDictPrefix: [String],
         lcidForOutput: (String) -> Int?
     ) -> String? {
-        guard KanaUtils.moraCount(in: reading) >= 2 else { return nil }
+        let moraCount = KanaUtils.moraCount(in: reading)
+        guard moraCount >= 2 else { return nil }
         for text in prefixHistory {
-            if isNounOrProperNoun(lcidForOutput(text)) { return text }
+            if acceptsPrefixFocus(readingMoraCount: moraCount, lcid: lcidForOutput(text)) {
+                return text
+            }
         }
         for text in userDictPrefix {
-            if isNounOrProperNoun(lcidForOutput(text)) { return text }
+            if acceptsPrefixFocus(readingMoraCount: moraCount, lcid: lcidForOutput(text)) {
+                return text
+            }
         }
         return nil
     }
@@ -74,10 +84,17 @@ enum InitialRowPolicyResolver {
         }
     }
 
-    private static func isNounOrProperNoun(_ lcid: Int?) -> Bool {
+    private static func minimumMoraeForPrefixFocus(lcid: Int?) -> Int? {
         switch LcidRank.from(lcid: lcid) {
-        case .noun, .properNoun: return true
-        default: return false
+        case .noun, .properNoun: return 2
+        case .verb: return 3
+        case .adjective, .unknown: return 5
+        case .particle, .auxiliary: return nil
         }
+    }
+
+    private static func acceptsPrefixFocus(readingMoraCount: Int, lcid: Int?) -> Bool {
+        guard let minimum = minimumMoraeForPrefixFocus(lcid: lcid) else { return false }
+        return readingMoraCount >= minimum
     }
 }
