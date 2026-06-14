@@ -54,6 +54,59 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         XCTAssertTrue(payload.candidates.contains("あい"))
     }
 
+    // MARK: - whileTyping 子音打鍵（母音限定候補の副作用対策）
+
+    func testConsonantAfterWhileTypingDismissesCandidatesAndShowsPending() {
+        handler.deferAzooKeyWhileTyping = true
+        type(chars: "a", base: "a")
+        let (_, showAction) = type(chars: "i", base: "i")
+        guard case .show = showAction else {
+            XCTFail("あい で whileTyping 候補が出るはず: \(showAction)"); return
+        }
+        XCTAssertTrue(handler.candidateSession.isVisible)
+        let (_, action) = type(chars: "k", base: "k")
+        guard case .dismiss = action else {
+            XCTFail("子音打鍵は .dismiss を返すはず: \(action)"); return
+        }
+        XCTAssertFalse(handler.candidateSession.isVisible)
+        XCTAssertEqual(client.markedText, "あいk")
+    }
+
+    func testEnterAfterConsonantDismissCommitsFullComposition() {
+        handler.deferAzooKeyWhileTyping = true
+        typeRomaji("kanzi")
+        XCTAssertTrue(handler.candidateSession.isVisible)
+        type(chars: "b", base: "b")
+        XCTAssertFalse(handler.candidateSession.isVisible)
+        XCTAssertEqual(client.markedText, "かんじb")
+        press(keyCode: KeyCode.enter)
+        XCTAssertEqual(client.inserted.last, "かんじb")
+    }
+
+    func testEnterWithPassiveCandidateAndPendingCommitsFinalizedText() {
+        handler.deferAzooKeyWhileTyping = true
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        handler.state.pendingRomaji = "k"
+        let ctx = handler.candidateSession.makeContext()
+        XCTAssertTrue(ctx.isVisible)
+        XCTAssertFalse(ctx.isExplicitlySelected)
+        handleAndApply(keyCode: KeyCode.enter, candidate: ctx)
+        XCTAssertEqual(client.inserted.last, "あいk")
+    }
+
+    func testEnterWithExplicitCandidateAndPendingStillCommitsSelection() {
+        handler.deferAzooKeyWhileTyping = true
+        type(chars: "a", base: "a")
+        type(chars: "i", base: "i")
+        handler.state.pendingRomaji = "k"
+        let ctx = CandidateContext(
+            isVisible: true, selectedRow: 0, selectedText: "あい", isExplicitlySelected: true
+        )
+        handleAndApply(keyCode: KeyCode.enter, candidate: ctx)
+        XCTAssertEqual(client.inserted.last, "あい")
+    }
+
     // MARK: - Return で確定
     // See: docs/domain/states.md#組成中
 

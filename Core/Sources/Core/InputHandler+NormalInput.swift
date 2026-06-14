@@ -130,9 +130,11 @@ public extension InputHandler {
         let isVowelKey = base.count == 1 && Self.vowelKeys.contains(base.lowercased().first!)
         let candidateAction: CandidateAction
         if needsRefresh {
+            // 母音/`n` だけ whileTyping 再構築。子音は候補を閉じて marked に pending を出す
+            // （visible のまま `.none` だと MarkedTextSync がローマ字尾を隠し Enter で pending が消える）。
             candidateAction = isVowelKey
                 ? buildCandidateListForTrigger(.whileTyping)
-                : .none
+                : .dismiss
         } else {
             candidateAction = .dismiss
         }

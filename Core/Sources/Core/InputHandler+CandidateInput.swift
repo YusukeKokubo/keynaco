@@ -7,6 +7,11 @@ extension InputHandler {
     @discardableResult
     mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         guard state.isComposing else { return .none }
+        let hasTrailingRomaji = !state.pendingRomaji.isEmpty || state.hiddenPendingN
+        if !candidate.isExplicitlySelected, hasTrailingRomaji {
+            commitComposition(client: client, candidate: .hidden)
+            return .dismiss
+        }
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する

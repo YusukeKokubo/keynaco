@@ -81,6 +81,18 @@ final class MarkedTextSyncTests: XCTestCase {
         ), "かん")
     }
 
+    func testHiddenCandidate_showsTrailingRomajiTail() {
+        XCTAssertEqual(MarkedTextSync.resolve(
+            isBracketMode: false,
+            candidateVisible: false,
+            isExplicitlySelected: false,
+            composedHiragana: "あい",
+            pendingRomaji: "s",
+            composingText: "あいs",
+            selectedCandidate: nil
+        ), "あいs")
+    }
+
     func testPassiveCompose_keepsAsciiWordPending() {
         XCTAssertEqual(MarkedTextSync.resolve(
             isBracketMode: false,

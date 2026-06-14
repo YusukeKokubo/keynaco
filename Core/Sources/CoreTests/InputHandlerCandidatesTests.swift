@@ -250,7 +250,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         type(chars: "i", base: "i")
         type(chars: "k", base: "k", candidateVisible: true, selectedRow: 2, selectedText: "愛")
         XCTAssertTrue(client.inserted.isEmpty, "↑↓ なしで文字入力しても候補を確定しない")
-        XCTAssertEqual(client.markedText, "あい")
+        XCTAssertEqual(client.markedText, "あいk", "子音打鍵で候補を閉じたあとは pending を marked に出す")
     }
 
     func testSpaceDuringCandidatesSelectsNextWithoutRebuild() {
