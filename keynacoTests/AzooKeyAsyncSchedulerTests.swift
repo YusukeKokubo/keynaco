@@ -55,6 +55,26 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
         try? await Task.sleep(nanoseconds: AzooKeyAsyncScheduler.debounceNanoseconds + 50_000_000)
         XCTAssertNil(stub.lastRichCandidates, "stale generation should skip requestCandidates")
     }
+
+    /// onComplete 内で hasPendingWork が false であること（フッターが fetching のまま残るバグの防止）。
+    func testOnCompleteRunsAfterPendingTaskCleared() async {
+        let scheduler = AzooKeyAsyncScheduler()
+        let stub = RichFlagStub()
+        let gen = scheduler.onKeyDown()
+        var pendingDuringCallback: Bool?
+        scheduler.schedule(
+            generation: gen,
+            reading: "かんじ",
+            leftSideContext: nil,
+            converter: stub,
+            debounceNanoseconds: 0
+        ) { _ in
+            pendingDuringCallback = scheduler.hasPendingWork
+        }
+        _ = await scheduler.waitUntilIdle(timeoutNanoseconds: 500_000_000)
+        XCTAssertEqual(pendingDuringCallback, false)
+        XCTAssertFalse(scheduler.hasPendingWork)
+    }
 }
 
 private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {

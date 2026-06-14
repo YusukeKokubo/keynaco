@@ -100,8 +100,8 @@ final class AzooKeyAsyncScheduler {
 
             guard !Task.isCancelled else { return }
             guard candidateGeneration == generation else { return }
-            onComplete(candidates)
             pendingTask = nil
+            onComplete(candidates)
         }
     }
 
