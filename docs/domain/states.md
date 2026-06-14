@@ -66,6 +66,44 @@ flowchart LR
 | ひらがな部分 | `CompositionState.composedHiragana` | ローマ字変換済み部分。AzooKey へ渡す読みはこちら |
 | 未確定ローマ字 | `CompositionState.pendingRomaji` | まだひらがなに変換されていないローマ字（例: `k`・`sh` 途中） |
 | 確定経路 | `CommitTrigger` | 確定の起因（`.enter`・`.rightArrow`・`.modeSwitch`・`.deactivate`）。`commitComposition` の呼び出し側が明示する |
+| 候補フェーズ | `CandidatePanelInteraction` | `isVisible × isExplicitlySelected` から導出される3状態（`.hidden` / `.passive` / `.explicit`）。パネルの表示有無と操作種別を一元化する |
+| 行セクション | `CandidateRowSection` | 候補リストを `fixedEnd` / `historyEnd` で3ゾーンに分割した区分（`.fixed` / `.history` / `.dictionary`）。Shift+Delete 可否と区切り線描画の基準 |
+| 構築トリガー | `CandidateListTrigger` | `buildCandidateList` の呼び出し起因（`.whileTyping` / `.explicit`）。候補フェーズとは別概念 |
+
+## 候補フェーズの詳細
+
+`CandidatePanelInteraction` は `CandidateSession.panelInteraction` プロパティで導出する。
+
+| フェーズ | `isVisible` | `isExplicitlySelected` | 文字キーの挙動 |
+|----------|-------------|------------------------|--------------|
+| `.hidden` | false | false | 通常入力 |
+| `.passive` | true | false | 通常入力（サジェスト表示のみ） |
+| `.explicit` | true | true | 先に選択候補を確定してから入力 |
+
+`.passive` に遷移するのは `.whileTyping` トリガーの `buildCandidateList` 経由のみ。Space（候補非表示時）・↑↓ は `.explicit` で開始する。
+
+## 候補リストのセクション構造
+
+候補リストは2つの整数インデックス `fixedEnd` / `historyEnd` で3ゾーンに分割される（`CandidateLayout` が保証する不変条件: `0 <= fixedEnd <= historyEnd <= candidates.count`）。
+
+| 行セクション | 行範囲 | 内容 | Shift+Delete |
+|-------------|--------|------|-------------|
+| `.fixed` | `row < fixedEnd` | ひらがな固定・ユーザー辞書 | 不可 |
+| `.history` | `fixedEnd <= row < historyEnd` | 高スコア履歴 | 可 |
+| `.dictionary` | `row >= historyEnd` | AzooKey辞書・数値・日時・カタカナ | 不可 |
+
+`CandidateLayout` はビルド時に `CandidateSection.Kind`（8種）を `sectionOrder` に従って平坦化してからインデックスを確定する。各 Kind と行セクションの対応は下表のとおり。
+
+| `CandidateSection.Kind` | 行セクション | 備考 |
+|------------------------|-------------|------|
+| `.fixedHiragana` | fixed | `hiraganaPreferred` 時の先頭固定 |
+| `.userDict` | fixed | ユーザー辞書 |
+| `.exactMatchHistory` | history | 読み完全一致履歴。Zenzai 順でソート後に先頭へ |
+| `.highHistory` | history | 前方一致などその他高スコア履歴 |
+| `.number` | dictionary | 数値変換 |
+| `.dateTime` | dictionary | 日時変換 |
+| `.azooKeyDict` | dictionary | AzooKey 辞書候補（Zenzai 推論結果込み） |
+| `.katakana` | dictionary | カタカナ変換（末尾固定） |
 
 ## 注意点
 
