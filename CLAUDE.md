@@ -56,7 +56,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 ## ビルド・インストール
 
-`/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。手動でビルドのみ行う場合:
+`/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。Post-action でプロセス再起動しても `pgrep -x keynaco` が空のことがある。未起動なら `open "/Library/Input Methods/keynaco.app"` または日本語入力ソースへ切替。手動でビルドのみ行う場合:
 
 ```bash
 xcodebuild build -scheme keynaco -destination "platform=macOS" \
@@ -137,11 +137,20 @@ fast + slow 両方（CI・リリース前）:
 
 `fixedEnd <= row < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能（ユーザー辞書行は保護）。
 
+### 打鍵中の前方一致初期行（`InitialRowPolicyResolver`）
+
+- `.whileTyping` のみ: 前方一致履歴/ユーザー辞書 prefix の初期フォーカスは品詞別モーラ閾値（名詞・固有名詞 2 / 動詞 3 / その他 5）。助詞・助動詞は対象外（`docs/concept.md` 指針 1・機能語 UI dismiss と整合）
+- 読み完全一致履歴は閾値なしで最優先。explicit（Space）は prefix focus 無効
+- 品詞: `rankForPrefixFocus`（`lcid` → `pos` → `longestInputForOutput` + 辞書 → 組成読み）。確定直後は `schedulePOSClassification` 非同期で `lcid` NULL があり得る
+- `whileTypingInitialRow`: 閾値未満の前方一致履歴は初期行からスキップ。フォーカス可能行がなければ dismiss
+- 記録: `plans/PLAN260614-prefix-focus-mora-thresholds.md`
+
 ## テスト方針
 
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
 - `ScenarioRegressionTests.swift`: 具体的な入力シーケンス×期待出力のリグレッションテスト（worked example の正本）
 - **E2E 動作確認**: 状態（Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）。sandbox で通常文字を送るには `{"type_string": "k"}` を使う（`{"key": "k"}` は特殊キーのみ有効）
+- **prefix focus / 履歴シードの sandbox**: `type_string` → `wait_azoo_key` → `state` で `selectedText` を見る（`seed_history` は `pos`/`lcid` 無し。final を `wait_azoo_key` だけにしない）
 
 ## キー入力の挙動（特殊ケース）
 
