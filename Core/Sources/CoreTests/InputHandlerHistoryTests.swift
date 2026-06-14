@@ -437,6 +437,36 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
             "ユーザー辞書 prefix の名詞に初期フォーカスするはず: \(payload.candidates)"
         )
     }
+
+    func testWhileTyping_skipsVerbPrefixHistoryBelowThreeMorae() {
+        setUpWithConverter(SnapStub(["田部"]))
+        handler.db.recordPrefixes(reading: "たべる", output: "食べる")
+        handler.db.updatePOSClassification(output: "食べる", pos: "verb", lcid: 100)
+
+        typeRomaji("tabe")
+        guard let payload = handler.buildCandidateList(trigger: .whileTyping).showPayload else { return }
+        XCTAssertNotEqual(
+            payload.candidates[payload.initialRow],
+            "食べる",
+            "2 モーラでは動詞履歴にフォーカスしない: \(payload.candidates)"
+        )
+    }
+
+    func testWhileTyping_prefixHistoryFocusesNounWithPosOnly() {
+        setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
+        handler.db.recordPrefixes(reading: "だけんすうげん", output: "打鍵数削減")
+        handler.db.updatePOSClassification(output: "打鍵数削減", pos: "noun", lcid: nil)
+
+        typeRomaji("dakensu")
+        guard let payload = handler.buildCandidateList(trigger: .whileTyping).showPayload else {
+            XCTFail("候補を出すはず"); return
+        }
+        XCTAssertEqual(
+            payload.candidates[payload.initialRow],
+            "打鍵数削減",
+            "pos のみでも名詞前方一致にフォーカスするはず: \(payload.candidates)"
+        )
+    }
 }
 
 private final class LcidOutputStub: BaseAzooKeyStub, @unchecked Sendable {

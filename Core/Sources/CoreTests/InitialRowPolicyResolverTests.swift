@@ -143,12 +143,8 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: "だけんす",
             prefixHistory: ["打鍵数削減", "動詞"],
             userDictPrefix: [],
-            lcidForOutput: { text in
-                switch text {
-                case "打鍵数削減": return 1285
-                case "動詞": return 100
-                default: return nil
-                }
+            rankForOutput: { text in
+                text == "打鍵数削減" ? .noun : .verb
             }
         )
         XCTAssertEqual(focus, "打鍵数削減")
@@ -159,7 +155,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: "だけんす",
             prefixHistory: ["出る"],
             userDictPrefix: [],
-            lcidForOutput: { _ in 100 }
+            rankForOutput: { _ in .verb }
         )
         XCTAssertEqual(focus, "出る")
     }
@@ -169,7 +165,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: "かん",
             prefixHistory: ["出る"],
             userDictPrefix: [],
-            lcidForOutput: { _ in 100 }
+            rankForOutput: { _ in .verb }
         )
         XCTAssertNil(focus)
     }
@@ -179,7 +175,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: "おもしろい",
             prefixHistory: ["面白い"],
             userDictPrefix: [],
-            lcidForOutput: { _ in 20 }
+            rankForOutput: { _ in .adjective }
         )
         XCTAssertEqual(focus, "面白い")
     }
@@ -189,7 +185,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: "おもし",
             prefixHistory: ["面白い"],
             userDictPrefix: [],
-            lcidForOutput: { _ in 20 }
+            rankForOutput: { _ in .adjective }
         )
         XCTAssertNil(focus)
     }
@@ -199,7 +195,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: "だけんす",
             prefixHistory: ["だけ"],
             userDictPrefix: [],
-            lcidForOutput: { _ in 147 }
+            rankForOutput: { _ in .particle }
         )
         XCTAssertNil(focus)
     }
@@ -209,7 +205,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: "だ",
             prefixHistory: ["打鍵数削減"],
             userDictPrefix: [],
-            lcidForOutput: { _ in 1285 }
+            rankForOutput: { _ in .noun }
         )
         XCTAssertNil(focus)
     }
@@ -219,10 +215,62 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: "だけんす",
             prefixHistory: ["だけ"],
             userDictPrefix: ["打鍵数削減"],
-            lcidForOutput: { text in
-                text == "打鍵数削減" ? 1285 : 147
+            rankForOutput: { text in
+                text == "打鍵数削減" ? .noun : .particle
             }
         )
         XCTAssertEqual(focus, "打鍵数削減")
+    }
+
+    func testWhileTypingInitialRow_skipsIneligiblePrefixHistory() {
+        let row = InitialRowPolicyResolver.whileTypingInitialRow(
+            candidates: ["食べる", "タベ"],
+            fixedEnd: 0,
+            historyEnd: 1,
+            computedRow: 0,
+            reading: "たべ",
+            exactMatchHistory: [],
+            rankForOutput: { _ in .verb }
+        )
+        XCTAssertEqual(row, 1)
+    }
+
+    func testWhileTypingInitialRow_keepsExactMatchHistoryWithoutMoraGate() {
+        let row = InitialRowPolicyResolver.whileTypingInitialRow(
+            candidates: ["食べる"],
+            fixedEnd: 0,
+            historyEnd: 1,
+            computedRow: 0,
+            reading: "たべ",
+            exactMatchHistory: ["食べる"],
+            rankForOutput: { _ in .verb }
+        )
+        XCTAssertEqual(row, 0)
+    }
+
+    func testWhileTypingInitialRow_nilWhenOnlyIneligibleHistory() {
+        let row = InitialRowPolicyResolver.whileTypingInitialRow(
+            candidates: ["食べる"],
+            fixedEnd: 0,
+            historyEnd: 1,
+            computedRow: 0,
+            reading: "たべ",
+            exactMatchHistory: [],
+            rankForOutput: { _ in .verb }
+        )
+        XCTAssertNil(row)
+    }
+
+    func testWhileTypingInitialRow_prefersDictionaryAfterIneligibleHistory() {
+        let row = InitialRowPolicyResolver.whileTypingInitialRow(
+            candidates: ["打鍵数削減", "ダケンス", "だけんす"],
+            fixedEnd: 0,
+            historyEnd: 1,
+            computedRow: 0,
+            reading: "だけんす",
+            exactMatchHistory: [],
+            rankForOutput: { text in text == "打鍵数削減" ? .unknown : .noun }
+        )
+        XCTAssertEqual(row, 1)
     }
 }

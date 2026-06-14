@@ -24,6 +24,36 @@ struct InitialRowPolicyInput: Equatable, Sendable {
 }
 
 enum InitialRowPolicyResolver {
+    private enum MoraThreshold {
+        static let noun = 2
+        static let verb = 3
+        static let other = 5
+    }
+
+    /// 前方一致フォーカス用の品詞ランク。`lcid` → `pos`（NULL 行のみ）→ 履歴最長読み → `readingHint` での辞書 lookup。
+    static func rankForPrefixFocus(
+        output: String,
+        db: DatabaseManager,
+        azooKey: AzooKeyConverting,
+        readingHint: String = ""
+    ) -> LcidRank {
+        if let lcid = db.lcidForOutput(output) {
+            return LcidRank.from(lcid: lcid)
+        }
+        if let pos = db.posForOutput(output) {
+            return LcidRank.from(pos: pos)
+        }
+        if let input = db.longestInputForOutput(output),
+           let lcid = azooKey.lcidForCommitted(reading: input, output: output) {
+            return LcidRank.from(lcid: lcid)
+        }
+        if !readingHint.isEmpty,
+           let lcid = azooKey.lcidForCommitted(reading: readingHint, output: output) {
+            return LcidRank.from(lcid: lcid)
+        }
+        return .unknown
+    }
+
     /// 前方一致履歴 → ユーザー辞書 prefix の順で、品詞ごとの最低モーラ数を満たす先頭を返す。
     ///
     /// - 名詞・固有名詞: 2 モーラ以上
@@ -34,19 +64,54 @@ enum InitialRowPolicyResolver {
         reading: String,
         prefixHistory: [String],
         userDictPrefix: [String],
-        lcidForOutput: (String) -> Int?
+        rankForOutput: (String) -> LcidRank
     ) -> String? {
         let moraCount = KanaUtils.moraCount(in: reading)
-        guard moraCount >= 2 else { return nil }
+        guard moraCount >= MoraThreshold.noun else { return nil }
         for text in prefixHistory {
-            if acceptsPrefixFocus(readingMoraCount: moraCount, lcid: lcidForOutput(text)) {
+            if acceptsPrefixFocus(readingMoraCount: moraCount, rank: rankForOutput(text)) {
                 return text
             }
         }
         for text in userDictPrefix {
-            if acceptsPrefixFocus(readingMoraCount: moraCount, lcid: lcidForOutput(text)) {
+            if acceptsPrefixFocus(readingMoraCount: moraCount, rank: rankForOutput(text)) {
                 return text
             }
+        }
+        return nil
+    }
+
+    /// 打鍵中: 閾値未満の前方一致履歴行を初期行から外し、辞書/カタカナ側へ進める。
+    /// 読み完全一致履歴は閾値なしで維持する。フォーカス可能な行が無ければ nil（候補 UI 非表示）。
+    static func whileTypingInitialRow(
+        candidates: [String],
+        fixedEnd: Int,
+        historyEnd: Int,
+        computedRow: Int,
+        reading: String,
+        exactMatchHistory: Set<String>,
+        rankForOutput: (String) -> LcidRank
+    ) -> Int? {
+        guard !candidates.isEmpty, fixedEnd <= historyEnd else { return computedRow }
+        let moraCount = KanaUtils.moraCount(in: reading)
+
+        func historyRowEligible(at index: Int) -> Bool {
+            guard index >= fixedEnd, index < historyEnd else { return false }
+            let text = candidates[index]
+            if exactMatchHistory.contains(text) { return true }
+            return acceptsPrefixFocus(readingMoraCount: moraCount, rank: rankForOutput(text))
+        }
+
+        if computedRow < candidates.count, computedRow < fixedEnd || computedRow >= historyEnd {
+            return computedRow
+        }
+        if computedRow < candidates.count, historyRowEligible(at: computedRow) {
+            return computedRow
+        }
+
+        for index in fixedEnd..<candidates.count {
+            if index >= historyEnd { return index }
+            if historyRowEligible(at: index) { return index }
         }
         return nil
     }
@@ -84,17 +149,17 @@ enum InitialRowPolicyResolver {
         }
     }
 
-    private static func minimumMoraeForPrefixFocus(lcid: Int?) -> Int? {
-        switch LcidRank.from(lcid: lcid) {
-        case .noun, .properNoun: return 2
-        case .verb: return 3
-        case .adjective, .unknown: return 5
+    private static func minimumMorae(for rank: LcidRank) -> Int? {
+        switch rank {
+        case .noun, .properNoun: return MoraThreshold.noun
+        case .verb: return MoraThreshold.verb
+        case .adjective, .unknown: return MoraThreshold.other
         case .particle, .auxiliary: return nil
         }
     }
 
-    private static func acceptsPrefixFocus(readingMoraCount: Int, lcid: Int?) -> Bool {
-        guard let minimum = minimumMoraeForPrefixFocus(lcid: lcid) else { return false }
+    private static func acceptsPrefixFocus(readingMoraCount: Int, rank: LcidRank) -> Bool {
+        guard let minimum = minimumMorae(for: rank) else { return false }
         return readingMoraCount >= minimum
     }
 }

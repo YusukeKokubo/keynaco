@@ -367,15 +367,20 @@ extension InputHandler {
             sectionOrder: built.sectionOrder,
             initialRowPolicy: .afterFixed
         )
+        let prefixFocusRank = { (output: String) in
+            InitialRowPolicyResolver.rankForPrefixFocus(
+                output: output,
+                db: db,
+                azooKey: azooKeyConverter,
+                readingHint: h
+            )
+        }
         let prefixFocusCandidate = trigger == .whileTyping
             ? InitialRowPolicyResolver.prefixFocusCandidate(
                 reading: h,
                 prefixHistory: sources.highHistory,
                 userDictPrefix: sources.userDictPrefix,
-                lcidForOutput: { output in
-                    db.lcidForOutput(output)
-                        ?? azooKeyConverter.lcidForCommitted(reading: h, output: output)
-                }
+                rankForOutput: prefixFocusRank
             )
             : nil
         let policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
@@ -394,10 +399,40 @@ extension InputHandler {
             sectionOrder: built.sectionOrder,
             initialRowPolicy: policy
         )
+        let computedRow = layout.initialRow
+        let exactMatchHistorySet = Set(sources.exactMatchHighHistory)
+        let whileTypingRow = trigger == .whileTyping
+            ? InitialRowPolicyResolver.whileTypingInitialRow(
+                candidates: layout.candidates,
+                fixedEnd: layout.fixedEnd,
+                historyEnd: layout.historyEnd,
+                computedRow: computedRow,
+                reading: h,
+                exactMatchHistory: exactMatchHistorySet,
+                rankForOutput: prefixFocusRank
+            )
+            : computedRow
+        guard whileTypingRow != nil || trigger != .whileTyping else {
+            #if DEBUG
+            recordCandidateBuildDiagnostics(
+                trigger: trigger,
+                reading: h,
+                outcome: .dismissedEmpty,
+                fixedSlot: fixedSlot,
+                hiraganaInHistory: hiraganaInHistory,
+                addsDefaultFixedHiragana: addsDefaultFixedHiragana,
+                sources: sources,
+                built: built,
+                policy: policy,
+                layout: layout
+            )
+            #endif
+            return .dismiss
+        }
         let initialRow = CandidateLayout.adjustedInitialRow(
             candidates: layout.candidates,
             fixedEnd: layout.fixedEnd,
-            computedRow: layout.initialRow,
+            computedRow: whileTypingRow ?? computedRow,
             appliesDefaultFixedHiragana: addsDefaultFixedHiragana
         )
         guard !layout.candidates.isEmpty else {
