@@ -154,7 +154,7 @@ struct RomajiConverter {
                 }
             }
 
-            // "nn" → ん（両方消費）。3 つ目以降の n は pending として残す（konnnyaku→こんにゃく）
+            // "nn" → ん（両方消費）。3 つ目以降の n は pending として残す
             // "n" + 子音(y,n 以外) → ん
             if remaining.count >= 2 {
                 let first = remaining[remaining.startIndex]

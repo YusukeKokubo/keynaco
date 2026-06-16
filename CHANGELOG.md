@@ -4,6 +4,19 @@ macOS IME **keynaco** の機能追加・変更・修正のログ。日付降順�
 
 ---
 
+## 2026-06-16 — hiddenPendingN 削除
+
+実装: `191edff` / ドキュメント: `2a809d3`
+
+### 削除
+- **`hiddenPendingN`** — `nn` 後の非表示 pending `n` と `CompositionState.hiddenPendingN` フラグ。`hiddenNKeepFollowers`・Enter 時 hidden 分岐・`InputHandlerHiddenPendingNTests` を含む
+
+### 変更
+- **`RomajiConverter`** — `nn` を両方消費して `ん` に確定（ローマ字テーブル通り）。例: `konnyaku` → こんやく
+- **`docs/rejected.md`** — R-1（`hiddenPendingN` 不採用）を追記
+
+---
+
 ## 2026-05-25 — sessionTextBuffer・content_bigram 廃止
 
 設計: [`plans/POC260525-left-context-enhancement.md`](plans/POC260525-left-context-enhancement.md) / 実装: [`plans/PLAN260525-session-text-buffer.md`](plans/PLAN260525-session-text-buffer.md)（`5edf2bc` → `86c163a`）

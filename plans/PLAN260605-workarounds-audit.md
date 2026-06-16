@@ -36,7 +36,7 @@ keynaco の IME 層に残る「ワークアラウンド／回避策」につい�
 | **C-3** | **必須** | Terminal/Electron 等で `selectedRange()` が `NSNotFound`。無理に surrounding を使うとクラッシュやゴミ文脈。 | `LeftContextSource.assembleProduction` のガード・キャッシュ破棄を維持。 | ガード外しで Terminal / Cursor 内蔵ターミナルで BS 連打・変換。 |
 | **D-1** | **必須** | IMK SDK が Swift 6 `@MainActor` 隔離に未対応。`handle` / `init` は nonisolated のため `assumeIsolated` / `nonisolated(unsafe)` が現実解。 | **将来**: IMK 薄ブリッジ + `@MainActor` Session（IMKSwift 等を参考に別 PLAN）。 | `assumeIsolated` 除去でコンパイルエラーを確認。 |
 | **D-2** | **仕様** | `KanaKanjiConverter` / Zenzai `llama_context` は非スレッドセーフ。`LockedConverter`（NSLock）は必須。 | ロック削除不可。Actor への閉じ込めは改善候補（`Task.detached` の `commit` 経路含む）。 | ロック外しで変換連打時 SIGABRT。 |
-| **E-1** | **仕様** | `hiddenPendingN`（`nn` → ん + 非表示 n）は標準的ローマ字処理。 | なし。 | `InputHandlerZSequenceTests` / 組成テスト。 |
+| **E-1** | **撤回**（2026-06-16 → [rejected.md R-1](../docs/rejected.md)） | 旧 `hiddenPendingN`（`nn` → ん + 非表示 n）は keynaco 独自レイヤで、`konnyaku` 等のローマ字テーブル分解を壊していた。 | `RomajiConverter` で `nn` 両方消費に変更（`191edff`）。 | `InputHandlerNNTests` / `RomajiConverterTests`。 |
 | **E-2** | **整理済**（2026-06-05） | 旧 `hasBigramContext` → `shouldRefreshWhileTypingAfterCommit`。実態は `lastCommittedOutput != nil` かつ組成非空で whileTyping 再構築。 | 挙動変更・条件見直しは別 PR・sandbox。 | 条件を常に true/false に固定して 1 文字目サジェストの差分確認。 |
 | **E-3** | **仕様** | 同一ターン内の handler 状態は pre 退避必須（1 キー遅延バグの実績）。 | なし。 | `CLAUDE.md`「キー入力の挙動」参照。 |
 

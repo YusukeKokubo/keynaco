@@ -13,8 +13,8 @@
     },
     {
       "id": 3,
-      "prompt": "IMEサンドボックスで「nn」と入力すると pendingRomaji はどう変化する？「ん」になるタイミングと hiddenPendingN の挙動を確認して。",
-      "expected_output": "n → nn の各ステップでの composedHiragana と pendingRomaji の変化が説明されること"
+      "prompt": "IMEサンドボックスで「nn」と入力したあと「yaku」まで続けたとき、composedHiragana・pendingRomaji・composingText はどう変化する？「konnyaku」全体を一度に打った場合も比較して。",
+      "expected_output": "nn 後は composedHiragana=ん・pendingRomaji 空。konnyaku 全体では composingText=こんやく になること"
     }
   ]
 }

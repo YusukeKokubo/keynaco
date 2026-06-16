@@ -279,7 +279,7 @@ Phase 3 後の残ギャップ:
 |----|------|------|
 | 母音限定を削除 | 不採用 | `buildCandidateListWithoutAzooKey` の読みは `composedHiragana` のみ。毎キー再構築しても pending 中はリストが変わらず、marked 凍結は `MarkedTextSync` 側が残る |
 | 子音 + `needsRefresh` → `.dismiss` | **採用** | 候補を閉じれば marked に `composingText` が出る。差分最小で AzooKey debounce 方針も維持 |
-| Enter 時 pending 保護 | **採用** | passive + `pendingRomaji` / `hiddenPendingN` なら `commitComposition(.hidden)` で `finalizedText` を確定 |
+| Enter 時 pending 保護 | **採用** | passive + `pendingRomaji` 非空なら `commitComposition(.hidden)` で `finalizedText` を確定 |
 
 ### 実装（`380456c`）
 
