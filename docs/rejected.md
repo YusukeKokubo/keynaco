@@ -4,6 +4,34 @@
 
 ---
 
+## R-1 `hiddenPendingN`（`nn` 後の非表示 pending n）（2026-06-16 削除）
+
+**概要**: `"nn"` → `ん` のあと、2 つ目の `n` を非表示の pending として残し、続く母音・`y`・`n` と組み合わせてナ行・拗音を作る実装。`CompositionState.hiddenPendingN` フラグで `composingText`・確定・Backspace・Enter 時 trailing romaji 判定を横断管理していた（2026-05 頃導入。当時「標準 IME 準拠」と称した）。
+
+**何が壊れていたか** — ローマ字テーブル通りの分解:
+
+```
+konnyaku →  k+o=こ  /  n+n=ん  /  y+a=や  /  k+u=く  →  こんやく  →  婚約
+```
+
+`hiddenPendingN` があると `nn` 後の非表示 `n` が `y` と結合し `ny`→`にゃ` となり、**同じ打鍵列が `こんにゃく` に化ける**。これはローマ字仕様の問題ではなく、keynaco 独自の状態機械が標準分解を上書きしていたバグ。
+
+**削除の理由**:
+
+- **ローマ字テーブルに戻すだけで要件を満たす**: `RomajiConverter` で `"nn"` を両方消費して `ん` に確定させ、`CompositionState` から hidden レイヤを除く。追加の「3 つ目の n」ルールや読みの特別扱いは不要
+- **状態機械の複雑さ**: `hiddenNKeepFollowers`・`addRomaji` / `backspace` / `absorbPendingIntoComposed` / `finalizedText` / Enter 時 trailing romaji 判定が絡み、仕様説明コストが高い
+- **ローマ字表記と打鍵列の混同を招いていた**: Web 上の Hepburn 表記（例: こんにゃくの英字 `konnyaku`）と IME の 1 文字ずつの分解を混同し、「`konnnyaku` で蒟蒻」等の誤った説明を生んでいた
+
+**削除後**: `pendingRomaji` は常に表示・確定に含まれる。`nn` はテーブルどおり両 `n` を消費して `ん` になる。
+
+**削除した周辺**: `CompositionState.hiddenPendingN` / `hiddenNKeepFollowers`、`InputHandler+CandidateInput` の hidden 分岐、`InputHandlerHiddenPendingNTests`（→ `InputHandlerNNTests` に置換）。
+
+**再検討するなら**: Apple かな入力のように `nn` 後に hidden `n` を残し `kanna`→`かんな`・`konnichiwa`→`こんにちわ` を取る互換レイヤが本当に必要か。採用するなら **`konnyaku`→`こんやく`（婚約）が再び壊れない**ことを先にテストで固定する。
+
+> 関連: commit `191edff`、`CHANGELOG.md`（旧 `hiddenPendingN` エントリ）、[PLAN260605-workarounds-audit](../plans/PLAN260605-workarounds-audit.md) E-1
+
+---
+
 ## P-3 Zenzai top-1 プロモート（2026-06-13 削除）
 
 **概要**: 左文脈ありかつ Zenzai 有効のとき、AzooKey が返す `mainResults[0]`（Zenzai 推論込みのスコアで最上位の候補）を `.zenzaiTop1` という独立セクションに切り出し、候補リストの先頭で固定表示していた。`CandidateSession.zenzaiRow` で行番号を保持し、Shift+Delete から保護、紫ラベルで視覚的に区別、初期選択行も Zenzai 行に固定。
