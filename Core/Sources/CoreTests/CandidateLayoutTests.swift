@@ -55,16 +55,16 @@ final class CandidateLayoutTests: XCTestCase {
     }
 
     func testAllBoundaries() {
-        // fixedEnd=3, historyEnd=5
+        // fixedEnd=3, historyEnd=3（exactMatchHistory なし → fixedEnd と同値）
         let l = layout(
             (.fixedHiragana, ["の"]),
             (.userDict, ["UD1", "UD2"]),
             (.highHistory, ["H1", "H2"]),
             (.azooKeyDict, ["A1", "A2"])
         )
-        XCTAssertEqual(l.candidates, ["の", "UD1", "UD2", "H1", "H2", "A1", "A2"])
+        XCTAssertEqual(l.candidates, ["の", "UD1", "UD2", "A1", "A2", "H1", "H2"])
         XCTAssertEqual(l.fixedEnd, 3)
-        XCTAssertEqual(l.historyEnd, 5)
+        XCTAssertEqual(l.historyEnd, 3)
         XCTAssertEqual(l.initialRow, 3)
     }
 
@@ -90,7 +90,7 @@ final class CandidateLayoutTests: XCTestCase {
         XCTAssertEqual(l.candidates, ["重複", "別語"])
         XCTAssertEqual(l.candidates.filter { $0 == "重複" }.count, 1)
         XCTAssertEqual(l.fixedEnd, 1)
-        XCTAssertEqual(l.historyEnd, 2)
+        XCTAssertEqual(l.historyEnd, 1)
     }
 
     func testDedupWithinSection() {
@@ -99,12 +99,12 @@ final class CandidateLayoutTests: XCTestCase {
     }
 
     func testDedupFirstOccurrenceWins() {
-        // highHistory に "X" → azooKeyDict の "X" は除外
+        // azooKeyDict が highHistory より先に処理されるため、azooKeyDict の "X" が残る
         let l = layout(
             (.highHistory, ["X", "H1"]),
             (.azooKeyDict, ["X", "A1"])
         )
-        XCTAssertEqual(l.candidates, ["X", "H1", "A1"])
+        XCTAssertEqual(l.candidates, ["X", "A1", "H1"])
         XCTAssertEqual(l.candidates.filter { $0 == "X" }.count, 1)
     }
 
@@ -129,9 +129,9 @@ final class CandidateLayoutTests: XCTestCase {
     }
 
     func testPolicyFirstMatchingInHistory() {
-        // "の" が highHistory にある（fixedHiragana なし）: firstIndex で見つかる
+        // "の" が highHistory にある（fixedHiragana なし）: azooKeyDict が先に来るので index=2
         let l = layout((.highHistory, ["別語", "の"]), (.azooKeyDict, ["辞書A"]), policy: .firstMatching("の"))
-        XCTAssertEqual(l.initialRow, 1)
+        XCTAssertEqual(l.initialRow, 2)
     }
 
     func testPolicyFirstMatchingNotFoundFallsToAfterFixed() {
@@ -208,7 +208,7 @@ final class CandidateLayoutTests: XCTestCase {
         )
         XCTAssertEqual(l.candidates, ["H1", "A1"])
         XCTAssertEqual(l.fixedEnd, 0)
-        XCTAssertEqual(l.historyEnd, 1)
+        XCTAssertEqual(l.historyEnd, 0)
     }
 
     // MARK: - 不変条件

@@ -244,7 +244,10 @@ public struct InputHandler {
             let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
             let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
             let isPunct = Self.readingPunctuations.contains(selected) || Self.sentenceTerminators.contains(selected)
-            if !isDateTime && !isNumber && !isPunct { db.recordPrefixes(reading: normalizedInput, output: selected) }
+            if !isDateTime && !isNumber && !isPunct {
+                let reading = resolvedHistoryReading(userReading: normalizedInput, inputKey: inputKey, output: selected)
+                db.recordPrefixes(reading: reading, output: selected)
+            }
             let conv = azooKeyConverter; let r = inputKey; let t = selected
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
             commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
@@ -253,6 +256,16 @@ public struct InputHandler {
             if !isPunct { db.recordPrefixes(reading: normalizedInput, output: inputKey) }
             commitText(text: inputKey, client: client)
         }
+    }
+
+    /// prefix-focus で短い読みで確定した場合に canonical reading（AzooKey のキャッシュ ruby）を返す。
+    /// `userReading` が canonical の前方一致になっているときのみ置き換える。
+    func resolvedHistoryReading(userReading: String, inputKey: String, output: String) -> String {
+        guard let canonical = azooKeyConverter.canonicalReading(for: inputKey, text: output),
+              DatabaseManager.isReadingPrefix(userReading, of: canonical) else {
+            return userReading
+        }
+        return canonical
     }
 
     // MARK: - 共通ヘルパー（extension からも参照される）

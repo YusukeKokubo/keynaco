@@ -108,7 +108,6 @@ final class CandidateSectionBuilderTests: XCTestCase {
         )
         let l = layout(from: input)
         XCTAssertEqual(l.candidates.filter { $0 == "感じる" }.count, 1, "履歴に載る語は辞書と重複しない")
-        XCTAssertTrue(l.candidates.prefix(l.historyEnd).contains("感じる"))
         XCTAssertEqual(l.candidates.filter { $0 == "漢字" }.count, 1)
     }
 
@@ -122,7 +121,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
         )
         let l = layout(from: input)
         XCTAssertFalse(builtSectionsContainKind(.fixedHiragana, input: input))
-        XCTAssertEqual(l.candidates, ["の", "辞書A", "辞書B", "ノ"])
+        XCTAssertEqual(l.candidates, ["辞書A", "辞書B", "の", "ノ"])
     }
 
     func testWhileTypingDefaultFixed() {

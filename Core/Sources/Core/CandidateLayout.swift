@@ -47,23 +47,24 @@ struct CandidateLayout: Sendable {
         .fixedHiragana, .userDict,
     ]
 
+    /// 読み完全一致の履歴なし。辞書候補を前方一致履歴より優先する。
     static let defaultSectionOrder: [CandidateSection.Kind] = [
         .fixedHiragana,
         .userDict,
-        .highHistory,
         .number, .dateTime,
         .azooKeyDict,
+        .highHistory,
         .katakana,
     ]
 
-    /// 読み完全一致の履歴あり。固定枠の直後に exact / その他履歴を出す。
+    /// 読み完全一致の履歴あり。固定枠の直後に exactMatch を出し、辞書の後ろに前方一致履歴を置く。
     static let exactMatchFirstSectionOrder: [CandidateSection.Kind] = [
         .fixedHiragana,
         .userDict,
         .exactMatchHistory,
-        .highHistory,
         .number, .dateTime,
         .azooKeyDict,
+        .highHistory,
         .katakana,
     ]
 
@@ -90,7 +91,7 @@ struct CandidateLayout: Sendable {
             if Self.fixedSectionKinds.contains(kind) {
                 fixedEndAcc = result.count
             }
-            if kind == .exactMatchHistory || kind == .highHistory {
+            if kind == .exactMatchHistory {
                 historyEndAcc = result.count
             }
         }

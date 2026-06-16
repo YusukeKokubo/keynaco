@@ -289,6 +289,21 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
     }
 
+    /// キャッシュから候補の canonical reading（各 data 要素の ruby を連結）を返す。
+    /// prefix-focus で短い読みで確定した場合に、本来の読みで履歴を保存するために使う。
+    /// キャッシュミス（未変換 or キャッシュ evict 済み）の場合は nil。
+    public func canonicalReading(for reading: String, text: String) -> String? {
+        locked.withLock { _ in
+            for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
+                if let candidate = candidates.first(where: { $0.text == text }) {
+                    let ruby = candidate.data.map(\.ruby).joined()
+                    return ruby.isEmpty ? nil : ruby
+                }
+            }
+            return nil
+        }
+    }
+
     /// `cacheKey` の先頭セグメント（`|` より前）を読みとして取り出す。
     private static func cacheSegment(fromCacheKey key: String) -> String {
         guard let idx = key.firstIndex(of: "|") else { return key }

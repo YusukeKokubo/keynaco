@@ -19,7 +19,8 @@ extension InputHandler {
             let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
             let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
             if !isDateTime && !isNumber {
-                db.recordPrefixes(reading: normalizedInput, output: selected)
+                let reading = resolvedHistoryReading(userReading: normalizedInput, inputKey: inputKey, output: selected)
+                db.recordPrefixes(reading: reading, output: selected)
             }
             let conv = azooKeyConverter; let r = inputKey; let t = selected
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
