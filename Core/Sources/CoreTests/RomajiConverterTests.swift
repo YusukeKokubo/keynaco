@@ -75,8 +75,11 @@ final class RomajiConverterTests: XCTestCase {
     }
 
     func testNN() {
-        assertConvert("nn", converted: "ん", pending: "n")
-        assertConvert("kanna", converted: "かんな", pending: "")
+        assertConvert("nn", converted: "ん", pending: "")
+        assertConvert("nnna", converted: "んな", pending: "")
+        assertConvert("nnn", converted: "ん", pending: "n")
+        assertConvert("nnny", converted: "ん", pending: "ny")
+        assertConvert("nnnya", converted: "んにゃ", pending: "")
     }
 
     func testNAlone() {
@@ -140,7 +143,7 @@ final class RomajiConverterTests: XCTestCase {
     }
 
     func testLongSentence() {
-        assertConvert("konnichiwa", converted: "こんにちわ", pending: "")
+        assertConvert("konnnichiwa", converted: "こんにちわ", pending: "")
     }
 
     func testHyphenToLongVowel() {

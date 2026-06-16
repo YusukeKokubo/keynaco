@@ -2,33 +2,16 @@ import AppKit
 
 /// InputController から分離した純粋な状態遷移ロジック。
 /// IMK ランタイムに依存しないため、ユニットテストで検証可能。
-///
-/// ## `hiddenPendingN` のライフサイクル（本 struct 内のみ set/clear）
-///
-/// | 操作 | 箇所 |
-/// |------|------|
-/// | **set `true`** | `addRomaji` — `"nn"` → `ん` + pending `"n"` 検出時 |
-/// | **clear `false`** | `absorbPendingIntoComposed`、`addRomaji` の hidden-n 分岐、`backspace`、`reset` |
 public struct CompositionState {
-
-    /// "nn" 後の hidden n を保持すべき入力。
-    /// 母音: "na/ni/nu/ne/no" になるよう n と組み合わせる（標準IME準拠: kanna→かんな、hanni→はんに）。
-    /// y: "nyu/nya" 等の拗音を拾うため。
-    /// n: 3つ目の n を新しい pending として受ける。
-    private static let hiddenNKeepFollowers: Set<Character> = ["a", "i", "u", "e", "o", "y", "n"]
 
     public init() {}
 
     public var composedHiragana = ""
     public var pendingRomaji = ""
-    // "nn" → "ん" + pending "n" の状態。"n" は表示・確定に含めず、次の母音と組み合わせる。
-    // 標準IME準拠: "nn" 後は "ん" のみ表示し、続けて "ni" と打てば "んに" になる。
-    public var hiddenPendingN = false
 
     /// ユーザーが現在打っている読み全体。マークドテキストの表示にも使う。
-    /// `hiddenPendingN` のときは非表示の pending "n" を除いた `composedHiragana` のみを返す。
     public var composingText: String {
-        hiddenPendingN ? composedHiragana : composedHiragana + pendingRomaji
+        composedHiragana + pendingRomaji
     }
 
     /// 組成中（未確定テキストあり）。`composingText` が空でないとき true。
@@ -36,27 +19,20 @@ public struct CompositionState {
 
     /// 確定時のテキストを返す（pending の "n" → "ん" 等を含む）
     public var finalizedText: String {
-        // hiddenPendingN のとき pending "n" は捨てる（"nn" 後の確定は "ん" 1つ）
-        hiddenPendingN ? composedHiragana : composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
+        composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
     }
 
     /// Space 確定前など、`absorbPendingIntoComposed` 後の `composedHiragana` を非破壊で見積もる。
     public func composedHiraganaAfterAbsorbingPending() -> String {
         guard !pendingRomaji.isEmpty else { return composedHiragana }
-        if hiddenPendingN { return composedHiragana }
         return composedHiragana + RomajiConverter.forceFinalize(pendingRomaji)
     }
 
-    /// `pendingRomaji` を `composedHiragana` へ取り込む。`hiddenPendingN` のときは `finalizedText` と同じく捨てるだけ。
+    /// `pendingRomaji` を `composedHiragana` へ取り込む。
     public mutating func absorbPendingIntoComposed() {
         guard !pendingRomaji.isEmpty else { return }
-        if hiddenPendingN {
-            pendingRomaji = ""
-            hiddenPendingN = false
-        } else {
-            composedHiragana += RomajiConverter.forceFinalize(pendingRomaji)
-            pendingRomaji = ""
-        }
+        composedHiragana += RomajiConverter.forceFinalize(pendingRomaji)
+        pendingRomaji = ""
     }
 
     /// ローマ字を追加してひらがなに変換する。
@@ -70,28 +46,10 @@ public struct CompositionState {
         if !isRomajiChar && !pendingRomaji.isEmpty {
             absorbPendingIntoComposed()
         }
-        // "nn" 後の hidden n の扱い:
-        // - n が続く: hidden n を破棄して新しい n を受ける（konnna 対策）
-        // - 子音（母音/y/n 以外）が続く: typo 許容として hidden n を破棄（hennkann... 対策）
-        if hiddenPendingN {
-            let incoming = chars.lowercased()
-            if incoming == "n" {
-                pendingRomaji = ""
-                hiddenPendingN = false
-            } else if incoming.count == 1,
-                      let ch = incoming.first,
-                      ch >= "a", ch <= "z",
-                      !Self.hiddenNKeepFollowers.contains(ch) {
-                pendingRomaji = ""
-                hiddenPendingN = false
-            }
-        }
         pendingRomaji += chars
         let result = RomajiConverter.convert(pendingRomaji)
         composedHiragana += result.converted
         pendingRomaji = result.pending
-        // "nn" → "ん" + pending "n" のとき非表示フラグを立てる
-        hiddenPendingN = result.pending == "n" && result.converted.hasSuffix("ん")
         return composedHiragana.count >= 2
     }
 
@@ -100,12 +58,7 @@ public struct CompositionState {
     ///   handled=false は未確定文字列が空だった場合
     public mutating func backspace() -> (handled: Bool, candidateRefreshNeeded: Bool) {
         guard isComposing else { return (false, false) }
-        if hiddenPendingN {
-            // "nn" → "ん"(表示) の状態: pending "n" と直前の "ん" をまとめて1操作で削除
-            pendingRomaji = ""
-            hiddenPendingN = false
-            composedHiragana.removeLast()
-        } else if !pendingRomaji.isEmpty {
+        if !pendingRomaji.isEmpty {
             pendingRomaji.removeLast()
         } else {
             composedHiragana.removeLast()
@@ -119,7 +72,6 @@ public struct CompositionState {
         guard isComposing else { return false }
         composedHiragana = ""
         pendingRomaji = ""
-        hiddenPendingN = false
         return true
     }
 

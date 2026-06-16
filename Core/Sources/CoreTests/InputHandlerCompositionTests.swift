@@ -262,27 +262,34 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
     }
 
     func testNNShowsNWithoutPending() {
-        // 標準IME準拠: "nn" 後は "ん" のみ表示（pending "n" は非表示）
         typeRomaji("nn")
         XCTAssertEqual(client.markedText, "ん")
     }
 
     func testNNThenVowelFinalizesN() {
-        // 標準IME準拠: "nn" 後に母音が来ると hidden n と組んでナ行になる
-        typeRomaji("nna")
+        typeRomaji("nnna")
         XCTAssertEqual(client.markedText, "んな")
     }
 
     func testKonnnaProducesKonna() {
-        // "konnna": nn→ん (hidden n)、3つ目のn でhidden nをクリアして新しいpendingに、na→な
+        // "konnna": nn→ん、3つ目の n + na→な
         typeRomaji("konnna")
         XCTAssertEqual(client.markedText, "こんな")
     }
 
     func testKonnichiwa() {
-        // 標準IME準拠: "konnichiwa" → "こんにちわ"（hidden n が i と組んで「に」になる）
-        typeRomaji("konnichiwa")
+        typeRomaji("konnnichiwa")
         XCTAssertEqual(client.markedText, "こんにちわ")
+    }
+
+    func testKonnyakuProducesKonyaku() {
+        typeRomaji("konnyaku")
+        XCTAssertEqual(client.markedText, "こんやく")
+    }
+
+    func testKonnnyakuProducesKonnyaku() {
+        typeRomaji("konnnyaku")
+        XCTAssertEqual(client.markedText, "こんにゃく")
     }
 
     func testNBeforeVowelDoesNotProduceN() {

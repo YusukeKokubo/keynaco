@@ -65,28 +65,40 @@ final class CompositionStateTests: XCTestCase {
         XCTAssertEqual(s.pendingRomaji, "")
     }
 
-    func testAddRomajiNNBeforeVowelKeepsPendingN() {
-        // 標準IME準拠: "nn" 後に母音が来たとき、hidden n は母音と組んでナ行になる。
-        // "kanna" → "かんな"（"かんあ" にはならない）
+    func testAddRomajiTripleNBeforeVowelGivesNa() {
+        // "nn" は両方消費して ん。ナ行は 3 つ目の n が必要。
+        // "kannna" → "かんな"（"kanna" → "かんあ"）
         var s = CompositionState()
-        "kanna".forEach { _ = s.addRomaji(String($0)) }
+        "kannna".forEach { _ = s.addRomaji(String($0)) }
         XCTAssertEqual(s.composedHiragana, "かんな")
         XCTAssertEqual(s.pendingRomaji, "")
     }
 
-    func testAddRomajiNNBeforeIGivesNI() {
-        // 標準IME準拠: "hanni" → "はんに"
+    func testAddRomajiTripleNBeforeIGivesNI() {
+        // "hannni" → "はんに"（"hanni" → "はんい"）
         var s = CompositionState()
-        "hanni".forEach { _ = s.addRomaji(String($0)) }
+        "hannni".forEach { _ = s.addRomaji(String($0)) }
         XCTAssertEqual(s.composedHiragana, "はんに")
         XCTAssertEqual(s.pendingRomaji, "")
     }
 
-    func testAddRomajiNNBeforeYouonKeepsPendingN() {
-        // "hannya" → "はんにゃ"（般若: y は hiddenNKeepFollowers に残すので拗音になる）
+    func testAddRomajiTripleNBeforeYouon() {
+        // 拗音は 3 つ目の n が必要: "hannnya" → "はんにゃ"
         var s = CompositionState()
-        "hannya".forEach { _ = s.addRomaji(String($0)) }
+        "hannnya".forEach { _ = s.addRomaji(String($0)) }
         XCTAssertEqual(s.composedHiragana, "はんにゃ")
+        XCTAssertEqual(s.pendingRomaji, "")
+    }
+
+    func testAddRomajiKonnyakuVsKonnnyaku() {
+        var s = CompositionState()
+        "konnyaku".forEach { _ = s.addRomaji(String($0)) }
+        XCTAssertEqual(s.composedHiragana, "こんやく")
+        XCTAssertEqual(s.pendingRomaji, "")
+
+        s = CompositionState()
+        "konnnyaku".forEach { _ = s.addRomaji(String($0)) }
+        XCTAssertEqual(s.composedHiragana, "こんにゃく")
         XCTAssertEqual(s.pendingRomaji, "")
     }
 
@@ -183,16 +195,15 @@ final class CompositionStateTests: XCTestCase {
 
     // MARK: - absorbPendingIntoComposed
 
-    func testAbsorbPendingIntoComposedAfterNNDiscardsHiddenN() {
+    func testAbsorbPendingIntoComposedAfterNN() {
         var s = CompositionState()
         _ = s.addRomaji("n")
         _ = s.addRomaji("n")
-        XCTAssertTrue(s.hiddenPendingN)
         XCTAssertEqual(s.composedHiragana, "ん")
+        XCTAssertEqual(s.pendingRomaji, "")
         s.absorbPendingIntoComposed()
         XCTAssertEqual(s.composedHiragana, "ん")
         XCTAssertEqual(s.pendingRomaji, "")
-        XCTAssertFalse(s.hiddenPendingN)
     }
 
     func testAbsorbPendingIntoComposedForceFinalizesWhenNotHidden() {
@@ -200,7 +211,6 @@ final class CompositionStateTests: XCTestCase {
         _ = s.addRomaji("k")
         _ = s.addRomaji("a")
         _ = s.addRomaji("n")
-        XCTAssertFalse(s.hiddenPendingN)
         s.absorbPendingIntoComposed()
         XCTAssertEqual(s.composedHiragana, "かん")
         XCTAssertEqual(s.pendingRomaji, "")

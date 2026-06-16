@@ -154,14 +154,22 @@ struct RomajiConverter {
                 }
             }
 
-            // "n" + 子音(y,n以外) → ん
+            // "nn" → ん（両方消費）。3 つ目以降の n は pending として残す（konnnyaku→こんにゃく）
+            // "n" + 子音(y,n 以外) → ん
             if remaining.count >= 2 {
                 let first = remaining[remaining.startIndex]
                 let second = remaining[remaining.index(after: remaining.startIndex)]
-                if first == "n" && !nExceptions.contains(second) {
-                    converted += "ん"
-                    remaining.removeFirst()
-                    continue
+                if first == "n" {
+                    if second == "n" {
+                        converted += "ん"
+                        remaining.removeFirst(2)
+                        continue
+                    }
+                    if !nExceptions.contains(second) {
+                        converted += "ん"
+                        remaining.removeFirst()
+                        continue
+                    }
                 }
             }
 

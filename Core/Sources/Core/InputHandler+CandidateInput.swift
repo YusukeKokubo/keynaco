@@ -7,7 +7,7 @@ extension InputHandler {
     @discardableResult
     mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         guard state.isComposing else { return .none }
-        let hasTrailingRomaji = !state.pendingRomaji.isEmpty && !state.hiddenPendingN
+        let hasTrailingRomaji = !state.pendingRomaji.isEmpty
         if !candidate.isExplicitlySelected, hasTrailingRomaji {
             commitComposition(client: client, candidate: .hidden, trigger: .enter)
             return .dismiss
