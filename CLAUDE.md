@@ -154,6 +154,15 @@ fast + slow 両方（CI・リリース前）:
 - **E2E 動作確認**: 状態（Bracket モード等）に依存する機能変更後は `/keynaco-ime-sandbox` スキルで実機相当の検証を行う（ユニットテストだけではパイプラインのタイミングバグを見逃す）。sandbox で通常文字を送るには `{"type_string": "k"}` を使う（`{"key": "k"}` は特殊キーのみ有効）
 - **prefix focus / 履歴シードの sandbox**: `type_string` → `wait_azoo_key` → `state` で `selectedText` を見る（`seed_history` は `pos`/`lcid` 無し。final を `wait_azoo_key` だけにしない）
 
+## ローマ字分解（エージェント向け）
+
+**正本**: `RomajiConverter` + `Core/Sources/CoreTests/`（`InputHandlerCompositionTests.testKonnyakuProducesKonyaku` 等）。分解規則を OS 名・「標準 IME 準拠」で正当化しない。
+
+- **`nn` は両方の `n` を消費して `ん`**。`hiddenPendingN`（非表示 pending `n`）は不採用（[`docs/rejected.md` R-1](docs/rejected.md)）。
+- **表記 ≠ 打鍵列**: Web の Hepburn 表記（例: こんにゃくの英字 `konnyaku`）と、IME への打鍵を 1 文字ずつ分解した結果は別物。
+- **変更・説明前に trace する**: `konnyaku` → `k+o=こ` / `n+n=ん` / `y+a=や` / `k+u=く` → **こんやく**（婚約）。この反例を壊さない。
+- **やってはいけない**: 特定 OS/製品 IME の挙動を未検証で断定する、表記から打鍵結果を推論する、Converter の `pending` 実装を「IME の内部状態」と述べる。
+
 ## キー入力の挙動（特殊ケース）
 
 - **`InputController` での `handler` フィールド書き換えのタイミング**: `handle()` 内で同一ターン中に読む値は書き換え前の値（pre）を変数に退避してから使うこと。書き換え後の値が次キー以降のみ参照される場合は post 書きでよいが、混在するとサイレントに1キー遅延バグになる（実績あり）。
