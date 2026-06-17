@@ -79,6 +79,16 @@ label は `TypingLatencyStats` か `AzooKeyConverter` に `var currentLabel: Str
 - `{"set_latency_label": "..."}` コマンドで `latencyStats.currentLabel` を更新
 - `{"read_latency_log": true}` コマンドで直近 20 行を返す（LLM 分析用）
 
+## ファイル vs SQLite の判断
+
+SQLite（`DatabaseManager` に追加）ではなく JSONL ファイルを選ぶ理由:
+
+- **LLM への渡しやすさ**: JSONL は Read ツールやデバッグソケットの `read_latency_log` でそのまま貼り付けられる。SQLite は直接読めないため tooling が一枚増える
+- **append-only の性質**: セッションごとに1行追記するだけで更新・削除が不要。SQL の得意なパターンではなく、むしろファイルの方が自然
+- **既存 DB との分離**: `DatabaseManager` は history / user dict という「ユーザーが意図的に作ったデータ」を保持する。観測用数値を混ぜるとスキーマ変更時に巻き込まれるリスクがある
+
+SQLite が有利になるのは「数百セッション分を複雑な条件でクエリしたい」場面だが、before/after 比較が主用途であれば数十行の JSONL を LLM に渡す方が速い。今の用途規模では SQLite は過剰。
+
 ## 既存コードの活用
 
 | 既存コード | 活用方法 |
