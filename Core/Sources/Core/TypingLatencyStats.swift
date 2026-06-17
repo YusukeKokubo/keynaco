@@ -28,6 +28,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
         public let fetchP95ZenzaiOffMs: Double?
         public let missRateByReadingLen: [String: Double]
         public let missCountByReadingLen: [String: Int]
+        public let fetchP95ByReadingLen: [String: Double]
         public let candidateConfirmations: Int
         public let firstCandidateRate: Double?
         public let selectionDepthP50: Int?
@@ -51,6 +52,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
             if let fetchP95ZenzaiOffMs { dict["fetch_p95_zenzai_off"] = fetchP95ZenzaiOffMs }
             if !missRateByReadingLen.isEmpty { dict["miss_rate_by_reading_len"] = missRateByReadingLen }
             if !missCountByReadingLen.isEmpty { dict["miss_count_by_reading_len"] = missCountByReadingLen }
+            if !fetchP95ByReadingLen.isEmpty { dict["fetch_p95_by_reading_len"] = fetchP95ByReadingLen }
             if candidateConfirmations > 0 { dict["candidate_confirmations"] = candidateConfirmations }
             if let firstCandidateRate { dict["first_candidate_rate"] = firstCandidateRate }
             if let selectionDepthP50 { dict["selection_depth_p50"] = selectionDepthP50 }
@@ -72,6 +74,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
     private var interKeyDurationsMs: [Double] = []
     private var peeksByReadingLenBucket: [Int: Int] = [:]
     private var missesByReadingLenBucket: [Int: Int] = [:]
+    private var fetchDurationsMsByReadingLen: [Int: [Double]] = [:]
     private var confirmationDepths: [Int] = []
     private var currentLabelStorage: String?
     private var lastFlushedAt: Date?
@@ -100,13 +103,17 @@ public final class TypingLatencyStats: @unchecked Sendable {
         }
     }
 
-    public func recordFetch(ms: Double, zenzaiEnabled: Bool = false) {
+    public func recordFetch(ms: Double, zenzaiEnabled: Bool = false, readingLength: Int = 0) {
         lock.withLock {
             fetchDurationsMs.append(ms)
             if zenzaiEnabled {
                 fetchDurationsZenzaiOnMs.append(ms)
             } else {
                 fetchDurationsZenzaiOffMs.append(ms)
+            }
+            if readingLength > 0 {
+                let bucket = Self.readingLenBucket(readingLength)
+                fetchDurationsMsByReadingLen[bucket, default: []].append(ms)
             }
         }
     }
@@ -246,6 +253,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
                 misses: missesByReadingLenBucket
             ),
             missCountByReadingLen: Self.missCountByReadingLen(misses: missesByReadingLenBucket),
+            fetchP95ByReadingLen: Self.fetchP95ByReadingLen(durationsByBucket: fetchDurationsMsByReadingLen),
             candidateConfirmations: sortedDepths.count,
             firstCandidateRate: firstCandidateRate,
             selectionDepthP50: Self.percentileInt(sortedDepths, p: 50),
@@ -266,6 +274,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
         interKeyDurationsMs.removeAll(keepingCapacity: false)
         peeksByReadingLenBucket.removeAll(keepingCapacity: false)
         missesByReadingLenBucket.removeAll(keepingCapacity: false)
+        fetchDurationsMsByReadingLen.removeAll(keepingCapacity: false)
         confirmationDepths.removeAll(keepingCapacity: false)
     }
 
@@ -279,6 +288,15 @@ public final class TypingLatencyStats: @unchecked Sendable {
 
     private static func missCountByReadingLen(misses: [Int: Int]) -> [String: Int] {
         misses.reduce(into: [:]) { $0[readingLenBucketKey($1.key)] = $1.value }
+    }
+
+    private static func fetchP95ByReadingLen(durationsByBucket: [Int: [Double]]) -> [String: Double] {
+        durationsByBucket.reduce(into: [:]) { result, pair in
+            let sorted = pair.value.sorted()
+            if let p95 = percentile(sorted, p: 95) {
+                result[readingLenBucketKey(pair.key)] = p95
+            }
+        }
     }
 
     private static func missRateByReadingLen(

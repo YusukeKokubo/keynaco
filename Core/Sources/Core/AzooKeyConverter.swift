@@ -225,7 +225,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
             let elapsedMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
             os_signpost(.end, log: spLog, name: "requestCandidates")
             os_log(.debug, log: spLog, "requestCandidates %.1fms %{public}s zenzai=%d", elapsedMs, hiragana, zenzaiEnabled ? 1 : 0)
-            latencyStats.recordFetch(ms: elapsedMs, zenzaiEnabled: zenzaiEnabled)
+            latencyStats.recordFetch(ms: elapsedMs, zenzaiEnabled: zenzaiEnabled, readingLength: hiragana.count)
             insertCache(key: key, value: result.mainResults)
             return Self.candidateTexts(from: result.mainResults, inputLength: inputLength)
         }
