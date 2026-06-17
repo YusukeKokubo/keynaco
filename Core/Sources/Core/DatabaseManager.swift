@@ -62,10 +62,14 @@ public final class DatabaseManager: @unchecked Sendable {
     // MARK: - セットアップ
 
     static var dbPath: String {
-        let dir = FileManager.default
+        latencyLogURL.deletingLastPathComponent().appendingPathComponent("history.db").path
+    }
+
+    static var latencyLogURL: URL {
+        FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("keynaco", isDirectory: true)
-        return dir.appendingPathComponent("history.db").path
+            .appendingPathComponent("latency_log.jsonl")
     }
 
     private func openDatabase() {

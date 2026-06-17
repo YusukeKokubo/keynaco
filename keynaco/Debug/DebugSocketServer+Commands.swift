@@ -532,6 +532,31 @@ extension DebugSocketServer {
         return Self.finalize(["stats": snap.asDictionary()], cmd: cmd)
     }
 
+    /// `{"set_latency_label": "before-debounce-change"}` / `{"set_latency_label": null}`
+    func handleSetLatencyLabel(cmd: [String: Any]) -> [String: Any] {
+        let raw = cmd["set_latency_label"]
+        if raw is NSNull {
+            handler.azooKeyConverter.latencyStats.currentLabel = nil
+            return Self.finalize(["ok": true, "label": NSNull()], cmd: cmd)
+        }
+        guard let label = raw as? String else {
+            return Self.finalize(["error": "set_latency_label must be a string or null"], cmd: cmd)
+        }
+        handler.azooKeyConverter.latencyStats.currentLabel = label
+        return Self.finalize(["ok": true, "label": label], cmd: cmd)
+    }
+
+    /// `{"read_latency_log": true}` → 直近 20 行の JSONL を返す。
+    func handleReadLatencyLog(cmd: [String: Any]) -> [String: Any] {
+        let fileURL = DatabaseManager.latencyLogURL
+        let lines = TypingLatencyStats.readRecentLines(from: fileURL)
+        return Self.finalize([
+            "lines": lines,
+            "path": fileURL.path,
+            "count": lines.count,
+        ], cmd: cmd)
+    }
+
     /// `{"pos_backfill": true}` → 未分類 history を全件再分類。
     /// `{"pos_backfill": {"limit": 100}}` → 最大 100 output まで。
     func handlePosBackfill(cmd: [String: Any]) -> [String: Any] {

@@ -760,6 +760,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static let knownCommandKeys: Set<String> = [
         "reset", "state", "get_log", "annotate", "stats",
+        "set_latency_label", "read_latency_log",
         "wait_until", "wait_azoo_key", "assert_eventually", "seed_history",
         "set_surrounding", "set_left_context",
         "benchmark",
@@ -1022,6 +1023,8 @@ final class DebugSocketServer: @unchecked Sendable {
         if cmd["pos_availability"] != nil { return handlePosAvailability(cmd: cmd) }
         if cmd["pos_backfill"] != nil { return handlePosBackfill(cmd: cmd) }
         if cmd["stats"] != nil { return handleStats(cmd: cmd) }
+        if cmd.keys.contains("set_latency_label") { return handleSetLatencyLabel(cmd: cmd) }
+        if cmd["read_latency_log"] != nil { return handleReadLatencyLog(cmd: cmd) }
         if cmd["set_surrounding"] is [String: Any] { return handleSetSurrounding(cmd: cmd) }
         if cmd["set_left_context"] is String { return handleSetLeftContext(cmd: cmd) }
         if cmd["benchmark"] is [String: Any] { return await handleBenchmarkAsync(cmd: cmd) }

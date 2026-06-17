@@ -127,6 +127,11 @@ class InputController: IMKInputController, @unchecked Sendable {
         cancelAzooKeyAsyncWork()
         handler.flushDiaryBuffer()
         commitComposition(sender)
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        handler.azooKeyConverter.latencyStats.appendToLog(
+            fileURL: DatabaseManager.latencyLogURL,
+            appVersion: version
+        )
         super.deactivateServer(sender)
     }
 
