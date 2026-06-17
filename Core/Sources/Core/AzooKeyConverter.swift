@@ -51,7 +51,8 @@ public final class AzooKeyConverter: @unchecked Sendable {
     var candidateCacheCount: Int { candidateCache.count }
 
     private static func cacheKey(segment: String, leftSideContext: String?, richCandidates: Bool) -> String {
-        let ctx = leftSideContext ?? ""
+        // 読み2文字以下はZenzaiの文脈効果がほぼなく、文脈をキーに含めるとミス率が急増するため除外する
+        let ctx = segment.count <= 2 ? "" : (leftSideContext ?? "")
         return richCandidates ? "\(segment)|\(ctx)|rich" : "\(segment)|\(ctx)"
     }
 
@@ -166,14 +167,12 @@ public final class AzooKeyConverter: @unchecked Sendable {
             recordCachePeek(hiragana: hiragana, peek: peek)
             return peek
         }
-        let ctx = leftSideContext ?? ""
-        let keySuffix = richCandidates ? "|\(ctx)|rich" : "|\(ctx)"
         var bestPrefix: String?
         var bestCandidates: [Candidate]?
         for key in candidateCacheKeys.reversed() {
-            guard key.hasSuffix(keySuffix) else { continue }
             let segment = Self.cacheSegment(fromCacheKey: key)
             guard segment.count < hiragana.count, hiragana.hasPrefix(segment) else { continue }
+            guard key == Self.cacheKey(segment: segment, leftSideContext: leftSideContext, richCandidates: richCandidates) else { continue }
             if let current = bestPrefix, segment.count <= current.count { continue }
             bestPrefix = segment
             bestCandidates = candidateCache[key]

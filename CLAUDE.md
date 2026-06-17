@@ -147,6 +147,10 @@ fast + slow 両方（CI・リリース前）:
 - `whileTypingInitialRow`: 閾値未満の前方一致履歴は初期行からスキップ。フォーカス可能行がなければ dismiss
 - 記録: `plans/PLAN260614-prefix-focus-mora-thresholds.md`
 
+## パフォーマンス計測
+
+Instruments によるプロファイリングは IME では実用的でない（UI にフォーカスが奪われ自然な打鍵ができない）。`latency_log.jsonl`（`~/Library/Application Support/keynaco/latency_log.jsonl`）への in-process 記録が唯一の実用手段。Claude Code からそのまま読んで分析できる。
+
 ## テスト方針
 
 - `InputHandler`（純粋 Swift struct）+ `MockTextClient` でユニットテストする
