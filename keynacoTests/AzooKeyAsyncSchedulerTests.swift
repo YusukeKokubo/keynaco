@@ -79,6 +79,7 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
 
 private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {
     var isZenzaiEnabled: Bool { false }
+    let latencyStats = TypingLatencyStats()
     private(set) var lastRichCandidates: Bool?
     private(set) var requestCount = 0
 

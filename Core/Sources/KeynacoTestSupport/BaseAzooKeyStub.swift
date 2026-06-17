@@ -8,6 +8,7 @@ import Foundation
 /// このクラスだけ更新すれば既存モックはコンパイル可能なまま。
 class BaseAzooKeyStub: AzooKeyConverting, @unchecked Sendable {
     var isZenzaiEnabled: Bool = false
+    let latencyStats = TypingLatencyStats()
 
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
         _ = (hiragana, leftSideContext, richCandidates)

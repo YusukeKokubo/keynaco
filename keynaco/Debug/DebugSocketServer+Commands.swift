@@ -9,6 +9,7 @@ extension DebugSocketServer {
     func handleReset(cmd: [String: Any]) -> [String: Any] {
     cleanupSnapshot()
     cancelAzooKeyAsyncWork()
+    handler.azooKeyConverter.latencyStats.reset()
     let useRealDB = cmd["useRealDB"] as? Bool ?? false
     let converter = ZenzaiSettings.makeConverter()
     if useRealDB {
@@ -524,6 +525,11 @@ extension DebugSocketServer {
 
     func handlePosAvailability(cmd: [String: Any]) -> [String: Any] {
         Self.finalize(["availability": "available", "engine": "AzooKey"], cmd: cmd)
+    }
+
+    func handleStats(cmd: [String: Any]) -> [String: Any] {
+        let snap = handler.azooKeyConverter.latencyStats.snapshot()
+        return Self.finalize(["stats": snap.asDictionary()], cmd: cmd)
     }
 
     /// `{"pos_backfill": true}` → 未分類 history を全件再分類。

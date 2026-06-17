@@ -187,7 +187,8 @@ class InputController: IMKInputController, @unchecked Sendable {
         action: CandidateAction,
         adapter: IMKTextInputAdapter,
         composedHiraganaWasEmpty: Bool,
-        imkSenderForSurrounding: Any?
+        imkSenderForSurrounding: Any?,
+        keydownGeneration: Int
     ) {
         var newSnapshot: IMKSurroundingSnapshot?
         if composedHiraganaWasEmpty && !handler.state.composedHiragana.isEmpty {
@@ -215,6 +216,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         if consumed {
             applyCandidateWindowEffects(action: action, adapter: adapter)
         }
+        KeydownLatencySignpost.endPeekUpdate(generation: keydownGeneration)
 
         if adapter.didInsertText {
             schedulePOSClassification(
@@ -241,6 +243,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         )
         warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
         let generation = azooKeyScheduler.onKeyDown()
+        KeydownLatencySignpost.onKeyDown(generation: generation)
         let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
         let ctx = handler.candidateSession.makeContext()
         let (consumed, action) = handler.handle(
@@ -256,7 +259,8 @@ class InputController: IMKInputController, @unchecked Sendable {
             action: action,
             adapter: adapter,
             composedHiraganaWasEmpty: composedHiraganaWasEmpty,
-            imkSenderForSurrounding: imkSenderForSurrounding
+            imkSenderForSurrounding: imkSenderForSurrounding,
+            keydownGeneration: generation
         )
         scheduleAzooKeyReplacementIfNeeded(
             generation: generation,

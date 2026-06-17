@@ -1,5 +1,5 @@
 ---
-status: draft
+status: implemented
 created: 2026-06-17
 ---
 
@@ -47,14 +47,14 @@ os_log(.debug, log: spLog, "cachePeek %{public}s → %{public}s", hiragana, peek
 
 ### 2. end-to-end signpost（中コスト）
 
-`InputController.runKeyDown` の先頭と `applyCandidateWindowEffects` に `os_signpost` の begin/end を追加する。Instruments の「Points of Interest」で A→D の分布が見られるようになる。
+defer 経路では `applyCandidateWindowEffects` が2回走る（peek 暫定表示と非同期 fetch 完了後）。これを1本の signpost に押し込むと「暫定表示が遅いのか fetch が遅いのか」が区別できなくなるため、**2本の signpost 名で分ける**。
 
-```
-os_signpost(.begin, "keydown→candidate", キー識別子)  // runKeyDown 先頭
-os_signpost(.end,   "keydown→candidate", キー識別子)  // applyCandidateWindowEffects 内
-```
+| signpost 名 | begin | end |
+|------------|-------|-----|
+| `peekUpdate` | `runKeyDown` 先頭 | 最初の `applyCandidateWindowEffects`（peek 暫定表示） |
+| `fetchComplete` | `runKeyDown` 先頭 | 非同期 `rebuildCandidateList` コールバック後の `applyCandidateWindowEffects` |
 
-`generation` をキー識別子に使えば非同期コールバック側の end も正しく打てる。
+`generation`（`AzooKeyAsyncScheduler.candidateGeneration`）をキー識別子に使うことで、非同期コールバックの end を正しい begin に対応させられる。キャッシュ完全ヒット時は `fetchComplete` の end が発火しないため、`peekUpdate` のみの分布として Instruments に現れる。
 
 ### 3. ローリング統計 + debug socket クエリ（中コスト）
 

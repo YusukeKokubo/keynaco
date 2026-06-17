@@ -21,6 +21,7 @@ final class AzooKeyRichPrefetchCacheTests: XCTestCase {
 
 private final class MockAzooKeyRichPrefetch: AzooKeyConverting, @unchecked Sendable {
     var isZenzaiEnabled: Bool { false }
+    let latencyStats = TypingLatencyStats()
     private(set) var requestCount = 0
     private var cache: [String: [String]] = [:]
 

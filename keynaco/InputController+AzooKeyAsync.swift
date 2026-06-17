@@ -27,6 +27,7 @@ extension InputController {
         adapter: IMKTextInputAdapter
     ) {
         guard consumed, let reading = handler.pendingAzooKeyReading else { return }
+        KeydownLatencySignpost.beginFetchComplete(generation: generation)
         let leftContext = handler.leftContext.azooKeyValue
         let converter = handler.azooKeyConverter
         let debounceNs = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
@@ -66,11 +67,18 @@ extension InputController {
             azooKeyCandidates: candidates,
             trigger: .whileTyping
         )
-        if case .none = action { return }
-        applyAsyncAzooKeyCandidateAction(action: action, adapter: adapter)
+        if case .none = action {
+            KeydownLatencySignpost.endFetchComplete(generation: generation)
+            return
+        }
+        applyAsyncAzooKeyCandidateAction(action: action, adapter: adapter, generation: generation)
     }
 
-    func applyAsyncAzooKeyCandidateAction(action: CandidateAction, adapter: IMKTextInputAdapter) {
+    func applyAsyncAzooKeyCandidateAction(
+        action: CandidateAction,
+        adapter: IMKTextInputAdapter,
+        generation: Int
+    ) {
         let wasVisible = handler.candidateSession.isVisible
         let previousSelectedRow = handler.candidateSession.selectedRow
         let previousSelectedText = handler.candidateSession.selectedText
@@ -90,5 +98,6 @@ extension InputController {
             adapter: adapter,
             preferInPlaceRefresh: wasVisible
         )
+        KeydownLatencySignpost.endFetchComplete(generation: generation)
     }
 }

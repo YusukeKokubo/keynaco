@@ -1,6 +1,8 @@
 public protocol AzooKeyConverting: AnyObject, Sendable {
     /// ユーザー設定の Zenzai 有効フラグ。モデルの実ロード状態は反映しない（ベストエフォート）。
     var isZenzaiEnabled: Bool { get }
+    /// 打鍵レイテンシ計測（`AzooKeyConverter` のみ実値。スタブは独立インスタンス）。
+    var latencyStats: TypingLatencyStats { get }
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String]
     /// `candidateCache` の同期参照。ヒット時は非同期取得を待たず候補に使える。
     func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek?

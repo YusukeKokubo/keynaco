@@ -12,6 +12,7 @@
 		A260612F60718293A4B5C6D05 /* DebugSocketServer+AzooKeyAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A260612F60718293A4B5C6D06 /* DebugSocketServer+AzooKeyAsync.swift */; };
 		A260612F60718293A4B5C6D01 /* AzooKeyAsyncScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A260612F60718293A4B5C6D02 /* AzooKeyAsyncScheduler.swift */; };
 		A260612F60718293A4B5C6D03 /* InputController+AzooKeyAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A260612F60718293A4B5C6D04 /* InputController+AzooKeyAsync.swift */; };
+		B260617B60718293A4B5C6D01 /* KeydownLatencySignpost.swift in Sources */ = {isa = PBXBuildFile; fileRef = B260617B60718293A4B5C6D02 /* KeydownLatencySignpost.swift */; };
 		A1B2C3D4E5F6071829ABCD01 /* DebugPOSClassifierV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */; };
 		D0A1B2C3D4E5F60718293A03 /* DebugSocketServer+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */; };
 		D0A1B2C3D4E5F60718293A05 /* SocketMockClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */; };
@@ -69,6 +70,7 @@
 		3A755C9097E561BF05FF3D11 /* InputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputController.swift; sourceTree = "<group>"; };
 		A260612F60718293A4B5C6D02 /* AzooKeyAsyncScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyAsyncScheduler.swift; sourceTree = "<group>"; };
 		A260612F60718293A4B5C6D04 /* InputController+AzooKeyAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+AzooKeyAsync.swift"; sourceTree = "<group>"; };
+		B260617B60718293A4B5C6D02 /* KeydownLatencySignpost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeydownLatencySignpost.swift; sourceTree = "<group>"; };
 		A260612F60718293A4B5C6D06 /* DebugSocketServer+AzooKeyAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+AzooKeyAsync.swift"; sourceTree = "<group>"; };
 		8D4E3F204152637485B6C7D8 /* InputController+LLM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+LLM.swift"; sourceTree = "<group>"; };
 		E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InputController+IMKAdapter.swift"; sourceTree = "<group>"; };
@@ -145,6 +147,7 @@
 				022B67AD4C0C026C0F7A0564 /* Info.plist */,
 				A260612F60718293A4B5C6D02 /* AzooKeyAsyncScheduler.swift */,
 				3A755C9097E561BF05FF3D11 /* InputController.swift */,
+				B260617B60718293A4B5C6D02 /* KeydownLatencySignpost.swift */,
 				A260612F60718293A4B5C6D04 /* InputController+AzooKeyAsync.swift */,
 				C3D4E5F60718293A4B5C6D02 /* InputController+Debug.swift */,
 				E5F60718293A4B5C6D7E8F0A /* InputController+IMKAdapter.swift */,
@@ -376,6 +379,7 @@
 				9D8C79D665B585F63D5695FF /* IMESandboxWindow.swift in Sources */,
 				A260612F60718293A4B5C6D01 /* AzooKeyAsyncScheduler.swift in Sources */,
 				E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */,
+				B260617B60718293A4B5C6D01 /* KeydownLatencySignpost.swift in Sources */,
 				A260612F60718293A4B5C6D03 /* InputController+AzooKeyAsync.swift in Sources */,
 				C3D4E5F60718293A4B5C6D01 /* InputController+Debug.swift in Sources */,
 				A260612F60718293A4B5C6D05 /* DebugSocketServer+AzooKeyAsync.swift in Sources */,

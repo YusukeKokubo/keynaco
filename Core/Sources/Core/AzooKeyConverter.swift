@@ -43,6 +43,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
 
     /// ユーザー設定の Zenzai 有効フラグ。モデル URL 未取得などで実リランキングがフォールバックしていても `true` になり得る（ベストエフォート。プロモート行は辞書 top-1）。
     public var isZenzaiEnabled: Bool { zenzaiEnabled }
+    public let latencyStats = TypingLatencyStats()
     private let zenzaiProfile: String
     private let zenzaiInferenceLimit: Int
     private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }
@@ -161,7 +162,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
         if let cached = candidateCache[exactKey] {
             let texts = Self.candidateTexts(from: cached, inputLength: hiragana.count)
             guard !texts.isEmpty else { return nil }
-            return AzooKeyCachePeek(candidates: texts, match: .exact)
+            let peek = AzooKeyCachePeek(candidates: texts, match: .exact)
+            recordCachePeek(hiragana: hiragana, peek: peek)
+            return peek
         }
         let ctx = leftSideContext ?? ""
         let keySuffix = richCandidates ? "|\(ctx)|rich" : "|\(ctx)"
@@ -178,9 +181,32 @@ public final class AzooKeyConverter: @unchecked Sendable {
         if let segment = bestPrefix, let cached = bestCandidates {
             let texts = Self.candidateTexts(from: cached, inputLength: segment.count)
             guard !texts.isEmpty else { return nil }
-            return AzooKeyCachePeek(candidates: texts, match: .prefix(sourceReading: segment))
+            let peek = AzooKeyCachePeek(candidates: texts, match: .prefix(sourceReading: segment))
+            recordCachePeek(hiragana: hiragana, peek: peek)
+            return peek
         }
+        recordCachePeek(hiragana: hiragana, peek: nil)
         return nil
+    }
+
+    private func recordCachePeek(hiragana: String, peek: AzooKeyCachePeek?) {
+        let label: String
+        let kind: TypingLatencyStats.CachePeekKind
+        if let peek {
+            switch peek.match {
+            case .exact:
+                label = "exact"
+                kind = .exact
+            case .prefix:
+                label = "prefix"
+                kind = .prefix
+            }
+        } else {
+            label = "miss"
+            kind = .miss
+        }
+        os_log(.debug, log: spLog, "cachePeek %{public}s → %{public}s", hiragana, label)
+        latencyStats.recordCachePeek(kind)
     }
 
     public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [String] {
@@ -200,6 +226,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
             let elapsedMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
             os_signpost(.end, log: spLog, name: "requestCandidates")
             os_log(.debug, log: spLog, "requestCandidates %.1fms %{public}s zenzai=%d", elapsedMs, hiragana, zenzaiEnabled ? 1 : 0)
+            latencyStats.recordFetch(ms: elapsedMs)
             insertCache(key: key, value: result.mainResults)
             return Self.candidateTexts(from: result.mainResults, inputLength: inputLength)
         }

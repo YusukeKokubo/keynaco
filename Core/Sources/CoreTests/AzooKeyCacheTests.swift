@@ -8,6 +8,7 @@ import XCTest
 final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
     private(set) var requestCount = 0
     private(set) var lastLeftContext: String?
+    let latencyStats = TypingLatencyStats()
     private var cache: [String: [String]] = [:]
 
     private func cacheKey(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> String {
