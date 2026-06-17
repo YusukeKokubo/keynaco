@@ -21,7 +21,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
         public let peekUpdateP95Ms: Double?
         public let fetchCompleteP50Ms: Double?
         public let fetchCompleteP95Ms: Double?
-        public let debounceP50Ms: Double?
+        public let debouncePolicyP50Ms: Double?
         public let interKeyP50Ms: Double?
         public let fetchP95ZenzaiOnMs: Double?
         public let fetchP95ZenzaiOffMs: Double?
@@ -39,7 +39,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
             if let peekUpdateP95Ms { dict["peek_update_p95_ms"] = peekUpdateP95Ms }
             if let fetchCompleteP50Ms { dict["fetch_complete_p50_ms"] = fetchCompleteP50Ms }
             if let fetchCompleteP95Ms { dict["fetch_complete_p95_ms"] = fetchCompleteP95Ms }
-            if let debounceP50Ms { dict["debounce_p50_ms"] = debounceP50Ms }
+            if let debouncePolicyP50Ms { dict["debounce_policy_p50_ms"] = debouncePolicyP50Ms }
             if let interKeyP50Ms { dict["inter_key_p50_ms"] = interKeyP50Ms }
             if let fetchP95ZenzaiOnMs { dict["fetch_p95_zenzai_on"] = fetchP95ZenzaiOnMs }
             if let fetchP95ZenzaiOffMs { dict["fetch_p95_zenzai_off"] = fetchP95ZenzaiOffMs }
@@ -220,7 +220,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
             peekUpdateP95Ms: Self.percentile(sortedPeekUpdate, p: 95),
             fetchCompleteP50Ms: Self.percentile(sortedFetchComplete, p: 50),
             fetchCompleteP95Ms: Self.percentile(sortedFetchComplete, p: 95),
-            debounceP50Ms: Self.percentile(sortedDebounce, p: 50),
+            debouncePolicyP50Ms: Self.percentile(sortedDebounce, p: 50),
             interKeyP50Ms: Self.percentile(sortedInterKey, p: 50),
             fetchP95ZenzaiOnMs: Self.percentile(sortedFetchZenzaiOn, p: 95),
             fetchP95ZenzaiOffMs: Self.percentile(sortedFetchZenzaiOff, p: 95),
