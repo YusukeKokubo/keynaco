@@ -370,12 +370,7 @@ extension InputHandler {
             initialRowPolicy: .afterFixed
         )
         let prefixFocusRank = { (output: String) in
-            InitialRowPolicyResolver.rankForPrefixFocus(
-                output: output,
-                db: db,
-                azooKey: azooKeyConverter,
-                readingHint: h
-            )
+            InitialRowPolicyResolver.rankForPrefixFocus(output: output, db: db)
         }
         let prefixFocusCandidate = trigger == .whileTyping
             ? InitialRowPolicyResolver.prefixFocusCandidate(

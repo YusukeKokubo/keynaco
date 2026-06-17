@@ -143,7 +143,7 @@ fast + slow 両方（CI・リリース前）:
 
 - `.whileTyping` のみ: 前方一致履歴/ユーザー辞書 prefix の初期フォーカスは品詞別モーラ閾値（名詞・固有名詞 2 / 動詞 3 / その他 5）。助詞・助動詞は対象外（`docs/concept.md` 指針 1・機能語 UI dismiss と整合）
 - 読み完全一致履歴は閾値なしで最優先。explicit（Space）は prefix focus 無効
-- 品詞: `rankForPrefixFocus`（`lcid` → `pos` → `longestInputForOutput` + 辞書 → 組成読み）。確定直後は `schedulePOSClassification` 非同期で `lcid` NULL があり得る
+- 品詞: `rankForPrefixFocus`（`lcid` → `pos` → `.unknown`）。確定直後は `schedulePOSClassification` 非同期で `lcid` NULL があり得る
 - `whileTypingInitialRow`: 閾値未満の前方一致履歴は初期行からスキップ。フォーカス可能行がなければ dismiss
 - 記録: `plans/PLAN260614-prefix-focus-mora-thresholds.md`
 

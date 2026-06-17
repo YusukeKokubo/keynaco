@@ -30,26 +30,13 @@ enum InitialRowPolicyResolver {
         static let other = 5
     }
 
-    /// 前方一致フォーカス用の品詞ランク。`lcid` → `pos`（NULL 行のみ）→ 履歴最長読み → `readingHint` での辞書 lookup。
-    static func rankForPrefixFocus(
-        output: String,
-        db: DatabaseManager,
-        azooKey: AzooKeyConverting,
-        readingHint: String = ""
-    ) -> LcidRank {
+    /// 前方一致フォーカス用の品詞ランク。`lcid` → `pos`（NULL 行のみ）→ `.unknown`。
+    static func rankForPrefixFocus(output: String, db: DatabaseManager) -> LcidRank {
         if let lcid = db.lcidForOutput(output) {
             return LcidRank.from(lcid: lcid)
         }
         if let pos = db.posForOutput(output) {
             return LcidRank.from(pos: pos)
-        }
-        if let input = db.longestInputForOutput(output),
-           let lcid = azooKey.lcidForCommitted(reading: input, output: output) {
-            return LcidRank.from(lcid: lcid)
-        }
-        if !readingHint.isEmpty,
-           let lcid = azooKey.lcidForCommitted(reading: readingHint, output: output) {
-            return LcidRank.from(lcid: lcid)
         }
         return .unknown
     }

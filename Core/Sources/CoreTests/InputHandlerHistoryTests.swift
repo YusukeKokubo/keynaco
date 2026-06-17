@@ -423,18 +423,18 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         )
     }
 
-    func testWhileTyping_userDictPrefixFocusesNoun() {
-        setUpWithConverter(LcidOutputStub(["ダケンス"], lcidByOutput: ["カスタム語": 1285]))
+    func testWhileTyping_userDictPrefixDoesNotFocusWithoutClassification() {
+        setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
         handler.db.addUserDict(input: "だけん", output: "カスタム語")
 
         typeRomaji("dakensu")
         guard let payload = handler.buildCandidateList(trigger: .whileTyping).showPayload else {
             XCTFail("候補を出すはず"); return
         }
-        XCTAssertEqual(
+        XCTAssertNotEqual(
             payload.candidates[payload.initialRow],
             "カスタム語",
-            "ユーザー辞書 prefix の名詞に初期フォーカスするはず: \(payload.candidates)"
+            "pos/lcid 未設定のユーザー辞書は unknown（5 モーラ必要）のため 4 モーラではフォーカスしない: \(payload.candidates)"
         )
     }
 
@@ -466,23 +466,5 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
             "打鍵数削減",
             "pos のみでも名詞前方一致にフォーカスするはず: \(payload.candidates)"
         )
-    }
-}
-
-private final class LcidOutputStub: BaseAzooKeyStub, @unchecked Sendable {
-    private let lines: [String]
-    private let lcidByOutput: [String: Int]
-
-    init(_ lines: [String], lcidByOutput: [String: Int]) {
-        self.lines = lines
-        self.lcidByOutput = lcidByOutput
-    }
-
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
-        lines
-    }
-
-    override func lcidForCommitted(reading: String, output: String) -> Int? {
-        lcidByOutput[output]
     }
 }
