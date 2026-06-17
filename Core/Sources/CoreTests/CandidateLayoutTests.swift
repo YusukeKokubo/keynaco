@@ -197,6 +197,20 @@ final class CandidateLayoutTests: XCTestCase {
         )
     }
 
+    func testAdjustedInitialRow_singleKatakanaJumpsToFixedEnd() {
+        // 「ないとくらぶ → ナイトクラブ」のように唯一の辞書候補がカタカナ語のとき fixedEnd にフォーカスする。
+        // カタカナを除外すると「インタネット」「デメリット」等の純粋なカタカナ語で誤動作するため除外しない。
+        XCTAssertEqual(
+            CandidateLayout.adjustedInitialRow(
+                candidates: ["ないとくらぶ", "ナイトクラブ"],
+                fixedEnd: 1,
+                computedRow: 0,
+                appliesDefaultFixedHiragana: true
+            ),
+            1
+        )
+    }
+
     // MARK: - カスタム sectionOrder
 
     func testCustomSectionOrderWithoutFixedSections() {

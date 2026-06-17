@@ -15,6 +15,15 @@ private final class ScenarioS01KanjiMockConverter: BaseAzooKeyStub {
     }
 }
 
+// MARK: - なので dismiss 用モック（AzooKey がカタカナのみ返すケース）
+
+private final class NanodeFunctionalWordStub: BaseAzooKeyStub {
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+        _ = (leftSideContext, richCandidates)
+        return hiragana == "なので" ? ["ナノデ"] : []
+    }
+}
+
 final class ScenarioRegressionTests: InputHandlerTestCase {
 
     /// **S-01**: `k` `a` `n` `j` `i` Space Enter → 確定「漢字」。
@@ -70,5 +79,16 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
         type(chars: "o", base: "o")
         press(keyCode: KeyCode.enter)
         assertInserted("tOKyo")
+    }
+
+    /// **S-05**: `n` `a` `n` `o` `d` `e` → whileTyping で dismiss。
+    /// 「なので」は接続助詞（HiraganaPreferredBuiltins 登録済み）のため打鍵中は候補を出さない。
+    /// AzooKey がカタカナ「ナノデ」のみを返しても「ナノデ」に誤フォーカスしないことも兼ねて確認する。
+    func testS05_nanode_whileTyping_dismisses() {
+        setUpWithConverter(NanodeFunctionalWordStub())
+        typeRomaji("nanod")
+        let (_, action) = type(chars: "e", base: "e")
+        XCTAssertEqual(handler.state.composedHiragana, "なので")
+        assertDismiss(action, "なので は接続助詞なので whileTyping では dismiss されるはず")
     }
 }
