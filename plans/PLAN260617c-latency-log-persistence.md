@@ -61,6 +61,8 @@ debug socket で任意タグを付けられるようにする。施策前後に�
 
 label は `TypingLatencyStats` か `AzooKeyConverter` に `var currentLabel: String?` として持たせる。
 
+**label のライフサイクル**: label は `{"set_latency_label": null}` を明示的に送るまで維持する（flush 成功時・`reset()` 呼び出し時にはクリアしない）。before/after 比較では複数セッションにまたがって同じ label を使うため、明示的に消すまで残っていることが必要。
+
 ## 実装範囲
 
 ### Core（`TypingLatencyStats.swift`）
