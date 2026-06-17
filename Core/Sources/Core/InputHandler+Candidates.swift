@@ -162,21 +162,21 @@ extension InputHandler {
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
         let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
-        let exactMatchHistoryOutputs = Set(db.fetchHistoryExact(reading: historyKey))
+        let exactMatchScored = db.fetchHistoryExactScored(reading: historyKey)
+        let exactMatchHistoryOutputs = Set(exactMatchScored.map { $0.output })
         var exactMatchHighHistory: [String] = []
         var highHistory: [String] = []
         var historyOutputSet = Set<String>()
         var seenExact = Set<String>()
         var seenOther = Set<String>()
-        for row in historyScored {
-            historyOutputSet.insert(row.output)
+        for row in exactMatchScored {
             if row.score >= Self.historyRecencyScoreCutoff,
-               exactMatchHistoryOutputs.contains(row.output),
                seenExact.insert(row.output).inserted {
                 exactMatchHighHistory.append(row.output)
             }
         }
         for row in historyScored {
+            historyOutputSet.insert(row.output)
             guard row.score >= Self.historyRecencyScoreCutoff,
                   !exactMatchHistoryOutputs.contains(row.output),
                   highHistory.count < Self.maxHighHistoryCount,

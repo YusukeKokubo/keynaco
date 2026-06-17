@@ -27,6 +27,24 @@ extension DatabaseManager {
         }
     }
 
+    /// 読みに完全一致する履歴候補をスコア付きで返す。
+    /// `fetchHistoryScoredMerged`（prefix SUM 集計）と異なり、`input = reading` のスコアのみを返す。
+    /// `exactMatchHighHistory` の判定に使う。
+    func fetchHistoryExactScored(reading: String) -> [(output: String, score: Double)] {
+        dbQueue.sync {
+            let now = self.nowEpoch()
+            return self.queryOutputScorePairsOnQueue("""
+            SELECT output, (\(Self.recencyExpr)) AS s FROM history
+            WHERE input = ? COLLATE NOCASE
+            ORDER BY s DESC
+            LIMIT 10
+            """) {
+                self.bindRecency($0, at: 1, now: now)
+                self.bindText($0, 3, reading)
+            }
+        }
+    }
+
     /// 読みが前方一致する履歴候補を使用頻度順で返す（完全一致は除外）。
     func fetchHistoryPrefix(reading: String) -> [String] {
         dbQueue.sync {

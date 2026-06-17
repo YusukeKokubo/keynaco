@@ -522,6 +522,35 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
     }
 
+    // MARK: - exactMatchHighHistory のスコア判定
+
+    /// 「よう→要件」が DB に直接あり「ようけん→要件」が高スコード prefix として存在する場合、
+    /// fetchHistoryScoredMerged の prefix SUM スコアが「要件」に混入して
+    /// exactMatchHighHistory の先頭に入ってしまうバグの回帰テスト。
+    func testExactMatchHighHistoryUsesExactScoreNotPrefixSumScore() {
+        setUpWithConverter(BaseAzooKeyStub())
+
+        // よう→用: count=8（高スコア完全一致）
+        for _ in 0..<8 { handler.db.record(input: "よう", output: "用") }
+        // よう→要件: count=1（完全一致として DB に直接存在するが低カウント）
+        handler.db.record(input: "よう", output: "要件")
+        // ようけん→要件: count=10（高スコード prefix。GROUP BY output の SUM で「要件」のスコアを底上げする）
+        for _ in 0..<10 { handler.db.record(input: "ようけん", output: "要件") }
+
+        typeRomaji("you")
+        let action = handler.buildCandidateList(trigger: .whileTyping)
+
+        guard let payload = action.showPayload else {
+            XCTFail("candidates should be shown: \(action)"); return
+        }
+        XCTAssertEqual(
+            payload.candidates[payload.initialRow], "用",
+            "「よう→用」が最高スコアの完全一致なので初期選択は「用」のはず。"
+            + "「ようけん→要件」の prefix SUM が混入して「要件」が選ばれてはいけない。"
+            + "candidates=\(payload.candidates), initialRow=\(payload.initialRow)"
+        )
+    }
+
     // MARK: - 日時候補
 
     func testKyouIncludesDateCandidates() {
