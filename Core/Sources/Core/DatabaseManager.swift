@@ -65,7 +65,7 @@ public final class DatabaseManager: @unchecked Sendable {
         latencyLogURL.deletingLastPathComponent().appendingPathComponent("history.db").path
     }
 
-    static var latencyLogURL: URL {
+    public static var latencyLogURL: URL {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("keynaco", isDirectory: true)
