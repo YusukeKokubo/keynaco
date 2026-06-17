@@ -1,0 +1,37 @@
+{
+  "eval_id": 1,
+  "run": "without_skill",
+  "summary": {
+    "pass_rate": 0.8,
+    "passed": 4,
+    "failed": 1,
+    "total": 5
+  },
+  "expectations": [
+    {
+      "text": "analyze.py を実行するか、latency_log.jsonl を読み込んで数値を集計した",
+      "passed": true,
+      "evidence": "latency_log.jsonl を読み込み、fetch/fetch_complete/キャッシュ/debounce など全指標を独自集計して報告"
+    },
+    {
+      "text": "fetch p50 / fetch p95 など変換処理時間の具体的な数値を報告した",
+      "passed": true,
+      "evidence": "fetch_p50=95.9ms / fetch_complete_p50=195ms などを詳細に報告"
+    },
+    {
+      "text": "キャッシュミス率（全体・または読み長別）を数値で報告した",
+      "passed": true,
+      "evidence": "miss=50.1%、読み長別ミス率テーブルを掲載"
+    },
+    {
+      "text": "ボトルネックを特定し、改善提案を1つ以上含んだ",
+      "passed": true,
+      "evidence": "fetch・debounce・peek_update スパイク・コールドスタートの4点を優先順位付きで整理し、adaptive debounce 等の提案も含む"
+    },
+    {
+      "text": "fetch_complete_p95 ≥ 300ms のセッション比率に言及した",
+      "passed": false,
+      "evidence": "「fc_p95 が 400ms 超のセッション（4件）」は言及しているが 300ms 閾値に対する比率（23.5%）は報告なし"
+    }
+  ]
+}

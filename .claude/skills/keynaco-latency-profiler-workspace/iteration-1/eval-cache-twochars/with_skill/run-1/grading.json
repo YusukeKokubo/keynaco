@@ -1,0 +1,32 @@
+{
+  "eval_id": 2,
+  "run": "with_skill",
+  "summary": {
+    "pass_rate": 1.0,
+    "passed": 4,
+    "failed": 0,
+    "total": 4
+  },
+  "expectations": [
+    {
+      "text": "exact / prefix / miss の内訳（件数または割合）を報告した",
+      "passed": true,
+      "evidence": "exact 6.5% / prefix 43.4% / miss 50.1% を明示"
+    },
+    {
+      "text": "2文字読みのミス率（90%台など高い数値）を明示した",
+      "passed": true,
+      "evidence": "「2文字: 93.5%」を読み長別テーブルで明示"
+    },
+    {
+      "text": "2文字ミス率が高い原因（タイミング的問題 or leftSideContext キー設計 or eviction）を説明した",
+      "passed": true,
+      "evidence": "修正前ビルドの leftSideContext 問題とキャッシュ eviction（LRU 50件）の2つの原因候補を明示"
+    },
+    {
+      "text": "具体的な改善アクション（sandbox確認、LRU上限変更、prefetch など）を提案した",
+      "passed": true,
+      "evidence": "「/deploy でビルド確認」「/keynaco-ime-sandbox で実測」「fetch_p95_by_reading_len を確認」の3アクションを優先順で提案"
+    }
+  ]
+}

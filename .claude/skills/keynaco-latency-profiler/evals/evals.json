@@ -1,0 +1,20 @@
+{
+  "skill_name": "keynaco-latency-profiler",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "ログ分析して",
+      "expected_output": "latency_log.jsonl を読み込み、fetch レイテンシ・キャッシュ効率・読み長別ミス率などの主要指標を集計して、ボトルネックと改善提案をまとめた分析レポート"
+    },
+    {
+      "id": 2,
+      "prompt": "最近キャッシュ効いてる？2文字の挙動が気になる",
+      "expected_output": "キャッシュヒット率の内訳（exact/prefix/miss）と miss_rate_by_reading_len の2文字欄に着目した分析。2文字が高ミス率なら背景（キャッシュキー設計）の説明と対処の提案"
+    },
+    {
+      "id": 3,
+      "prompt": "Zenzai遅い気がするんだけど、ログからわかる？",
+      "expected_output": "fetch_p95_ms と fetch_complete_p95_ms の遅いセッション割合を提示し、fetch_p95_by_reading_len があれば読み長別に分析。「ログだけでは断定できない点」も正直に伝える"
+    }
+  ]
+}

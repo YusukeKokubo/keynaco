@@ -1,0 +1,32 @@
+{
+  "eval_id": 2,
+  "run": "without_skill",
+  "summary": {
+    "pass_rate": 1.0,
+    "passed": 4,
+    "failed": 0,
+    "total": 4
+  },
+  "expectations": [
+    {
+      "text": "exact / prefix / miss の内訳（件数または割合）を報告した",
+      "passed": true,
+      "evidence": "exact 6.5% / prefix 43.4% / miss 50.1% を表で掲載"
+    },
+    {
+      "text": "2文字読みのミス率（90%台など高い数値）を明示した",
+      "passed": true,
+      "evidence": "「2文字 mean=0.935 / median=1.000」を表で明示。92セッション中67セッションで1.0と定量的"
+    },
+    {
+      "text": "2文字ミス率が高い原因（タイミング的問題 or leftSideContext キー設計 or eviction）を説明した",
+      "passed": true,
+      "evidence": "fetch_p50=96ms と inter_key_p50=105ms の拮抗から「fetch完了前に2文字目が来る構造的タイミング問題」を正確に導出"
+    },
+    {
+      "text": "具体的な改善アクション（sandbox確認、LRU上限変更、prefetch など）を提案した",
+      "passed": true,
+      "evidence": "「1文字目 fetch 時に2文字先読みを一緒に取得する prefetch」と「fetch_complete 後半処理の削減」を提案"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "eval_id": 3,
+  "run": "with_skill",
+  "summary": {
+    "pass_rate": 1.0,
+    "passed": 4,
+    "failed": 0,
+    "total": 4
+  },
+  "expectations": [
+    {
+      "text": "fetch_complete_p95 ≥ 300ms のセッション比率を数値で報告した",
+      "passed": true,
+      "evidence": "「102件中24件（23.5%）でfetch_complete_p95が300msを超えている。スキルの判定基準（>20%）を上回る」と明記"
+    },
+    {
+      "text": "fetch_p95 の中央値もしくは最大値を報告した",
+      "passed": true,
+      "evidence": "fetch p95 中央値 151.0ms、最大値 375.5ms を表で掲載"
+    },
+    {
+      "text": "「ログだけでは断定できない」「ON/OFF 比較がない」などの限界を明示した",
+      "passed": true,
+      "evidence": "「言えること・言えないこと」セクションで Zenzai 推論単体時間の分離不可・ON/OFF 比較不可を明示"
+    },
+    {
+      "text": "Zenzai の遅さをさらに調査するための具体的な次のステップを提案した",
+      "passed": true,
+      "evidence": "LRU 上限見直し・Zenzai 単体タイマー追加・zenzai_enabled フラグ追加の3アクションを提案"
+    }
+  ]
+}

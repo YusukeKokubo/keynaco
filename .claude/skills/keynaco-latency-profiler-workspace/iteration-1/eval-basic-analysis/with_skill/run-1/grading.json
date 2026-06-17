@@ -1,0 +1,37 @@
+{
+  "eval_id": 1,
+  "run": "with_skill",
+  "summary": {
+    "pass_rate": 1.0,
+    "passed": 5,
+    "failed": 0,
+    "total": 5
+  },
+  "expectations": [
+    {
+      "text": "analyze.py を実行するか、latency_log.jsonl を読み込んで数値を集計した",
+      "passed": true,
+      "evidence": "analyze.py を実行し 102 セッションを集計。fetch p50/p95 など具体的な数値を表形式で掲載"
+    },
+    {
+      "text": "fetch p50 / fetch p95 など変換処理時間の具体的な数値を報告した",
+      "passed": true,
+      "evidence": "fetch p50 avg=104.9ms/median=95.9ms/max=375.5ms など詳細な表を掲載"
+    },
+    {
+      "text": "キャッシュミス率（全体・または読み長別）を数値で報告した",
+      "passed": true,
+      "evidence": "全体 miss=50.1%、読み長別（2文字 93.5% / 3文字 53.6% / 4文字 20.1% / 5文字+ 4.9%）を掲載"
+    },
+    {
+      "text": "ボトルネックを特定し、改善提案を1つ以上含んだ",
+      "passed": true,
+      "evidence": "問題1〜4を整理し、sandbox での確認・LRU 上限引き上げ・Zenzai 外れ値調査など優先順位付きで3つのアクションを提案"
+    },
+    {
+      "text": "fetch_complete_p95 ≥ 300ms のセッション比率に言及した",
+      "passed": true,
+      "evidence": "「24件（23.5%）がスキルの閾値（>20%）を超えている」と明記"
+    }
+  ]
+}

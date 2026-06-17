@@ -1,0 +1,27 @@
+{
+  "eval_id": 1,
+  "eval_name": "basic-analysis",
+  "prompt": "ログ分析して",
+  "assertions": [
+    {
+      "id": "runs_analysis",
+      "text": "analyze.py を実行するか、latency_log.jsonl を読み込んで数値を集計した"
+    },
+    {
+      "id": "reports_fetch_latency",
+      "text": "fetch p50 / fetch p95 など変換処理時間の具体的な数値を報告した"
+    },
+    {
+      "id": "reports_cache_miss_rate",
+      "text": "キャッシュミス率（全体・または読み長別）を数値で報告した"
+    },
+    {
+      "id": "identifies_bottleneck",
+      "text": "ボトルネックを特定し、改善提案を1つ以上含んだ"
+    },
+    {
+      "id": "reports_300ms_sessions",
+      "text": "fetch_complete_p95 ≥ 300ms のセッション比率に言及した"
+    }
+  ]
+}
