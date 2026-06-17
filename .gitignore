@@ -6,6 +6,7 @@ DerivedData/
 .claude/*
 !.claude/commands/
 !.claude/skills/
+.claude/skills/*-workspace/
 
 # SPM/Xcode のビルドキャッシュ（コミットしない）
 LocalPackages/
