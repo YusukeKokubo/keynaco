@@ -29,10 +29,52 @@ final class TypingLatencyStatsTests: XCTestCase {
         XCTAssertEqual(snap.fetchP95Ms, 100.0)
     }
 
+    func testExtendedProfilingFields() {
+        let stats = TypingLatencyStats()
+        stats.recordPeekUpdate(ms: 10)
+        stats.recordPeekUpdate(ms: 30)
+        stats.recordFetchComplete(ms: 100)
+        stats.recordFetchComplete(ms: 150)
+        stats.recordFetchComplete(ms: 200)
+        stats.recordDebounce(ms: 70)
+        stats.recordDebounce(ms: 110)
+        stats.recordInterKey(ms: 85)
+        stats.recordInterKey(ms: 160)
+        stats.recordFetch(ms: 50, zenzaiEnabled: false)
+        stats.recordFetch(ms: 150, zenzaiEnabled: true)
+        stats.recordCachePeek(.miss, readingLength: 2)
+        stats.recordCachePeek(.exact, readingLength: 2)
+        stats.recordCachePeek(.miss, readingLength: 5)
+
+        let snap = stats.snapshot()
+        XCTAssertEqual(snap.peekUpdateP50Ms, 30.0)
+        XCTAssertEqual(snap.peekUpdateP95Ms, 30.0)
+        XCTAssertEqual(snap.fetchCompleteP50Ms, 150.0)
+        XCTAssertEqual(snap.fetchCompleteP95Ms, 200.0)
+        XCTAssertEqual(snap.debounceP50Ms, 110.0)
+        XCTAssertEqual(snap.interKeyP50Ms, 160.0)
+        XCTAssertEqual(snap.fetchP95ZenzaiOffMs, 50.0)
+        XCTAssertEqual(snap.fetchP95ZenzaiOnMs, 150.0)
+        XCTAssertEqual(snap.missRateByReadingLen["2"], 0.5)
+        XCTAssertEqual(snap.missRateByReadingLen["5+"], 1.0)
+
+        let dict = snap.asDictionary()
+        XCTAssertNotNil(dict["peek_update_p95_ms"])
+        XCTAssertNotNil(dict["fetch_complete_p95_ms"])
+        XCTAssertNotNil(dict["debounce_p50_ms"])
+        XCTAssertNotNil(dict["inter_key_p50_ms"])
+        XCTAssertNotNil(dict["fetch_p95_zenzai_on"])
+        XCTAssertNotNil(dict["miss_rate_by_reading_len"])
+    }
+
     func testResetClearsAll() {
         let stats = TypingLatencyStats()
-        stats.recordCachePeek(.miss)
-        stats.recordFetch(ms: 42.0)
+        stats.recordCachePeek(.miss, readingLength: 3)
+        stats.recordFetch(ms: 42.0, zenzaiEnabled: true)
+        stats.recordPeekUpdate(ms: 12)
+        stats.recordFetchComplete(ms: 88)
+        stats.recordDebounce(ms: 70)
+        stats.recordInterKey(ms: 90)
         stats.reset()
 
         let snap = stats.snapshot()
@@ -41,6 +83,12 @@ final class TypingLatencyStatsTests: XCTestCase {
         XCTAssertEqual(snap.cacheMiss, 0)
         XCTAssertNil(snap.fetchP50Ms)
         XCTAssertNil(snap.fetchP95Ms)
+        XCTAssertNil(snap.peekUpdateP50Ms)
+        XCTAssertNil(snap.fetchCompleteP50Ms)
+        XCTAssertNil(snap.debounceP50Ms)
+        XCTAssertNil(snap.interKeyP50Ms)
+        XCTAssertNil(snap.fetchP95ZenzaiOnMs)
+        XCTAssertTrue(snap.missRateByReadingLen.isEmpty)
     }
 
     func testSnapshotDictionaryOmitsFetchWhenEmpty() {

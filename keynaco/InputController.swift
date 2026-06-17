@@ -221,7 +221,10 @@ class InputController: IMKInputController, @unchecked Sendable {
         if consumed {
             applyCandidateWindowEffects(action: action, adapter: adapter)
         }
-        KeydownLatencySignpost.endPeekUpdate(generation: keydownGeneration)
+        KeydownLatencySignpost.endPeekUpdate(
+            generation: keydownGeneration,
+            stats: handler.azooKeyConverter.latencyStats
+        )
 
         if adapter.didInsertText {
             schedulePOSClassification(

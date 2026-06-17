@@ -34,6 +34,10 @@ extension InputController {
             interKeyIntervalMs: azooKeyScheduler.lastInterKeyIntervalMs,
             hasPendingRomaji: !handler.state.pendingRomaji.isEmpty
         ))
+        converter.latencyStats.recordDebounce(ms: Double(debounceNs) / 1_000_000)
+        if let interKeyMs = azooKeyScheduler.lastInterKeyIntervalMs {
+            converter.latencyStats.recordInterKey(ms: interKeyMs)
+        }
         azooKeyScheduler.schedule(
             generation: generation,
             reading: reading,
@@ -68,7 +72,10 @@ extension InputController {
             trigger: .whileTyping
         )
         if case .none = action {
-            KeydownLatencySignpost.endFetchComplete(generation: generation)
+            KeydownLatencySignpost.endFetchComplete(
+                generation: generation,
+                stats: handler.azooKeyConverter.latencyStats
+            )
             return
         }
         applyAsyncAzooKeyCandidateAction(action: action, adapter: adapter, generation: generation)
@@ -98,6 +105,9 @@ extension InputController {
             adapter: adapter,
             preferInPlaceRefresh: wasVisible
         )
-        KeydownLatencySignpost.endFetchComplete(generation: generation)
+        KeydownLatencySignpost.endFetchComplete(
+            generation: generation,
+            stats: handler.azooKeyConverter.latencyStats
+        )
     }
 }

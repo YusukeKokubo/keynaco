@@ -17,6 +17,15 @@ public final class TypingLatencyStats: @unchecked Sendable {
         public let cacheMiss: Int
         public let fetchP50Ms: Double?
         public let fetchP95Ms: Double?
+        public let peekUpdateP50Ms: Double?
+        public let peekUpdateP95Ms: Double?
+        public let fetchCompleteP50Ms: Double?
+        public let fetchCompleteP95Ms: Double?
+        public let debounceP50Ms: Double?
+        public let interKeyP50Ms: Double?
+        public let fetchP95ZenzaiOnMs: Double?
+        public let fetchP95ZenzaiOffMs: Double?
+        public let missRateByReadingLen: [String: Double]
 
         public func asDictionary() -> [String: Any] {
             var dict: [String: Any] = [
@@ -26,6 +35,15 @@ public final class TypingLatencyStats: @unchecked Sendable {
             ]
             if let fetchP50Ms { dict["fetch_p50_ms"] = fetchP50Ms }
             if let fetchP95Ms { dict["fetch_p95_ms"] = fetchP95Ms }
+            if let peekUpdateP50Ms { dict["peek_update_p50_ms"] = peekUpdateP50Ms }
+            if let peekUpdateP95Ms { dict["peek_update_p95_ms"] = peekUpdateP95Ms }
+            if let fetchCompleteP50Ms { dict["fetch_complete_p50_ms"] = fetchCompleteP50Ms }
+            if let fetchCompleteP95Ms { dict["fetch_complete_p95_ms"] = fetchCompleteP95Ms }
+            if let debounceP50Ms { dict["debounce_p50_ms"] = debounceP50Ms }
+            if let interKeyP50Ms { dict["inter_key_p50_ms"] = interKeyP50Ms }
+            if let fetchP95ZenzaiOnMs { dict["fetch_p95_zenzai_on"] = fetchP95ZenzaiOnMs }
+            if let fetchP95ZenzaiOffMs { dict["fetch_p95_zenzai_off"] = fetchP95ZenzaiOffMs }
+            if !missRateByReadingLen.isEmpty { dict["miss_rate_by_reading_len"] = missRateByReadingLen }
             return dict
         }
     }
@@ -35,6 +53,14 @@ public final class TypingLatencyStats: @unchecked Sendable {
     private var cachePrefix = 0
     private var cacheMiss = 0
     private var fetchDurationsMs: [Double] = []
+    private var fetchDurationsZenzaiOnMs: [Double] = []
+    private var fetchDurationsZenzaiOffMs: [Double] = []
+    private var peekUpdateDurationsMs: [Double] = []
+    private var fetchCompleteDurationsMs: [Double] = []
+    private var debounceDurationsMs: [Double] = []
+    private var interKeyDurationsMs: [Double] = []
+    private var peeksByReadingLenBucket: [Int: Int] = [:]
+    private var missesByReadingLenBucket: [Int: Int] = [:]
     private var currentLabelStorage: String?
     private var lastFlushedAt: Date?
     var nowProvider: () -> Date = { Date() }
@@ -46,19 +72,54 @@ public final class TypingLatencyStats: @unchecked Sendable {
         set { lock.withLock { currentLabelStorage = newValue } }
     }
 
-    public func recordCachePeek(_ kind: CachePeekKind) {
+    public func recordCachePeek(_ kind: CachePeekKind, readingLength: Int = 0) {
         lock.withLock {
             switch kind {
             case .exact: cacheExact += 1
             case .prefix: cachePrefix += 1
             case .miss: cacheMiss += 1
             }
+            guard readingLength > 0 else { return }
+            let bucket = Self.readingLenBucket(readingLength)
+            peeksByReadingLenBucket[bucket, default: 0] += 1
+            if kind == .miss {
+                missesByReadingLenBucket[bucket, default: 0] += 1
+            }
         }
     }
 
-    public func recordFetch(ms: Double) {
+    public func recordFetch(ms: Double, zenzaiEnabled: Bool = false) {
         lock.withLock {
             fetchDurationsMs.append(ms)
+            if zenzaiEnabled {
+                fetchDurationsZenzaiOnMs.append(ms)
+            } else {
+                fetchDurationsZenzaiOffMs.append(ms)
+            }
+        }
+    }
+
+    public func recordPeekUpdate(ms: Double) {
+        lock.withLock {
+            peekUpdateDurationsMs.append(ms)
+        }
+    }
+
+    public func recordFetchComplete(ms: Double) {
+        lock.withLock {
+            fetchCompleteDurationsMs.append(ms)
+        }
+    }
+
+    public func recordDebounce(ms: Double) {
+        lock.withLock {
+            debounceDurationsMs.append(ms)
+        }
+    }
+
+    public func recordInterKey(ms: Double) {
+        lock.withLock {
+            interKeyDurationsMs.append(ms)
         }
     }
 
@@ -72,6 +133,14 @@ public final class TypingLatencyStats: @unchecked Sendable {
             cachePrefix = 0
             cacheMiss = 0
             fetchDurationsMs.removeAll(keepingCapacity: false)
+            fetchDurationsZenzaiOnMs.removeAll(keepingCapacity: false)
+            fetchDurationsZenzaiOffMs.removeAll(keepingCapacity: false)
+            peekUpdateDurationsMs.removeAll(keepingCapacity: false)
+            fetchCompleteDurationsMs.removeAll(keepingCapacity: false)
+            debounceDurationsMs.removeAll(keepingCapacity: false)
+            interKeyDurationsMs.removeAll(keepingCapacity: false)
+            peeksByReadingLenBucket.removeAll(keepingCapacity: false)
+            missesByReadingLenBucket.removeAll(keepingCapacity: false)
         }
     }
 
@@ -108,6 +177,14 @@ public final class TypingLatencyStats: @unchecked Sendable {
             cachePrefix = 0
             cacheMiss = 0
             fetchDurationsMs.removeAll(keepingCapacity: false)
+            fetchDurationsZenzaiOnMs.removeAll(keepingCapacity: false)
+            fetchDurationsZenzaiOffMs.removeAll(keepingCapacity: false)
+            peekUpdateDurationsMs.removeAll(keepingCapacity: false)
+            fetchCompleteDurationsMs.removeAll(keepingCapacity: false)
+            debounceDurationsMs.removeAll(keepingCapacity: false)
+            interKeyDurationsMs.removeAll(keepingCapacity: false)
+            peeksByReadingLenBucket.removeAll(keepingCapacity: false)
+            missesByReadingLenBucket.removeAll(keepingCapacity: false)
             lastFlushedAt = prepared.flushTime
         }
         return true
@@ -125,17 +202,56 @@ public final class TypingLatencyStats: @unchecked Sendable {
     }
 
     private func makeSnapshotLocked() -> Snapshot {
-        let sorted = fetchDurationsMs.sorted()
-        let count = sorted.count
-        let p50: Double? = count > 0 ? Self.percentile(sorted, p: 50) : nil
-        let p95: Double? = count > 0 ? Self.percentile(sorted, p: 95) : nil
+        let sortedFetch = fetchDurationsMs.sorted()
+        let sortedPeekUpdate = peekUpdateDurationsMs.sorted()
+        let sortedFetchComplete = fetchCompleteDurationsMs.sorted()
+        let sortedDebounce = debounceDurationsMs.sorted()
+        let sortedInterKey = interKeyDurationsMs.sorted()
+        let sortedFetchZenzaiOn = fetchDurationsZenzaiOnMs.sorted()
+        let sortedFetchZenzaiOff = fetchDurationsZenzaiOffMs.sorted()
+
         return Snapshot(
             cacheExact: cacheExact,
             cachePrefix: cachePrefix,
             cacheMiss: cacheMiss,
-            fetchP50Ms: p50,
-            fetchP95Ms: p95
+            fetchP50Ms: Self.percentile(sortedFetch, p: 50),
+            fetchP95Ms: Self.percentile(sortedFetch, p: 95),
+            peekUpdateP50Ms: Self.percentile(sortedPeekUpdate, p: 50),
+            peekUpdateP95Ms: Self.percentile(sortedPeekUpdate, p: 95),
+            fetchCompleteP50Ms: Self.percentile(sortedFetchComplete, p: 50),
+            fetchCompleteP95Ms: Self.percentile(sortedFetchComplete, p: 95),
+            debounceP50Ms: Self.percentile(sortedDebounce, p: 50),
+            interKeyP50Ms: Self.percentile(sortedInterKey, p: 50),
+            fetchP95ZenzaiOnMs: Self.percentile(sortedFetchZenzaiOn, p: 95),
+            fetchP95ZenzaiOffMs: Self.percentile(sortedFetchZenzaiOff, p: 95),
+            missRateByReadingLen: Self.missRateByReadingLen(
+                peeks: peeksByReadingLenBucket,
+                misses: missesByReadingLenBucket
+            )
         )
+    }
+
+    private static func readingLenBucket(_ length: Int) -> Int {
+        min(max(length, 1), 5)
+    }
+
+    private static func readingLenBucketKey(_ bucket: Int) -> String {
+        bucket >= 5 ? "5+" : "\(bucket)"
+    }
+
+    private static func missRateByReadingLen(
+        peeks: [Int: Int],
+        misses: [Int: Int]
+    ) -> [String: Double] {
+        var rates: [String: Double] = [:]
+        for bucket in peeks.keys.sorted() {
+            let peekCount = peeks[bucket] ?? 0
+            guard peekCount > 0 else { continue }
+            let missCount = misses[bucket] ?? 0
+            let rate = round(Double(missCount) / Double(peekCount) * 1000) / 1000
+            rates[readingLenBucketKey(bucket)] = rate
+        }
+        return rates
     }
 
     private func writeJSONLine(_ dict: [String: Any], to fileURL: URL) -> Bool {
@@ -166,7 +282,8 @@ public final class TypingLatencyStats: @unchecked Sendable {
         }
     }
 
-    private static func percentile(_ sorted: [Double], p: Int) -> Double {
+    private static func percentile(_ sorted: [Double], p: Int) -> Double? {
+        guard !sorted.isEmpty else { return nil }
         let count = sorted.count
         let idx = min(count - 1, count * p / 100)
         return round(sorted[idx] * 10) / 10
