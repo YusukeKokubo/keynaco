@@ -67,6 +67,45 @@ final class TypingLatencyStatsTests: XCTestCase {
         XCTAssertNotNil(dict["miss_rate_by_reading_len"])
     }
 
+    func testCandidateNavigationMetrics() {
+        let stats = TypingLatencyStats()
+        // row 0 × 3, row 1 × 1, row 3 × 1 → first_candidate_rate = 0.6, p50 = 0, p95 = 3
+        stats.recordConfirmation(selectionDepth: 0)
+        stats.recordConfirmation(selectionDepth: 0)
+        stats.recordConfirmation(selectionDepth: 1)
+        stats.recordConfirmation(selectionDepth: 0)
+        stats.recordConfirmation(selectionDepth: 3)
+        // 候補非表示の確定は無視される
+        stats.recordConfirmation(selectionDepth: nil)
+
+        let snap = stats.snapshot()
+        XCTAssertEqual(snap.candidateConfirmations, 5)
+        XCTAssertEqual(snap.firstCandidateRate, 0.6)
+        XCTAssertEqual(snap.selectionDepthP50, 0)
+        XCTAssertEqual(snap.selectionDepthP95, 3)
+
+        let dict = snap.asDictionary()
+        XCTAssertEqual(dict["candidate_confirmations"] as? Int, 5)
+        XCTAssertEqual(dict["first_candidate_rate"] as? Double, 0.6)
+        XCTAssertEqual(dict["selection_depth_p50"] as? Int, 0)
+        XCTAssertEqual(dict["selection_depth_p95"] as? Int, 3)
+    }
+
+    func testCandidateMetricsAbsentWhenNoConfirmations() {
+        let stats = TypingLatencyStats()
+        stats.recordConfirmation(selectionDepth: nil)
+
+        let snap = stats.snapshot()
+        XCTAssertEqual(snap.candidateConfirmations, 0)
+        XCTAssertNil(snap.firstCandidateRate)
+        XCTAssertNil(snap.selectionDepthP50)
+        XCTAssertNil(snap.selectionDepthP95)
+
+        let dict = snap.asDictionary()
+        XCTAssertNil(dict["candidate_confirmations"])
+        XCTAssertNil(dict["first_candidate_rate"])
+    }
+
     func testResetClearsAll() {
         let stats = TypingLatencyStats()
         stats.recordCachePeek(.miss, readingLength: 3)
@@ -75,6 +114,7 @@ final class TypingLatencyStatsTests: XCTestCase {
         stats.recordFetchComplete(ms: 88)
         stats.recordDebounce(ms: 70)
         stats.recordInterKey(ms: 90)
+        stats.recordConfirmation(selectionDepth: 2)
         stats.reset()
 
         let snap = stats.snapshot()
@@ -89,6 +129,8 @@ final class TypingLatencyStatsTests: XCTestCase {
         XCTAssertNil(snap.interKeyP50Ms)
         XCTAssertNil(snap.fetchP95ZenzaiOnMs)
         XCTAssertTrue(snap.missRateByReadingLen.isEmpty)
+        XCTAssertEqual(snap.candidateConfirmations, 0)
+        XCTAssertNil(snap.firstCandidateRate)
     }
 
     func testSnapshotDictionaryOmitsFetchWhenEmpty() {
@@ -101,14 +143,39 @@ final class TypingLatencyStatsTests: XCTestCase {
         XCTAssertNil(dict["fetch_p95_ms"])
     }
 
-    func testAppendToLogSkipsWhenPeeksInsufficient() throws {
+    func testAppendToLogRequiresMinConfirmations() throws {
         let stats = TypingLatencyStats()
         let fileURL = temporaryLogURL()
 
-        for _ in 0..<19 { stats.recordCachePeek(.exact) }
-        XCTAssertFalse(stats.appendToLog(fileURL: fileURL, appVersion: "0.9.0"))
+        // 4 confirmations: 閾値未満なのでフラッシュしない
+        for _ in 0..<4 { stats.recordConfirmation(selectionDepth: 0) }
+        XCTAssertFalse(stats.appendToLog(fileURL: fileURL, appVersion: "1.0.0"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
-        XCTAssertEqual(stats.snapshot().cacheExact, 19)
+
+        // 5 件目でフラッシュ
+        stats.recordConfirmation(selectionDepth: 0)
+        XCTAssertTrue(stats.appendToLog(fileURL: fileURL, appVersion: "1.0.0"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+        XCTAssertEqual(stats.snapshot().candidateConfirmations, 0)
+    }
+
+    func testAppendToLogForcedFlushesAnyData() throws {
+        let stats = TypingLatencyStats()
+        let fileURL = temporaryLogURL()
+
+        // 確定 1 件だけ（通常フラッシュ閾値未満）
+        stats.recordConfirmation(selectionDepth: 1)
+        XCTAssertFalse(stats.appendToLog(fileURL: fileURL, appVersion: "1.0.0"))
+        XCTAssertTrue(stats.appendToLogForced(fileURL: fileURL, appVersion: "1.0.0"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+        XCTAssertEqual(stats.snapshot().candidateConfirmations, 0)
+    }
+
+    func testAppendToLogForcedSkipsWhenNoData() throws {
+        let stats = TypingLatencyStats()
+        let fileURL = temporaryLogURL()
+        XCTAssertFalse(stats.appendToLogForced(fileURL: fileURL, appVersion: "1.0.0"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
     func testAppendToLogWritesAndResetsWhileKeepingLabel() throws {
@@ -116,14 +183,13 @@ final class TypingLatencyStatsTests: XCTestCase {
         stats.currentLabel = "before-change"
         let fileURL = temporaryLogURL()
 
-        for _ in 0..<20 { stats.recordCachePeek(.miss) }
+        for _ in 0..<5 { stats.recordConfirmation(selectionDepth: 0) }
         stats.recordFetch(ms: 42.0)
 
         XCTAssertTrue(stats.appendToLog(fileURL: fileURL, appVersion: "0.9.1"))
 
         let snap = stats.snapshot()
-        XCTAssertEqual(snap.cacheExact, 0)
-        XCTAssertEqual(snap.cacheMiss, 0)
+        XCTAssertEqual(snap.candidateConfirmations, 0)
         XCTAssertEqual(stats.currentLabel, "before-change")
 
         let lines = TypingLatencyStats.readRecentLines(from: fileURL)
@@ -133,8 +199,7 @@ final class TypingLatencyStatsTests: XCTestCase {
         let dict = try XCTUnwrap(JSONSerialization.jsonObject(with: json) as? [String: Any])
         XCTAssertEqual(dict["version"] as? String, "0.9.1")
         XCTAssertEqual(dict["label"] as? String, "before-change")
-        XCTAssertEqual(dict["total_peeks"] as? Int, 20)
-        XCTAssertEqual(dict["cache_miss"] as? Int, 20)
+        XCTAssertEqual(dict["candidate_confirmations"] as? Int, 5)
         XCTAssertEqual(dict["fetch_p50_ms"] as? Double, 42.0)
         XCTAssertNotNil(dict["ts"])
     }
@@ -145,13 +210,13 @@ final class TypingLatencyStatsTests: XCTestCase {
         stats.nowProvider = { now }
         let fileURL = temporaryLogURL()
 
-        for _ in 0..<20 { stats.recordCachePeek(.exact) }
+        for _ in 0..<5 { stats.recordConfirmation(selectionDepth: 0) }
         XCTAssertTrue(stats.appendToLog(fileURL: fileURL, appVersion: "0.9.0"))
 
-        for _ in 0..<20 { stats.recordCachePeek(.prefix) }
+        for _ in 0..<5 { stats.recordConfirmation(selectionDepth: 0) }
         now = now.addingTimeInterval(60)
         XCTAssertFalse(stats.appendToLog(fileURL: fileURL, appVersion: "0.9.0"))
-        XCTAssertEqual(stats.snapshot().cachePrefix, 20)
+        XCTAssertEqual(stats.snapshot().candidateConfirmations, 5)
 
         now = now.addingTimeInterval(4 * 60 + 1)
         XCTAssertTrue(stats.appendToLog(fileURL: fileURL, appVersion: "0.9.0"))
@@ -162,7 +227,7 @@ final class TypingLatencyStatsTests: XCTestCase {
         let stats = TypingLatencyStats()
         let fileURL = temporaryLogURL()
 
-        for _ in 0..<20 { stats.recordCachePeek(.miss) }
+        for _ in 0..<5 { stats.recordConfirmation(selectionDepth: 0) }
         XCTAssertTrue(stats.appendToLog(fileURL: fileURL, appVersion: "0.9.0"))
         XCTAssertEqual(TypingLatencyStats.readRecentLines(from: fileURL).count, 1)
     }

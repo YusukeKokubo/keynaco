@@ -128,7 +128,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         handler.flushDiaryBuffer()
         commitComposition(sender)
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-        handler.azooKeyConverter.latencyStats.appendToLog(
+        handler.azooKeyConverter.latencyStats.appendToLogForced(
             fileURL: DatabaseManager.latencyLogURL,
             appVersion: version
         )

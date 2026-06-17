@@ -8,7 +8,8 @@ public final class TypingLatencyStats: @unchecked Sendable {
         case miss
     }
 
-    public static let minPeeksForFlush = 20
+    /// 候補ウィンドウ表示中の確定が `minConfirmationsForFlush` 回に達したらフラッシュ。
+    public static let minConfirmationsForFlush = 5
     public static let minFlushInterval: TimeInterval = 300
 
     public struct Snapshot: Equatable, Sendable {
@@ -26,6 +27,10 @@ public final class TypingLatencyStats: @unchecked Sendable {
         public let fetchP95ZenzaiOnMs: Double?
         public let fetchP95ZenzaiOffMs: Double?
         public let missRateByReadingLen: [String: Double]
+        public let candidateConfirmations: Int
+        public let firstCandidateRate: Double?
+        public let selectionDepthP50: Int?
+        public let selectionDepthP95: Int?
 
         public func asDictionary() -> [String: Any] {
             var dict: [String: Any] = [
@@ -44,6 +49,10 @@ public final class TypingLatencyStats: @unchecked Sendable {
             if let fetchP95ZenzaiOnMs { dict["fetch_p95_zenzai_on"] = fetchP95ZenzaiOnMs }
             if let fetchP95ZenzaiOffMs { dict["fetch_p95_zenzai_off"] = fetchP95ZenzaiOffMs }
             if !missRateByReadingLen.isEmpty { dict["miss_rate_by_reading_len"] = missRateByReadingLen }
+            if candidateConfirmations > 0 { dict["candidate_confirmations"] = candidateConfirmations }
+            if let firstCandidateRate { dict["first_candidate_rate"] = firstCandidateRate }
+            if let selectionDepthP50 { dict["selection_depth_p50"] = selectionDepthP50 }
+            if let selectionDepthP95 { dict["selection_depth_p95"] = selectionDepthP95 }
             return dict
         }
     }
@@ -61,6 +70,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
     private var interKeyDurationsMs: [Double] = []
     private var peeksByReadingLenBucket: [Int: Int] = [:]
     private var missesByReadingLenBucket: [Int: Int] = [:]
+    private var confirmationDepths: [Int] = []
     private var currentLabelStorage: String?
     private var lastFlushedAt: Date?
     var nowProvider: () -> Date = { Date() }
@@ -123,37 +133,59 @@ public final class TypingLatencyStats: @unchecked Sendable {
         }
     }
 
+    /// 候補ウィンドウ表示中の確定を記録する。`selectionDepth` は選択行（候補非表示なら nil）。
+    public func recordConfirmation(selectionDepth: Int?) {
+        guard let depth = selectionDepth else { return }
+        lock.withLock { confirmationDepths.append(depth) }
+    }
+
     public func snapshot() -> Snapshot {
         lock.withLock { makeSnapshotLocked() }
     }
 
     public func reset() {
-        lock.withLock {
-            cacheExact = 0
-            cachePrefix = 0
-            cacheMiss = 0
-            fetchDurationsMs.removeAll(keepingCapacity: false)
-            fetchDurationsZenzaiOnMs.removeAll(keepingCapacity: false)
-            fetchDurationsZenzaiOffMs.removeAll(keepingCapacity: false)
-            peekUpdateDurationsMs.removeAll(keepingCapacity: false)
-            fetchCompleteDurationsMs.removeAll(keepingCapacity: false)
-            debounceDurationsMs.removeAll(keepingCapacity: false)
-            interKeyDurationsMs.removeAll(keepingCapacity: false)
-            peeksByReadingLenBucket.removeAll(keepingCapacity: false)
-            missesByReadingLenBucket.removeAll(keepingCapacity: false)
-        }
+        lock.withLock { resetLocked() }
     }
 
-    /// フラッシュ条件を満たすとき JSONL に 1 行追記し、成功時のみカウンタを reset する。
+    /// 通常フラッシュ: 候補確定 `minConfirmationsForFlush` 回以上 + 5 分インターバル。
     @discardableResult
     public func appendToLog(fileURL: URL, appVersion: String) -> Bool {
-        let prepared: (dict: [String: Any], flushTime: Date)? = lock.withLock {
+        let prepared = buildFlushPayloadLocked(appVersion: appVersion, minConfirmations: Self.minConfirmationsForFlush, minInterval: Self.minFlushInterval)
+        return writePrepared(prepared, to: fileURL)
+    }
+
+    /// 強制フラッシュ: 件数条件なし・インターバルなし。アプリ非アクティブ時に短セッションのデータを保全する。
+    @discardableResult
+    public func appendToLogForced(fileURL: URL, appVersion: String) -> Bool {
+        let prepared = buildFlushPayloadLocked(appVersion: appVersion, minConfirmations: 0, minInterval: 0)
+        return writePrepared(prepared, to: fileURL)
+    }
+
+    /// JSONL ファイルの末尾 `limit` 行を返す。
+    public static func readRecentLines(from fileURL: URL, limit: Int = 20) -> [String] {
+        guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { return [] }
+        let lines = content
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+            .filter { !$0.isEmpty }
+        guard lines.count > limit else { return lines }
+        return Array(lines.suffix(limit))
+    }
+
+    private func buildFlushPayloadLocked(appVersion: String, minConfirmations: Int, minInterval: TimeInterval) -> (dict: [String: Any], flushTime: Date)? {
+        lock.withLock {
+            let confirmations = confirmationDepths.count
             let totalPeeks = cacheExact + cachePrefix + cacheMiss
-            guard totalPeeks >= Self.minPeeksForFlush else { return nil }
+            let hasData = confirmations > 0 || totalPeeks > 0
+            if minConfirmations > 0 {
+                guard confirmations >= minConfirmations else { return nil }
+            } else {
+                guard hasData else { return nil }
+            }
 
             let now = nowProvider()
-            if let lastFlushedAt,
-               now.timeIntervalSince(lastFlushedAt) < Self.minFlushInterval {
+            if minInterval > 0, let lastFlushedAt,
+               now.timeIntervalSince(lastFlushedAt) < minInterval {
                 return nil
             }
 
@@ -168,37 +200,16 @@ public final class TypingLatencyStats: @unchecked Sendable {
             dict["total_peeks"] = totalPeeks
             return (dict, now)
         }
+    }
 
+    private func writePrepared(_ prepared: (dict: [String: Any], flushTime: Date)?, to fileURL: URL) -> Bool {
         guard let prepared else { return false }
         guard writeJSONLine(prepared.dict, to: fileURL) else { return false }
-
         lock.withLock {
-            cacheExact = 0
-            cachePrefix = 0
-            cacheMiss = 0
-            fetchDurationsMs.removeAll(keepingCapacity: false)
-            fetchDurationsZenzaiOnMs.removeAll(keepingCapacity: false)
-            fetchDurationsZenzaiOffMs.removeAll(keepingCapacity: false)
-            peekUpdateDurationsMs.removeAll(keepingCapacity: false)
-            fetchCompleteDurationsMs.removeAll(keepingCapacity: false)
-            debounceDurationsMs.removeAll(keepingCapacity: false)
-            interKeyDurationsMs.removeAll(keepingCapacity: false)
-            peeksByReadingLenBucket.removeAll(keepingCapacity: false)
-            missesByReadingLenBucket.removeAll(keepingCapacity: false)
+            resetLocked()
             lastFlushedAt = prepared.flushTime
         }
         return true
-    }
-
-    /// JSONL ファイルの末尾 `limit` 行を返す。
-    public static func readRecentLines(from fileURL: URL, limit: Int = 20) -> [String] {
-        guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { return [] }
-        let lines = content
-            .split(whereSeparator: \.isNewline)
-            .map(String.init)
-            .filter { !$0.isEmpty }
-        guard lines.count > limit else { return lines }
-        return Array(lines.suffix(limit))
     }
 
     private func makeSnapshotLocked() -> Snapshot {
@@ -209,6 +220,10 @@ public final class TypingLatencyStats: @unchecked Sendable {
         let sortedInterKey = interKeyDurationsMs.sorted()
         let sortedFetchZenzaiOn = fetchDurationsZenzaiOnMs.sorted()
         let sortedFetchZenzaiOff = fetchDurationsZenzaiOffMs.sorted()
+        let sortedDepths = confirmationDepths.sorted()
+
+        let firstCandidateRate: Double? = sortedDepths.isEmpty ? nil :
+            round(Double(sortedDepths.filter { $0 == 0 }.count) / Double(sortedDepths.count) * 1000) / 1000
 
         return Snapshot(
             cacheExact: cacheExact,
@@ -227,8 +242,28 @@ public final class TypingLatencyStats: @unchecked Sendable {
             missRateByReadingLen: Self.missRateByReadingLen(
                 peeks: peeksByReadingLenBucket,
                 misses: missesByReadingLenBucket
-            )
+            ),
+            candidateConfirmations: sortedDepths.count,
+            firstCandidateRate: firstCandidateRate,
+            selectionDepthP50: Self.percentileInt(sortedDepths, p: 50),
+            selectionDepthP95: Self.percentileInt(sortedDepths, p: 95)
         )
+    }
+
+    private func resetLocked() {
+        cacheExact = 0
+        cachePrefix = 0
+        cacheMiss = 0
+        fetchDurationsMs.removeAll(keepingCapacity: false)
+        fetchDurationsZenzaiOnMs.removeAll(keepingCapacity: false)
+        fetchDurationsZenzaiOffMs.removeAll(keepingCapacity: false)
+        peekUpdateDurationsMs.removeAll(keepingCapacity: false)
+        fetchCompleteDurationsMs.removeAll(keepingCapacity: false)
+        debounceDurationsMs.removeAll(keepingCapacity: false)
+        interKeyDurationsMs.removeAll(keepingCapacity: false)
+        peeksByReadingLenBucket.removeAll(keepingCapacity: false)
+        missesByReadingLenBucket.removeAll(keepingCapacity: false)
+        confirmationDepths.removeAll(keepingCapacity: false)
     }
 
     private static func readingLenBucket(_ length: Int) -> Int {
@@ -287,5 +322,11 @@ public final class TypingLatencyStats: @unchecked Sendable {
         let count = sorted.count
         let idx = min(count - 1, count * p / 100)
         return round(sorted[idx] * 10) / 10
+    }
+
+    private static func percentileInt(_ sorted: [Int], p: Int) -> Int? {
+        guard !sorted.isEmpty else { return nil }
+        let idx = min(sorted.count - 1, sorted.count * p / 100)
+        return sorted[idx]
     }
 }

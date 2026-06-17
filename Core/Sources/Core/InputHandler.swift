@@ -238,6 +238,7 @@ public struct InputHandler {
     /// - Parameter trigger: 呼び出し元の確定経路（`CommitTrigger`）
     public mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden, trigger: CommitTrigger = .enter) {
         guard state.isComposing else { return }
+        azooKeyConverter.latencyStats.recordConfirmation(selectionDepth: candidate.isVisible ? candidate.selectedRow : nil)
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
         if candidate.isVisible, let selected = candidate.selectedText {
