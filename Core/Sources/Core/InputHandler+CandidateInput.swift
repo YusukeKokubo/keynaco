@@ -24,7 +24,25 @@ extension InputHandler {
             }
             let conv = azooKeyConverter; let r = inputKey; let t = selected
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
+            let prevReadingForReTyped = lastCommittedReading
             commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
+            let nowMs = Int(Date().timeIntervalSince1970 * 1000)
+            var anomaly: [String] = []
+            if sessionTracker.scrollCount >= 4 { anomaly.append("deep_scroll") }
+            if !inputKey.isEmpty, inputKey == prevReadingForReTyped { anomaly.append("re_typed") }
+            pendingSessionRecord = InputSessionRecord(
+                ts: nowMs,
+                keyCount: sessionTracker.keyCount,
+                bsCount: sessionTracker.bsCount,
+                compositionMs: sessionTracker.compositionMs(endMs: nowMs),
+                reading: inputKey,
+                committed: selected,
+                candidateDepth: candidate.isVisible ? candidate.selectedRow : nil,
+                wasExplicit: candidate.isExplicitlySelected,
+                scrollCount: sessionTracker.scrollCount,
+                anomaly: anomaly
+            )
+            sessionTracker.reset()
         } else {
             commitComposition(client: client, trigger: .enter)
         }
