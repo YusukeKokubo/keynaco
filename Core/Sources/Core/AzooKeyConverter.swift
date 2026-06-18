@@ -278,7 +278,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return opts
     }
 
-    /// `requestCandidates` と同じ残余・予測フィルタ（POC260529b'）。
+    /// 残余・予測補完フィルタ（POC260529b'）。削除不可。
+    /// AzooKey は読みより長い予測補完候補も返すため、外すと完全一致が大幅に後退する
+    /// （例: "かくにん" → "角煮ん"が1位、"確認"が205位）。完全一致優先はこのフィルタが担っている。
     static func filterCandidatesForDisplay(_ candidates: [Candidate], inputLength: Int) -> [Candidate] {
         let fullCoverage = candidates.filter { composingCountValueStatic($0) == inputLength }
         let predictionFiltered = fullCoverage.filter { c in
