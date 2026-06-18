@@ -79,9 +79,8 @@ extension InputHandler {
         trigger: CandidateListTrigger = .whileTyping
     ) -> CandidateAction {
         guard state.composedHiragana == reading else { return .none }
-        let filtered = azooKeyCandidates.filter { !KanaUtils.isScriptMixed($0) }
         let sorted = sortAzooKeyCandidates(
-            filtered,
+            azooKeyCandidates,
             reading: reading,
             richCandidates: true
         )
@@ -90,7 +89,7 @@ extension InputHandler {
             h: reading,
             cheap: cheap,
             azooKeyCandidates: sorted,
-            azooKeyApiOrder: filtered
+            azooKeyApiOrder: azooKeyCandidates
         )
         let action = assembleCandidateList(from: sources, trigger: trigger)
         clearPendingAzooKeyReading()
@@ -212,9 +211,8 @@ extension InputHandler {
             leftSideContext: leftContext.azooKeyValue,
             richCandidates: richCandidates
         )
-        let filtered = raw.filter { !KanaUtils.isScriptMixed($0) }
-        let sorted = sortAzooKeyCandidates(filtered, reading: reading, richCandidates: richCandidates)
-        return AzooKeyFetch(sorted: sorted, apiOrder: filtered)
+        let sorted = sortAzooKeyCandidates(raw, reading: reading, richCandidates: richCandidates)
+        return AzooKeyFetch(sorted: sorted, apiOrder: raw)
     }
 
     private func sortAzooKeyCandidates(

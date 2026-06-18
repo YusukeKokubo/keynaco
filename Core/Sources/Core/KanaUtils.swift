@@ -23,19 +23,7 @@ enum KanaUtils {
         }
     }
 
-    /// ひらがなと全角カタカナが混在する文字列かどうか（AzooKey が返す「きョ」等を除外するため）。
-    static func isScriptMixed(_ text: String) -> Bool {
-        var hasHiragana = false
-        var hasKatakana = false
-        for scalar in text.unicodeScalars {
-            if isHiragana(scalar) { hasHiragana = true }
-            if isKatakana(scalar) { hasKatakana = true }
-            if hasHiragana && hasKatakana { return true }
-        }
-        return false
-    }
-
-    /// 小書き仮名（拗音・促音以外の縮み仮名）。モーラ数カウントでは 1 モーラに含めない。
+/// 小書き仮名（拗音・促音以外の縮み仮名）。モーラ数カウントでは 1 モーラに含めない。
     private static let moraSmallKana: Set<Character> = [
         "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "ゃ", "ゅ", "ょ", "ゎ", "ゕ", "ゖ",
     ]
