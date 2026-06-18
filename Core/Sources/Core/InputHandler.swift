@@ -185,6 +185,12 @@ public struct InputHandler {
     public var lastConfirmedContext: LastConfirmedContext? = nil
     /// 直前の確定の読み（`commitText` 時の `finalizedText`）。
     public var lastCommittedReading: String? = nil
+    /// 現在変換セッションの打鍵蓄積。セッション終了（確定/Escape）でリセット。
+    public var sessionTracker = InputSessionTracker()
+    /// 直近セッション終了後に `InputController` へ渡す記録（書き込み前）。
+    public var pendingSessionRecord: InputSessionRecord? = nil
+    /// 直近 `doBackspace` で `penalizeAll` が実行されたか。次キーで `InputController` が前セッション record に反映。
+    public var lastKeyDownDidPenalize = false
     /// 左文脈の解決結果。`LeftContextSource` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
     public var leftContext: LeftContext = .empty
     /// IMK surrounding キャッシュ。`.invalidated` は `LeftContextSource.applyPostKeyDown` が `.empty` に遷移させる。
@@ -241,6 +247,9 @@ public struct InputHandler {
         azooKeyConverter.latencyStats.recordConfirmation(selectionDepth: candidate.isVisible ? candidate.selectedRow : nil)
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
+        // commitText が lastCommittedReading を更新するため先に退避する
+        let prevReadingForReTyped = lastCommittedReading
+        let committedText: String
         if candidate.isVisible, let selected = candidate.selectedText {
             let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
             let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
@@ -252,11 +261,30 @@ public struct InputHandler {
             let conv = azooKeyConverter; let r = inputKey; let t = selected
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
             commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
+            committedText = selected
         } else {
             let isPunct = Self.readingPunctuations.contains(inputKey) || Self.sentenceTerminators.contains(inputKey)
             if !isPunct { db.recordPrefixes(reading: normalizedInput, output: inputKey) }
             commitText(text: inputKey, client: client)
+            committedText = inputKey
         }
+        let nowMs = Int(Date().timeIntervalSince1970 * 1000)
+        var anomaly: [String] = []
+        if sessionTracker.scrollCount >= 4 { anomaly.append("deep_scroll") }
+        if !inputKey.isEmpty, inputKey == prevReadingForReTyped { anomaly.append("re_typed") }
+        pendingSessionRecord = InputSessionRecord(
+            ts: nowMs,
+            keyCount: sessionTracker.keyCount,
+            bsCount: sessionTracker.bsCount,
+            compositionMs: sessionTracker.compositionMs(endMs: nowMs),
+            reading: inputKey,
+            committed: committedText,
+            candidateDepth: candidate.isVisible ? candidate.selectedRow : nil,
+            wasExplicit: candidate.isExplicitlySelected,
+            scrollCount: sessionTracker.scrollCount,
+            anomaly: anomaly
+        )
+        sessionTracker.reset()
     }
 
     /// prefix-focus で短い読みで確定した場合に canonical reading（AzooKey のキャッシュ ruby）を返す。
@@ -380,6 +408,7 @@ public struct InputHandler {
                 fullReading: ctx.fullReading
             )
             lastConfirmedContext = nil
+            lastKeyDownDidPenalize = true
         }
         guard handled else { return (false, .none) }
         // 非表示からの BS は .whileTyping にしないと initialIsExplicitlySelected=true で候補が復活して誤確定する
@@ -390,7 +419,25 @@ public struct InputHandler {
     }
 
     public mutating func doEscape(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
+        let reading = state.finalizedText
+        let wasExplicit = candidateSession.isExplicitlySelected
         guard state.reset() else { return (false, .none) }
+        let nowMs = Int(Date().timeIntervalSince1970 * 1000)
+        var anomaly: [String] = []
+        if reading.count >= 3 { anomaly.append("escaped_long") }
+        pendingSessionRecord = InputSessionRecord(
+            ts: nowMs,
+            keyCount: sessionTracker.keyCount,
+            bsCount: sessionTracker.bsCount,
+            compositionMs: sessionTracker.compositionMs(endMs: nowMs),
+            reading: reading,
+            committed: nil,
+            candidateDepth: nil,
+            wasExplicit: wasExplicit,
+            scrollCount: sessionTracker.scrollCount,
+            anomaly: anomaly
+        )
+        sessionTracker.reset()
         return (true, .dismiss)
     }
 }

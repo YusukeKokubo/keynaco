@@ -21,6 +21,8 @@ class InputController: IMKInputController, @unchecked Sendable {
     private var candidateWindow: CandidateWindow!
     /// 直近の `handle(event:client:)` の IMK クライアント（候補 UI 削除などキーイベント外の marked 同期用）。
     private weak var activeIMKClient: AnyObject?
+    /// 直前セッション終了時に生成したレコード。次キーで penalize 判定後に書き込む。
+    private var pendingInputRecord: InputSessionRecord? = nil
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
@@ -262,6 +264,8 @@ class InputController: IMKInputController, @unchecked Sendable {
             candidate: ctx,
             client: adapter
         )
+        flushPendingInputRecord(penalized: handler.lastKeyDownDidPenalize)
+        checkAndStorePendingSessionRecord()
         applyPostKeyDownEffects(
             consumed: consumed,
             action: action,
@@ -341,6 +345,9 @@ class InputController: IMKInputController, @unchecked Sendable {
                     && !session.isBracketMode
             ) else { return }
             ic.handler.commitComposition(client: adapter, candidate: session.makeContext(), trigger: .deactivate)
+            ic.flushPendingInputRecord()
+            ic.checkAndStorePendingSessionRecord()
+            ic.flushPendingInputRecord()
             ic.handler.candidateSession.reset()
             LeftContextSource.resetCache(&ic.handler.leftContextIMKCache)
             ic.handler.leftContext = .empty
@@ -349,5 +356,20 @@ class InputController: IMKInputController, @unchecked Sendable {
     }
 
     // MARK: - プライベートヘルパー
+
+    private func flushPendingInputRecord(penalized: Bool = false) {
+        guard let pending = pendingInputRecord else { return }
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        let record = penalized ? pending.addingAnomaly("penalized") : pending
+        InputQualityLogger.append(record: record, appVersion: version, to: InputQualityLogger.inputLogURL)
+        pendingInputRecord = nil
+    }
+
+    private func checkAndStorePendingSessionRecord() {
+        if let record = handler.pendingSessionRecord {
+            pendingInputRecord = record
+            handler.pendingSessionRecord = nil
+        }
+    }
 
 }

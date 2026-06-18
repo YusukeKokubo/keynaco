@@ -16,6 +16,10 @@ extension InputHandler {
         let isBackspace = keyCode == KeyCode.backspace || characters == "\u{08}"
         clearLastConfirmedContextUnlessBackspace(isBackspace: isBackspace)
 
+        lastKeyDownDidPenalize = false
+        if !state.isComposing { sessionTracker.reset() }
+        sessionTracker.track(keyCode: keyCode)
+
         let route = KeyDispatch.route(KeyDispatchInput(
             keyCode: keyCode,
             isBackspace: isBackspace,
