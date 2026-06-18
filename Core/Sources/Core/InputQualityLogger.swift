@@ -1,7 +1,16 @@
 import Foundation
 
 /// 入力品質ログ（`input_log.jsonl`）への書き込みとトリミングを担う。
-public enum InputQualityLogger {
+///
+/// メインスレッドから呼ぶ前提。`buffer` に 10 件蓄積してからまとめて書き込むことで
+/// セッション確定ごとの同期 I/O を避ける。アプリ非アクティブ時は `flushForced()` で強制書き出し。
+public final class InputQualityLogger {
+    private static let flushThreshold = 10
+
+    private var buffer: [[String: Any]] = []
+
+    public init() {}
+
     public static var inputLogURL: URL {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -9,10 +18,27 @@ public enum InputQualityLogger {
             .appendingPathComponent("input_log.jsonl")
     }
 
-    public static func append(record: InputSessionRecord, appVersion: String, to fileURL: URL) {
+    public func append(record: InputSessionRecord, appVersion: String) {
         var dict = record.asDictionary()
         dict["version"] = appVersion
-        writeJSONLine(dict, to: fileURL)
+        buffer.append(dict)
+        if buffer.count >= Self.flushThreshold {
+            flush(to: InputQualityLogger.inputLogURL)
+        }
+    }
+
+    /// バッファ内容を即座に書き出す。アプリ非アクティブ時（`deactivateServer`）に呼ぶ。
+    public func flushForced() {
+        flush(to: InputQualityLogger.inputLogURL)
+    }
+
+    private func flush(to fileURL: URL) {
+        guard !buffer.isEmpty else { return }
+        let toWrite = buffer
+        buffer.removeAll()
+        for dict in toWrite {
+            Self.writeJSONLine(dict, to: fileURL)
+        }
     }
 
     /// 起動時に古い行を切り詰める。30 日分 or 最新 20000 セッション（先に超えた方）。7 日に 1 回だけ実行。

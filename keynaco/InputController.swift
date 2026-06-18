@@ -23,6 +23,7 @@ class InputController: IMKInputController, @unchecked Sendable {
     private weak var activeIMKClient: AnyObject?
     /// 直前セッション終了時に生成したレコード。次キーで penalize 判定後に書き込む。
     private var pendingInputRecord: InputSessionRecord? = nil
+    private let inputQualityLogger = InputQualityLogger()
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
@@ -134,6 +135,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             fileURL: DatabaseManager.latencyLogURL,
             appVersion: version
         )
+        inputQualityLogger.flushForced()
         super.deactivateServer(sender)
     }
 
@@ -361,7 +363,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         guard let pending = pendingInputRecord else { return }
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
         let record = penalized ? pending.addingAnomaly("penalized") : pending
-        InputQualityLogger.append(record: record, appVersion: version, to: InputQualityLogger.inputLogURL)
+        inputQualityLogger.append(record: record, appVersion: version)
         pendingInputRecord = nil
     }
 
