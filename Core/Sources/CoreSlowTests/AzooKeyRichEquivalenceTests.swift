@@ -72,9 +72,9 @@ final class AzooKeyRichEquivalenceTests: XCTestCase {
                 leftSideContext: leftContext,
                 richCandidates: true
             )
-            if plain != rich {
+            if plain.texts != rich.texts {
                 mismatches.append(
-                    "[\(label)] \(word): plain=\(plain.prefix(3)) rich=\(rich.prefix(3))"
+                    "[\(label)] \(word): plain=\(plain.texts.prefix(3)) rich=\(rich.texts.prefix(3))"
                 )
             }
         }

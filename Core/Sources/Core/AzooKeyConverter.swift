@@ -56,10 +56,10 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return richCandidates ? "\(segment)|\(ctx)|rich" : "\(segment)|\(ctx)"
     }
 
-    private static func candidateTexts(from candidates: [Candidate], inputLength: Int) -> [String] {
+    private static func displayCandidates(from candidates: [Candidate], inputLength: Int) -> [AzooKeyCandidate] {
         let filtered = filterCandidatesForDisplay(candidates, inputLength: inputLength)
         let source = filtered.isEmpty ? candidates : filtered
-        return source.map(\.text)
+        return source.map { AzooKeyCandidate(text: $0.text, segmentCount: $0.data.count) }
     }
 
     private static func primaryLcidMap(from candidates: [Candidate], inputLength: Int) -> [String: Int] {
@@ -161,9 +161,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
             richCandidates: richCandidates
         )
         if let cached = candidateCache[exactKey] {
-            let texts = Self.candidateTexts(from: cached, inputLength: hiragana.count)
-            guard !texts.isEmpty else { return nil }
-            let peek = AzooKeyCachePeek(candidates: texts, match: .exact)
+            let items = Self.displayCandidates(from: cached, inputLength: hiragana.count)
+            guard !items.isEmpty else { return nil }
+            let peek = AzooKeyCachePeek(candidates: items, match: .exact)
             recordCachePeek(hiragana: hiragana, peek: peek)
             return peek
         }
@@ -178,9 +178,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
             bestCandidates = candidateCache[key]
         }
         if let segment = bestPrefix, let cached = bestCandidates {
-            let texts = Self.candidateTexts(from: cached, inputLength: segment.count)
-            guard !texts.isEmpty else { return nil }
-            let peek = AzooKeyCachePeek(candidates: texts, match: .prefix(sourceReading: segment))
+            let items = Self.displayCandidates(from: cached, inputLength: segment.count)
+            guard !items.isEmpty else { return nil }
+            let peek = AzooKeyCachePeek(candidates: items, match: .prefix(sourceReading: segment))
             recordCachePeek(hiragana: hiragana, peek: peek)
             return peek
         }
@@ -208,12 +208,12 @@ public final class AzooKeyConverter: @unchecked Sendable {
         latencyStats.recordCachePeek(kind, readingLength: hiragana.count)
     }
 
-    public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [String] {
+    public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [AzooKeyCandidate] {
         let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         let inputLength = hiragana.count
         if let cached = candidateCache[key] {
             insertCache(key: key, value: cached)
-            return Self.candidateTexts(from: cached, inputLength: inputLength)
+            return Self.displayCandidates(from: cached, inputLength: inputLength)
         }
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
@@ -227,7 +227,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
             os_log(.debug, log: spLog, "requestCandidates %.1fms %{public}s zenzai=%d", elapsedMs, hiragana, zenzaiEnabled ? 1 : 0)
             latencyStats.recordFetch(ms: elapsedMs, zenzaiEnabled: zenzaiEnabled, readingLength: hiragana.count)
             insertCache(key: key, value: result.mainResults)
-            return Self.candidateTexts(from: result.mainResults, inputLength: inputLength)
+            return Self.displayCandidates(from: result.mainResults, inputLength: inputLength)
         }
     }
 
@@ -278,6 +278,13 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return opts
     }
 
+    private static func endsWithKanji(_ text: String) -> Bool {
+        guard let last = text.unicodeScalars.last else { return false }
+        return (0x4E00...0x9FFF).contains(last.value)
+            || (0x3400...0x4DBF).contains(last.value)
+            || last.value == 0x3005
+    }
+
     /// 残余・予測補完フィルタ（POC260529b'）。削除不可。
     /// AzooKey は読みより長い予測補完候補も返すため、外すと完全一致が大幅に後退する
     /// （例: "かくにん" → "角煮ん"が1位、"確認"が205位）。完全一致優先はこのフィルタが担っている。
@@ -286,21 +293,26 @@ public final class AzooKeyConverter: @unchecked Sendable {
         let predictionFiltered = fullCoverage.filter { c in
             let rubySum = c.data.reduce(0) { $0 + $1.ruby.count }
             guard rubySum > inputLength else { return true }
-            guard let last = c.text.unicodeScalars.last else { return true }
-            let isKanji = (0x4E00...0x9FFF).contains(last.value)
-                || (0x3400...0x4DBF).contains(last.value)
-                || last.value == 0x3005
-            return isKanji
+            return endsWithKanji(c.text)
         }
         let validCoverage = predictionFiltered.filter { c in
-            guard c.data.count > 1, let last = c.data.last else { return true }
-            guard last.word.count == 1, let scalar = last.word.unicodeScalars.first else { return true }
-            let isHiragana = KanaUtils.isHiragana(scalar)
-            let isKatakana = KanaUtils.isKatakana(scalar)
-            guard isHiragana || isKatakana else { return true }
-            return (147...554).contains(last.lcid)
+            let segmentCount = c.data.count
+            if segmentCount == 1 { return true }
+            guard segmentCount >= 2, let lastSegment = c.data.last else { return true }
+            if lastSegment.word.count > 1 { return true }
+            if endsWithKanji(c.text) { return true }
+            guard let scalar = lastSegment.word.unicodeScalars.first,
+                  lastSegment.word.count == 1 else { return true }
+            let isKana = KanaUtils.isHiragana(scalar) || KanaUtils.isKatakana(scalar)
+            guard isKana else { return true }
+            return isFunctionalKanaTail(lcid: lastSegment.lcid)
         }
         return validCoverage.isEmpty ? predictionFiltered : validCoverage
+    }
+
+    /// 末尾 1 文字かなセグメントが助詞・助動詞か（旧 validCoverage の lcid 147…554 をセグメント＋名前付き判定に置換）。
+    private static func isFunctionalKanaTail(lcid: Int) -> Bool {
+        CIDData.isJoshi(cid: lcid) || (369...554).contains(lcid)
     }
 
     public func commit(reading: String, text: String) {

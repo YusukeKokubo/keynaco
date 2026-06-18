@@ -28,8 +28,8 @@ final class AzooKeyRichEquivalenceHostedTests: XCTestCase {
                 richCandidates: true
             )
             XCTAssertEqual(
-                plain,
-                rich,
+                plain.texts,
+                rich.texts,
                 "Zenzai on: rich/non-rich should match for \(word)"
             )
         }

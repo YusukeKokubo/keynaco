@@ -9,19 +9,19 @@ final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
     private(set) var requestCount = 0
     private(set) var lastLeftContext: String?
     let latencyStats = TypingLatencyStats()
-    private var cache: [String: [String]] = [:]
+    private var cache: [String: [AzooKeyCandidate]] = [:]
 
     private func cacheKey(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> String {
         let ctx = leftSideContext ?? ""
         return richCandidates ? "\(hiragana)|\(ctx)|rich" : "\(hiragana)|\(ctx)"
     }
 
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
         lastLeftContext = leftSideContext
         let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         if let hit = cache[key] { return hit }
         requestCount += 1
-        let result = ["テスト"]
+        let result = [AzooKeyCandidate.text("テスト")]
         cache[key] = result
         return result
     }

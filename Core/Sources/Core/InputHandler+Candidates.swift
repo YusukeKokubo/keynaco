@@ -53,7 +53,7 @@ extension InputHandler {
             : nil
         let peekRaw = peek?.candidates ?? []
         let azooKeyCandidates = sortAzooKeyCandidates(
-            peekRaw,
+            peekRaw.texts,
             reading: h,
             richCandidates: true
         )
@@ -63,7 +63,7 @@ extension InputHandler {
             h: h,
             cheap: cheap,
             azooKeyCandidates: azooKeyCandidates,
-            azooKeyApiOrder: peekRaw
+            azooKeyApiOrder: peekRaw.texts
         )
         let action = assembleCandidateList(from: sources, trigger: trigger)
         return (action, pendingReading)
@@ -75,12 +75,12 @@ extension InputHandler {
     ///（コールバック時のデフォルト `.whileTyping` に頼らない）。
     public mutating func rebuildCandidateList(
         reading: String,
-        azooKeyCandidates: [String],
+        azooKeyCandidates: [AzooKeyCandidate],
         trigger: CandidateListTrigger = .whileTyping
     ) -> CandidateAction {
         guard state.composedHiragana == reading else { return .none }
         let sorted = sortAzooKeyCandidates(
-            azooKeyCandidates,
+            azooKeyCandidates.texts,
             reading: reading,
             richCandidates: true
         )
@@ -89,7 +89,7 @@ extension InputHandler {
             h: reading,
             cheap: cheap,
             azooKeyCandidates: sorted,
-            azooKeyApiOrder: azooKeyCandidates
+            azooKeyApiOrder: azooKeyCandidates.texts
         )
         let action = assembleCandidateList(from: sources, trigger: trigger)
         clearPendingAzooKeyReading()
@@ -211,8 +211,8 @@ extension InputHandler {
             leftSideContext: leftContext.azooKeyValue,
             richCandidates: richCandidates
         )
-        let sorted = sortAzooKeyCandidates(raw, reading: reading, richCandidates: richCandidates)
-        return AzooKeyFetch(sorted: sorted, apiOrder: raw)
+        let sorted = sortAzooKeyCandidates(raw.texts, reading: reading, richCandidates: richCandidates)
+        return AzooKeyFetch(sorted: sorted, apiOrder: raw.texts)
     }
 
     private func sortAzooKeyCandidates(

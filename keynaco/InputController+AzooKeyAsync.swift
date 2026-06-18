@@ -58,7 +58,7 @@ extension InputController {
     private func applyAsyncAzooKeyResult(
         generation: Int,
         reading: String,
-        candidates: [String],
+        candidates: [AzooKeyCandidate],
         adapter: IMKTextInputAdapter
     ) {
         guard azooKeyScheduler.candidateGeneration == generation else { return }

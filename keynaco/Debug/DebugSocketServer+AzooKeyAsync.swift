@@ -47,7 +47,7 @@ extension DebugSocketServer {
     private func applySandboxAzooKeyResult(
         generation: Int,
         reading: String,
-        candidates: [String]
+        candidates: [AzooKeyCandidate]
     ) {
         guard azooKeyScheduler.candidateGeneration == generation else { return }
         guard handler.state.composedHiragana == reading else { return }

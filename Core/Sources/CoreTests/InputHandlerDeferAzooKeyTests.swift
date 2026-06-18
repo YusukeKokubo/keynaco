@@ -135,21 +135,21 @@ extension InputHandlerTestCase {
 
 /// `requestCandidates` で温めたキャッシュを `peekCachedCandidates` でも返すスタブ。
 private final class CachePeekStub: BaseAzooKeyStub, @unchecked Sendable {
-    private var cache: [String: [String]] = [:]
+    private var cache: [String: [AzooKeyCandidate]] = [:]
 
     private func cacheKey(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> String {
         let ctx = leftSideContext ?? ""
         return richCandidates ? "\(hiragana)|\(ctx)|rich" : "\(hiragana)|\(ctx)"
     }
 
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
         let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         if let hit = cache[key] { return hit }
-        let result: [String] = switch hiragana {
-        case "あい": ["愛", "合い"]
-        case "かん": ["漢", "感"]
-        case "かんじ": ["漢字", "感じ"]
-        default: ["候補"]
+        let result: [AzooKeyCandidate] = switch hiragana {
+        case "あい": ["愛", "合い"].map { AzooKeyCandidate.text($0) }
+        case "かん": ["漢", "感"].map { AzooKeyCandidate.text($0) }
+        case "かんじ": ["漢字", "感じ"].map { AzooKeyCandidate.text($0) }
+        default: [.text("候補")]
         }
         cache[key] = result
         return result
@@ -164,7 +164,7 @@ private final class CachePeekStub: BaseAzooKeyStub, @unchecked Sendable {
         if let exact = cache[key] {
             return AzooKeyCachePeek(candidates: exact, match: .exact)
         }
-        var best: (String, [String])?
+        var best: (String, [AzooKeyCandidate])?
         for (segment, candidates) in cache {
             let reading = String(segment.split(separator: "|", maxSplits: 1).first ?? "")
             guard reading.count < hiragana.count, hiragana.hasPrefix(reading) else { continue }
@@ -187,9 +187,9 @@ private final class RichCapturingStub: BaseAzooKeyStub, @unchecked Sendable {
         super.init()
     }
 
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
         lastRichCandidates = richCandidates
-        return lines
+        return lines.map { AzooKeyCandidate.text($0) }
     }
 }
 
@@ -202,8 +202,8 @@ private final class CountingAzooKeyStub: BaseAzooKeyStub, @unchecked Sendable {
         super.init()
     }
 
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
         requestCount += 1
-        return lines
+        return lines.map { AzooKeyCandidate.text($0) }
     }
 }

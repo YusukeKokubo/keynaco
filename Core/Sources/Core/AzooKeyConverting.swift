@@ -3,7 +3,7 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
     var isZenzaiEnabled: Bool { get }
     /// 打鍵レイテンシ計測（`AzooKeyConverter` のみ実値。スタブは独立インスタンス）。
     var latencyStats: TypingLatencyStats { get }
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String]
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate]
     /// `candidateCache` の同期参照。ヒット時は非同期取得を待たず候補に使える。
     func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek?
     func commit(reading: String, text: String)
@@ -18,11 +18,11 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
 extension AzooKeyConverting {
     var isZenzaiEnabled: Bool { false }
 
-    func requestCandidates(hiragana: String) -> [String] {
+    func requestCandidates(hiragana: String) -> [AzooKeyCandidate] {
         requestCandidates(hiragana: hiragana, leftSideContext: nil, richCandidates: false)
     }
 
-    func requestCandidates(hiragana: String, leftSideContext: String?) -> [String] {
+    func requestCandidates(hiragana: String, leftSideContext: String?) -> [AzooKeyCandidate] {
         requestCandidates(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: false)
     }
 

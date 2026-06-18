@@ -76,7 +76,7 @@ final class AzooKeyAsyncScheduler {
         leftSideContext: String?,
         converter: any AzooKeyConverting,
         debounceNanoseconds: UInt64 = AzooKeyDebouncePolicy.defaultNanoseconds,
-        onComplete: @escaping @MainActor ([String]) -> Void
+        onComplete: @escaping @MainActor ([AzooKeyCandidate]) -> Void
     ) {
         pendingTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: debounceNanoseconds)
@@ -90,7 +90,7 @@ final class AzooKeyAsyncScheduler {
             let liveGen = liveGeneration
 
             let candidates = await Task.detached {
-                guard liveGen.get() == genSnapshot else { return [String]() }
+                guard liveGen.get() == genSnapshot else { return [AzooKeyCandidate]() }
                 return conv.requestCandidates(
                     hiragana: capturedReading,
                     leftSideContext: capturedContext,

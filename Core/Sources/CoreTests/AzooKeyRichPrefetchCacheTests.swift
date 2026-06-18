@@ -23,18 +23,18 @@ private final class MockAzooKeyRichPrefetch: AzooKeyConverting, @unchecked Senda
     var isZenzaiEnabled: Bool { false }
     let latencyStats = TypingLatencyStats()
     private(set) var requestCount = 0
-    private var cache: [String: [String]] = [:]
+    private var cache: [String: [AzooKeyCandidate]] = [:]
 
     private func cacheKey(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> String {
         let ctx = leftSideContext ?? ""
         return richCandidates ? "\(hiragana)|\(ctx)|rich" : "\(hiragana)|\(ctx)"
     }
 
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
         let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         if cache[key] != nil { return cache[key]! }
         requestCount += 1
-        let result = ["候補"]
+        let result = [AzooKeyCandidate.text("候補")]
         cache[key] = result
         return result
     }

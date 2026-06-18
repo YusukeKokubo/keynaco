@@ -10,7 +10,7 @@ class BaseAzooKeyStub: AzooKeyConverting, @unchecked Sendable {
     var isZenzaiEnabled: Bool = false
     let latencyStats = TypingLatencyStats()
 
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
         _ = (hiragana, leftSideContext, richCandidates)
         return []
     }

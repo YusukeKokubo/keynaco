@@ -8,10 +8,10 @@ public struct AzooKeyCachePeek: Equatable, Sendable {
         case prefix(sourceReading: String)
     }
 
-    public let candidates: [String]
+    public let candidates: [AzooKeyCandidate]
     public let match: Match
 
-    public init(candidates: [String], match: Match) {
+    public init(candidates: [AzooKeyCandidate], match: Match) {
         self.candidates = candidates
         self.match = match
     }

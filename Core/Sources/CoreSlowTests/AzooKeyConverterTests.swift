@@ -32,7 +32,6 @@ final class AzooKeyConverterTests: XCTestCase {
         XCTAssertEqual(first, second)
         XCTAssertEqual(converter.candidateCacheCount, countAfterFirst, "同一キー再要求でキャッシュエントリ数は増えない")
     }
-
     func testRequestCandidatesCacheMissWhenRichCandidatesDiffers() {
         let converter = AzooKeyConverter()
         _ = converter.requestCandidates(hiragana: "かい", leftSideContext: nil, richCandidates: false)
@@ -57,7 +56,7 @@ final class AzooKeyConverterTests: XCTestCase {
 
     func testRequestCandidatesDoesNotProduceDanglingHiraganaCandidates() {
         let converter = AzooKeyConverter()
-        let candidates = converter.requestCandidates(hiragana: "じゃあ")
+        let candidates = converter.requestCandidates(hiragana: "じゃあ").texts
         let hiraganaRange = Unicode.Scalar("あ").value...Unicode.Scalar("ん").value
         let dangling = candidates.filter { candidate in
             guard let first = candidate.unicodeScalars.first,
@@ -72,32 +71,32 @@ final class AzooKeyConverterTests: XCTestCase {
 
     func testRequestCandidatesIncludesKanjiForInflectedVerb() {
         let converter = AzooKeyConverter()
-        let candidates = converter.requestCandidates(hiragana: "たのみたい")
-        XCTAssertTrue(candidates.contains("頼みたい"),
-            "「たのみたい」→「頼みたい」が候補に含まれるはず: \(candidates)")
+        let texts = converter.requestCandidates(hiragana: "たのみたい").texts
+        XCTAssertTrue(texts.contains("頼みたい"),
+            "「たのみたい」→「頼みたい」が候補に含まれるはず: \(texts)")
     }
 
     // MARK: - 助詞付き音便形の変換
 
     func testManandakaConvertsToManandaka() {
         let converter = AzooKeyConverter()
-        let candidates = converter.requestCandidates(hiragana: "まなんだか", leftSideContext: nil, richCandidates: true)
-        XCTAssertTrue(candidates.contains("学んだか"),
-            "「まなんだか」→「学んだか」が候補に含まれるはず: \(candidates)")
+        let texts = converter.requestCandidates(hiragana: "まなんだか", leftSideContext: nil, richCandidates: true).texts
+        XCTAssertTrue(texts.contains("学んだか"),
+            "「まなんだか」→「学んだか」が候補に含まれるはず: \(texts)")
     }
 
     func testManandaConvertsToMananda() {
         let converter = AzooKeyConverter()
-        let candidates = converter.requestCandidates(hiragana: "まなんだ", leftSideContext: nil, richCandidates: true)
-        XCTAssertTrue(candidates.contains("学んだ"),
-            "「まなんだ」→「学んだ」が候補に含まれるはず: \(candidates)")
+        let texts = converter.requestCandidates(hiragana: "まなんだ", leftSideContext: nil, richCandidates: true).texts
+        XCTAssertTrue(texts.contains("学んだ"),
+            "「まなんだ」→「学んだ」が候補に含まれるはず: \(texts)")
     }
 
     // MARK: - 予測補完のかな尾ひれを落とす（POC260529b'）
 
     func testPredictionKanaTailsAreFiltered() {
         let converter = AzooKeyConverter()
-        let kigasuru = converter.requestCandidates(hiragana: "きがする")
+        let kigasuru = converter.requestCandidates(hiragana: "きがする").texts
         for tail in ["気がするん", "気がするの", "気がするし"] {
             XCTAssertFalse(kigasuru.contains(tail),
                 "かな尾ひれ「\(tail)」は除外されるはず: \(kigasuru)")
@@ -105,7 +104,7 @@ final class AzooKeyConverterTests: XCTestCase {
         XCTAssertTrue(kigasuru.contains("気がする"),
             "「気がする」（予測でない変換）は残るはず: \(kigasuru)")
 
-        let wakaranai = converter.requestCandidates(hiragana: "わからない")
+        let wakaranai = converter.requestCandidates(hiragana: "わからない").texts
         for tail in ["わからないの", "わからないん", "分からないん"] {
             XCTAssertFalse(wakaranai.contains(tail),
                 "かな尾ひれ「\(tail)」は除外されるはず: \(wakaranai)")
@@ -116,19 +115,32 @@ final class AzooKeyConverterTests: XCTestCase {
 
     func testKanjiExtendingPredictionsAreKept() {
         let converter = AzooKeyConverter()
-        let naikaku = converter.requestCandidates(hiragana: "ないかく")
+        let naikaku = converter.requestCandidates(hiragana: "ないかく").texts
         XCTAssertTrue(naikaku.contains("内閣"),
             "「内閣」は残るはず: \(naikaku)")
         XCTAssertTrue(naikaku.contains("内閣府"),
             "漢字伸長の予測「内閣府」は残るはず: \(naikaku)")
     }
 
+    func testKakuninExactMatchRanksAboveKakuniSegmentSplit() {
+        let converter = AzooKeyConverter()
+        let texts = converter.requestCandidates(hiragana: "かくにん").texts
+        XCTAssertFalse(texts.contains("角煮ん"),
+            "2セグメント・末尾かな「角煮ん」は除外されるはず: \(texts.prefix(5))")
+        XCTAssertTrue(texts.contains("確認"),
+            "1セグメント「確認」は残るはず: \(texts.prefix(5))")
+        if let rank = texts.firstIndex(of: "確認") {
+            XCTAssertLessThan(rank, 10,
+                "「確認」は上位に来るはず（実際 \(rank + 1) 位）: \(texts.prefix(10))")
+        }
+    }
+
     func testFullCoverageInflectionsAreNotDropped() {
         let converter = AzooKeyConverter()
-        let manandaka = converter.requestCandidates(hiragana: "まなんだか", leftSideContext: nil, richCandidates: true)
+        let manandaka = converter.requestCandidates(hiragana: "まなんだか", leftSideContext: nil, richCandidates: true).texts
         XCTAssertTrue(manandaka.contains("学んだか"),
             "予測でない「学んだか」は残るはず: \(manandaka)")
-        let wakaranai = converter.requestCandidates(hiragana: "わからない")
+        let wakaranai = converter.requestCandidates(hiragana: "わからない").texts
         XCTAssertTrue(wakaranai.contains("分からない") || wakaranai.contains("わからない"),
             "予測でない「分からない」は残るはず: \(wakaranai)")
     }

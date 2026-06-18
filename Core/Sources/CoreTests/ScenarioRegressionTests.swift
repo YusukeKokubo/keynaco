@@ -9,18 +9,18 @@ import Foundation
 // MARK: - S-01 用モック（候補に「漢字」のみ返す）
 
 private final class ScenarioS01KanjiMockConverter: BaseAzooKeyStub {
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
         _ = (leftSideContext, richCandidates)
-        return hiragana == "かんじ" ? ["漢字"] : ["□"]
+        return hiragana == "かんじ" ? [.text("漢字")] : [.text("□")]
     }
 }
 
 // MARK: - なので dismiss 用モック（AzooKey がカタカナのみ返すケース）
 
 private final class NanodeFunctionalWordStub: BaseAzooKeyStub {
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String] {
+    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
         _ = (leftSideContext, richCandidates)
-        return hiragana == "なので" ? ["ナノデ"] : []
+        return hiragana == "なので" ? [.text("ナノデ")] : []
     }
 }
 
