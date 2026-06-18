@@ -31,6 +31,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             DatabaseManager.shared.performGCIfNeeded()
         }
         Task.detached(priority: .background) {
+            TypingLatencyStats.trimLogIfNeeded(fileURL: DatabaseManager.latencyLogURL)
+        }
+        Task.detached(priority: .background) {
             InputController.performPOSBackfill()
         }
     }

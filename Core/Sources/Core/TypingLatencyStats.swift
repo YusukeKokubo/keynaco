@@ -170,6 +170,32 @@ public final class TypingLatencyStats: @unchecked Sendable {
         return writePrepared(prepared, to: fileURL)
     }
 
+    /// 起動時に古い行を切り詰める。`keepLines` 件以内なら何もしない。7 日に 1 回だけ実行する。
+    public static func trimLogIfNeeded(fileURL: URL, keepLines: Int = 2000) {
+        let key = "lastLatencyLogTrimDate"
+        let defaults = UserDefaults.standard
+        let now = Date().timeIntervalSince1970
+        if let last = defaults.object(forKey: key) as? Double,
+           now - last < 7 * 86400 { return }
+
+        guard FileManager.default.fileExists(atPath: fileURL.path),
+              let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            defaults.set(now, forKey: key)
+            return
+        }
+
+        let lines = content.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.isEmpty }
+        defaults.set(now, forKey: key)
+        guard lines.count > keepLines else { return }
+
+        let trimmed = lines.suffix(keepLines).joined(separator: "\n") + "\n"
+        guard let data = trimmed.data(using: .utf8) else { return }
+        try? data.write(to: fileURL)
+        #if DEBUG
+        NSLog("keynaco: latency log trimmed \(lines.count) → \(keepLines) lines")
+        #endif
+    }
+
     /// JSONL ファイルの末尾 `limit` 行を返す。
     public static func readRecentLines(from fileURL: URL, limit: Int = 20) -> [String] {
         guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { return [] }
