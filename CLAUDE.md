@@ -149,7 +149,12 @@ fast + slow 両方（CI・リリース前）:
 
 ## パフォーマンス計測
 
-Instruments によるプロファイリングは IME では実用的でない（UI にフォーカスが奪われ自然な打鍵ができない）。`latency_log.jsonl`（`~/Library/Application Support/keynaco/latency_log.jsonl`）への in-process 記録が唯一の実用手段。Claude Code からそのまま読んで分析できる。
+Instruments によるプロファイリングは IME では実用的でない（UI にフォーカスが奪われ自然な打鍵ができない）。in-process 記録が唯一の実用手段。Claude Code からそのまま読んで分析できる。
+
+| ログ | パス | 内容 |
+|------|------|------|
+| `latency_log.jsonl` | `~/Library/Application Support/keynaco/latency_log.jsonl` | 変換レイテンシ・キャッシュヒット率（セッション単位）。`/keynaco-latency-profiler` スキルで分析 |
+| `input_log.jsonl` | `~/Library/Application Support/keynaco/input_log.jsonl` | 確定ごとの入力品質（`key_count`・`bs_count`・`composition_ms`・`was_explicit`）。バッファ 10 件 or `deactivateServer` でフラッシュ |
 
 ## テスト方針
 
