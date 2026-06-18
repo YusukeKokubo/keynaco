@@ -382,8 +382,9 @@ public struct InputHandler {
             lastConfirmedContext = nil
         }
         guard handled else { return (false, .none) }
+        // 非表示からの BS は .whileTyping にしないと initialIsExplicitlySelected=true で候補が復活して誤確定する
         let trigger: CandidateListTrigger =
-            candidateSession.isVisible && !candidateSession.isExplicitlySelected ? .whileTyping : .explicit
+            candidateSession.isVisible && candidateSession.isExplicitlySelected ? .explicit : .whileTyping
         let action: CandidateAction = needsRefresh ? buildCandidateListForTrigger(trigger) : .dismiss
         return (true, action)
     }
