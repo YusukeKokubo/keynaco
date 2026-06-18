@@ -17,8 +17,11 @@ extension InputHandler {
         clearLastConfirmedContextUnlessBackspace(isBackspace: isBackspace)
 
         lastKeyDownDidPenalize = false
-        if !state.isComposing { sessionTracker.reset() }
-        sessionTracker.track(keyCode: keyCode)
+        if !state.isComposing {
+            sessionTracker.reset()
+        } else {
+            sessionTracker.track(keyCode: keyCode)
+        }
 
         let route = KeyDispatch.route(KeyDispatchInput(
             keyCode: keyCode,
