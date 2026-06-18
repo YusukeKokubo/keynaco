@@ -59,7 +59,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "k", base: "k")
         let result = type(chars: ".", base: ".")
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "k。")
+        XCTAssertEqual(handler.state.composedHiragana, "k。")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
         }
@@ -220,7 +220,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         type(chars: "k", base: "k")
         let result = type(chars: "[", base: "[")
         XCTAssertTrue(client.inserted.isEmpty)
-        XCTAssertEqual(client.markedText, "k「")
+        XCTAssertEqual(handler.state.composedHiragana, "k「")
         if case .show = result.candidateAction { } else {
             XCTFail("Expected .show candidateAction but got \(result.candidateAction)")
         }
