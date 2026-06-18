@@ -4,48 +4,17 @@ import AppKit
 
 extension InputHandler {
 
+    /// 候補ウィンドウ表示中の Enter 経路。確定本体は `commitComposition` に委ね、
+    /// 候補状態マシンへ `.dismiss` を返す薄いラッパー。
+    /// 末尾に未吸収ローマ字が残っていて explicit 選択でないとき（whileTyping 候補で Enter を押した場合）は、
+    /// 視覚的選択を捨てて入力読みそのものを確定する。
     @discardableResult
     mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         guard state.isComposing else { return .none }
         let hasTrailingRomaji = !state.pendingRomaji.isEmpty
-        if !candidate.isExplicitlySelected, hasTrailingRomaji {
-            commitComposition(client: client, candidate: .hidden, trigger: .enter)
-            return .dismiss
-        }
-        let inputKey = state.finalizedText
-        let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
-        // Enter キーによる確定: 視覚的に選択中の候補をそのまま確定する
-        if let selected = candidate.selectedText {
-            let isDateTime = Self.generateDateTimeCandidates(for: normalizedInput).contains(selected)
-            let isNumber = Self.generateNumberCandidates(for: normalizedInput).contains(selected)
-            if !isDateTime && !isNumber {
-                let reading = resolvedHistoryReading(userReading: normalizedInput, inputKey: inputKey, output: selected)
-                db.recordPrefixes(reading: reading, output: selected)
-            }
-            let conv = azooKeyConverter; let r = inputKey; let t = selected
-            Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }
-            let prevReadingForReTyped = lastCommittedReading
-            commitText(text: selected, skipHistory: isDateTime || isNumber, client: client)
-            let nowMs = Int(Date().timeIntervalSince1970 * 1000)
-            var anomaly: [String] = []
-            if sessionTracker.scrollCount >= 4 { anomaly.append("deep_scroll") }
-            if !inputKey.isEmpty, inputKey == prevReadingForReTyped { anomaly.append("re_typed") }
-            pendingSessionRecord = InputSessionRecord(
-                ts: nowMs,
-                keyCount: sessionTracker.keyCount,
-                bsCount: sessionTracker.bsCount,
-                compositionMs: sessionTracker.compositionMs(endMs: nowMs),
-                reading: inputKey,
-                committed: selected,
-                candidateDepth: candidate.isVisible ? candidate.selectedRow : nil,
-                wasExplicit: candidate.isExplicitlySelected,
-                scrollCount: sessionTracker.scrollCount,
-                anomaly: anomaly
-            )
-            sessionTracker.reset()
-        } else {
-            commitComposition(client: client, trigger: .enter)
-        }
+        let effectiveCandidate: CandidateContext =
+            (!candidate.isExplicitlySelected && hasTrailingRomaji) ? .hidden : candidate
+        commitComposition(client: client, candidate: effectiveCandidate, trigger: .enter)
         return .dismiss
     }
 
