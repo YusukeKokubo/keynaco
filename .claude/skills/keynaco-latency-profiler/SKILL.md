@@ -18,7 +18,24 @@ JSONL 形式（1行1セッション）。セッションは「5確定以上 + 5�
 まず `scripts/analyze.py` を実行して全体像を把握する。スクリプトは以下を出力する：
 
 ```bash
+# 全セッション集計
 python3 .claude/skills/keynaco-latency-profiler/scripts/analyze.py
+
+# バージョン別比較（リリース前後の確認に使う）
+python3 .claude/skills/keynaco-latency-profiler/scripts/analyze.py --by-version
+
+# 日付範囲で絞り込む（ts は Unix timestamp）
+python3 .claude/skills/keynaco-latency-profiler/scripts/analyze.py --ts-start 1781708400 --ts-end 1781794799
+
+# 絞り込み＋バージョン別を組み合わせる
+python3 .claude/skills/keynaco-latency-profiler/scripts/analyze.py --ts-start 1781708400 --by-version
+```
+
+`ts` フィールドは Unix timestamp（秒）。日付から変換する場合:
+```python
+import datetime
+d = datetime.date(2026, 6, 18)
+start = int(datetime.datetime(d.year, d.month, d.day).timestamp())
 ```
 
 出力が得られたら、下記「指標の読み方」と「よくあるパターン」を参照しながら解釈する。数字だけ出して終わりにせず、「何が問題か」「次に何をすべきか」まで伝える。
