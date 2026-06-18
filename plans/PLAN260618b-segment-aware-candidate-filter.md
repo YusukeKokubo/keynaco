@@ -1,6 +1,7 @@
 ---
-status: draft
+status: implemented
 created: 2026-06-18
+related_commit: b6d848f
 ---
 
 # PLAN260618b: セグメント情報を活用した候補フィルタ改善
