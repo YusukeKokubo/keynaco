@@ -135,6 +135,15 @@ final class AzooKeyConverterTests: XCTestCase {
         }
     }
 
+    func testNaikakufuExactMatchPrecedesCompletion() {
+        let converter = AzooKeyConverter()
+        let texts = converter.requestCandidates(hiragana: "ないかくふ").texts
+        guard let idxFu = texts.firstIndex(of: "内閣府"),
+              let idxRei = texts.firstIndex(of: "内閣府令") else { return }
+        XCTAssertLessThan(idxFu, idxRei,
+            "内閣府(完全一致) が 内閣府令(予測補完) より前に来るはず: \(texts.prefix(8))")
+    }
+
     func testFullCoverageInflectionsAreNotDropped() {
         let converter = AzooKeyConverter()
         let manandaka = converter.requestCandidates(hiragana: "まなんだか", leftSideContext: nil, richCandidates: true).texts

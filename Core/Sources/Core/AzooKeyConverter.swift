@@ -307,7 +307,18 @@ public final class AzooKeyConverter: @unchecked Sendable {
             guard isKana else { return true }
             return isFunctionalKanaTail(lcid: lastSegment.lcid)
         }
-        return validCoverage.isEmpty ? predictionFiltered : validCoverage
+        let base = validCoverage.isEmpty ? predictionFiltered : validCoverage
+        var exact = [Candidate]()
+        var rest = [Candidate]()
+        for c in base {
+            let rubySum = c.data.reduce(0) { $0 + $1.ruby.count }
+            if c.data.count == 1 && rubySum == inputLength {
+                exact.append(c)
+            } else {
+                rest.append(c)
+            }
+        }
+        return exact + rest
     }
 
     /// 末尾 1 文字かなセグメントが助詞・助動詞か（旧 validCoverage の lcid 147…554 をセグメント＋名前付き判定に置換）。
