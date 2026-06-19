@@ -22,8 +22,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
         highHistory: [String] = [],
         historyOutputSet: Set<String> = [],
         exactMatchHistoryOutputs: Set<String> = [],
-        fixedSlot: CandidateFixedSlot = .none,
-        addsDefaultFixedHiragana: Bool = false
+        fixedSlot: CandidateFixedSlot = .none
     ) -> CandidateSectionBuildInput {
         CandidateSectionBuildInput(
             reading: reading,
@@ -36,7 +35,6 @@ final class CandidateSectionBuilderTests: XCTestCase {
             historyOutputSet: historyOutputSet,
             exactMatchHistoryOutputs: exactMatchHistoryOutputs,
             fixedSlot: fixedSlot,
-            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             numberCandidates: [],
             dateTimeCandidates: []
         )
@@ -121,14 +119,6 @@ final class CandidateSectionBuilderTests: XCTestCase {
         let l = layout(from: input)
         XCTAssertFalse(builtSectionsContainKind(.fixedHiragana, input: input))
         XCTAssertEqual(l.candidates, ["辞書A", "辞書B", "の"])
-    }
-
-    func testWhileTypingDefaultFixed() {
-        let input = baseInput(addsDefaultFixedHiragana: true)
-        let built = CandidateSectionBuilder.build(input)
-        XCTAssertEqual(built.sectionOrder, CandidateLayout.defaultSectionOrder)
-        let l = layout(from: input)
-        XCTAssertEqual(l.candidates, ["あい", "辞書A", "辞書B"])
     }
 
     func testHiraganaPreferredFixedSlot() {

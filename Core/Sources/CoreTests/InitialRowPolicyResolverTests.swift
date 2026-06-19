@@ -7,7 +7,6 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         reading: String = "あい",
         fixedSlot: CandidateFixedSlot = .none,
         hiraganaInHistory: Bool = false,
-        addsDefaultFixedHiragana: Bool = false,
         exactMatchHighHistory: [String] = [],
         userDictExact: [String] = [],
         prefixFocusCandidate: String? = nil,
@@ -18,7 +17,6 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             reading: reading,
             fixedSlot: fixedSlot,
             hiraganaInHistory: hiraganaInHistory,
-            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             exactMatchHighHistory: exactMatchHighHistory,
             userDictExact: userDictExact,
             prefixFocusCandidate: prefixFocusCandidate,
@@ -29,13 +27,6 @@ final class InitialRowPolicyResolverTests: XCTestCase {
 
     func testHiraganaFixedSlot() {
         XCTAssertEqual(resolve(reading: "の", fixedSlot: .hiragana), .firstMatching("の"))
-    }
-
-    func testDefaultFixed() {
-        XCTAssertEqual(
-            resolve(reading: "あい", addsDefaultFixedHiragana: true),
-            .firstMatching("あい")
-        )
     }
 
     func testAfterFixedDefault() {
@@ -69,14 +60,6 @@ final class InitialRowPolicyResolverTests: XCTestCase {
     func testAzooKeyFirstSelectedWhenNoHistoryNoUserDict() {
         XCTAssertEqual(
             resolve(azooKeyCandidates: ["愛", "藍"]),
-            .firstMatching("愛")
-        )
-    }
-
-    /// AzooKey が選ばれるなら addsDefaultFixedHiragana のひらがな自動選択はバイパスする。
-    func testAzooKeyBeatsDefaultFixedHiragana() {
-        XCTAssertEqual(
-            resolve(addsDefaultFixedHiragana: true, azooKeyCandidates: ["愛"]),
             .firstMatching("愛")
         )
     }

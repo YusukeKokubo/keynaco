@@ -819,7 +819,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             lines.append("hiraganaPreferred(DB)    : \(build.hiraganaPreferred)")
             lines.append("hiraganaBuiltin          : \(build.hiraganaBuiltin)")
             lines.append("hiraganaInHistory        : \(build.hiraganaInHistory)")
-            lines.append("addsDefaultFixedHiragana : \(build.addsDefaultFixedHiragana)")
             lines.append("exactMatchHighHistory    : \(build.exactMatchHighHistory)")
             lines.append("highHistory              : \(build.highHistory)")
             lines.append("userDictExact            : \(build.userDictExact)")
@@ -901,7 +900,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             }
             for key in [
                 "hiraganaPreferred", "hiraganaBuiltin", "hiraganaInHistory",
-                "addsDefaultFixedHiragana", "deferAzooKeyWhileTyping",
+                "deferAzooKeyWhileTyping",
             ] {
                 lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(buildStr(key))")
             }

@@ -281,24 +281,6 @@ extension InputHandler {
         return .none
     }
 
-    /// 履歴・予測・ユーザー辞書・数値/日時がなく AzooKey のみのとき、読みのひらがなを先頭固定する。
-    private func shouldAddDefaultFixedHiragana(
-        trigger: CandidateListTrigger,
-        fixedSlot: CandidateFixedSlot,
-        hiraganaInHistory: Bool,
-        sources: CandidateListSources,
-        numberCandidates: [String],
-        dateTimeCandidates: [String]
-    ) -> Bool {
-        trigger == .whileTyping
-            && fixedSlot == .none
-            && !hiraganaInHistory
-            && sources.highHistoryCount == 0
-            && sources.userDictRaw.isEmpty
-            && numberCandidates.isEmpty
-            && dateTimeCandidates.isEmpty
-    }
-
     private mutating func assembleCandidateList(
         from sources: CandidateListSources,
         trigger: CandidateListTrigger
@@ -307,9 +289,15 @@ extension InputHandler {
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
-        // defer 有効時は AzooKey 到着前でも読みのひらがな/カタカナを即時出す（空ウィンドウ充填ではない）。
+        let hiragana = state.composedHiragana
+        let hiraganaInHistory = sources.exactMatchHighHistory.contains(hiragana)
+            || sources.highHistory.contains(hiragana)
+        let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
+
+        // 打鍵中で出すべき素材がゼロなら候補窓自体出さない（AzooKey 結果待ちの placeholder は廃止）。
+        // hiraganaPreferred 経路（fixedSlot=.hiragana）は明示的な意図なので維持する。
         if trigger == .whileTyping,
-           !deferAzooKeyWhileTyping,
+           fixedSlot == .none,
            sources.highHistoryCount == 0,
            sources.azooKeyCandidates.isEmpty,
            sources.userDictRaw.isEmpty,
@@ -322,7 +310,6 @@ extension InputHandler {
                 outcome: .dismissedEmpty,
                 fixedSlot: .none,
                 hiraganaInHistory: false,
-                addsDefaultFixedHiragana: false,
                 sources: sources,
                 built: nil,
                 policy: .afterFixed,
@@ -332,19 +319,6 @@ extension InputHandler {
             return .dismiss
         }
 
-        let hiragana = state.composedHiragana
-        let hiraganaInHistory = sources.exactMatchHighHistory.contains(hiragana)
-            || sources.highHistory.contains(hiragana)
-        let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
-
-        let addsDefaultFixedHiragana = shouldAddDefaultFixedHiragana(
-            trigger: trigger,
-            fixedSlot: fixedSlot,
-            hiraganaInHistory: hiraganaInHistory,
-            sources: sources,
-            numberCandidates: numberCandidates,
-            dateTimeCandidates: dateTimeCandidates
-        )
         let built = CandidateSectionBuilder.build(CandidateSectionBuildInput(
             reading: h,
             hiragana: hiragana,
@@ -356,7 +330,6 @@ extension InputHandler {
             historyOutputSet: sources.historyOutputSet,
             exactMatchHistoryOutputs: sources.exactMatchHistoryOutputs,
             fixedSlot: fixedSlot,
-            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
         ))
@@ -380,7 +353,6 @@ extension InputHandler {
             reading: h,
             fixedSlot: fixedSlot,
             hiraganaInHistory: hiraganaInHistory,
-            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             exactMatchHighHistory: sources.exactMatchHighHistory,
             userDictExact: sources.userDictExact,
             prefixFocusCandidate: prefixFocusCandidate,
@@ -413,7 +385,6 @@ extension InputHandler {
                 outcome: .dismissedEmpty,
                 fixedSlot: fixedSlot,
                 hiraganaInHistory: hiraganaInHistory,
-                addsDefaultFixedHiragana: addsDefaultFixedHiragana,
                 sources: sources,
                 built: built,
                 policy: policy,
@@ -422,12 +393,7 @@ extension InputHandler {
             #endif
             return .dismiss
         }
-        let initialRow = CandidateLayout.adjustedInitialRow(
-            candidates: layout.candidates,
-            fixedEnd: layout.fixedEnd,
-            computedRow: whileTypingRow ?? computedRow,
-            appliesDefaultFixedHiragana: addsDefaultFixedHiragana
-        )
+        let initialRow = whileTypingRow ?? computedRow
         guard !layout.candidates.isEmpty else {
             #if DEBUG
             recordCandidateBuildDiagnostics(
@@ -436,7 +402,6 @@ extension InputHandler {
                 outcome: .dismissedEmpty,
                 fixedSlot: fixedSlot,
                 hiraganaInHistory: hiraganaInHistory,
-                addsDefaultFixedHiragana: addsDefaultFixedHiragana,
                 sources: sources,
                 built: built,
                 policy: policy,
@@ -458,7 +423,6 @@ extension InputHandler {
                 outcome: .dismissedFunctionalWord,
                 fixedSlot: fixedSlot,
                 hiraganaInHistory: hiraganaInHistory,
-                addsDefaultFixedHiragana: addsDefaultFixedHiragana,
                 sources: sources,
                 built: built,
                 policy: policy,
@@ -477,7 +441,6 @@ extension InputHandler {
             outcome: .shown,
             fixedSlot: fixedSlot,
             hiraganaInHistory: hiraganaInHistory,
-            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             sources: sources,
             built: built,
             policy: policy,
@@ -501,7 +464,6 @@ extension InputHandler {
         outcome: CandidateBuildDiagnostics.Outcome,
         fixedSlot: CandidateFixedSlot,
         hiraganaInHistory: Bool,
-        addsDefaultFixedHiragana: Bool,
         sources: CandidateListSources,
         built: CandidateSectionBuildResult?,
         policy: InitialRowPolicy,
@@ -519,7 +481,6 @@ extension InputHandler {
             hiraganaPreferred: hiraganaPreferredSet.contains(reading),
             hiraganaBuiltin: HiraganaPreferredBuiltins.words[reading] != nil,
             hiraganaInHistory: hiraganaInHistory,
-            addsDefaultFixedHiragana: addsDefaultFixedHiragana,
             exactMatchHighHistory: sources.exactMatchHighHistory,
             highHistory: sources.highHistory,
             userDictExact: sources.userDictExact,

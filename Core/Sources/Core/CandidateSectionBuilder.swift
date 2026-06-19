@@ -14,7 +14,6 @@ struct CandidateSectionBuildInput: Sendable {
     /// 組成読み（marked ひらがな）と `input` が完全一致する履歴 output。
     let exactMatchHistoryOutputs: Set<String>
     let fixedSlot: CandidateFixedSlot
-    let addsDefaultFixedHiragana: Bool
     let numberCandidates: [String]
     let dateTimeCandidates: [String]
 }
@@ -49,7 +48,7 @@ enum CandidateSectionBuilder {
         for item in allHighHistory { seen.insert(item) }
         for item in azooKeyUniq { seen.insert(item) }
 
-        if input.fixedSlot == .hiragana || input.addsDefaultFixedHiragana {
+        if input.fixedSlot == .hiragana {
             // allCandidatesSeen（全候補のスナップショット）にある場合は、seen から一度外して
             // 固定枠が先取りできるようにし、追加後に再登録して後続の重複排除を機能させる。
             if allCandidatesSeen.contains(input.hiragana) { seen.remove(input.hiragana) }

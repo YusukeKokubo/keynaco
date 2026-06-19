@@ -179,8 +179,8 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
                       "AzooKey が返したカタカナは辞書セクションに出るはず: \(payload.candidates)")
     }
 
-    func testSingleNonFixedCandidateFocusesBeyondFixedEnd() {
-        // ひらがな先頭固定 + 変換候補1件のとき、初期フォーカスは変換候補に当たる。
+    func testSingleAzooKeyCandidateIsInitialRow() {
+        // AzooKey 候補が1件だけのとき、その候補が初期フォーカスになる。
         setUpWithConverter(SnapStub(["今回のことは誤解である"]))
         handler.state.composedHiragana = "こんかいのことはごかいである"
         handler.state.pendingRomaji = ""
@@ -188,11 +188,9 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(payload.fixedEnd, 1)
-        XCTAssertEqual(payload.candidates.count - payload.fixedEnd, 1,
-                       "固定枠以外は変換候補1件のみのはず: \(payload.candidates)")
-        XCTAssertEqual(payload.initialRow, 1)
-        XCTAssertEqual(payload.candidates[payload.initialRow], "今回のことは誤解である")
+        XCTAssertEqual(payload.fixedEnd, 0)
+        XCTAssertEqual(payload.candidates, ["今回のことは誤解である"])
+        XCTAssertEqual(payload.initialRow, 0)
     }
 
     func testHiraganaInHistoryAppearsAsHistoryCandidate() {

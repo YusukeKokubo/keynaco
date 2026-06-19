@@ -57,6 +57,8 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
     // MARK: - whileTyping 子音打鍵（母音限定候補の副作用対策）
 
     func testConsonantAfterWhileTypingDismissesCandidatesAndShowsPending() {
+        // 履歴があれば defer モードでも候補窓が即時表示される。子音打鍵で dismiss する挙動の検証。
+        handler.db.record(input: "あい", output: "愛")
         handler.deferAzooKeyWhileTyping = true
         type(chars: "a", base: "a")
         let (_, showAction) = type(chars: "i", base: "i")
@@ -73,6 +75,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
     }
 
     func testEnterAfterConsonantDismissCommitsFullComposition() {
+        handler.db.record(input: "かんじ", output: "漢字")
         handler.deferAzooKeyWhileTyping = true
         typeRomaji("kanzi")
         XCTAssertTrue(handler.candidateSession.isVisible)
@@ -84,6 +87,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
     }
 
     func testEnterWithPassiveCandidateAndPendingCommitsFinalizedText() {
+        handler.db.record(input: "あい", output: "愛")
         handler.deferAzooKeyWhileTyping = true
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")

@@ -159,58 +159,6 @@ final class CandidateLayoutTests: XCTestCase {
         XCTAssertEqual(l.initialRow, 0)  // fixedEnd=0
     }
 
-    // MARK: - adjustedInitialRow
-
-    func testAdjustedInitialRow_singleNonFixed() {
-        XCTAssertEqual(
-            CandidateLayout.adjustedInitialRow(
-                candidates: ["あい", "愛"],
-                fixedEnd: 1,
-                computedRow: 0,
-                appliesDefaultFixedHiragana: true
-            ),
-            1
-        )
-    }
-
-    func testAdjustedInitialRow_multipleNonFixedUnchanged() {
-        XCTAssertEqual(
-            CandidateLayout.adjustedInitialRow(
-                candidates: ["あい", "愛", "アイ"],
-                fixedEnd: 1,
-                computedRow: 0,
-                appliesDefaultFixedHiragana: true
-            ),
-            0
-        )
-    }
-
-    func testAdjustedInitialRow_skippedWithoutDefaultFixedHiragana() {
-        XCTAssertEqual(
-            CandidateLayout.adjustedInitialRow(
-                candidates: ["カスタム語", "ダケンス"],
-                fixedEnd: 1,
-                computedRow: 0,
-                appliesDefaultFixedHiragana: false
-            ),
-            0
-        )
-    }
-
-    func testAdjustedInitialRow_singleKatakanaJumpsToFixedEnd() {
-        // 「ないとくらぶ → ナイトクラブ」のように唯一の辞書候補がカタカナ語のとき fixedEnd にフォーカスする。
-        // カタカナを除外すると「インタネット」「デメリット」等の純粋なカタカナ語で誤動作するため除外しない。
-        XCTAssertEqual(
-            CandidateLayout.adjustedInitialRow(
-                candidates: ["ないとくらぶ", "ナイトクラブ"],
-                fixedEnd: 1,
-                computedRow: 0,
-                appliesDefaultFixedHiragana: true
-            ),
-            1
-        )
-    }
-
     // MARK: - カスタム sectionOrder
 
     func testCustomSectionOrderWithoutFixedSections() {

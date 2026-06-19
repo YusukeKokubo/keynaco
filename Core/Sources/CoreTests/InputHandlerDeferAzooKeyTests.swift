@@ -39,15 +39,14 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
         assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
     }
 
-    /// Phase 3: 非同期経路は `richCandidates: true`（Space 先読みと同一キー）。
-    func testDefer_immediateFixedHiraganaWhileAzooKeyPending() {
+    /// Phase 3: AzooKey 結果待ち中で履歴・ユーザー辞書もなければ候補窓は出さず dismiss する。
+    func testDefer_dismissesWhileAzooKeyPending() {
         typeRomaji("kanzi")
         let (action, pending) = handler.buildCandidateListWithoutAzooKey(trigger: .whileTyping)
         XCTAssertEqual(pending, "かんじ")
-        guard case .show(let show) = action else {
-            return XCTFail("expected show while AzooKey pending, got \(action)")
+        guard case .dismiss = action else {
+            return XCTFail("expected dismiss while AzooKey pending with no fallback, got \(action)")
         }
-        XCTAssertTrue(show.candidates.contains("かんじ"))
     }
 
     func testDefer_injectPathMatchesSyncWhileTyping_withRichPrefetch() {
@@ -84,22 +83,24 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
         XCTAssertTrue(show.candidates.contains("漢"))
     }
 
-    func testDefer_spaceOnKanaPlaceholderUpgradesToExplicit() {
+    /// AzooKey 結果待ち中（候補窓未表示）に Space を押すと同期取得して explicit 経路で候補窓を表示する。
+    func testDefer_spaceWhileAzooKeyPendingFetchesDictionary() {
         let stub = SnapStub(["低頻度", "定頻度"])
         setUpWithConverter(stub)
         handler.deferAzooKeyWhileTyping = true
         typeRomaji("teihindo")
+        // 履歴も辞書も無い状態では候補窓が出ないことを確認
         applyCandidateAction(handler.buildCandidateListWithoutAzooKey(trigger: .whileTyping).action)
-        XCTAssertEqual(handler.candidateSession.candidates, ["ていひんど"])
+        XCTAssertEqual(handler.candidateSession.candidates, [])
         let ctx = handler.candidateSession.makeContext()
         let (_, action) = handleAndApply(
             keyCode: KeyCode.space, characters: " ", baseCharacters: " ", candidate: ctx
         )
         guard case .show(let show) = action else {
-            return XCTFail("expected .show from explicit upgrade, got \(action)")
+            return XCTFail("expected .show from explicit space, got \(action)")
         }
         XCTAssertTrue(show.candidates.contains("低頻度"),
-                      "Space on kana placeholder should fetch dictionary: \(show.candidates)")
+                      "Space should fetch dictionary explicitly: \(show.candidates)")
         XCTAssertTrue(show.initialIsExplicitlySelected)
     }
 }

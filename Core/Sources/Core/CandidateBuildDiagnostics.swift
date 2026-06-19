@@ -18,7 +18,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
     public var hiraganaPreferred: Bool
     public var hiraganaBuiltin: Bool
     public var hiraganaInHistory: Bool
-    public var addsDefaultFixedHiragana: Bool
     public var exactMatchHighHistory: [String]
     public var highHistory: [String]
     public var userDictExact: [String]
@@ -63,7 +62,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             "hiraganaPreferred": hiraganaPreferred,
             "hiraganaBuiltin": hiraganaBuiltin,
             "hiraganaInHistory": hiraganaInHistory,
-            "addsDefaultFixedHiragana": addsDefaultFixedHiragana,
             "exactMatchHighHistory": exactMatchHighHistory,
             "highHistory": highHistory,
             "userDictExact": userDictExact,
