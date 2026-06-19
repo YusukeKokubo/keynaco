@@ -532,6 +532,14 @@ extension DebugSocketServer {
         return Self.finalize(["stats": snap.asDictionary()], cmd: cmd)
     }
 
+    /// `{"diagnostics": true}` で直近 `assembleCandidateList` の入力・policy・initialRow を返す。
+    func handleDiagnostics(cmd: [String: Any]) -> [String: Any] {
+        if let diag = handler.lastCandidateBuildDiagnostics {
+            return Self.finalize(["diagnostics": diag.asDictionary()], cmd: cmd)
+        }
+        return Self.finalize(["diagnostics": NSNull()], cmd: cmd)
+    }
+
     /// `{"set_latency_label": "before-debounce-change"}` / `{"set_latency_label": null}`
     func handleSetLatencyLabel(cmd: [String: Any]) -> [String: Any] {
         let raw = cmd["set_latency_label"]

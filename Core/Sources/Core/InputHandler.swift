@@ -165,7 +165,7 @@ public struct InputHandler {
     public private(set) var pendingAzooKeyReading: String?
     #if DEBUG
     /// 直近の `assembleCandidateList` で初期行を決めたときの診断情報。
-    var lastCandidateBuildDiagnostics: CandidateBuildDiagnostics?
+    public internal(set) var lastCandidateBuildDiagnostics: CandidateBuildDiagnostics?
     #endif
 
     mutating func clearPendingAzooKeyReading() {

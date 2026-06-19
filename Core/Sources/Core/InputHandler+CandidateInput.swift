@@ -38,6 +38,12 @@ extension InputHandler {
             if isAzooKeyPendingKanaPlaceholder(candidate) {
                 return (true, buildCandidateList(trigger: .explicit))
             }
+            // 打鍵中に自動表示された候補（ユーザー未操作）への Space は「次候補」ではなく
+            // 「明示変換要求」として扱い、initialRow=0 から再開する。これをしないと AzooKey が
+            // 自動表示した Z1 ひらがな候補を Space で素通りして Z2（カタカナ等）が確定する事故が起きる。
+            if !candidate.isExplicitlySelected {
+                return (true, buildCandidateList(trigger: .explicit))
+            }
             return (true, .selectNext)
         case KeyCode.tab, KeyCode.downArrow:
             return (true, .selectNext)

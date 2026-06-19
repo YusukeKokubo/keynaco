@@ -230,9 +230,33 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "あいk", "子音打鍵で候補を閉じたあとは pending を marked に出す")
     }
 
-    func testSpaceDuringCandidatesSelectsNextWithoutRebuild() {
+    /// 打鍵中に AzooKey が自動表示した候補（`isExplicitlySelected=false`）上の Space は
+    /// `.selectNext` ではなく `.explicit` リビルドにする。Zenzai が Z1 を推した候補を素通りして
+    /// Z2 が確定してしまう事故を防ぐため（[docs/rejected.md] / 2026-06-19 修正）。
+    func testSpaceDuringAutoShownCandidatesRebuildsExplicit() {
         typeRomaji("kanzi")
         applyCandidateAction(handler.buildCandidateList(trigger: .whileTyping))
+        XCTAssertFalse(handler.candidateSession.isExplicitlySelected,
+                       "whileTyping 表示は isExplicitlySelected=false が前提")
+        let ctx = handler.candidateSession.makeContext()
+        let (consumed, action) = handleAndApply(
+            keyCode: KeyCode.space, characters: " ", baseCharacters: " ", candidate: ctx
+        )
+        XCTAssertTrue(consumed)
+        guard case .show = action else {
+            XCTFail("自動表示中の Space は .explicit リビルドで .show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(handler.candidateSession.isExplicitlySelected,
+                      "明示変換要求として処理されたので isExplicitlySelected=true になる")
+    }
+
+    /// 一度ユーザーが明示選択した（Space / ↓ 等）あとの Space は通常通り `.selectNext`。
+    /// `isExplicitlySelected=true` を経た候補窓では次候補移動が期待される挙動。
+    func testSpaceAfterExplicitSelectionSelectsNext() {
+        typeRomaji("kanzi")
+        applyCandidateAction(handler.buildCandidateList(trigger: .explicit))
+        XCTAssertTrue(handler.candidateSession.isExplicitlySelected,
+                      "explicit 表示は isExplicitlySelected=true が前提")
         let before = handler.candidateSession.candidates
         let ctx = handler.candidateSession.makeContext()
         let (consumed, action) = handleAndApply(
@@ -240,10 +264,10 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         )
         XCTAssertTrue(consumed)
         guard case .selectNext = action else {
-            XCTFail("候補表示中の Space は .selectNext のはず: \(action)"); return
+            XCTFail("明示選択後の Space は .selectNext のはず: \(action)"); return
         }
         XCTAssertEqual(handler.candidateSession.candidates, before,
-                       "候補表示中の Space でリストを差し替えないはず")
+                       "明示選択後の Space でリストを差し替えないはず")
     }
 
     func testSelectKatakanaCandidate() {
