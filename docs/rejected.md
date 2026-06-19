@@ -32,6 +32,74 @@ konnyaku →  k+o=こ  /  n+n=ん  /  y+a=や  /  k+u=く  →  こんやく  �
 
 ---
 
+## P-5 `addsDefaultFixedHiragana`（ひらがな先頭固定の暗黙フォールバック）（2026-06-19 削除）
+
+**概要**: 打鍵中（`whileTyping`）に履歴・ユーザー辞書・数値/日時のいずれもなく AzooKey 候補だけが返ってきたとき、組成ひらがなを候補リストの先頭に強制挿入していた。`shouldAddDefaultFixedHiragana` が trigger・fixedSlot・履歴有無・各種候補の有無を AND で判定し、`addsDefaultFixedHiragana=true` のときだけ `CandidateSectionBuilder` が `fixedHiragana` セクションを追加する設計。`CandidateLayout.adjustedInitialRow` で「ひらがな先頭固定 + 変換候補1件」のとき初期フォーカスを変換候補に当てる補助ロジックも同居していた。
+
+役割は実質2つに分裂していた:
+
+- **役割 A**: `deferAzooKeyWhileTyping=true` で AzooKey 結果待ち中の placeholder（kana のみで候補窓を即時表示）
+- **役割 B**: AzooKey が結果を返したがひらがな読みを含まなかったケース（`kanzi` → `[完治, カンジ, 寛治, ...]` にひらがな `かんじ` が無い）で、ひらがな確定の動線を先頭固定で保証
+
+**削除の理由**:
+
+- **役割 A は意図のない挙動**: `deferAzooKeyWhileTyping` 導入時に「結果待ちの間は kana だけでも見せておく」と入れたが、明示的な設計判断ではなかった。`marked text`（組成ひらがな表示）は出ているのでユーザーは打鍵そのものは見えており、候補窓は AzooKey 結果が返ってから出せばよい
+- **役割 B は AzooKey の順序を毎回上書きする副作用がある**: Zenzai は文脈と履歴を考慮した順序を返してくれる。先頭固定で読みを毎回上書きすると、その文脈推論を活かせない。`docs/concept.md` の「AzooKey の出力を素直に信頼する」ポジショニングと一貫しない
+- **明示的な代替動線が既に揃っていた**: ひらがな確定は **F6 キー**（`testF6ConfirmsHiragana`）で意図を明示できる。特定の語をひらがな優先したい場合は **hiraganaPreferred リスト**（`fixedSlot=.hiragana` 経路、設定 UI から追加可能）で明示できる。暗黙フォールバックは必要ない
+- **カタカナ末尾固定撤廃（[P-4](#p-4-カタカナ末尾固定セクション2026-06-19-削除)）と同じ原則の一貫適用**: ひらがな先頭 / カタカナ末尾の対称設計から、両方とも撤廃して「AzooKey の出力を素直に信頼する」原則に集約
+
+**残すもの**: F6 によるひらがな確定動線、`hiraganaPreferred` 経路（`fixedSlot=.hiragana`）、`HiraganaPreferredBuiltins`（助詞・記号の builtin リスト）、設定 UI の「ひらがな優先」タブ。
+
+**削除した周辺**:
+
+- `shouldAddDefaultFixedHiragana` 関数（`InputHandler+Candidates.swift`）
+- `CandidateSectionBuildInput.addsDefaultFixedHiragana` フィールド
+- `InitialRowPolicyInput.addsDefaultFixedHiragana` フィールド
+- `CandidateBuildDiagnostics.addsDefaultFixedHiragana` フィールド
+- `CandidateLayout.adjustedInitialRow` 関数（`appliesDefaultFixedHiragana=true` 限定だったため全体が dead code 化）
+- `CandidateSectionBuilder.build` の `|| input.addsDefaultFixedHiragana` 条件
+- 関連テスト（`CandidateLayoutTests` の `testAdjustedInitialRow_*` 4 件、`testWhileTypingDefaultFixed`、`testDefer_immediateFixedHiraganaWhileAzooKeyPending` 等）
+
+**早期 dismiss 条件への追加**: `whileTyping` で AzooKey 候補も履歴もユーザー辞書も数値/日時も無いとき dismiss する条件を新設したが、**`fixedSlot=.none` ガードを最初に入れ忘れて** `no`/`wo`/`toka` 等の hiraganaPreferred 経路まで巻き込んで dismiss する事故を起こした（ユニットテストでは全緑、実機 sandbox で発覚）。`fixedSlot == .none` を dismiss 条件に追加して修正。`docs/retrospectives.md`「フォールバックを撤廃するときは『同じ条件分岐に乗っとった明示意図ロジック』を実機で再点検する」参照。
+
+**再検討するなら**: 「ひらがな確定の頻度が想定より高く、F6 を覚えてもらうコストが UX 後退として表面化した」場合。ただし暗黙フォールバックではなく、設定で明示的に opt-in できる「ひらがな常時先頭」モードのほうが筋がよい。
+
+> 関連: commit `7986157`、[P-4 カタカナ末尾固定セクション](#p-4-カタカナ末尾固定セクション2026-06-19-削除)、`docs/retrospectives.md`「過去の fix コミット＋保護テストの組み合わせは『バグ仕様』として固着しうる」「フォールバックを撤廃するときは『同じ条件分岐に乗っとった明示意図ロジック』を実機で再点検する」
+
+---
+
+## P-4 カタカナ末尾固定セクション（2026-06-19 削除）
+
+**概要**: 候補リストの末尾に「読みのひらがなをカタカナに変換した文字列」（`KanaUtils.hiraganaToKatakana(hiragana)`）を専用セクション `.katakana` として常時挿入していた。AzooKey が同じカタカナを返しても、`addsDefaultFixedHiragana=true` の条件下では azooKey セクションから除外して末尾セクションに「集約」していた。`CandidateSection.Kind.katakana`・`CandidateLayout.defaultSectionOrder`／`exactMatchFirstSectionOrder` の末尾エントリ・`CandidateSectionBuilder` のフィルター（`hasRealCandidates` の分岐）が関与。
+
+**何が壊れていたか**: 「`しゃつ` → `シャツ` が候補に出ない」というバグ報告がきっかけ。AzooKey は実際に `[しゃつ, 謝通門, シャツ, 洋袗]` を返していたが、`addsDefaultFixedHiragana=true` の条件で azooKey セクションから `シャツ` を除外し、`seen` セットには残したまま末尾の katakana セクションでも `seen.insert(input.katakana).inserted` が false 返して追加されず、**シャツがどこにも出ない**状態だった。
+
+過去の修正コミット `bf57684`（「未知語でカタカナ候補が候補ウィンドウに表示されないバグを修正」）は `hasRealCandidates=false`（未知語）のときだけ `seen.remove` する部分修正で、`hasRealCandidates=true`（既知語＋珍辞書語）のケースは依然消える状態を残したまま、`testKnownWordWithZenzaiDoesNotShowKatakanaInMainList` で「変換候補があるときカタカナ除外」を保護していた——固着したバグ仕様の典型。
+
+**削除の理由**:
+
+- **AzooKey が既知語のカタカナを既に返している**: 実機で 8 ケース測ったところ、`しゃつ`/`ぐろ`/`かんじ`/`にほんご`/`ぴざ`/`こひ` 等の既知語は AzooKey 自身が読みのカタカナ表記（`シャツ`/`グロ`/`カンジ`/...）を返してくれる。独立した強制生成は冗長で、除外フィルターと末尾固定の二段構造が複雑さを増していた
+- **未知語/架空語フォールバックも捨てる判断**: 架空語（`ぐろとすく`）や AzooKey が返さない短い読み（`a` 一文字）では撤廃後にカタカナが出なくなるが、実用上ほぼ問題ない。`docs/concept.md`「AzooKey の出力を素直に信頼する」ポジショニングの一貫適用
+- **「足し算の設計」へ**: 修正前は「ひらがな先頭固定 + カタカナ末尾固定」で対称設計を試みていたが、AzooKey が返したカタカナを除外して末尾に再集約する逆向き操作（`hasRealCandidates` の三項分岐）が認知負荷の主因だった
+
+**残すもの**: AzooKey 経由のカタカナ候補（`シャツ`・`カンジ`・`ピザ` 等は AzooKey が返したものを azooKey セクションにそのまま並べる）、F7 によるカタカナ確定動線（`testF7ConfirmsKatakana`）、F8 による半角カタカナ確定。
+
+**削除した周辺**:
+
+- `CandidateSection.Kind.katakana` ケース
+- `CandidateLayout.defaultSectionOrder` / `exactMatchFirstSectionOrder` 末尾の `.katakana` エントリ
+- `CandidateSectionBuilder` の `azooKeyItems` フィルター（`hasRealCandidates` 分岐）
+- `CandidateSectionBuildInput.katakana` フィールド
+- `InputHandler+Candidates` での `KanaUtils.hiraganaToKatakana(hiragana)` 生成
+- `CandidateBuildDiagnostics.sectionKindLabel` の `.katakana` ケース
+- 関連テスト（`testKatakanaInCandidatesWhenSpacePressed`、`testSpaceWithUnknownReadingShowsHiraganaAndKatakana`、`testKnownWordWithZenzaiDoesNotShowKatakanaInMainList`、snapshot tests の末尾カタカナ期待値 14 箇所）
+
+**再検討するなら**: 「AzooKey が読みのカタカナを返さない既知語が頻繁に出現し、ユーザーが F7 を覚えるコストが UX 後退として表面化した」場合。ただしフィルター付きの末尾固定ではなく、AzooKey 結果に katakana が含まれていない場合のみフォールバックする最小設計から POC する。
+
+> 関連: commit `cb05019`、過去の部分修正コミット `bf57684`、[P-5 `addsDefaultFixedHiragana`](#p-5-addsdefaultfixedhiraganaひらがな先頭固定の暗黙フォールバック2026-06-19-削除)、`docs/retrospectives.md`「過去の fix コミット＋保護テストの組み合わせは『バグ仕様』として固着しうる」
+
+---
+
 ## P-3 Zenzai top-1 プロモート（2026-06-13 削除）
 
 **概要**: 左文脈ありかつ Zenzai 有効のとき、AzooKey が返す `mainResults[0]`（Zenzai 推論込みのスコアで最上位の候補）を `.zenzaiTop1` という独立セクションに切り出し、候補リストの先頭で固定表示していた。`CandidateSession.zenzaiRow` で行番号を保持し、Shift+Delete から保護、紫ラベルで視覚的に区別、初期選択行も Zenzai 行に固定。
