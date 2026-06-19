@@ -283,9 +283,17 @@ public final class AzooKeyConverter: @unchecked Sendable {
         var rest = [Candidate]()
         for c in base {
             let rubySum = c.data.reduce(0) { $0 + $1.ruby.count }
-            let isMachineGeneratedKatakana = c.data.count == 1
-                && c.data.first.map { $0.ruby == c.text && $0.lcid == CIDData.固有名詞.cid } ?? false
-            if c.data.count == 1 && rubySum == inputLength && !isMachineGeneratedKatakana {
+            // `getAdditionalCandidate` が生成する機械生成候補（カタカナ / ひらがな / 大文字 ASCII 等）は
+            // どれも `data.ruby == 入力読みの toKatakana()` で lcid=固有名詞(1288)。
+            // ruby が全カタカナかつ固有名詞 lcid なら辞書ヒットではない＝ exact プロモートから外す。
+            // 辞書の固有名詞（「内閣府」「マイクロソフト」等）は ruby がひらがな登録なので除外されない。
+            let isMachineGenerated = c.data.count == 1
+                && c.data.first.map { d in
+                    d.lcid == CIDData.固有名詞.cid
+                    && !d.ruby.isEmpty
+                    && d.ruby.unicodeScalars.allSatisfy(KanaUtils.isKatakana)
+                } ?? false
+            if c.data.count == 1 && rubySum == inputLength && !isMachineGenerated {
                 exact.append(c)
             } else {
                 rest.append(c)

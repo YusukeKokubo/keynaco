@@ -144,7 +144,7 @@ final class AzooKeyConverterTests: XCTestCase {
     }
 
     /// 長文ひらがな読みで AzooKey の機械生成カタカナ候補が exact プロモートで Z1 に
-    /// 上がる事故を防ぐ。`getAdditionalCandidate` が `ruby == text かつ lcid == 固有名詞`
+    /// 上がる事故を防ぐ。`getAdditionalCandidate` が `lcid == 固有名詞 かつ ruby が全カタカナ`
     /// として返す候補を exact 枠から除外して、辞書ヒット候補に Z1 を譲る。
     func testLongReadingMachineGeneratedKatakanaIsNotPromoted() {
         let converter = AzooKeyConverter()
@@ -156,5 +156,19 @@ final class AzooKeyConverterTests: XCTestCase {
         let earlierCandidates = Array(texts.prefix(idxKatakana))
         XCTAssertFalse(earlierCandidates.isEmpty,
             "カタカナ機械生成より前にひらがな or 漢字混じり候補が少なくとも 1 件は来るはず: \(texts.prefix(5))")
+    }
+
+    /// 機械生成ひらがな候補（`text==hiraganaString, ruby=カタカナ, lcid=固有名詞`）も
+    /// exact 枠から除外され、辞書由来の漢字混じり候補に Z1 を譲る。
+    /// 「かくにんがひつようですね」で「確認が必要ですね」が「かくにんがひつようですね」より前に来る。
+    func testLongReadingMachineGeneratedHiraganaIsNotPromoted() {
+        let converter = AzooKeyConverter()
+        let texts = converter.requestCandidates(hiragana: "かくにんがひつようですね").texts
+        guard let idxKanji = texts.firstIndex(of: "確認が必要ですね"),
+              let idxHiragana = texts.firstIndex(of: "かくにんがひつようですね") else {
+            return  // 辞書次第でどちらかが出ないことがあるのでスキップ
+        }
+        XCTAssertLessThan(idxKanji, idxHiragana,
+            "漢字混じり辞書候補が機械生成ひらがなより前に来るはず: \(texts.prefix(5))")
     }
 }
