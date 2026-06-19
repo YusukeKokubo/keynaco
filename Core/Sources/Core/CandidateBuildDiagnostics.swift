@@ -113,7 +113,6 @@ enum CandidateBuildDiagnosticsSupport {
         case .number: return "number"
         case .dateTime: return "dateTime"
         case .azooKeyDict: return "azooKeyDict"
-        case .katakana: return "katakana"
         }
     }
 

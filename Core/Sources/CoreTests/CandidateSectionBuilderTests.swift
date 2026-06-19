@@ -28,7 +28,6 @@ final class CandidateSectionBuilderTests: XCTestCase {
         CandidateSectionBuildInput(
             reading: reading,
             hiragana: hiragana,
-            katakana: KanaUtils.hiraganaToKatakana(hiragana),
             azooKeyCandidates: azooKeyCandidates,
             azooKeyApiOrder: azooKeyApiOrder,
             userDictRaw: userDictRaw,
@@ -50,7 +49,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
             historyOutputSet: ["Acme"]
         )
         let l = layout(from: input)
-        XCTAssertEqual(l.candidates, ["Acme", "辞書B", "アイ"])
+        XCTAssertEqual(l.candidates, ["Acme", "辞書B"])
         XCTAssertEqual(l.candidates.filter { $0 == "Acme" }.count, 1)
     }
 
@@ -121,7 +120,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
         )
         let l = layout(from: input)
         XCTAssertFalse(builtSectionsContainKind(.fixedHiragana, input: input))
-        XCTAssertEqual(l.candidates, ["辞書A", "辞書B", "の", "ノ"])
+        XCTAssertEqual(l.candidates, ["辞書A", "辞書B", "の"])
     }
 
     func testWhileTypingDefaultFixed() {
@@ -129,7 +128,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
         let built = CandidateSectionBuilder.build(input)
         XCTAssertEqual(built.sectionOrder, CandidateLayout.defaultSectionOrder)
         let l = layout(from: input)
-        XCTAssertEqual(l.candidates, ["あい", "辞書A", "辞書B", "アイ"])
+        XCTAssertEqual(l.candidates, ["あい", "辞書A", "辞書B"])
     }
 
     func testHiraganaPreferredFixedSlot() {
@@ -139,7 +138,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
             fixedSlot: .hiragana
         )
         let l = layout(from: input)
-        XCTAssertEqual(l.candidates, ["の", "辞書A", "辞書B", "ノ"])
+        XCTAssertEqual(l.candidates, ["の", "辞書A", "辞書B"])
         XCTAssertEqual(l.fixedEnd, 1)
     }
 

@@ -48,7 +48,6 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
             return XCTFail("expected show while AzooKey pending, got \(action)")
         }
         XCTAssertTrue(show.candidates.contains("かんじ"))
-        XCTAssertTrue(show.candidates.contains("カンジ"))
     }
 
     func testDefer_injectPathMatchesSyncWhileTyping_withRichPrefetch() {
@@ -91,7 +90,7 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
         handler.deferAzooKeyWhileTyping = true
         typeRomaji("teihindo")
         applyCandidateAction(handler.buildCandidateListWithoutAzooKey(trigger: .whileTyping).action)
-        XCTAssertEqual(handler.candidateSession.candidates, ["ていひんど", "テイヒンド"])
+        XCTAssertEqual(handler.candidateSession.candidates, ["ていひんど"])
         let ctx = handler.candidateSession.makeContext()
         let (_, action) = handleAndApply(
             keyCode: KeyCode.space, characters: " ", baseCharacters: " ", candidate: ctx

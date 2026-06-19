@@ -3,7 +3,6 @@ import Foundation
 struct CandidateSectionBuildInput: Sendable {
     let reading: String
     let hiragana: String
-    let katakana: String
     let azooKeyCandidates: [String]
     /// Zenzai 込みの AzooKey 内部順序。`exactMatchHighHistory` の並べ替えに使う。
     let azooKeyApiOrder: [String]
@@ -60,16 +59,8 @@ enum CandidateSectionBuilder {
 
         addSection(.userDict, from: input.userDictRaw, seen: &seen, into: &sections)
 
-        let azooKeyItems = azooKeyUniq.filter { candidate in
-            guard input.addsDefaultFixedHiragana && candidate == input.katakana else { return true }
-            let hasRealCandidates = input.azooKeyCandidates.contains {
-                $0 != input.katakana && $0 != input.hiragana
-            }
-            if !hasRealCandidates { seen.remove(candidate) }
-            return false
-        }
-        if !azooKeyItems.isEmpty {
-            sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyItems))
+        if !azooKeyUniq.isEmpty {
+            sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyUniq))
         }
 
         if !sortedExactHistory.isEmpty {
@@ -82,11 +73,6 @@ enum CandidateSectionBuilder {
 
         addSection(.number, from: input.numberCandidates, seen: &seen, into: &sections)
         addSection(.dateTime, from: input.dateTimeCandidates, seen: &seen, into: &sections)
-
-        if !input.hiragana.allSatisfy({ $0.isASCII }),
-           seen.insert(input.katakana).inserted {
-            sections.append(CandidateSection(kind: .katakana, items: [input.katakana]))
-        }
 
         let sectionOrder: [CandidateSection.Kind] = sortedExactHistory.isEmpty
             ? CandidateLayout.defaultSectionOrder

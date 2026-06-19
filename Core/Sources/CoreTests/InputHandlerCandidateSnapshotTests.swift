@@ -34,7 +34,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub(["辞書A", "辞書B"]))
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["辞書A", "辞書B", "アイ"],
+                     candidates: ["辞書A", "辞書B"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -44,7 +44,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛", "辞書A", "辞書B", "アイ"],
+                     candidates: ["愛", "辞書A", "辞書B"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -58,7 +58,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.clock = { t + 3 }
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛情", "愛媛", "愛知", "辞書A", "辞書B", "アイ"],
+                     candidates: ["愛情", "愛媛", "愛知", "辞書A", "辞書B"],
                      historyEnd: 3, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -71,7 +71,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.clock = { t + 40 * 86400 }
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["辞書A", "辞書B", "アイ"],
+                     candidates: ["辞書A", "辞書B"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -85,7 +85,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛", "辞書A", "辞書B", "アイ"],
+                     candidates: ["愛", "辞書A", "辞書B"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -96,7 +96,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub(["辞書A", "辞書B"]))
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["の", "辞書A", "辞書B", "ノ"],
+                     candidates: ["の", "辞書A", "辞書B"],
                      historyEnd: 1, fixedEnd: 1, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -106,7 +106,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "の", output: "ノックアウト")
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["の", "ノックアウト", "辞書A", "辞書B", "ノ"],
+                     candidates: ["の", "ノックアウト", "辞書A", "辞書B"],
                      historyEnd: 2, fixedEnd: 1, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -116,7 +116,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "の", output: "の")
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["の", "辞書A", "辞書B", "ノ"],
+                     candidates: ["の", "辞書A", "辞書B"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -126,7 +126,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "とか", output: "UD戸籍")
         typeRomaji("toka")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["とか", "UD戸籍", "辞書A", "辞書B", "トカ"],
+                     candidates: ["とか", "UD戸籍", "辞書A", "辞書B"],
                      historyEnd: 2, fixedEnd: 2, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -141,7 +141,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         type(chars: "r", base: "r"); type(chars: "u", base: "u")
         XCTAssertEqual(handler.state.composedHiragana, "とーたる")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["辞書A", "辞書B", "トータル"],
+                     candidates: ["辞書A", "辞書B"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -166,7 +166,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         type(chars: "b", base: "b"); type(chars: "u", base: "u")
         XCTAssertEqual(handler.state.composedHiragana, "ねいてぃぶ")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["辞書A", "辞書B", "ネイティブ"],
+                     candidates: ["辞書A", "辞書B"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -179,7 +179,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         // ユーザー辞書 exact は履歴 exact と同等扱いで初期選択される。
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Acme", "辞書A", "辞書B", "アイ"],
+                     candidates: ["Acme", "辞書A", "辞書B"],
                      historyEnd: 1, fixedEnd: 1, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -190,7 +190,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Acme", "愛", "辞書A", "辞書B", "アイ"],
+                     candidates: ["Acme", "愛", "辞書A", "辞書B"],
                      historyEnd: 2, fixedEnd: 1, initialRow: 1)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -200,7 +200,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "Acme")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Acme", "辞書B", "アイ"],
+                     candidates: ["Acme", "辞書B"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
@@ -230,8 +230,8 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         XCTAssertEqual(p.historyEnd, 0, "履歴なしなら historyEnd=0")
         XCTAssertEqual(Array(p.candidates[0..<expectedDates.count]), expectedDates,
                        "日時候補が先頭（historyEnd=0 の位置）から並ぶはず: \(p.candidates)")
-        XCTAssertEqual(Array(p.candidates.suffix(3)), ["今日", "本日", "キョウ"],
-                       "AzooKey 候補は日時候補の後ろ・カタカナは末尾: \(p.candidates)")
+        XCTAssertEqual(Array(p.candidates.suffix(2)), ["今日", "本日"],
+                       "AzooKey 候補は日時候補の後ろ: \(p.candidates)")
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -251,7 +251,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(trigger: .whileTyping),
-                     candidates: ["愛", "アイ"],
+                     candidates: ["愛"],
                      historyEnd: 1, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
     }
@@ -268,7 +268,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["UD合い", "愛", "辞書A", "アイ"],
+                     candidates: ["UD合い", "愛", "辞書A"],
                      historyEnd: 2, fixedEnd: 1, initialRow: 1)
         assertInjectPathMatchesSync(stub: stub)
     }

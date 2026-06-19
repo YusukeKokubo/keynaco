@@ -37,16 +37,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertTrue(payload.candidates.contains("アイ"), "カタカナが候補に含まれるはず")
     }
 
-    func testKatakanaInCandidatesWhenSpacePressed() {
-        type(chars: "a", base: "a")
-        let (consumed, action) = press(keyCode: 49)
-        XCTAssertTrue(consumed)
-        guard let payload = action.showPayload else {
-            XCTFail(".show を返すはず"); return
-        }
-        XCTAssertTrue(payload.candidates.contains("ア"), "カタカナが候補に含まれるはず")
-    }
-
     // MARK: - 漢字変換（azooKey）
 
     /// 組成中 + 候補表示では marked text が選択行に追従する（`InputController` 経路）。
@@ -175,21 +165,23 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertEqual(payload.candidates[payload.initialRow], "これ")
     }
 
-    func testUnknownWordShowsKatakanaCandidate() {
-        // 未知語（カタカナ・ひらがな以外の候補なし）: カタカナがカタカナセクションに現れる
-        setUpWithConverter(SnapStub(["グロトスク", "ぐろとすく"]))
-        handler.state.composedHiragana = "ぐろとすく"
+    func testAzooKeyKatakanaPassesThroughDictSection() {
+        // AzooKey がカタカナ表記を返したらそのまま辞書セクションに出る。
+        // 既知語（しゃつ→シャツ など）はこの経路で表示される。
+        setUpWithConverter(SnapStub(["しゃつ", "謝通門", "シャツ", "洋袗"]))
+        handler.state.composedHiragana = "しゃつ"
         handler.state.pendingRomaji = ""
         let action = handler.buildCandidateList(trigger: .whileTyping)
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertTrue(payload.candidates.contains("グロトスク"), "未知語でもカタカナ候補が表示されるはず")
-        XCTAssertTrue(payload.candidates.contains("ぐろとすく"), "ひらがなも表示されるはず")
+        XCTAssertTrue(payload.candidates.contains("シャツ"),
+                      "AzooKey が返したカタカナは辞書セクションに出るはず: \(payload.candidates)")
     }
 
     func testSingleNonFixedCandidateFocusesBeyondFixedEnd() {
-        setUpWithConverter(SnapStub(["今回のことは誤解である", "コンカイノコトハゴカイデアル"]))
+        // ひらがな先頭固定 + 変換候補1件のとき、初期フォーカスは変換候補に当たる。
+        setUpWithConverter(SnapStub(["今回のことは誤解である"]))
         handler.state.composedHiragana = "こんかいのことはごかいである"
         handler.state.pendingRomaji = ""
         let action = handler.buildCandidateList(trigger: .whileTyping)
@@ -201,19 +193,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
                        "固定枠以外は変換候補1件のみのはず: \(payload.candidates)")
         XCTAssertEqual(payload.initialRow, 1)
         XCTAssertEqual(payload.candidates[payload.initialRow], "今回のことは誤解である")
-    }
-
-    func testKnownWordWithZenzaiDoesNotShowKatakanaInMainList() {
-        // 実質的な変換候補がある場合: カタカナは主要リストに出ない（既存の仕様を保護）
-        setUpWithConverter(SnapStub(["良いのでは", "ヨイノデハ", "よいのでは"], zenzai: true))
-        handler.leftContext = .testing(combined: "prefix")
-        handler.state.composedHiragana = "よいのでは"
-        handler.state.pendingRomaji = ""
-        let action = handler.buildCandidateList(trigger: .whileTyping)
-        guard let payload = action.showPayload else {
-            XCTFail(".show を返すはず"); return
-        }
-        XCTAssertFalse(payload.candidates.contains("ヨイノデハ"), "変換候補がある場合はカタカナを除外")
     }
 
     func testHiraganaInHistoryAppearsAsHistoryCandidate() {
@@ -273,17 +252,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         typeRomaji("ai")
         press(keyCode: 36, candidateVisible: true, selectedText: "アイ", isExplicitlySelected: true)
         XCTAssertEqual(client.inserted, ["アイ"], "カタカナ候補を確定できるはず")
-    }
-
-    func testSpaceWithUnknownReadingShowsHiraganaAndKatakana() {
-        type(chars: "u", base: "u")
-        let (consumed, action) = press(keyCode: 49)
-        XCTAssertTrue(consumed)
-        guard let payload = action.showPayload else {
-            XCTFail(".show を返すはず"); return
-        }
-        XCTAssertTrue(payload.candidates.contains("う"))
-        XCTAssertTrue(payload.candidates.contains("ウ"))
     }
 
     // MARK: - 候補ウィンドウ中のキーナビゲーション

@@ -333,7 +333,6 @@ extension InputHandler {
         }
 
         let hiragana = state.composedHiragana
-        let katakana = KanaUtils.hiraganaToKatakana(hiragana)
         let hiraganaInHistory = sources.exactMatchHighHistory.contains(hiragana)
             || sources.highHistory.contains(hiragana)
         let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
@@ -349,7 +348,6 @@ extension InputHandler {
         let built = CandidateSectionBuilder.build(CandidateSectionBuildInput(
             reading: h,
             hiragana: hiragana,
-            katakana: katakana,
             azooKeyCandidates: sources.azooKeyCandidates,
             azooKeyApiOrder: sources.azooKeyApiOrder,
             userDictRaw: sources.userDictRaw,

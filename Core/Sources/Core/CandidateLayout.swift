@@ -8,8 +8,7 @@ struct CandidateSection: Sendable {
         case highHistory    // 前方一致などその他の高スコア履歴
         case number         // 数値変換
         case dateTime       // 日時変換
-        case azooKeyDict    // AzooKey 辞書候補（Zenzai 推論結果も内部スコアに込みでこのセクションに混ざる）
-        case katakana       // カタカナ変換（末尾固定）
+        case azooKeyDict    // AzooKey 辞書候補（Zenzai 推論結果・カタカナ表記も内部スコアに込みでこのセクションに混ざる）
     }
 
     let kind: Kind
@@ -54,7 +53,6 @@ struct CandidateLayout: Sendable {
         .number, .dateTime,
         .azooKeyDict,
         .highHistory,
-        .katakana,
     ]
 
     /// 読み完全一致の履歴あり。固定枠の直後に exactMatch を出し、辞書の後ろに前方一致履歴を置く。
@@ -65,7 +63,6 @@ struct CandidateLayout: Sendable {
         .number, .dateTime,
         .azooKeyDict,
         .highHistory,
-        .katakana,
     ]
 
     init(
