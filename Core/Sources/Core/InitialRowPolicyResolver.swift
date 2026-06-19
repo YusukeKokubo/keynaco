@@ -9,7 +9,6 @@ enum CandidateFixedSlot: Equatable, Sendable {
 struct InitialRowPolicyInput: Equatable, Sendable {
     let reading: String
     let fixedSlot: CandidateFixedSlot
-    let hiraganaInHistory: Bool
     /// 読み完全一致の履歴（スコア順）。非空なら初期選択する。
     let exactMatchHighHistory: [String]
     /// 読み完全一致のユーザー辞書エントリ。履歴より弱く、AzooKey 辞書より強い。

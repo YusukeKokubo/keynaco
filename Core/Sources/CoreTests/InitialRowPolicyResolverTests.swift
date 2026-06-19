@@ -6,7 +6,6 @@ final class InitialRowPolicyResolverTests: XCTestCase {
     private func resolve(
         reading: String = "あい",
         fixedSlot: CandidateFixedSlot = .none,
-        hiraganaInHistory: Bool = false,
         exactMatchHighHistory: [String] = [],
         userDictExact: [String] = [],
         prefixFocusCandidate: String? = nil,
@@ -16,7 +15,6 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
             reading: reading,
             fixedSlot: fixedSlot,
-            hiraganaInHistory: hiraganaInHistory,
             exactMatchHighHistory: exactMatchHighHistory,
             userDictExact: userDictExact,
             prefixFocusCandidate: prefixFocusCandidate,

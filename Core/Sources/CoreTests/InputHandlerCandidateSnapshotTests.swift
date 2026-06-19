@@ -115,9 +115,12 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         useStub(SnapStub(["辞書A", "辞書B"]))
         handler.db.record(input: "の", output: "の")
         typeRomaji("no")
+        // 履歴の `の` は固定枠で先取りされ、CandidateLayout の dedup で
+        // exactMatchHistory 側は脱落。fixedEnd=1, historyEnd=1 で空の履歴範囲となり、
+        // 第一行の `の` は Shift+Delete 不可。
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "辞書A", "辞書B"],
-                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 

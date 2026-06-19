@@ -271,14 +271,8 @@ extension InputHandler {
     /// 候補ヘッドの過剰膨張を抑える前方一致履歴の上限件数。
     private static let maxHighHistoryCount = 3
 
-    private func resolveFixedSlot(
-        reading: String,
-        hiraganaInHistory: Bool
-    ) -> CandidateFixedSlot {
-        if isHiraganaPreferred(reading) {
-            return hiraganaInHistory ? .none : .hiragana
-        }
-        return .none
+    private func resolveFixedSlot(reading: String) -> CandidateFixedSlot {
+        isHiraganaPreferred(reading) ? .hiragana : .none
     }
 
     private mutating func assembleCandidateList(
@@ -290,9 +284,7 @@ extension InputHandler {
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
         let hiragana = state.composedHiragana
-        let hiraganaInHistory = sources.exactMatchHighHistory.contains(hiragana)
-            || sources.highHistory.contains(hiragana)
-        let fixedSlot = resolveFixedSlot(reading: h, hiraganaInHistory: hiraganaInHistory)
+        let fixedSlot = resolveFixedSlot(reading: h)
 
         // 打鍵中で出すべき素材がゼロなら候補窓自体出さない（AzooKey 結果待ちの placeholder は廃止）。
         // hiraganaPreferred 経路（fixedSlot=.hiragana）は明示的な意図なので維持する。
@@ -309,7 +301,6 @@ extension InputHandler {
                 reading: h,
                 outcome: .dismissedEmpty,
                 fixedSlot: .none,
-                hiraganaInHistory: false,
                 sources: sources,
                 built: nil,
                 policy: .afterFixed,
@@ -352,7 +343,6 @@ extension InputHandler {
         let policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
             reading: h,
             fixedSlot: fixedSlot,
-            hiraganaInHistory: hiraganaInHistory,
             exactMatchHighHistory: sources.exactMatchHighHistory,
             userDictExact: sources.userDictExact,
             prefixFocusCandidate: prefixFocusCandidate,
@@ -384,7 +374,6 @@ extension InputHandler {
                 reading: h,
                 outcome: .dismissedEmpty,
                 fixedSlot: fixedSlot,
-                hiraganaInHistory: hiraganaInHistory,
                 sources: sources,
                 built: built,
                 policy: policy,
@@ -401,7 +390,6 @@ extension InputHandler {
                 reading: h,
                 outcome: .dismissedEmpty,
                 fixedSlot: fixedSlot,
-                hiraganaInHistory: hiraganaInHistory,
                 sources: sources,
                 built: built,
                 policy: policy,
@@ -422,7 +410,6 @@ extension InputHandler {
                 reading: h,
                 outcome: .dismissedFunctionalWord,
                 fixedSlot: fixedSlot,
-                hiraganaInHistory: hiraganaInHistory,
                 sources: sources,
                 built: built,
                 policy: policy,
@@ -440,7 +427,6 @@ extension InputHandler {
             reading: h,
             outcome: .shown,
             fixedSlot: fixedSlot,
-            hiraganaInHistory: hiraganaInHistory,
             sources: sources,
             built: built,
             policy: policy,
@@ -463,7 +449,6 @@ extension InputHandler {
         reading: String,
         outcome: CandidateBuildDiagnostics.Outcome,
         fixedSlot: CandidateFixedSlot,
-        hiraganaInHistory: Bool,
         sources: CandidateListSources,
         built: CandidateSectionBuildResult?,
         policy: InitialRowPolicy,
@@ -480,7 +465,6 @@ extension InputHandler {
             fixedSlot: CandidateBuildDiagnosticsSupport.fixedSlotLabel(fixedSlot),
             hiraganaPreferred: hiraganaPreferredSet.contains(reading),
             hiraganaBuiltin: HiraganaPreferredBuiltins.words[reading] != nil,
-            hiraganaInHistory: hiraganaInHistory,
             exactMatchHighHistory: sources.exactMatchHighHistory,
             highHistory: sources.highHistory,
             userDictExact: sources.userDictExact,

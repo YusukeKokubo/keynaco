@@ -17,7 +17,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
     public var fixedSlot: String
     public var hiraganaPreferred: Bool
     public var hiraganaBuiltin: Bool
-    public var hiraganaInHistory: Bool
     public var exactMatchHighHistory: [String]
     public var highHistory: [String]
     public var userDictExact: [String]
@@ -61,7 +60,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             "fixedSlot": fixedSlot,
             "hiraganaPreferred": hiraganaPreferred,
             "hiraganaBuiltin": hiraganaBuiltin,
-            "hiraganaInHistory": hiraganaInHistory,
             "exactMatchHighHistory": exactMatchHighHistory,
             "highHistory": highHistory,
             "userDictExact": userDictExact,

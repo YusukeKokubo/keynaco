@@ -818,7 +818,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             lines.append("fixedSlot                : \(build.fixedSlot)")
             lines.append("hiraganaPreferred(DB)    : \(build.hiraganaPreferred)")
             lines.append("hiraganaBuiltin          : \(build.hiraganaBuiltin)")
-            lines.append("hiraganaInHistory        : \(build.hiraganaInHistory)")
             lines.append("exactMatchHighHistory    : \(build.exactMatchHighHistory)")
             lines.append("highHistory              : \(build.highHistory)")
             lines.append("userDictExact            : \(build.userDictExact)")
@@ -899,7 +898,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                 if !val.isEmpty { lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(val)") }
             }
             for key in [
-                "hiraganaPreferred", "hiraganaBuiltin", "hiraganaInHistory",
+                "hiraganaPreferred", "hiraganaBuiltin",
                 "deferAzooKeyWhileTyping",
             ] {
                 lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(buildStr(key))")

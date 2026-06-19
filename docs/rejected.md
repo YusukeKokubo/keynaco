@@ -4,6 +4,42 @@
 
 ---
 
+## P-6 `hiraganaInHistory`（履歴に同じひらがなが居るときに固定枠を抑止）（2026-06-19 削除）
+
+**概要**: `isHiraganaPreferred(reading)` で固定ひらがな枠（`fixedSlot=.hiragana`）を出す経路で、組成中のひらがなが履歴（`exactMatchHighHistory` or `highHistory`）にも含まれているとき、`fixedSlot=.none` にフォールバックして固定枠を作らない実装。`CandidateBuildDiagnostics.hiraganaInHistory` フラグ・`InitialRowPolicyInput.hiraganaInHistory` フィールドが関与。
+
+**何が冗長だったか**:
+
+- **見た目の重複は `CandidateLayout.init` の `seen` で既に dedup されとる**: 固定枠と履歴セクションが同じ文字列を持っとっても、セクション順に flatten する際に `seen.insert.inserted` で 2 度目は弾かれる。`hiraganaInHistory` を見なくても候補リストに同じ行が並ぶことはない
+- **`InitialRowPolicyInput.hiraganaInHistory` フィールドはデッドコード**: `InitialRowPolicyResolver.resolve` は `fixedSlot` しか参照しとらん。フィールドを `Input` に持たせとるだけで、policy 決定には一切寄与しとらんかった
+- **唯一観測可能だった差は Shift+Delete の可否**: `fixedSlot=.none` だと hiragana 行が history 範囲（`fixedEnd <= row < historyEnd`）に入り Shift+Delete で履歴削除可能、`.hiragana` だと fixed 範囲に入って削除不可。ただし
+  - builtin 機能語（`の`/`は`/`を` 等）は function-word check で候補窓自体 dismiss されるため、Shift+Delete は元から発火しない
+  - ユーザー設定 `hiraganaPreferred` 語は「明示的にひらがな優先」と登録した語であり、履歴から消したいなら設定リストから外すのが筋。同じ文字列の Shift+Delete 動線を別途用意する必要性が薄い
+
+**削除の理由**:
+
+- 仕様としても dead field（`InitialRowPolicyResolver.resolve` が参照しとらん）
+- 残すと「`hiraganaInHistory` で何かが切り替わっとる」と読み手に誤解させる
+- ログ（`input_log.jsonl` / `latency_log.jsonl`）に flag の効果を測定できる計装がなく、効果検証も不可能だった
+
+**残すもの**: `isHiraganaPreferred` 自体（`hiraganaPreferredSet` ＋ `HiraganaPreferredBuiltins`）、`fixedSlot=.hiragana` 経路、function-word による打鍵中 dismiss（`HiraganaPreferredBuiltins.words[layout.candidates[initialRow]] != nil`）。
+
+**削除した周辺**:
+
+- `InputHandler+Candidates.swift` の `hiraganaInHistory` 計算と `resolveFixedSlot(hiraganaInHistory:)` パラメータ
+- `InitialRowPolicyInput.hiraganaInHistory` フィールド
+- `CandidateBuildDiagnostics.hiraganaInHistory` フィールド・dict キー
+- `IMESandboxWindow` のデバッグ表示行 2 箇所
+- `InitialRowPolicyResolverTests` の `hiraganaInHistory:` パラメータ
+
+**挙動の差分**: 観察可能な差は `testSnap_C3_HiraganaPreferredHiraganaInHistory` の `fixedEnd` のみ（`0 → 1`）。候補リスト本体（`candidates: [の, 辞書A, 辞書B]`）と initialRow は変わらず。
+
+**再検討するなら**: ユーザーから「`hiraganaPreferred` 登録した語を後から履歴削除したい」という声が複数件出たとき。ただしその場合は固定枠を出し分けるよりも、設定 UI で `hiraganaPreferred` リストから外す→自動で関連履歴も消す動線のほうが直感的。
+
+> 関連: `docs/retrospectives.md`「過去の fix コミット＋保護テストの組み合わせは『バグ仕様』として固着しうる」。`testSnap_C3` も PLAN260519 で「履歴重複 → fixedEnd=0」を化石化しとったが、deadfield 削除に合わせて期待値を更新した
+
+---
+
 ## R-1 `hiddenPendingN`（`nn` 後の非表示 pending n）（2026-06-16 削除）
 
 **概要**: `"nn"` → `ん` のあと、2 つ目の `n` を非表示の pending として残し、続く母音・`y`・`n` と組み合わせてナ行・拗音を作る実装。`CompositionState.hiddenPendingN` フラグで `composingText`・確定・Backspace・Enter 時 trailing romaji 判定を横断管理していた（2026-05 頃導入。当時「標準 IME 準拠」と称した）。
