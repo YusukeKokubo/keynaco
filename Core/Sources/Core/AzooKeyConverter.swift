@@ -283,7 +283,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
         var rest = [Candidate]()
         for c in base {
             let rubySum = c.data.reduce(0) { $0 + $1.ruby.count }
-            if c.data.count == 1 && rubySum == inputLength {
+            let isMachineGeneratedKatakana = c.data.count == 1
+                && c.data.first.map { $0.ruby == c.text && $0.lcid == CIDData.固有名詞.cid } ?? false
+            if c.data.count == 1 && rubySum == inputLength && !isMachineGeneratedKatakana {
                 exact.append(c)
             } else {
                 rest.append(c)

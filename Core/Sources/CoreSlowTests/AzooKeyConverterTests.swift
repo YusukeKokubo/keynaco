@@ -142,4 +142,19 @@ final class AzooKeyConverterTests: XCTestCase {
         XCTAssertTrue(wakaranai.contains("分からない") || wakaranai.contains("わからない"),
             "予測でない「分からない」は残るはず: \(wakaranai)")
     }
+
+    /// 長文ひらがな読みで AzooKey の機械生成カタカナ候補が exact プロモートで Z1 に
+    /// 上がる事故を防ぐ。`getAdditionalCandidate` が `ruby == text かつ lcid == 固有名詞`
+    /// として返す候補を exact 枠から除外して、辞書ヒット候補に Z1 を譲る。
+    func testLongReadingMachineGeneratedKatakanaIsNotPromoted() {
+        let converter = AzooKeyConverter()
+        let texts = converter.requestCandidates(hiragana: "かくにんがひつようですね").texts
+        // 「確認が必要ですね」のような漢字混じり候補 or ひらがな候補が、機械生成カタカナより前に来る
+        guard let idxKatakana = texts.firstIndex(of: "カクニンガヒツヨウデスネ") else {
+            return  // そもそも候補に出てなければスキップ（辞書次第）
+        }
+        let earlierCandidates = Array(texts.prefix(idxKatakana))
+        XCTAssertFalse(earlierCandidates.isEmpty,
+            "カタカナ機械生成より前にひらがな or 漢字混じり候補が少なくとも 1 件は来るはず: \(texts.prefix(5))")
+    }
 }
