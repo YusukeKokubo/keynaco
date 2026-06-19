@@ -376,6 +376,17 @@ extension InputHandler {
 
         let zenzaiActive = azooKeyConverter.isZenzaiEnabled && leftContext.azooKeyValue != nil
         let apiOrder = zenzaiActive ? sources.azooKeyApiOrder : []
+        if !sources.exactMatchHighHistory.isEmpty {
+            lastInitialRowReason = "exactMatchHistory"
+        } else if !sources.userDictExact.isEmpty {
+            lastInitialRowReason = "userDictExact"
+        } else if prefixFocusCandidate != nil {
+            lastInitialRowReason = "prefixFocus"
+        } else if !sources.azooKeyCandidates.isEmpty {
+            lastInitialRowReason = "azooKey"
+        } else {
+            lastInitialRowReason = "afterFixed"
+        }
         #if DEBUG
         recordCandidateBuildDiagnostics(
             trigger: trigger,

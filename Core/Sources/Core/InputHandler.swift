@@ -192,6 +192,8 @@ public struct InputHandler {
 
     /// `commitComposition` で Z1 ≠ confirmed を検出した直近 1 件。`InputController` が引き取って flush する。
     public var pendingDivergenceRecord: CandidateDivergenceRecord? = nil
+    /// 直近 `assembleCandidateList` で決定した初期行の理由ラベル。divergence log に付与する。
+    var lastInitialRowReason: String = "afterFixed"
     /// 直近 `doBackspace` で `penalizeAll` が実行されたか。次キーで `InputController` が前セッション record に反映。
     public var lastKeyDownDidPenalize = false
     /// 左文脈の解決結果。`LeftContextSource` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
@@ -310,15 +312,27 @@ public struct InputHandler {
             || Self.sentenceTerminators.contains(committedText)
         guard !isPunct else { return }
         let candidatesTop = Array(candidateSession.candidates.prefix(8))
+        let row = candidateSession.selectedRow
+        let confirmedSource: String
+        if row < candidateSession.fixedEnd {
+            confirmedSource = "fixed"
+        } else if row < candidateSession.historyEnd {
+            confirmedSource = "history"
+        } else {
+            confirmedSource = "dict"
+        }
         pendingDivergenceRecord = CandidateDivergenceRecord(
             ts: nowMs,
             reading: reading,
             z1: z1,
             confirmed: committedText,
-            selectedRow: candidateSession.selectedRow,
+            selectedRow: row,
             wasExplicit: wasExplicit,
             candidates: candidatesTop,
-            leftContext: leftContext.azooKeyValue
+            leftContext: leftContext.azooKeyValue,
+            confirmedSource: confirmedSource,
+            initialRow: candidateSession.initialRow,
+            initialRowReason: lastInitialRowReason
         )
     }
 

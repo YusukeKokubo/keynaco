@@ -15,6 +15,12 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
     public let wasExplicit: Bool
     public let candidates: [String]
     public let leftContext: String?
+    /// 確定候補のセクション由来。"fixed"（ひらがな固定/ユーザー辞書）/ "history" / "dict"。
+    public let confirmedSource: String
+    /// `.show` 時の初期選択行。ユーザーがスクロールしていれば `selectedRow` と異なる。
+    public let initialRow: Int
+    /// 初期行を選んだ理由。"exactMatchHistory" / "userDictExact" / "prefixFocus" / "azooKey" / "afterFixed"。
+    public let initialRowReason: String
 
     public init(
         ts: Int,
@@ -24,7 +30,10 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
         selectedRow: Int,
         wasExplicit: Bool,
         candidates: [String],
-        leftContext: String?
+        leftContext: String?,
+        confirmedSource: String,
+        initialRow: Int,
+        initialRowReason: String
     ) {
         self.ts = ts
         self.reading = reading
@@ -34,6 +43,9 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
         self.wasExplicit = wasExplicit
         self.candidates = candidates
         self.leftContext = leftContext
+        self.confirmedSource = confirmedSource
+        self.initialRow = initialRow
+        self.initialRowReason = initialRowReason
     }
 
     public func asDictionary() -> [String: Any] {
@@ -45,6 +57,9 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
             "selected_row": selectedRow,
             "was_explicit": wasExplicit,
             "candidates": candidates,
+            "confirmed_source": confirmedSource,
+            "initial_row": initialRow,
+            "initial_row_reason": initialRowReason,
         ]
         if let leftContext { dict["left_context"] = leftContext }
         return dict
