@@ -24,6 +24,7 @@ class InputController: IMKInputController, @unchecked Sendable {
     /// 直前セッション終了時に生成したレコード。次キーで penalize 判定後に書き込む。
     private var pendingInputRecord: InputSessionRecord? = nil
     private let inputQualityLogger = InputQualityLogger()
+    private let divergenceLogger = CandidateDivergenceLogger()
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
@@ -136,6 +137,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             appVersion: version
         )
         inputQualityLogger.flushForced()
+        divergenceLogger.flushForced()
         super.deactivateServer(sender)
     }
 
@@ -371,6 +373,11 @@ class InputController: IMKInputController, @unchecked Sendable {
         if let record = handler.pendingSessionRecord {
             pendingInputRecord = record
             handler.pendingSessionRecord = nil
+        }
+        if let divergence = handler.pendingDivergenceRecord {
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+            divergenceLogger.append(record: divergence, appVersion: version)
+            handler.pendingDivergenceRecord = nil
         }
     }
 

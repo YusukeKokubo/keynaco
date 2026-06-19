@@ -37,6 +37,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             InputQualityLogger.trimIfNeeded(fileURL: InputQualityLogger.inputLogURL)
         }
         Task.detached(priority: .background) {
+            CandidateDivergenceLogger.trimIfNeeded(fileURL: CandidateDivergenceLogger.logURL)
+        }
+        Task.detached(priority: .background) {
             InputController.performPOSBackfill()
         }
     }

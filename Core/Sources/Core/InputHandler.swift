@@ -189,6 +189,9 @@ public struct InputHandler {
     public var sessionTracker = InputSessionTracker()
     /// 直近セッション終了後に `InputController` へ渡す記録（書き込み前）。
     public var pendingSessionRecord: InputSessionRecord? = nil
+
+    /// `commitComposition` で Z1 ≠ confirmed を検出した直近 1 件。`InputController` が引き取って flush する。
+    public var pendingDivergenceRecord: CandidateDivergenceRecord? = nil
     /// 直近 `doBackspace` で `penalizeAll` が実行されたか。次キーで `InputController` が前セッション record に反映。
     public var lastKeyDownDidPenalize = false
     /// 左文脈の解決結果。`LeftContextSource` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
@@ -284,7 +287,39 @@ public struct InputHandler {
             scrollCount: sessionTracker.scrollCount,
             anomaly: anomaly
         )
+        recordCandidateDivergenceIfAny(
+            reading: inputKey,
+            committedText: committedText,
+            wasExplicit: candidate.isExplicitlySelected,
+            nowMs: nowMs
+        )
         sessionTracker.reset()
+    }
+
+    /// Zenzai が推した Z1（`candidateSession.azooKeyApiOrder.first`）と実確定が違うときだけ 1 件残す。
+    /// Zenzai 無効 / 文脈なし時（`azooKeyApiOrder` 空）と、句読点・数字・日時の確定は対象外。
+    private mutating func recordCandidateDivergenceIfAny(
+        reading: String,
+        committedText: String,
+        wasExplicit: Bool,
+        nowMs: Int
+    ) {
+        let apiOrder = candidateSession.azooKeyApiOrder
+        guard let z1 = apiOrder.first, z1 != committedText else { return }
+        let isPunct = Self.readingPunctuations.contains(committedText)
+            || Self.sentenceTerminators.contains(committedText)
+        guard !isPunct else { return }
+        let candidatesTop = Array(candidateSession.candidates.prefix(8))
+        pendingDivergenceRecord = CandidateDivergenceRecord(
+            ts: nowMs,
+            reading: reading,
+            z1: z1,
+            confirmed: committedText,
+            selectedRow: candidateSession.selectedRow,
+            wasExplicit: wasExplicit,
+            candidates: candidatesTop,
+            leftContext: leftContext.azooKeyValue
+        )
     }
 
     /// prefix-focus で短い読みで確定した場合に canonical reading（AzooKey のキャッシュ ruby）を返す。

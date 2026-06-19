@@ -155,6 +155,7 @@ Instruments によるプロファイリングは IME では実用的でない（
 |------|------|------|
 | `latency_log.jsonl` | `~/Library/Application Support/keynaco/latency_log.jsonl` | 変換レイテンシ・キャッシュヒット率（セッション単位）。`/keynaco-latency-profiler` スキルで分析 |
 | `input_log.jsonl` | `~/Library/Application Support/keynaco/input_log.jsonl` | 確定ごとの入力品質（`key_count`・`bs_count`・`composition_ms`・`was_explicit`）。バッファ 10 件 or `deactivateServer` でフラッシュ |
+| `divergence_log.jsonl` | `~/Library/Application Support/keynaco/divergence_log.jsonl` | Zenzai が推した Z1 と実確定が食い違ったケースだけ 1 行記録。`was_explicit=false` なら自動表示中の素通り事故、`true` なら Z1 精度の改善余地（カタカナ偏向など）。バッファ 10 件 or `deactivateServer` でフラッシュ |
 
 ## テスト方針
 
