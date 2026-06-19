@@ -4,6 +4,43 @@
 
 ---
 
+## P-7 AzooKey 辞書セクション内 lcid 安定ソート（2026-06-19 削除）
+
+**概要**: AzooKey が返した候補配列を `LcidRank`（properNoun < noun < adjective < verb < unknown < particle < auxiliary）で安定ソートし直す実装。`InputHandler+Candidates.swift` の `sortAzooKeyCandidates` / `sortAzooKeyCandidatesByLcidRank` と、表示候補テキスト → 代表 lcid を返す `AzooKeyConverter.primaryLcidByText` が中核。導入時の意図は「Zenzai OFF や文脈なしでも、助詞より名詞、動詞より固有名詞を上に並べる」整序保険。
+
+**何が壊れていたか — Zenzai の文脈推論を静的ソートが上書き**:
+
+`soudatta` を `今日は` / `昨日は` / `彼は` などの左コンテキスト付きで打つと、Zenzai は「そうだった」を **API order 1 位**、「ソウダッタ」を **2 位**に推す（適切）。だが lcid ソートは AzooKey が「ソウダッタ」を `noun` 帯（lcid 1281…1305 のどれか）、「そうだった」を `verb` 帯（lcid 53…1280）として返してくるので、`noun(1) < verb(3)` で**ソウダッタを 1 位に押し上げる**。結果、文脈的にあり得ないカタカナ羅列が初期選択され、Enter 一発でカタカナが入る事故が発生していた。
+
+```
+入力: soudatta（left='今日は'）
+Zenzai 順序:                          表示順（lcid ソート後）:
+  1. そうだった                          1. ソウダッタ  ← 名詞 lcid で繰り上がり
+  2. ソウダッタ                          2. そうだった  ← 動詞 lcid で繰り下がり
+```
+
+**設計判断としての誤り**:
+
+- **Zenzai は LLM で文脈を見て確率分布をバイアスする仕組み**。lcid は AzooKey 辞書の連接 ID であり、文脈を一切見ない静的なメタデータ。後者で前者を上書きする道理がない
+- 「Zenzai OFF のときの保険」として導入された側面はあるが、Zenzai OFF は今や一番シンプルなフォールバック設定でしかなく、そこの整序のために Zenzai ON 体験を犠牲にするのは本末転倒
+- ソートが Zenzai を逆転させたかどうかは画面上から判別不能（candidate window に Zenzai rank 表示はあるが「逆転」イベントとして拾われない）。**サイレントに体感品質を落とす最悪のパターン**
+
+**削除した範囲**:
+
+- `InputHandler+Candidates.swift` の `sortAzooKeyCandidates` / `sortAzooKeyCandidatesByLcidRank` / `AzooKeyFetch` 中間構造
+- `AzooKeyConverter.primaryLcidByText` と `primaryLcidMap` ヘルパー、`AzooKeyConverting.primaryLcidByText` プロトコルメソッド
+- `InputHandlerAzooKeyLcidSortTests.swift`（保護していた挙動が消えるので化石化テストごと削除）
+- `AzooKeyConverterTests.testPrimaryLcidByTextReadsFromCacheAfterRequest`
+- `BaseAzooKeyStub` / `AzooKeyAsyncSchedulerTests` の `primaryLcidByText` スタブ実装
+
+**残すもの**: `LcidRank`（`InitialRowPolicyResolver.rankForPrefixFocus` の品詞別モーラ閾値で使用）、`AzooKeyLcidMapper.rank(for:)`（同上の正本）、`AzooKeyConverter.primaryLcid(from:)`（`lcidForCommitted` 経由で履歴の lcid 記録に使用）。
+
+**再検討するなら**: Zenzai が完全にオフかつ文脈なしの状況でも、AzooKey 生候補で助詞が冒頭に並ぶような目立つ崩れが観測されたとき。ただしその場合も「すべての候補を品詞でソート」ではなく「助詞・助動詞を末尾に回す」だけのフィルタにすべき。Zenzai が有効な経路には絶対に噛ませない。
+
+> 関連: `docs/retrospectives.md`「過去の fix コミット＋保護テストの組み合わせは『バグ仕様』として固着しうる」。`InputHandlerAzooKeyLcidSortTests` も「助詞より名詞を前へ」を化石化しとったが、Zenzai を逆転させる害のほうが大きかった
+
+---
+
 ## P-6 `hiraganaInHistory`（履歴に同じひらがなが居るときに固定枠を抑止）（2026-06-19 削除）
 
 **概要**: `isHiraganaPreferred(reading)` で固定ひらがな枠（`fixedSlot=.hiragana`）を出す経路で、組成中のひらがなが履歴（`exactMatchHighHistory` or `highHistory`）にも含まれているとき、`fixedSlot=.none` にフォールバックして固定枠を作らない実装。`CandidateBuildDiagnostics.hiraganaInHistory` フラグ・`InitialRowPolicyInput.hiraganaInHistory` フィールドが関与。

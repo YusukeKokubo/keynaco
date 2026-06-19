@@ -9,8 +9,6 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
     func commit(reading: String, text: String)
     /// 確定済み `(reading, output)` に対応する AzooKey 辞書エントリの代表 `lcid` を返す。
     func lcidForCommitted(reading: String, output: String) -> Int?
-    /// `requestCandidates` 直後の `candidateCache` から、表示候補テキスト → 代表 `lcid` を返す（変換は再実行しない）。
-    func primaryLcidByText(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String: Int]
     /// キャッシュから候補の canonical reading（ruby 連結）を返す。キャッシュミスの場合は nil。
     func canonicalReading(for reading: String, text: String) -> String?
 }
@@ -31,11 +29,6 @@ extension AzooKeyConverting {
     }
 
     func lcidForCommitted(reading: String, output: String) -> Int? { nil }
-
-    func primaryLcidByText(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String: Int] {
-        _ = (hiragana, leftSideContext, richCandidates)
-        return [:]
-    }
 
     func canonicalReading(for reading: String, text: String) -> String? { nil }
 }

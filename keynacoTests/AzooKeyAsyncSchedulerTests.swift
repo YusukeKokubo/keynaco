@@ -96,8 +96,4 @@ private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {
     func commit(reading: String, text: String) { _ = (reading, text) }
 
     func lcidForCommitted(reading: String, output: String) -> Int? { nil }
-
-    func primaryLcidByText(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [String: Int] {
-        [:]
-    }
 }

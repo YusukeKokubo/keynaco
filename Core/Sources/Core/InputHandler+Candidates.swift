@@ -52,17 +52,12 @@ extension InputHandler {
             )
             : nil
         let peekRaw = peek?.candidates ?? []
-        let azooKeyCandidates = sortAzooKeyCandidates(
-            peekRaw.texts,
-            reading: h,
-            richCandidates: true
-        )
         let pendingReading: String? = needsAzooKey && peek?.needsAsyncFetch != false ? h : nil
         let cheap = collectCheapCandidateSources(readingOverride: h)
         let sources = makeCandidateListSources(
             h: h,
             cheap: cheap,
-            azooKeyCandidates: azooKeyCandidates,
+            azooKeyCandidates: peekRaw.texts,
             azooKeyApiOrder: peekRaw.texts
         )
         let action = assembleCandidateList(from: sources, trigger: trigger)
@@ -79,16 +74,11 @@ extension InputHandler {
         trigger: CandidateListTrigger = .whileTyping
     ) -> CandidateAction {
         guard state.composedHiragana == reading else { return .none }
-        let sorted = sortAzooKeyCandidates(
-            azooKeyCandidates.texts,
-            reading: reading,
-            richCandidates: true
-        )
         let cheap = collectCheapCandidateSources(readingOverride: reading)
         let sources = makeCandidateListSources(
             h: reading,
             cheap: cheap,
-            azooKeyCandidates: sorted,
+            azooKeyCandidates: azooKeyCandidates.texts,
             azooKeyApiOrder: azooKeyCandidates.texts
         )
         let action = assembleCandidateList(from: sources, trigger: trigger)
@@ -123,7 +113,7 @@ extension InputHandler {
     private struct CandidateListSources {
         let h: String
         let azooKeyCandidates: [String]
-        /// LCID ソート前の AzooKey API 順序。Zenzai 順位表示用。
+        /// AzooKey API の返却順（Zenzai 込み）。Zenzai 順位ラベル表示と `exactMatchHighHistory` の並べ替えに使う。
         let azooKeyApiOrder: [String]
         let userDictRaw: [String]
         /// 読み完全一致のユーザー辞書（初期選択行判定用）。
@@ -143,12 +133,12 @@ extension InputHandler {
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
         let cheap = collectCheapCandidateSources(readingOverride: readingOverride)
-        let fetch = fetchAzooKeyCandidates(reading: h, trigger: trigger)
+        let azooKeyCandidates = fetchAzooKeyCandidates(reading: h, trigger: trigger)
         return makeCandidateListSources(
             h: h,
             cheap: cheap,
-            azooKeyCandidates: fetch.sorted,
-            azooKeyApiOrder: fetch.apiOrder
+            azooKeyCandidates: azooKeyCandidates,
+            azooKeyApiOrder: azooKeyCandidates
         )
     }
 
@@ -194,53 +184,18 @@ extension InputHandler {
         )
     }
 
-    private struct AzooKeyFetch {
-        let sorted: [String]
-        /// LCID ソート前の filtered 配列。各候補の AzooKey 内部順位を Zenzai 表示用に残す。
-        let apiOrder: [String]
-    }
-
     private mutating func fetchAzooKeyCandidates(
         reading: String,
         trigger: CandidateListTrigger
-    ) -> AzooKeyFetch {
-        guard !reading.allSatisfy({ $0.isASCII }) else { return AzooKeyFetch(sorted: [], apiOrder: []) }
+    ) -> [String] {
+        guard !reading.allSatisfy({ $0.isASCII }) else { return [] }
         let richCandidates = trigger == .explicit
         let raw = azooKeyConverter.requestCandidates(
             hiragana: reading,
             leftSideContext: leftContext.azooKeyValue,
             richCandidates: richCandidates
         )
-        let sorted = sortAzooKeyCandidates(raw.texts, reading: reading, richCandidates: richCandidates)
-        return AzooKeyFetch(sorted: sorted, apiOrder: raw.texts)
-    }
-
-    private func sortAzooKeyCandidates(
-        _ candidates: [String],
-        reading: String,
-        richCandidates: Bool
-    ) -> [String] {
-        guard candidates.count > 1 else { return candidates }
-        let lcidByText = azooKeyConverter.primaryLcidByText(
-            hiragana: reading,
-            leftSideContext: leftContext.azooKeyValue,
-            richCandidates: richCandidates
-        )
-        return Self.sortAzooKeyCandidatesByLcidRank(candidates, lcidByText: lcidByText)
-    }
-
-    /// AzooKey 辞書セクション内の lcid 安定ソート。`lcidByText` が空なら入力順を維持。
-    static func sortAzooKeyCandidatesByLcidRank(
-        _ candidates: [String],
-        lcidByText: [String: Int]
-    ) -> [String] {
-        guard candidates.count > 1, !lcidByText.isEmpty else { return candidates }
-        return candidates.enumerated().sorted { lhs, rhs in
-            let leftRank = LcidRank.from(lcid: lcidByText[lhs.element])
-            let rightRank = LcidRank.from(lcid: lcidByText[rhs.element])
-            if leftRank != rightRank { return leftRank < rightRank }
-            return lhs.offset < rhs.offset
-        }.map(\.element)
+        return raw.texts
     }
 
     private func makeCandidateListSources(

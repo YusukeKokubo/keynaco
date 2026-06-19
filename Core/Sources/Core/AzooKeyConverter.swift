@@ -62,19 +62,6 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return source.map { AzooKeyCandidate(text: $0.text, segmentCount: $0.data.count) }
     }
 
-    private static func primaryLcidMap(from candidates: [Candidate], inputLength: Int) -> [String: Int] {
-        let filtered = filterCandidatesForDisplay(candidates, inputLength: inputLength)
-        let source = filtered.isEmpty ? candidates : filtered
-        var map: [String: Int] = [:]
-        map.reserveCapacity(source.count)
-        for candidate in source {
-            if let lcid = primaryLcid(from: candidate.data) {
-                map[candidate.text] = lcid
-            }
-        }
-        return map
-    }
-
     /// XCTest 並列実行時に学習メモリのファイル競合を避けるため、テスト中はインスタンスごとに隔離する。
     private static func defaultMemoryURL() -> URL {
         let appSupport = FileManager.default
@@ -229,22 +216,6 @@ public final class AzooKeyConverter: @unchecked Sendable {
             insertCache(key: key, value: result.mainResults)
             return Self.displayCandidates(from: result.mainResults, inputLength: inputLength)
         }
-    }
-
-    /// `requestCandidates` と同じキャッシュキーで、表示候補テキスト → 代表 `lcid` を返す。
-    public func primaryLcidByText(
-        hiragana: String,
-        leftSideContext: String?,
-        richCandidates: Bool = false
-    ) -> [String: Int] {
-        guard !hiragana.isEmpty else { return [:] }
-        let key = Self.cacheKey(
-            segment: hiragana,
-            leftSideContext: leftSideContext,
-            richCandidates: richCandidates
-        )
-        guard let cached = candidateCache[key] else { return [:] }
-        return Self.primaryLcidMap(from: cached, inputLength: hiragana.count)
     }
 
     private static func composingCountValueStatic(_ candidate: Candidate) -> Int {
