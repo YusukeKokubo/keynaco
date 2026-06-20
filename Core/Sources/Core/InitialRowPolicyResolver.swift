@@ -28,6 +28,11 @@ enum InitialRowPolicyResolver {
         static let other = 5
     }
 
+    /// 前方一致フォーカスを許可する候補リスト上の最大行。
+    /// 候補ウィンドウは 8 行表示（index 0–7）なので、これ以降にフォーカスするとユーザーから見えない。
+    /// 「かみ→上社(行 26)」「きく→菊谷(行 25)」「かな→必ず(行 30)」のような暴発を抑制する。
+    static let maxPrefixFocusRow = 7
+
     /// 前方一致フォーカス用の品詞ランク。`lcid` → `pos`（NULL 行のみ）→ `.unknown`。
     static func rankForPrefixFocus(output: String, db: DatabaseManager) -> LcidRank {
         if let lcid = db.lcidForOutput(output) {
@@ -112,7 +117,9 @@ enum InitialRowPolicyResolver {
             if let first = input.userDictExact.first {
                 return .firstMatching(first)
             }
-            if let focus = input.prefixFocusCandidate {
+            if let focus = input.prefixFocusCandidate,
+               let row = input.candidateList.firstIndex(of: focus),
+               row <= Self.maxPrefixFocusRow {
                 return .firstMatching(focus)
             }
             if input.candidateList.first == input.reading {

@@ -107,6 +107,49 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         )
     }
 
+    /// 前方一致フォーカスが候補ウィンドウ可視範囲（行 0-7）に収まれば採用する。
+    func testPrefixFocusAcceptedAtMaxVisibleRow() {
+        let row7List = (0..<7).map { "row\($0)" } + ["必ず", "extra"]
+        XCTAssertEqual(
+            resolve(
+                reading: "かな",
+                prefixFocusCandidate: "必ず",
+                azooKeyCandidates: ["紙"],
+                candidateList: row7List
+            ),
+            .firstMatching("必ず")
+        )
+    }
+
+    /// 前方一致フォーカスが候補リストの深い位置（行 8 以降＝ウィンドウ不可視）に
+    /// 落ちる場合はフォーカスせず、後段ルール（AzooKey 先頭等）にフォールスルーする。
+    /// 「かな→必ず(行 30)」「かみ→上社(行 26)」「きく→菊谷(行 25)」型の暴発を抑制。
+    func testPrefixFocusBlockedWhenTooDeep() {
+        let deepList = (0..<8).map { "row\($0)" } + ["必ず"]  // 必ず は行 8
+        XCTAssertEqual(
+            resolve(
+                reading: "かな",
+                prefixFocusCandidate: "必ず",
+                azooKeyCandidates: ["row0"],
+                candidateList: deepList
+            ),
+            .firstMatching("row0")
+        )
+    }
+
+    /// 候補リストに focus が現れなくても採用しない（暴発抑制と整合）。
+    func testPrefixFocusBlockedWhenNotInCandidateList() {
+        XCTAssertEqual(
+            resolve(
+                reading: "かな",
+                prefixFocusCandidate: "必ず",
+                azooKeyCandidates: ["紙"],
+                candidateList: ["紙", "上"]
+            ),
+            .firstMatching("紙")
+        )
+    }
+
     /// 完全一致履歴は前方一致フォーカスより優先する。
     func testExactMatchHistoryBeatsPrefixFocus() {
         XCTAssertEqual(
