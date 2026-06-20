@@ -17,7 +17,9 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
 
 extension AzooKeyConverting {
     var isZenzaiEnabled: Bool { false }
-    var fetchLogger: FetchLogger { FetchLogger() }  // no-op default (個別 stub は無視できる)
+    /// テスト stub 向け no-op 共有インスタンス。`appVersion` セット等を安全に流せるが書き込みは行わない
+    /// （`FetchLogger.flushForced` を呼ばない限りディスクには出ない）。
+    var fetchLogger: FetchLogger { FetchLogger.sharedNoOp }
 
     func requestCandidates(hiragana: String) -> [AzooKeyCandidate] {
         requestCandidates(hiragana: hiragana, leftSideContext: nil, richCandidates: false)

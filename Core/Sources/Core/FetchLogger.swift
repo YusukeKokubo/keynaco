@@ -11,6 +11,10 @@ import Foundation
 public final class FetchLogger: @unchecked Sendable {
     private static let flushThreshold = 50
 
+    /// `AzooKeyConverting` の default 実装で使う共有 no-op インスタンス。
+    /// stub から `appVersion` セット等を呼んでもどこにも書かれず、ディスクへの副作用なし。
+    public static let sharedNoOp = FetchLogger()
+
     private let lock = NSLock()
     private var buffer: [[String: Any]] = []
     private var appVersionStorage = "0.0.0"
@@ -62,6 +66,47 @@ public final class FetchLogger: @unchecked Sendable {
 
     public func flushForced() {
         lock.withLock { flushLocked() }
+    }
+
+    /// 起動時に古い行を切り詰める。30 日分 or 最新 100000 行（先に超えた方）。7 日に 1 回だけ実行。
+    /// fetch は 1 セッション数百件出るため `input_log`（20000 行）より大きな上限。
+    public static func trimIfNeeded(fileURL: URL = FetchLogger.logURL) {
+        let key = "lastFetchLogTrimDate"
+        let defaults = UserDefaults.standard
+        let now = Date().timeIntervalSince1970
+        if let last = defaults.object(forKey: key) as? Double,
+           now - last < 7 * 86400 { return }
+
+        guard FileManager.default.fileExists(atPath: fileURL.path),
+              let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            defaults.set(now, forKey: key)
+            return
+        }
+
+        let allLines = content.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.isEmpty }
+        defaults.set(now, forKey: key)
+
+        let maxLines = 100_000
+        let cutoffMs = (now - 30 * 86400) * 1000
+        let lines = allLines.suffix(maxLines).filter { line in
+            guard let data = line.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return true
+            }
+            let ts: Double
+            if let v = obj["ts"] as? Int { ts = Double(v) }
+            else if let v = obj["ts"] as? Double { ts = v }
+            else { return true }
+            return ts >= cutoffMs
+        }
+
+        guard lines.count < allLines.count else { return }
+        let trimmed = lines.joined(separator: "\n") + "\n"
+        guard let data = trimmed.data(using: .utf8) else { return }
+        try? data.write(to: fileURL)
+        #if DEBUG
+        NSLog("keynaco: fetch log trimmed \(allLines.count) → \(lines.count) lines")
+        #endif
     }
 
     private func flushLocked() {

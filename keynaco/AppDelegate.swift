@@ -40,6 +40,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             CandidateDivergenceLogger.trimIfNeeded(fileURL: CandidateDivergenceLogger.logURL)
         }
         Task.detached(priority: .background) {
+            FetchLogger.trimIfNeeded(fileURL: FetchLogger.logURL)
+        }
+        Task.detached(priority: .background) {
             InputController.performPOSBackfill()
         }
     }
