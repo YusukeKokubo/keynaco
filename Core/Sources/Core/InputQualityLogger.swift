@@ -21,6 +21,7 @@ public final class InputQualityLogger {
     public func append(record: InputSessionRecord, appVersion: String) {
         var dict = record.asDictionary()
         dict["version"] = appVersion
+        dict["ts_iso"] = LogTimestamp.iso8601(fromUnixMs: record.ts)
         buffer.append(dict)
         if buffer.count >= Self.flushThreshold {
             flush(to: InputQualityLogger.inputLogURL)

@@ -131,6 +131,45 @@ final class TypingLatencyStatsTests: XCTestCase {
         XCTAssertTrue(snap.missRateByReadingLen.isEmpty)
         XCTAssertEqual(snap.candidateConfirmations, 0)
         XCTAssertNil(snap.firstCandidateRate)
+        XCTAssertNil(snap.fetchLockWaitP50Ms)
+        XCTAssertEqual(snap.fetchCount, 0)
+        XCTAssertEqual(snap.wastedFetchCount, 0)
+    }
+
+    func testInterKeyDistribution() {
+        let stats = TypingLatencyStats()
+        for ms in [60.0, 80.0, 100.0, 120.0, 160.0, 200.0, 300.0] {
+            stats.recordInterKey(ms: ms)
+        }
+        let snap = stats.snapshot()
+        XCTAssertEqual(snap.interKeyP25Ms, 80)
+        XCTAssertEqual(snap.interKeyP50Ms, 120)
+        XCTAssertEqual(snap.interKeyP75Ms, 200)
+        XCTAssertEqual(snap.interKeyP95Ms, 300)
+        let dict = snap.asDictionary()
+        XCTAssertEqual(dict["inter_key_p25_ms"] as? Double, 80)
+        XCTAssertEqual(dict["inter_key_p95_ms"] as? Double, 300)
+    }
+
+    func testFetchLockWaitAndWastedCount() {
+        let stats = TypingLatencyStats()
+        // 3 fetch、ロック待ちは 1ms / 5ms / 30ms
+        stats.recordFetch(ms: 80, lockWaitMs: 1)
+        stats.recordFetch(ms: 90, lockWaitMs: 5)
+        stats.recordFetch(ms: 100, lockWaitMs: 30)
+        // 2 件は破棄された
+        stats.recordWastedFetch()
+        stats.recordWastedFetch()
+
+        let snap = stats.snapshot()
+        XCTAssertEqual(snap.fetchCount, 3)
+        XCTAssertEqual(snap.wastedFetchCount, 2)
+        XCTAssertEqual(snap.fetchLockWaitP50Ms, 5)
+        XCTAssertEqual(snap.fetchLockWaitP95Ms, 30)
+        let dict = snap.asDictionary()
+        XCTAssertEqual(dict["fetch_count"] as? Int, 3)
+        XCTAssertEqual(dict["wasted_fetch_count"] as? Int, 2)
+        XCTAssertEqual(dict["fetch_lock_wait_p50_ms"] as? Double, 5)
     }
 
     func testSnapshotDictionaryOmitsFetchWhenEmpty() {

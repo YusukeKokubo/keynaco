@@ -18,6 +18,7 @@ public final class CandidateDivergenceLogger {
     public func append(record: CandidateDivergenceRecord, appVersion: String) {
         var dict = record.asDictionary()
         dict["version"] = appVersion
+        dict["ts_iso"] = LogTimestamp.iso8601(fromUnixMs: record.ts)
         buffer.append(dict)
         if buffer.count >= Self.flushThreshold {
             flush(to: Self.logURL)

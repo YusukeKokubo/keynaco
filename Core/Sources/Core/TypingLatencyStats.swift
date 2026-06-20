@@ -24,6 +24,10 @@ public final class TypingLatencyStats: @unchecked Sendable {
         public let fetchCompleteP95Ms: Double?
         public let debouncePolicyP50Ms: Double?
         public let interKeyP50Ms: Double?
+        /// 打鍵間隔の分布（debounce バケット境界 80/160ms の妥当性検証用）。
+        public let interKeyP25Ms: Double?
+        public let interKeyP75Ms: Double?
+        public let interKeyP95Ms: Double?
         public let fetchP95ZenzaiOnMs: Double?
         public let fetchP95ZenzaiOffMs: Double?
         public let missRateByReadingLen: [String: Double]
@@ -33,6 +37,15 @@ public final class TypingLatencyStats: @unchecked Sendable {
         public let firstCandidateRate: Double?
         public let selectionDepthP50: Int?
         public let selectionDepthP95: Int?
+        /// AzooKey converter のロック取得待ち時間（ms）。`LockedConverter` で直列化された fetch が
+        /// 前の fetch を待った時間。debounce 不足で queue 詰まりするとここが膨らむ。
+        public let fetchLockWaitP50Ms: Double?
+        public let fetchLockWaitP95Ms: Double?
+        /// セッション中に AzooKey converter が実行した fetch 回数（キャッシュヒット除く）。
+        public let fetchCount: Int
+        /// fetch が走ったが、新キーで世代が進んで結果が破棄された回数。
+        /// debounce が batch として機能しとれば低い、毎キー fire しとれば高い。
+        public let wastedFetchCount: Int
 
         public func asDictionary() -> [String: Any] {
             var dict: [String: Any] = [
@@ -48,6 +61,9 @@ public final class TypingLatencyStats: @unchecked Sendable {
             if let fetchCompleteP95Ms { dict["fetch_complete_p95_ms"] = fetchCompleteP95Ms }
             if let debouncePolicyP50Ms { dict["debounce_policy_p50_ms"] = debouncePolicyP50Ms }
             if let interKeyP50Ms { dict["inter_key_p50_ms"] = interKeyP50Ms }
+            if let interKeyP25Ms { dict["inter_key_p25_ms"] = interKeyP25Ms }
+            if let interKeyP75Ms { dict["inter_key_p75_ms"] = interKeyP75Ms }
+            if let interKeyP95Ms { dict["inter_key_p95_ms"] = interKeyP95Ms }
             if let fetchP95ZenzaiOnMs { dict["fetch_p95_zenzai_on"] = fetchP95ZenzaiOnMs }
             if let fetchP95ZenzaiOffMs { dict["fetch_p95_zenzai_off"] = fetchP95ZenzaiOffMs }
             if !missRateByReadingLen.isEmpty { dict["miss_rate_by_reading_len"] = missRateByReadingLen }
@@ -57,6 +73,10 @@ public final class TypingLatencyStats: @unchecked Sendable {
             if let firstCandidateRate { dict["first_candidate_rate"] = firstCandidateRate }
             if let selectionDepthP50 { dict["selection_depth_p50"] = selectionDepthP50 }
             if let selectionDepthP95 { dict["selection_depth_p95"] = selectionDepthP95 }
+            if let fetchLockWaitP50Ms { dict["fetch_lock_wait_p50_ms"] = fetchLockWaitP50Ms }
+            if let fetchLockWaitP95Ms { dict["fetch_lock_wait_p95_ms"] = fetchLockWaitP95Ms }
+            if fetchCount > 0 { dict["fetch_count"] = fetchCount }
+            if wastedFetchCount > 0 { dict["wasted_fetch_count"] = wastedFetchCount }
             return dict
         }
     }
@@ -76,6 +96,8 @@ public final class TypingLatencyStats: @unchecked Sendable {
     private var missesByReadingLenBucket: [Int: Int] = [:]
     private var fetchDurationsMsByReadingLen: [Int: [Double]] = [:]
     private var confirmationDepths: [Int] = []
+    private var fetchLockWaitMs: [Double] = []
+    private var wastedFetchCountStorage = 0
     private var currentLabelStorage: String?
     private var lastFlushedAt: Date?
     var nowProvider: () -> Date = { Date() }
@@ -103,9 +125,10 @@ public final class TypingLatencyStats: @unchecked Sendable {
         }
     }
 
-    public func recordFetch(ms: Double, zenzaiEnabled: Bool = false, readingLength: Int = 0) {
+    public func recordFetch(ms: Double, lockWaitMs: Double = 0, zenzaiEnabled: Bool = false, readingLength: Int = 0) {
         lock.withLock {
             fetchDurationsMs.append(ms)
+            fetchLockWaitMs.append(lockWaitMs)
             if zenzaiEnabled {
                 fetchDurationsZenzaiOnMs.append(ms)
             } else {
@@ -116,6 +139,11 @@ public final class TypingLatencyStats: @unchecked Sendable {
                 fetchDurationsMsByReadingLen[bucket, default: []].append(ms)
             }
         }
+    }
+
+    /// fetch を走らせたが、結果が破棄された回数を記録する（debounce 不足の指標）。
+    public func recordWastedFetch() {
+        lock.withLock { wastedFetchCountStorage += 1 }
     }
 
     public func recordPeekUpdate(ms: Double) {
@@ -226,6 +254,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
 
             var dict = makeSnapshotLocked().asDictionary()
             dict["ts"] = Int(now.timeIntervalSince1970)
+            dict["ts_iso"] = LogTimestamp.iso8601String(from: now)
             dict["version"] = appVersion
             if let label = currentLabelStorage {
                 dict["label"] = label
@@ -272,6 +301,9 @@ public final class TypingLatencyStats: @unchecked Sendable {
             fetchCompleteP95Ms: Self.percentile(sortedFetchComplete, p: 95),
             debouncePolicyP50Ms: Self.percentile(sortedDebounce, p: 50),
             interKeyP50Ms: Self.percentile(sortedInterKey, p: 50),
+            interKeyP25Ms: Self.percentile(sortedInterKey, p: 25),
+            interKeyP75Ms: Self.percentile(sortedInterKey, p: 75),
+            interKeyP95Ms: Self.percentile(sortedInterKey, p: 95),
             fetchP95ZenzaiOnMs: Self.percentile(sortedFetchZenzaiOn, p: 95),
             fetchP95ZenzaiOffMs: Self.percentile(sortedFetchZenzaiOff, p: 95),
             missRateByReadingLen: Self.missRateByReadingLen(
@@ -283,7 +315,11 @@ public final class TypingLatencyStats: @unchecked Sendable {
             candidateConfirmations: sortedDepths.count,
             firstCandidateRate: firstCandidateRate,
             selectionDepthP50: Self.percentileInt(sortedDepths, p: 50),
-            selectionDepthP95: Self.percentileInt(sortedDepths, p: 95)
+            selectionDepthP95: Self.percentileInt(sortedDepths, p: 95),
+            fetchLockWaitP50Ms: Self.percentile(fetchLockWaitMs.sorted(), p: 50),
+            fetchLockWaitP95Ms: Self.percentile(fetchLockWaitMs.sorted(), p: 95),
+            fetchCount: fetchDurationsMs.count,
+            wastedFetchCount: wastedFetchCountStorage
         )
     }
 
@@ -302,6 +338,8 @@ public final class TypingLatencyStats: @unchecked Sendable {
         missesByReadingLenBucket.removeAll(keepingCapacity: false)
         fetchDurationsMsByReadingLen.removeAll(keepingCapacity: false)
         confirmationDepths.removeAll(keepingCapacity: false)
+        fetchLockWaitMs.removeAll(keepingCapacity: false)
+        wastedFetchCountStorage = 0
     }
 
     private static func readingLenBucket(_ length: Int) -> Int {

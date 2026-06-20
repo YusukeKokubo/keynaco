@@ -205,14 +205,16 @@ public final class AzooKeyConverter: @unchecked Sendable {
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
         let options = makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates)
+        let lockRequestedAt = CFAbsoluteTimeGetCurrent()
         return locked.withLock { c in
+            let lockWaitMs = (CFAbsoluteTimeGetCurrent() - lockRequestedAt) * 1000
             os_signpost(.begin, log: spLog, name: "requestCandidates", "%{public}s", hiragana)
             let t0 = CFAbsoluteTimeGetCurrent()
             let result = c.requestCandidates(text, options: options)
             let elapsedMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
             os_signpost(.end, log: spLog, name: "requestCandidates")
-            os_log(.debug, log: spLog, "requestCandidates %.1fms %{public}s zenzai=%d", elapsedMs, hiragana, zenzaiEnabled ? 1 : 0)
-            latencyStats.recordFetch(ms: elapsedMs, zenzaiEnabled: zenzaiEnabled, readingLength: hiragana.count)
+            os_log(.debug, log: spLog, "requestCandidates %.1fms (lockWait %.1fms) %{public}s zenzai=%d", elapsedMs, lockWaitMs, hiragana, zenzaiEnabled ? 1 : 0)
+            latencyStats.recordFetch(ms: elapsedMs, lockWaitMs: lockWaitMs, zenzaiEnabled: zenzaiEnabled, readingLength: hiragana.count)
             insertCache(key: key, value: result.mainResults)
             return Self.displayCandidates(from: result.mainResults, inputLength: inputLength)
         }

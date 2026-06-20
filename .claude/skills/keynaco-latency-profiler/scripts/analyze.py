@@ -3,8 +3,20 @@
 
 import json
 import os
+import re
 import sys
+import time
 from collections import defaultdict
+
+
+def parse_since(s):
+    """`30m` / `2h` / `1d` を「現在からその秒数前の Unix 秒」に変換。"""
+    m = re.fullmatch(r"(\d+)\s*([smhd])", s.strip())
+    if not m:
+        raise ValueError(f"--since 形式エラー: {s!r}（例: 30m, 2h, 1d）")
+    n, unit = int(m.group(1)), m.group(2)
+    delta = n * {"s": 1, "m": 60, "h": 3600, "d": 86400}[unit]
+    return int(time.time()) - delta
 
 LOG_PATH = os.path.expanduser(
     "~/Library/Application Support/keynaco/latency_log.jsonl"
@@ -41,6 +53,9 @@ def parse_args(args):
         elif a == "--ts-end" and i + 1 < len(args):
             i += 1
             ts_end = int(args[i])
+        elif a == "--since" and i + 1 < len(args):
+            i += 1
+            ts_start = parse_since(args[i])
         elif not a.startswith("--"):
             path = a
         i += 1
@@ -70,6 +85,8 @@ def print_latency(data):
         ("peek_update_p95_ms",     "peek_update p95  "),
         ("debounce_policy_p50_ms", "debounce policy  "),
         ("inter_key_p50_ms",       "inter_key p50    "),
+        ("fetch_lock_wait_p50_ms", "lock_wait p50    "),
+        ("fetch_lock_wait_p95_ms", "lock_wait p95    "),
     ]
     for key, label in keys:
         vals = [d[key] for d in data if key in d]
@@ -154,6 +171,25 @@ def print_selection(data):
     if depths_p95:
         print(f"  選択行 p95: median={pct(depths_p95, 50)}")
 
+def print_fetch_efficiency(data):
+    fetch_total = sum(d.get("fetch_count", 0) for d in data)
+    wasted_total = sum(d.get("wasted_fetch_count", 0) for d in data)
+    sessions_with_fetch = [d for d in data if d.get("fetch_count", 0) > 0]
+    if not sessions_with_fetch:
+        print("  fetch_count / wasted_fetch_count を含むセッションなし（旧バージョン）")
+        return
+    print(f"  total fetch:  {fetch_total}")
+    print(f"  wasted fetch: {wasted_total} ({wasted_total/fetch_total*100:.1f}% of total)")
+    print(f"  ※ wasted = fetch が走ったが新キーで結果破棄。debounce が batch として効くと低い。")
+
+    wasted_ratios = [
+        d["wasted_fetch_count"] / d["fetch_count"]
+        for d in sessions_with_fetch if d.get("wasted_fetch_count", 0) >= 0
+    ]
+    if wasted_ratios:
+        print(f"\n  セッション別 wasted 率:")
+        print(f"    median={pct(wasted_ratios, 50)*100:.1f}%  p95={pct(wasted_ratios, 95)*100:.1f}%")
+
 def print_by_version(data):
     groups = defaultdict(list)
     for d in data:
@@ -220,6 +256,9 @@ def main():
 
     section("候補選択行動")
     print_selection(data)
+
+    section("fetch invocation / waste（debounce 効果の指標）")
+    print_fetch_efficiency(data)
 
     print()
 

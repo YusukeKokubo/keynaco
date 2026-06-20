@@ -98,8 +98,17 @@ final class AzooKeyAsyncScheduler {
                 )
             }.value
 
-            guard !Task.isCancelled else { return }
-            guard candidateGeneration == generation else { return }
+            // detached が早期 bail（liveGen ≠ genSnapshot）すると空配列が返り fetch 自体走らんため wasted 扱いしない。
+            // 非空 = fetch が走った → ここで cancel/世代不一致なら結果破棄 = wasted。
+            let didRunFetch = !candidates.isEmpty
+            guard !Task.isCancelled else {
+                if didRunFetch { converter.latencyStats.recordWastedFetch() }
+                return
+            }
+            guard candidateGeneration == generation else {
+                if didRunFetch { converter.latencyStats.recordWastedFetch() }
+                return
+            }
             pendingTask = nil
             onComplete(candidates)
         }

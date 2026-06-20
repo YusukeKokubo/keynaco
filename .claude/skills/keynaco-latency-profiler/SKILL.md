@@ -21,6 +21,40 @@ keynaco の `~/Library/Application Support/keynaco/` には 3 種類のログが
 3. `divergence_log.jsonl` を見るとき、`rescued_by` が入っとるエントリは UX 損失ではない（履歴/辞書が機能した証拠）。`rescued_by=null`（= `was_explicit=true`）だけが真の Zenzai 改善余地
 4. **DB を直接書き換える前に必ず `sqlite3` で中身を SELECT する**（同 docs の retrospectives 参照）
 
+**ワンライナー集**（直近のセッションで pain ケース・救われたケースを即時把握）:
+
+```bash
+# 直近 30 分の latency 集計
+python3 .claude/skills/keynaco-latency-profiler/scripts/analyze.py --since 30m
+
+# pain ケース（BS 多発 or 候補スクロール or 迷い時間長い）を直近 1 時間で抽出
+python3 -c '
+import json, time
+since = (time.time() - 3600) * 1000
+with open("'"$HOME"'/Library/Application Support/keynaco/input_log.jsonl") as f:
+    for l in f:
+        r = json.loads(l)
+        if r["ts"] < since: continue
+        if r.get("bs_count",0) >= 2 or r.get("scroll_count",0) > 0 or r["composition_ms"] > 3000:
+            print(f"bs={r.get(\"bs_count\",0)} scroll={r.get(\"scroll_count\",0)} ms={r[\"composition_ms\"]:5d} '\''{r[\"reading\"]}'\'' -> '\''{r.get(\"committed\")}'\''")
+'
+
+# divergence を「真の UX 損失」と「履歴/辞書が救った」に分けて表示
+python3 -c '
+import json, time
+since = (time.time() - 3600) * 1000
+with open("'"$HOME"'/Library/Application Support/keynaco/divergence_log.jsonl") as f:
+    rows = [json.loads(l) for l in f if json.loads(l).get("ts",0) >= since]
+loss = [r for r in rows if not r.get("rescued_by")]
+rescued = [r for r in rows if r.get("rescued_by")]
+print(f"真の UX 損失: {len(loss)} 件  救われた: {len(rescued)} 件")
+for r in loss:
+    print(f"  [UX損失] {r[\"reading\"]:12s} Z1={r.get(\"z1\",\"\"):15s} -> {r[\"confirmed\"]}")
+'
+```
+
+新しいログには `ts_iso`（ISO8601 文字列）も併記されとるため、`ts` の単位（latency=秒・input/divergence=ms）を読み違える事故は防止される。
+
 ## ログの場所と形式
 
 ```
