@@ -22,6 +22,18 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
     /// 初期行を選んだ理由。"exactMatchHistory" / "userDictExact" / "prefixFocus" / "azooKey" / "afterFixed"。
     public let initialRowReason: String
 
+    /// Z1 と確定がズレた要因。
+    ///
+    /// - `nil`（= `was_explicit=true`）: ユーザーが手で候補を navigate して選んだ。**真の UX 損失**で、
+    ///   Zenzai 精度の改善余地を示す（例: row 4 以下まで掘って選んだ）。
+    /// - 非 nil（= `was_explicit=false`）: 自動表示中に Z1 以外が初期行になり、ユーザーは何もしなくても正解に当たった。
+    ///   値は `confirmedSource`（"history" / "dict" / "fixed" / "userDict"）と一致。
+    ///   **UX 損失ではなく、履歴・辞書が Zenzai の粗さをカバーした証拠**として読む。
+    public var rescuedBy: String? {
+        if wasExplicit { return nil }
+        return confirmedSource.isEmpty ? nil : confirmedSource
+    }
+
     public init(
         ts: Int,
         reading: String,
@@ -62,6 +74,7 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
             "initial_row_reason": initialRowReason,
         ]
         if let leftContext { dict["left_context"] = leftContext }
+        if let rescued = rescuedBy { dict["rescued_by"] = rescued }
         return dict
     }
 }

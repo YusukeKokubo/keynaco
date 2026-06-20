@@ -5,6 +5,22 @@ description: keynaco の latency_log.jsonl を読んでパフォーマンスを�
 
 # keynaco レイテンシプロファイリング
 
+## 結論を出す前に 3 ログ全部を読む
+
+keynaco の `~/Library/Application Support/keynaco/` には 3 種類のログが並んでおり、性質が違う。**1 つだけで「IME のどこを直すべきか」を決めない**。詳しくは [`docs/retrospectives.md`](../../../docs/retrospectives.md) の「ログの『フラグ』と『UX 損失』を混同しない」を参照。
+
+| ログ | 役割 | 単独で使うと… |
+|------|------|------------------|
+| `input_log.jsonl` | **UX 損失の真実**。`bs_count`・`scroll_count`・`composition_ms`・`was_explicit` で「ユーザーが困った確定」を直接観察 | これが「直すべき問題」抽出の起点 |
+| `latency_log.jsonl` | 速度の指標（このスキルの本題） | 速度は分かるがユーザーが困ったかは分からん |
+| `divergence_log.jsonl` | Zenzai Z1 がズレたフラグ | **UX 損失とは限らない**。`rescued_by` が非 null なら履歴/辞書が救った成功ケース |
+
+**手順**:
+1. `input_log.jsonl` で `bs_count >= 2` / `scroll_count > 0` / `composition_ms > 3000` を抽出 → 真の pain ケース一覧
+2. `latency_log.jsonl` を本スキルのスクリプトで集計 → 速度ボトルネックの位置
+3. `divergence_log.jsonl` を見るとき、`rescued_by` が入っとるエントリは UX 損失ではない（履歴/辞書が機能した証拠）。`rescued_by=null`（= `was_explicit=true`）だけが真の Zenzai 改善余地
+4. **DB を直接書き換える前に必ず `sqlite3` で中身を SELECT する**（同 docs の retrospectives 参照）
+
 ## ログの場所と形式
 
 ```

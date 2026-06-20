@@ -55,6 +55,43 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
                      "Z1 == confirmed なら記録対象外")
     }
 
+    /// was_explicit=true（ユーザーが手で navigate）なら rescuedBy=nil（真の UX 損失）。
+    func testRescuedByNilWhenUserExplicit() {
+        let record = CandidateDivergenceRecord(
+            ts: 0, reading: "はし", z1: "はし", confirmed: "箸",
+            selectedRow: 1, wasExplicit: true,
+            candidates: ["はし", "箸"], leftContext: nil,
+            confirmedSource: "dict", initialRow: 0,
+            initialRowReason: "azooKey"
+        )
+        XCTAssertNil(record.rescuedBy)
+        XCTAssertNil(record.asDictionary()["rescued_by"] as? String)
+    }
+
+    /// was_explicit=false なら rescuedBy = confirmedSource（履歴/辞書が救った）。
+    func testRescuedByEqualsConfirmedSourceWhenAuto() {
+        let record = CandidateDivergenceRecord(
+            ts: 0, reading: "しょり", z1: "しょり", confirmed: "処理",
+            selectedRow: 0, wasExplicit: false,
+            candidates: ["処理", "しょり"], leftContext: nil,
+            confirmedSource: "history", initialRow: 0,
+            initialRowReason: "exactMatchHistory"
+        )
+        XCTAssertEqual(record.rescuedBy, "history")
+        XCTAssertEqual(record.asDictionary()["rescued_by"] as? String, "history")
+    }
+
+    /// confirmedSource が空文字なら rescuedBy=nil（旧形式互換）。
+    func testRescuedByNilWhenSourceEmpty() {
+        let record = CandidateDivergenceRecord(
+            ts: 0, reading: "x", z1: "a", confirmed: "b",
+            selectedRow: 0, wasExplicit: false,
+            candidates: ["a","b"], leftContext: nil,
+            confirmedSource: "", initialRow: 0, initialRowReason: ""
+        )
+        XCTAssertNil(record.rescuedBy)
+    }
+
     /// Zenzai 無効・文脈なしのとき（azooKeyApiOrder 空）は記録しない。
     func testNoDivergenceWhenApiOrderEmpty() {
         typeRomaji("yabai")
