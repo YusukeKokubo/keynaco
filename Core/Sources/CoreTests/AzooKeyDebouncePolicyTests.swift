@@ -11,6 +11,15 @@ final class AzooKeyDebouncePolicyTests: XCTestCase {
         XCTAssertEqual(ns, 110_000_000)
     }
 
+    func testNormalTypingUsesBalancedDebounce() {
+        // 通常打鍵速度（実測 inter_key_p50 ≈ 117ms）。fetch コスト 80ms 程度を上回る 90ms に設定。
+        let ns = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
+            interKeyIntervalMs: 120,
+            hasPendingRomaji: false
+        ))
+        XCTAssertEqual(ns, 90_000_000)
+    }
+
     func testPauseUsesShorterDebounce() {
         let ns = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
             interKeyIntervalMs: 200,

@@ -14,6 +14,10 @@ public struct AzooKeyDebounceInput: Equatable, Sendable {
 }
 
 /// 打鍵速度・読み完成度に応じて debounce を 40–120ms の範囲で調整する。
+///
+/// 通常バケット（80–160ms）の値は実測 `inter_key_p50 ≈ 117ms` ・ `fetch_p50 ≈ 84ms` を踏まえ
+/// 「fetch コストを下回らない」「打鍵間隔を超えない」両条件を満たす 90ms に設定。
+/// 70ms だと `LockedConverter` で直列化された fetch がキュー詰まりして `fetch_complete_p95` を悪化させとった。
 public enum AzooKeyDebouncePolicy {
     public static let minNanoseconds: UInt64 = 40_000_000
     public static let maxNanoseconds: UInt64 = 120_000_000
@@ -28,7 +32,7 @@ public enum AzooKeyDebouncePolicy {
             if interval < 80 {
                 ms = 110
             } else if interval < 160 {
-                ms = 70
+                ms = 90
             } else {
                 ms = 45
             }
