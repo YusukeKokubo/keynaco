@@ -8,29 +8,29 @@ final class InputHandlerNumberTests: XCTestCase {
 
     func testFourDigits() {
         let result = InputHandler.generateNumberCandidates(for: "1234")
-        XCTAssertEqual(result, ["１２３４", "1,234", "１，２３４"])
+        XCTAssertEqual(result, ["1234", "１２３４", "1,234", "１，２３４"])
     }
 
     func testSevenDigits() {
         let result = InputHandler.generateNumberCandidates(for: "1234567")
-        XCTAssertEqual(result, ["１２３４５６７", "1,234,567", "１，２３４，５６７"])
+        XCTAssertEqual(result, ["1234567", "１２３４５６７", "1,234,567", "１，２３４，５６７"])
     }
 
     func testThreeDigits() {
-        // 3桁以下は桁区切りが元の文字列と同じになるため除外され全角のみ
+        // 3桁以下は桁区切りが元の文字列と同じになるため除外され、半角原文と全角のみ
         let result = InputHandler.generateNumberCandidates(for: "123")
-        XCTAssertEqual(result, ["１２３"])
+        XCTAssertEqual(result, ["123", "１２３"])
     }
 
     func testSingleDigit() {
         let result = InputHandler.generateNumberCandidates(for: "5")
-        XCTAssertEqual(result, ["５"])
+        XCTAssertEqual(result, ["5", "５"])
     }
 
     func testLeadingZero() {
         // 先頭ゼロがあると Int 変換後に消えるため桁区切りは生成しない
         let result = InputHandler.generateNumberCandidates(for: "0123")
-        XCTAssertEqual(result, ["０１２３"])
+        XCTAssertEqual(result, ["0123", "０１２３"])
     }
 
     func testEmptyString() {

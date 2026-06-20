@@ -216,7 +216,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         type(chars: "3", base: "3"); type(chars: "4", base: "4")
         XCTAssertEqual(handler.state.composedHiragana, "1234")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["１２３４", "1,234", "１，２３４"],
+                     candidates: ["1234", "１２３４", "1,234", "１，２３４"],
                      historyEnd: 0, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }

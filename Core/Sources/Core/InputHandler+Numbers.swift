@@ -6,7 +6,7 @@ public extension InputHandler {
               reading.unicodeScalars.allSatisfy({ $0.value >= 0x30 && $0.value <= 0x39 })
         else { return [] }
 
-        var result: [String] = []
+        var result: [String] = [reading]
         result.append(KanaUtils.toZenkakuAscii(reading))
 
         // 先頭ゼロがない整数のみ桁区切り候補を生成
