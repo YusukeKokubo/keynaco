@@ -28,6 +28,8 @@ class InputController: IMKInputController, @unchecked Sendable {
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        handler.azooKeyConverter.fetchLogger.appVersion = version
         let ic = self
         MainActor.assumeIsolated {
             ic.candidateWindow = CandidateWindow(
@@ -138,6 +140,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         )
         inputQualityLogger.flushForced()
         divergenceLogger.flushForced()
+        handler.azooKeyConverter.fetchLogger.flushForced()
         super.deactivateServer(sender)
     }
 

@@ -3,6 +3,8 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
     var isZenzaiEnabled: Bool { get }
     /// 打鍵レイテンシ計測（`AzooKeyConverter` のみ実値。スタブは独立インスタンス）。
     var latencyStats: TypingLatencyStats { get }
+    /// fetch ごとの詳細ログ（`AzooKeyConverter` のみ実書き込み。スタブは no-op）。
+    var fetchLogger: FetchLogger { get }
     func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate]
     /// `candidateCache` の同期参照。ヒット時は非同期取得を待たず候補に使える。
     func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek?
@@ -15,6 +17,7 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
 
 extension AzooKeyConverting {
     var isZenzaiEnabled: Bool { false }
+    var fetchLogger: FetchLogger { FetchLogger() }  // no-op default (個別 stub は無視できる)
 
     func requestCandidates(hiragana: String) -> [AzooKeyCandidate] {
         requestCandidates(hiragana: hiragana, leftSideContext: nil, richCandidates: false)

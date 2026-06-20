@@ -21,6 +21,18 @@ keynaco の `~/Library/Application Support/keynaco/` には 3 種類のログが
 3. `divergence_log.jsonl` を見るとき、`rescued_by` が入っとるエントリは UX 損失ではない（履歴/辞書が機能した証拠）。`rescued_by=null`（= `was_explicit=true`）だけが真の Zenzai 改善余地
 4. **DB を直接書き換える前に必ず `sqlite3` で中身を SELECT する**（同 docs の retrospectives 参照）
 
+**pain ケース・複合語・fetch lock_wait の統合分析**:
+
+```bash
+python3 .claude/skills/keynaco-latency-profiler/scripts/pain_analysis.py --since 30m
+```
+
+`input_log` + `divergence_log` + `fetch_log` を横断して：
+- BS≥2 / scroll>0 / composition_ms>3000 の pain ケース一覧
+- 🔗 マーク = 漢字 cluster ≥2 = 複合語の苦戦（Zenzai が複合語処理に弱いパターンの検出）
+- pain と divergence の reading で join（「救:history」か「UX 損失」か）
+- fetch_log の `lock_wait` 上位（reading 単位の queue 詰まり犯人特定）
+
 **ワンライナー集**（直近のセッションで pain ケース・救われたケースを即時把握）:
 
 ```bash

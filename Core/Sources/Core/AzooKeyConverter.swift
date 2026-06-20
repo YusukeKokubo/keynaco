@@ -44,6 +44,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
     /// ユーザー設定の Zenzai 有効フラグ。モデル URL 未取得などで実リランキングがフォールバックしていても `true` になり得る（ベストエフォート。プロモート行は辞書 top-1）。
     public var isZenzaiEnabled: Bool { zenzaiEnabled }
     public let latencyStats = TypingLatencyStats()
+    public let fetchLogger = FetchLogger()
     private let zenzaiProfile: String
     private let zenzaiInferenceLimit: Int
     private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }
@@ -215,6 +216,14 @@ public final class AzooKeyConverter: @unchecked Sendable {
             os_signpost(.end, log: spLog, name: "requestCandidates")
             os_log(.debug, log: spLog, "requestCandidates %.1fms (lockWait %.1fms) %{public}s zenzai=%d", elapsedMs, lockWaitMs, hiragana, zenzaiEnabled ? 1 : 0)
             latencyStats.recordFetch(ms: elapsedMs, lockWaitMs: lockWaitMs, zenzaiEnabled: zenzaiEnabled, readingLength: hiragana.count)
+            fetchLogger.append(
+                reading: hiragana,
+                leftContext: leftSideContext,
+                fetchMs: elapsedMs,
+                lockWaitMs: lockWaitMs,
+                rich: richCandidates,
+                zenzaiEnabled: zenzaiEnabled
+            )
             insertCache(key: key, value: result.mainResults)
             return Self.displayCandidates(from: result.mainResults, inputLength: inputLength)
         }
