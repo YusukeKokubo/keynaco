@@ -359,14 +359,17 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
 
     // MARK: - 候補ウィンドウ中のバックスペース・Escape
 
-    func testBackspaceDuringCandidateDisplayDismissesWhenSingleCharRemains() {
+    func testBackspaceDuringCandidateDisplayKeepsCandidatesWhenSingleCharRemains() {
+        // 旧挙動: 2 char passive → BS → 1 char で .dismiss していた（state.backspace() の `>=2` 閾値）。
+        // 新挙動: composedHiragana が残っている限り .whileTyping で rebuild する。
+        // 「BS で候補が突然消える」体感を避けるため、1 char passive 候補を維持する。
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         let result = press(keyCode: 51, candidateVisible: true)
         XCTAssertTrue(result.consumed)
         XCTAssertEqual(client.markedText, "あ")
-        guard case .dismiss = result.candidateAction else {
-            XCTFail("1文字になったら .dismiss するはず: \(result.candidateAction)"); return
+        guard case .show = result.candidateAction else {
+            XCTFail("1 char に縮んでも .show を返すはず: \(result.candidateAction)"); return
         }
     }
 

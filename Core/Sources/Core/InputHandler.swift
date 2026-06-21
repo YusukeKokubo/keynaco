@@ -449,7 +449,7 @@ public struct InputHandler {
     }
 
     public mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
-        let (handled, needsRefresh) = state.backspace()
+        let (handled, _) = state.backspace()
         if !handled, let ctx = lastConfirmedContext {
             db.penalizeAll(
                 input: ctx.input,
@@ -464,7 +464,13 @@ public struct InputHandler {
         // explicit を維持して rebuild すると selectedRow=0 で別語に強制スナップし
         // marked text がちらつく（例: 幹事 row=1 → BS → 間 row=0 が即 marked される）。
         // .whileTyping なら row=0 でも passive 扱いで markedText がひらがな組成のまま落ち着く。
-        let action: CandidateAction = needsRefresh ? buildCandidateListForTrigger(.whileTyping) : .dismiss
+        //
+        // 打鍵側の `>=2` 閾値（`state.backspace()` が返す `needsRefresh`）は
+        // 「2 char で初めて候補を出す」ためのもの。BS では「2 char で出ていた候補が
+        // 1 BS で消える」体感を避けるため、composedHiragana が残っている限り rebuild する。
+        // 1 char passive 候補は Space 経由でも到達可能な状態なので新規リスクはない。
+        let shouldRefresh = !state.composedHiragana.isEmpty
+        let action: CandidateAction = shouldRefresh ? buildCandidateListForTrigger(.whileTyping) : .dismiss
         return (true, action)
     }
 
