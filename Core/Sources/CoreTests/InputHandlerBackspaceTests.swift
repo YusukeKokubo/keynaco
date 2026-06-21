@@ -106,4 +106,54 @@ final class InputHandlerBackspaceTests: InputHandlerTestCase {
         XCTAssertFalse(consumed, "組成空での BS は consumed=false（アプリへ素通し）")
         if case .none = action {} else { XCTFail(".none を期待: \(action)") }
     }
+
+    // MARK: - BS イベント観測
+
+    func testBackspaceCountersTrackExplicitAndShrinkToOne() {
+        // 観測ログ用カウンタが BS の文脈を正しく数えるか。
+        typeRomaji("kanzi")
+        applyCandidateAction(handler.buildCandidateList(trigger: .explicit))
+        XCTAssertTrue(handler.candidateSession.isExplicitlySelected)
+
+        // 1 回目: explicit 中の BS → bsExplicitCount += 1（composedAfter=2 なので bsShrunkToOne は増えない）
+        press(keyCode: KeyCode.backspace, candidateVisible: true, isExplicitlySelected: true)
+        XCTAssertEqual(handler.sessionTracker.bsExplicitCount, 1, "explicit 中の BS でカウントされるはず")
+        XCTAssertEqual(handler.sessionTracker.bsShrunkToOneCount, 0, "composedAfter=2 ではまだ")
+
+        // 2 回目: passive 中の BS で 2→1 char → bsShrunkToOne += 1（explicit は降格済みなので増えない）
+        press(keyCode: KeyCode.backspace, candidateVisible: true)
+        XCTAssertEqual(handler.sessionTracker.bsExplicitCount, 1, "passive なので bsExplicit は据え置き")
+        XCTAssertEqual(handler.sessionTracker.bsShrunkToOneCount, 1, "2→1 char の BS でカウントされるはず")
+    }
+
+    func testBackspaceCountersFlushIntoSessionRecord() {
+        // pendingSessionRecord に bsExplicitCount / bsShrunkToOneCount が乗ること。
+        typeRomaji("kanzi")
+        applyCandidateAction(handler.buildCandidateList(trigger: .explicit))
+        press(keyCode: KeyCode.backspace, candidateVisible: true, isExplicitlySelected: true)
+        press(keyCode: KeyCode.backspace, candidateVisible: true)
+        // Enter で確定 → pendingSessionRecord 生成
+        press(keyCode: KeyCode.enter, candidateVisible: true)
+        guard let record = handler.pendingSessionRecord else {
+            XCTFail("Enter 確定で pendingSessionRecord が生成されるはず"); return
+        }
+        XCTAssertEqual(record.bsExplicitCount, 1)
+        XCTAssertEqual(record.bsShrunkToOneCount, 1)
+        // JSON 出力にも乗ること
+        let dict = record.asDictionary()
+        XCTAssertEqual(dict["bs_explicit_count"] as? Int, 1)
+        XCTAssertEqual(dict["bs_shrunk_to_one"] as? Int, 1)
+    }
+
+    func testBackspaceCountersOmittedWhenZero() {
+        // BS なしの確定セッションでは新フィールドが JSON に出ない。
+        typeRomaji("kanzi")
+        press(keyCode: KeyCode.enter)
+        guard let record = handler.pendingSessionRecord else {
+            XCTFail("Enter 確定で pendingSessionRecord が生成されるはず"); return
+        }
+        let dict = record.asDictionary()
+        XCTAssertNil(dict["bs_explicit_count"], "0 のときは省略")
+        XCTAssertNil(dict["bs_shrunk_to_one"], "0 のときは省略")
+    }
 }

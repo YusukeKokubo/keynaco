@@ -5,6 +5,13 @@ public struct InputSessionTracker {
     public private(set) var keyCount = 0
     public private(set) var bsCount = 0
     public private(set) var scrollCount = 0
+    /// 候補 explicit 選択中に押された BS の回数。
+    /// 旧挙動では explicit を維持したまま rebuild されて marked text がちらついていた
+    /// （`InputHandlerBackspaceTests.testBackspaceDemotesExplicitSelectionToPassive` 参照）。
+    public private(set) var bsExplicitCount = 0
+    /// 2 char → 1 char に縮めた BS の回数。
+    /// 旧挙動では `state.backspace().needsRefresh = false` で候補窓が dismiss されていた。
+    public private(set) var bsShrunkToOneCount = 0
     private var startedAtMs: Int?
 
     public mutating func track(keyCode: UInt16) {
@@ -14,6 +21,12 @@ public struct InputSessionTracker {
         keyCount += 1
         if keyCode == KeyCode.backspace { bsCount += 1 }
         if keyCode == KeyCode.downArrow || keyCode == KeyCode.upArrow { scrollCount += 1 }
+    }
+
+    /// `doBackspace` から呼ぶ。`wasExplicit` は BS 実行前の候補状態、`composedAfter` は state.backspace() 後の char 数。
+    public mutating func trackBackspaceContext(wasExplicit: Bool, composedAfter: Int) {
+        if wasExplicit { bsExplicitCount += 1 }
+        if composedAfter == 1 { bsShrunkToOneCount += 1 }
     }
 
     public mutating func reset() {
@@ -38,13 +51,36 @@ public struct InputSessionRecord {
     public let wasExplicit: Bool
     public let scrollCount: Int
     public let anomaly: [String]
+    public let bsExplicitCount: Int
+    public let bsShrunkToOneCount: Int
+
+    public init(
+        ts: Int, keyCount: Int, bsCount: Int, compositionMs: Int,
+        reading: String, committed: String?, candidateDepth: Int?,
+        wasExplicit: Bool, scrollCount: Int, anomaly: [String],
+        bsExplicitCount: Int = 0, bsShrunkToOneCount: Int = 0
+    ) {
+        self.ts = ts
+        self.keyCount = keyCount
+        self.bsCount = bsCount
+        self.compositionMs = compositionMs
+        self.reading = reading
+        self.committed = committed
+        self.candidateDepth = candidateDepth
+        self.wasExplicit = wasExplicit
+        self.scrollCount = scrollCount
+        self.anomaly = anomaly
+        self.bsExplicitCount = bsExplicitCount
+        self.bsShrunkToOneCount = bsShrunkToOneCount
+    }
 
     public func addingAnomaly(_ kind: String) -> InputSessionRecord {
         InputSessionRecord(
             ts: ts, keyCount: keyCount, bsCount: bsCount,
             compositionMs: compositionMs, reading: reading, committed: committed,
             candidateDepth: candidateDepth, wasExplicit: wasExplicit,
-            scrollCount: scrollCount, anomaly: anomaly + [kind]
+            scrollCount: scrollCount, anomaly: anomaly + [kind],
+            bsExplicitCount: bsExplicitCount, bsShrunkToOneCount: bsShrunkToOneCount
         )
     }
 
@@ -68,6 +104,12 @@ public struct InputSessionRecord {
         }
         if !anomaly.isEmpty {
             dict["anomaly"] = anomaly
+        }
+        if bsExplicitCount > 0 {
+            dict["bs_explicit_count"] = bsExplicitCount
+        }
+        if bsShrunkToOneCount > 0 {
+            dict["bs_shrunk_to_one"] = bsShrunkToOneCount
         }
         return dict
     }

@@ -287,7 +287,9 @@ public struct InputHandler {
             candidateDepth: candidate.isVisible ? candidate.selectedRow : nil,
             wasExplicit: candidate.isExplicitlySelected,
             scrollCount: sessionTracker.scrollCount,
-            anomaly: anomaly
+            anomaly: anomaly,
+            bsExplicitCount: sessionTracker.bsExplicitCount,
+            bsShrunkToOneCount: sessionTracker.bsShrunkToOneCount
         )
         recordCandidateDivergenceIfAny(
             reading: inputKey,
@@ -449,7 +451,14 @@ public struct InputHandler {
     }
 
     public mutating func doBackspace(client: TextInputClient) -> (consumed: Bool, candidateAction: CandidateAction) {
+        let wasExplicitBeforeBackspace = candidateSession.isVisible && candidateSession.isExplicitlySelected
         let (handled, _) = state.backspace()
+        if handled {
+            sessionTracker.trackBackspaceContext(
+                wasExplicit: wasExplicitBeforeBackspace,
+                composedAfter: state.composedHiragana.count
+            )
+        }
         if !handled, let ctx = lastConfirmedContext {
             db.penalizeAll(
                 input: ctx.input,
@@ -491,7 +500,9 @@ public struct InputHandler {
             candidateDepth: nil,
             wasExplicit: wasExplicit,
             scrollCount: sessionTracker.scrollCount,
-            anomaly: anomaly
+            anomaly: anomaly,
+            bsExplicitCount: sessionTracker.bsExplicitCount,
+            bsShrunkToOneCount: sessionTracker.bsShrunkToOneCount
         )
         sessionTracker.reset()
         return (true, .dismiss)
