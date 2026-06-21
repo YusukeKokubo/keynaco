@@ -27,6 +27,43 @@ superseded_by: PLAN260528-history-segment-noise.md  # status: superseded のと�
 ---
 ```
 
+### 拡張フィールド（オプション）
+
+特定のスキル経由で作成された plan は、そのスキルが追加情報を contract として固定するために
+拡張フィールドを使う。**audit スクリプトは無視するで本体スキーマには影響せん**。
+ただし plan-audit の人手 triage で読み取り対象になるため、命名は本ファイルで集約しとく。
+
+#### `keynaco-perf-cycle` 由来 plan
+
+パフォーマンス改善サイクルの「目的軸 + ベースライン + 検証 window」を契約として固定する。
+
+```yaml
+---
+status: draft | in-progress | implemented
+created: 2026-MM-DD
+objective_axis: CPU-waste | UX-pain | latency | accuracy
+baseline_at: 2026-MM-DDTHH:MM:SS    # ベースライン計測時刻（ISO8601）
+baseline_window: 24h                 # /keynaco-latency-profiler の --since 値
+sample_threshold:                    # implemented に進む閾値
+  sessions: 5
+  confirmations: 100
+# 以下は status: implemented 時に追記
+verified_at: 2026-MM-DDTHH:MM:SS
+verified_window: 24h                 # baseline_window と同一値であるべき
+verified_sample:
+  sessions: 7
+  confirmations: 142
+related_commit: <hash>
+---
+```
+
+ルール:
+- `verified_window` は `baseline_window` と同一値であるべき（before/after の対称性）
+- `verified_sample` のいずれかが `sample_threshold` を下回るなら `status: in-progress` のまま据え置く
+- `objective_axis` は 1 つだけ。複数軸を同時最大化する plan は分割する
+
+詳細は `.claude/skills/keynaco-perf-cycle/SKILL.md` を参照。
+
 ## status の意味
 
 | 値 | 意味 | 次の遷移先 |
