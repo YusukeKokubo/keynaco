@@ -27,7 +27,8 @@ extension DebugSocketServer {
         let converter = handler.azooKeyConverter
         let debounceNs = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
             interKeyIntervalMs: azooKeyScheduler.lastInterKeyIntervalMs,
-            hasPendingRomaji: !handler.state.pendingRomaji.isEmpty
+            hasPendingRomaji: !handler.state.pendingRomaji.isEmpty,
+            readingLength: reading.count
         ))
         azooKeyScheduler.schedule(
             generation: generation,
