@@ -167,8 +167,12 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(results.first, "相", "同 count なら直近の方が上位")
     }
 
-    func testRecencyHighCountOldBeatsLowCountRecent() {
-        // count=10 / 30日前 (score≈5.0) と count=3 / 直近 (score=3.0) → 前者が上位
+    func testRecencyShortBonusBeatsOlderHighCount() {
+        // PLAN260621b（2 段 decay）の意図的な逆転テスト:
+        // 1 日以内のごく少ない count（short bonus が乗る）は、
+        // 30 日前の高頻度 count（long のみ）に勝つ。
+        // 旧設計では count=10/30日前 > count=3/直近 だったが、今は逆。
+        // 「直近の好み変更を強く反映」が新仕様。
         let base: Int64 = 1_700_000_000
         let tau = Int64(30 * 86400)
         db.clock = { base }
@@ -179,7 +183,40 @@ final class DatabaseManagerTests: XCTestCase {
         let results = db.fetchHistoryExact(reading: "あ")
         let idxOld = results.firstIndex(of: "高頻度古い")!
         let idxNew = results.firstIndex(of: "低頻度新しい")!
-        XCTAssertLessThan(idxOld, idxNew, "count=10 / score≈5.0 が count=3 / score=3.0 より上位")
+        XCTAssertLessThan(idxNew, idxOld, "直近 count=3 + short bonus が 30 日前 count=10 を上回る")
+    }
+
+    func testHistoryEntryScoreTwoStageDecay() {
+        // PLAN260621b: HistoryEntry.score の 2 段 decay 数値検証。
+        // 直近 0 秒: ~3.0 / 1日前: ~2.0 / 7日前: ~1.06 / 30日前: ~0.56
+        let now: Int64 = 1_700_000_000
+        func entry(ageDays: Double) -> DatabaseManager.HistoryEntry {
+            DatabaseManager.HistoryEntry(
+                input: "x", output: "y", count: 1, pos: nil, lcid: nil,
+                usedAt: now - Int64(ageDays * 86400)
+            )
+        }
+        XCTAssertEqual(entry(ageDays: 0).score(now: now), 3.0, accuracy: 0.01)
+        XCTAssertEqual(entry(ageDays: 1).score(now: now), 1.97, accuracy: 0.05)
+        XCTAssertEqual(entry(ageDays: 7).score(now: now), 1.06, accuracy: 0.05)
+        XCTAssertEqual(entry(ageDays: 30).score(now: now), 0.56, accuracy: 0.05)
+    }
+
+    func testRecencyShortBonusFadesAfter1Day() {
+        // PLAN260621b: short tau = 1 日。1 日経過で bonus は半分。
+        // 直近確定（age < 1h）と 24h 前確定で、ランキングが逆転する境界を確認。
+        let base: Int64 = 1_700_000_000
+        let oneHour: Int64 = 3600
+        let oneDay: Int64 = 86400
+        db.clock = { base }
+        db.record(input: "あ", output: "古い直近")  // 24h 後に「古い」になる予定
+        db.clock = { base + oneDay - oneHour }  // 23h 後に新規記録
+        db.record(input: "あ", output: "より直近")
+        db.clock = { base + oneDay }
+        let results = db.fetchHistoryExact(reading: "あ")
+        let idxRecent = results.firstIndex(of: "より直近")!
+        let idxOlder = results.firstIndex(of: "古い直近")!
+        XCTAssertLessThan(idxRecent, idxOlder, "1 日以内では直近側が上位（short bonus が支配）")
     }
 
     func testRecencyHighCountVeryOldBeatsLowCountRecent() {

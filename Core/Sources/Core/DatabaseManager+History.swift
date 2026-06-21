@@ -272,35 +272,34 @@ extension DatabaseManager {
     }
 
     /// dbQueue 上で実行する低頻度履歴削除。dispatchWrite ブロック内から呼ぶ。
+    /// GC は long-only 式で評価する（短期 bonus は削除判定に関与させない）。
     func cleanupLowScoreHistoryOnQueue(threshold: Double) -> Int {
         let now = nowEpoch()
-        let sql = "DELETE FROM history WHERE count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?) < ?"
+        let sql = "DELETE FROM history WHERE \(Self.recencyExprLongOnly) < ?"
         guard let stmt = prepareUncachedStmt(sql) else { return 0 }
         defer { sqlite3_finalize(stmt) }
         sqlite3_bind_int64(stmt, 1, now)
-        sqlite3_bind_double(stmt, 2, Self.recencyTauSeconds)
-        sqlite3_bind_double(stmt, 3, threshold)
+        sqlite3_bind_double(stmt, 2, threshold)
         guard sqlite3_step(stmt) == SQLITE_DONE else { return 0 }
         return Int(sqlite3_changes(db))
     }
 
-    /// 時間減衰スコアが `threshold` 未満のエントリ数を返す（ドライラン）。
+    /// 時間減衰スコアが `threshold` 未満のエントリ数を返す（ドライラン）。GC と同じ long-only 式で評価。
     public func countLowScoreHistory(threshold: Double = 0.1) -> Int {
         dbQueue.sync {
             let now = self.nowEpoch()
-            let sql = "SELECT COUNT(*) FROM history WHERE count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?) < ?"
+            let sql = "SELECT COUNT(*) FROM history WHERE \(Self.recencyExprLongOnly) < ?"
             guard let stmt = self.prepareUncachedStmt(sql) else { return 0 }
             defer { sqlite3_finalize(stmt) }
             sqlite3_bind_int64(stmt, 1, now)
-            sqlite3_bind_double(stmt, 2, Self.recencyTauSeconds)
-            sqlite3_bind_double(stmt, 3, threshold)
+            sqlite3_bind_double(stmt, 2, threshold)
             guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
             return Int(sqlite3_column_int(stmt, 0))
         }
     }
 
     /// 時間減衰スコアが `threshold` 未満のエントリを削除し、削除件数を返す。
-    /// デフォルト閾値 0.1 は count=1・約3ヶ月超相当（τ=30日）。
+    /// long-only 式で評価。デフォルト閾値 0.1 は count=1 で概ね 9 ヶ月超相当（τ=30日）。
     @discardableResult
     public func cleanupLowScoreHistory(threshold: Double = 0.1) -> Int {
         dbQueue.sync { self.cleanupLowScoreHistoryOnQueue(threshold: threshold) }

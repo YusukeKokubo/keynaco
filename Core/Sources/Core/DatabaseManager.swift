@@ -10,10 +10,29 @@ public final class DatabaseManager: @unchecked Sendable {
     // inMemory=true のテストでは書き込みを同期実行して即座に読み取れるようにする
     let writeAsync: Bool
 
-    // τ = 30日: 30日経過で count の重みが半減するスケール
+    // 時間減衰スコアの 2 段 decay 設計（PLAN260621b）:
+    // long: τ=30日。累積学習用。30 日経過で count の重みが半減する。
+    // short: τ=1日 + bonus=2.0。直近確定の重みを底上げし、Zenzai 推論を上回るランクで履歴を出すための直近重み。
+    //   - 直近 0 秒の確定: スコア 3.0 (= 1 + 2)
+    //   - 1 日前: スコア ~1.97
+    //   - 7 日前: スコア ~1.06（既存とほぼ同等）
+    //   - 30 日前: ~0.56
     static let recencyTauSeconds: Double = 30 * 86400
-    // 時間減衰スコア式: 各クエリの ORDER BY / SUM で使用する
-    static let recencyExpr = "count * 1.0 / (1.0 + (? - used_at) * 1.0 / ?)"
+    static let recencyShortTauSeconds: Double = 86400
+    static let recencyShortBonus: Double = 2.0
+    // 時間減衰スコア式: 各クエリの ORDER BY / SUM で使用する。
+    // bind は (now, now) を連続 2 箇所に bindRecency で埋める。tau / bonus は SQL リテラルとして
+    // 埋め込み、bind index を増やさず既存 5 箇所の SQL の `?` カウントを保つ。
+    static var recencyExpr: String {
+        "(count * 1.0 / (1.0 + (? - used_at) * 1.0 / \(recencyTauSeconds))"
+            + " + count * \(recencyShortBonus) / (1.0 + (? - used_at) * 1.0 / \(recencyShortTauSeconds)))"
+    }
+
+    // GC 用 long-only 式。GC は「累積で価値が薄いものを削除」する役割で、直近 short bonus は
+    // 表示ランクの目的なので関与させない（短期的なノイズで削除判定が揺れんようにする）。
+    static var recencyExprLongOnly: String {
+        "count * 1.0 / (1.0 + (? - used_at) * 1.0 / \(recencyTauSeconds))"
+    }
     var clock: () -> Int64 = { Int64(Date().timeIntervalSince1970) }
     func nowEpoch() -> Int64 { clock() }
 
@@ -242,10 +261,11 @@ public final class DatabaseManager: @unchecked Sendable {
         sqlite3_bind_text(stmt, index, value, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
 
-    /// recencyExpr の `?` パラメータ（now, tau）を連続した2インデックスにバインドする。
+    /// recencyExpr の `?` パラメータ（now, now）を連続した2インデックスにバインドする。
+    /// tau / bonus は SQL リテラルとして式に埋まっとるため、bind には現れない。
     func bindRecency(_ stmt: OpaquePointer?, at index: Int32, now: Int64) {
         sqlite3_bind_int64(stmt, index, now)
-        sqlite3_bind_double(stmt, index + 1, Self.recencyTauSeconds)
+        sqlite3_bind_int64(stmt, index + 1, now)
     }
 
     func cachedStmt(for sql: String) -> OpaquePointer? {
@@ -322,7 +342,12 @@ public final class DatabaseManager: @unchecked Sendable {
         public let usedAt: Int64
 
         public func score(now: Int64 = Int64(Date().timeIntervalSince1970)) -> Double {
-            Double(count) / (1.0 + Double(now - usedAt) / DatabaseManager.recencyTauSeconds)
+            // recencyExpr の Swift 表現。SQL と同じ 2 段 decay。
+            let dt = Double(now - usedAt)
+            let long = Double(count) / (1.0 + dt / DatabaseManager.recencyTauSeconds)
+            let short = Double(count) * DatabaseManager.recencyShortBonus
+                / (1.0 + dt / DatabaseManager.recencyShortTauSeconds)
+            return long + short
         }
     }
 
