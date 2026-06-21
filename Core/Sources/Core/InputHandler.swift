@@ -460,10 +460,11 @@ public struct InputHandler {
             lastKeyDownDidPenalize = true
         }
         guard handled else { return (false, .none) }
-        // 非表示からの BS は .whileTyping にしないと initialIsExplicitlySelected=true で候補が復活して誤確定する
-        let trigger: CandidateListTrigger =
-            candidateSession.isVisible && candidateSession.isExplicitlySelected ? .explicit : .whileTyping
-        let action: CandidateAction = needsRefresh ? buildCandidateListForTrigger(trigger) : .dismiss
+        // BS は読みを 1 戻す操作なので常に .whileTyping で rebuild する。
+        // explicit を維持して rebuild すると selectedRow=0 で別語に強制スナップし
+        // marked text がちらつく（例: 幹事 row=1 → BS → 間 row=0 が即 marked される）。
+        // .whileTyping なら row=0 でも passive 扱いで markedText がひらがな組成のまま落ち着く。
+        let action: CandidateAction = needsRefresh ? buildCandidateListForTrigger(.whileTyping) : .dismiss
         return (true, action)
     }
 
