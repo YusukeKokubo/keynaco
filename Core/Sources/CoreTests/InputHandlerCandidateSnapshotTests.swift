@@ -130,7 +130,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("toka")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["とか", "UD戸籍", "辞書A", "辞書B"],
-                     historyEnd: 2, fixedEnd: 2, initialRow: 0)
+                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -183,7 +183,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // ユーザー辞書 exact は履歴 exact と同等扱いで初期選択される。
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "辞書A", "辞書B"],
-                     historyEnd: 1, fixedEnd: 1, initialRow: 0)
+                     historyEnd: 0, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -193,8 +193,8 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["Acme", "愛", "辞書A", "辞書B"],
-                     historyEnd: 2, fixedEnd: 1, initialRow: 1)
+                     candidates: ["愛", "Acme", "辞書A", "辞書B"],
+                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -271,8 +271,8 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["UD合い", "愛", "辞書A"],
-                     historyEnd: 2, fixedEnd: 1, initialRow: 1)
+                     candidates: ["愛", "UD合い", "辞書A"],
+                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 }

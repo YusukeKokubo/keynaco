@@ -113,6 +113,21 @@ enum CandidateBuildDiagnosticsSupport {
         }
     }
 
+    static func scoredSourceLabel(_ candidate: ScoredCandidate) -> String {
+        let source: String
+        switch candidate.source {
+        case .historyExact: source = "historyExact"
+        case .historyPrefix: source = "historyPrefix"
+        case .userDict(let exact): source = exact ? "userDictExact" : "userDictPrefix"
+        case .azooKey(let rank): source = "azooKey(\(rank))"
+        case .hiraganaPreferred: source = "hiraganaPreferred"
+        case .hiraganaBuiltin: source = "hiraganaBuiltin"
+        case .number: source = "number"
+        case .dateTime: source = "dateTime"
+        }
+        return "\(source):\(candidate.text)(\(String(format: "%.2f", candidate.score)))"
+    }
+
     static func triggerLabel(_ trigger: CandidateListTrigger) -> String {
         switch trigger {
         case .whileTyping: return "whileTyping"
