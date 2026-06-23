@@ -14,7 +14,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
     public var reading: String
     public var outcome: Outcome
 
-    public var fixedSlot: String
     public var hiraganaPreferred: Bool
     public var hiraganaBuiltin: Bool
     public var exactMatchHighHistory: [String]
@@ -28,8 +27,8 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
     public var initialText: String?
     public var fixedEnd: Int
     public var historyEnd: Int
-    /// `"fixedHiragana:の"` 形式のセクション要約。
-    public var sections: [String]
+    /// `"historyPrefix:情報共有(93.00)"` 形式のスコア付き source 要約。
+    public var scoredSources: [String]
 
     public var deferAzooKeyWhileTyping: Bool
 
@@ -41,9 +40,8 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             let policy = initialRowPolicy
             let hist = exactMatchHighHistory.first ?? "-"
             let azoo = azooKeyCandidates.first ?? "-"
-            let fixed = fixedSlot
             let pref = hiraganaPreferred || hiraganaBuiltin ? 1 : 0
-            return " init:[\(initialRow)]\(initText) policy:\(policy) fixed:\(fixed) hist1:\(hist) azoo1:\(azoo) hirPref:\(pref)"
+            return " init:[\(initialRow)]\(initText) policy:\(policy) hist1:\(hist) azoo1:\(azoo) hirPref:\(pref)"
         case .dismissedEmpty:
             return " init:dismiss(empty)"
         case .dismissedFunctionalWord:
@@ -57,7 +55,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             "trigger": trigger,
             "reading": reading,
             "outcome": outcome.rawValue,
-            "fixedSlot": fixedSlot,
             "hiraganaPreferred": hiraganaPreferred,
             "hiraganaBuiltin": hiraganaBuiltin,
             "exactMatchHighHistory": exactMatchHighHistory,
@@ -69,7 +66,7 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             "initialRow": initialRow,
             "fixedEnd": fixedEnd,
             "historyEnd": historyEnd,
-            "sections": sections,
+            "scoredSources": scoredSources,
             "deferAzooKeyWhileTyping": deferAzooKeyWhileTyping,
             "logSuffix": logSuffix,
         ]
@@ -79,37 +76,10 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
 }
 
 enum CandidateBuildDiagnosticsSupport {
-    static func fixedSlotLabel(_ slot: CandidateFixedSlot) -> String {
-        switch slot {
-        case .none: return "none"
-        case .hiragana: return "hiragana"
-        }
-    }
-
     static func policyLabel(_ policy: InitialRowPolicy) -> String {
         switch policy {
         case .firstMatching(let s): return "firstMatching(\(s))"
         case .afterFixed: return "afterFixed"
-        }
-    }
-
-    static func sectionLabels(_ sections: [CandidateSection]) -> [String] {
-        sections.map { section in
-            let items = section.items.joined(separator: ",")
-            return "\(sectionKindLabel(section.kind)):\(items)"
-        }
-    }
-
-    static func sectionKindLabel(_ kind: CandidateSection.Kind) -> String {
-        switch kind {
-        case .fixedHiragana: return "fixedHiragana"
-        case .userDict: return "userDict"
-        case .exactMatchHistory: return "exactMatchHistory"
-        case .promotedPrefixHistory: return "promotedPrefixHistory"
-        case .highHistory: return "highHistory"
-        case .number: return "number"
-        case .dateTime: return "dateTime"
-        case .azooKeyDict: return "azooKeyDict"
         }
     }
 

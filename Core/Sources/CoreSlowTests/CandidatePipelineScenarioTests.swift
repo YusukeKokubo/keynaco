@@ -4,20 +4,18 @@ import XCTest
 
 /// AzooKey 生候補 → 画面表示までの post-processing パイプラインを通した end-to-end シナリオ集。
 ///
-/// 加工は 8 段あり、各段の単体テストは別ファイル（`AzooKeyConverterTests` /
-/// `CandidateSectionBuilderTests` / `CandidateLayoutTests` /
-/// `InitialRowPolicyResolverTests` / `InputHandlerCandidatesTests` 等）にある。
+/// 加工は 5 段あり、各段の単体テストは別ファイル（`AzooKeyConverterTests` /
+/// `CandidateScoreBuilderTests` / `InitialRowPolicyResolverTests` /
+/// `InputHandlerCandidatesTests` 等）にある。
 /// このファイルは「全段が連動して何を生むか」を worked example として固定する。
 ///
 /// ```
 /// [1] AzooKey 内部（KanaKanjiConverter.requestCandidates）
 /// [2] AzooKeyConverter.filterCandidatesForDisplay
 /// [3] InputHandler.fetchAzooKeyCandidates（ラッパー、lcid ソートは P-7 で削除済）
-/// [4] CandidateSectionBuilder.build
-/// [5] CandidateLayout.init
-/// [6] InitialRowPolicyResolver.resolve
-/// [7] InitialRowPolicyResolver.whileTypingInitialRow（打鍵中のみ）
-/// [8] assembleCandidateList の dismiss 条件
+/// [4] CandidateScoreBuilder.build + CandidateScoredLayout.assemble
+/// [5] InitialRowPolicyResolver.resolve（explicit のみ）/ スコア順先頭（whileTyping）
+/// [6] assembleCandidateList の dismiss 条件
 /// ```
 ///
 /// AzooKey 実辞書に依存するため slow tests。テスト名の `_protects_<段名>` は

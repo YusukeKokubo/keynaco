@@ -231,16 +231,10 @@ extension InputHandler {
         )
     }
 
-    // MARK: - Fixed slot（hiraganaPreferred）
-
     /// これ未満の履歴スコアは候補に載せない（DB の `recencyExpr` と同じ尺度）。
     private static let historyRecencyScoreCutoff = 0.5
     /// 候補ヘッドの過剰膨張を抑える前方一致履歴の上限件数。
     private static let maxHighHistoryCount = 3
-
-    private func resolveFixedSlot(reading: String) -> CandidateFixedSlot {
-        isHiraganaPreferred(reading) ? .hiragana : .none
-    }
 
     private func hiraganaBonusKind(for reading: String) -> CandidateScoreBuilder.HiraganaBonusKind? {
         if hiraganaPreferredSet.contains(reading) { return .userSetting }
@@ -271,7 +265,6 @@ extension InputHandler {
                 trigger: trigger,
                 reading: h,
                 outcome: .dismissedEmpty,
-                fixedSlot: .none,
                 sources: sources,
                 scored: [],
                 scoredLayout: nil,
@@ -288,7 +281,6 @@ extension InputHandler {
                 trigger: trigger,
                 reading: h,
                 outcome: .dismissedFunctionalWord,
-                fixedSlot: isHiraganaPref ? .hiragana : .none,
                 sources: sources,
                 scored: [],
                 scoredLayout: nil,
@@ -317,98 +309,43 @@ extension InputHandler {
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
         ))
-        let prefixFocusRank = { (output: String) in
-            InitialRowPolicyResolver.rankForPrefixFocus(output: output, db: db)
-        }
-        let prefixFocusCandidate = trigger == .whileTyping
-            ? InitialRowPolicyResolver.prefixFocusCandidate(
-                reading: h,
-                prefixHistory: sources.highHistory,
-                userDictPrefix: sources.userDictPrefix,
-                rankForOutput: prefixFocusRank
-            )
-            : nil
         let policy: InitialRowPolicy
-        if trigger == .explicit {
-            if isHiraganaPref {
-                policy = .firstMatching(h)
-            } else {
-                policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
-                    reading: h,
-                    fixedSlot: .none,
-                    exactMatchHighHistory: sources.exactMatchHighHistory,
-                    userDictExact: sources.userDictExact,
-                    prefixFocusCandidate: nil,
-                    promotedPrefixFocusCandidate: nil,
-                    azooKeyCandidates: sources.azooKeyCandidates,
-                    candidateList: scoredLayout.candidates
-                ))
-            }
-        } else {
+        let initialRow: Int
+        if trigger == .whileTyping {
             policy = .afterFixed
+            initialRow = scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0
+        } else if isHiraganaPref {
+            policy = .firstMatching(h)
+            initialRow = scoredLayout.candidates.firstIndex(of: h)
+                ?? (scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0)
+        } else {
+            policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
+                reading: h,
+                exactMatchHighHistory: sources.exactMatchHighHistory,
+                userDictExact: sources.userDictExact,
+                azooKeyCandidates: sources.azooKeyCandidates,
+                candidateList: scoredLayout.candidates
+            ))
+            switch policy {
+            case .firstMatching(let text):
+                initialRow = scoredLayout.candidates.firstIndex(of: text)
+                    ?? (scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0)
+            case .afterFixed:
+                initialRow = scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0
+            }
         }
         let exactMatchHistorySet = Set(sources.exactMatchHighHistory)
-        let bestExactScore = sources.exactMatchHighHistory
-            .compactMap { sources.exactMatchScores[$0] }
-            .max() ?? 0
-        let scorePromotedHistory = Set(scored.compactMap { item -> String? in
-            guard case .historyPrefix = item.source, bestExactScore > 0 else { return nil }
-            return item.score > bestExactScore ? item.text : nil
-        })
-        var computedRow: Int
-        switch policy {
-        case .firstMatching(let text):
-            computedRow = scoredLayout.candidates.firstIndex(of: text)
-                ?? (scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0)
-        case .afterFixed:
-            computedRow = scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0
-        }
-        if trigger == .whileTyping,
-           computedRow < scoredLayout.candidates.count,
-           sources.userDictPrefix.contains(scoredLayout.candidates[computedRow]),
-           prefixFocusCandidate == nil,
-           let azooIdx = scoredLayout.candidates.firstIndex(where: { sources.azooKeyCandidates.contains($0) }) {
-            computedRow = azooIdx
-        }
-        let whileTypingRow = trigger == .whileTyping
-            ? InitialRowPolicyResolver.whileTypingInitialRow(
-                candidates: scoredLayout.candidates,
-                fixedEnd: scoredLayout.fixedEnd,
-                historyEnd: scoredLayout.historyEnd,
-                computedRow: computedRow,
-                reading: h,
-                exactMatchHistory: exactMatchHistorySet,
-                scorePromotedHistory: scorePromotedHistory,
-                rankForOutput: prefixFocusRank
-            )
-            : computedRow
-        guard whileTypingRow != nil || trigger != .whileTyping else {
-            #if DEBUG
-            recordCandidateBuildDiagnostics(
-                trigger: trigger,
-                reading: h,
-                outcome: .dismissedEmpty,
-                fixedSlot: isHiraganaPref ? .hiragana : .none,
-                sources: sources,
-                scored: scored,
-                scoredLayout: scoredLayout,
-                policy: policy
-            )
-            #endif
-            return .dismiss
-        }
-        let initialRow = whileTypingRow ?? computedRow
         guard !scoredLayout.candidates.isEmpty else {
             #if DEBUG
             recordCandidateBuildDiagnostics(
                 trigger: trigger,
                 reading: h,
                 outcome: .dismissedEmpty,
-                fixedSlot: isHiraganaPref ? .hiragana : .none,
                 sources: sources,
                 scored: scored,
                 scoredLayout: scoredLayout,
-                policy: policy
+                policy: policy,
+                initialRow: initialRow
             )
             #endif
             return .dismiss
@@ -424,43 +361,44 @@ extension InputHandler {
                 trigger: trigger,
                 reading: h,
                 outcome: .dismissedFunctionalWord,
-                fixedSlot: isHiraganaPref ? .hiragana : .none,
                 sources: sources,
                 scored: scored,
                 scoredLayout: scoredLayout,
-                policy: policy
+                policy: policy,
+                initialRow: initialRow
             )
             #endif
             return .dismiss
         }
 
-        if !sources.exactMatchHighHistory.isEmpty, initialRow < scoredLayout.historyEnd,
-           exactMatchHistorySet.contains(scoredLayout.candidates[initialRow]) {
+        if initialRow < scoredLayout.fixedEnd {
+            lastInitialRowReason = isHiraganaPref ? "hiraganaPreferred" : "hiraganaBuiltin"
+        } else if !sources.exactMatchHighHistory.isEmpty, initialRow < scoredLayout.historyEnd,
+                  exactMatchHistorySet.contains(scoredLayout.candidates[initialRow]) {
             lastInitialRowReason = "exactMatchHistory"
         } else if initialRow < scoredLayout.historyEnd,
                   scored.first(where: { $0.text == scoredLayout.candidates[initialRow] })?.source == .historyPrefix {
-            lastInitialRowReason = "prefixFocus"
+            lastInitialRowReason = "historyPrefix"
         } else if !sources.userDictExact.isEmpty,
                   initialRow < scoredLayout.candidates.count,
                   sources.userDictExact.contains(scoredLayout.candidates[initialRow]) {
             lastInitialRowReason = "userDictExact"
-        } else if prefixFocusCandidate != nil {
-            lastInitialRowReason = "prefixFocus"
-        } else if !sources.azooKeyCandidates.isEmpty {
+        } else if initialRow >= scoredLayout.historyEnd,
+                  sources.azooKeyCandidates.contains(scoredLayout.candidates[initialRow]) {
             lastInitialRowReason = "azooKey"
         } else {
-            lastInitialRowReason = "afterFixed"
+            lastInitialRowReason = "scoreOrder"
         }
         #if DEBUG
         recordCandidateBuildDiagnostics(
             trigger: trigger,
             reading: h,
             outcome: .shown,
-            fixedSlot: isHiraganaPref ? .hiragana : .none,
             sources: sources,
             scored: scored,
             scoredLayout: scoredLayout,
-            policy: policy
+            policy: policy,
+            initialRow: initialRow
         )
         #endif
         return .show(
@@ -478,23 +416,22 @@ extension InputHandler {
         trigger: CandidateListTrigger,
         reading: String,
         outcome: CandidateBuildDiagnostics.Outcome,
-        fixedSlot: CandidateFixedSlot,
         sources: CandidateListSources,
         scored: [ScoredCandidate],
         scoredLayout: CandidateScoredLayout.Result?,
-        policy: InitialRowPolicy
+        policy: InitialRowPolicy,
+        initialRow: Int? = nil
     ) {
-        let initialRow = scoredLayout.flatMap { layout in
+        let resolvedInitialRow = initialRow ?? scoredLayout.flatMap { layout in
             layout.fixedEnd < layout.candidates.count ? layout.fixedEnd : 0
         } ?? 0
         let initialText = scoredLayout.flatMap { layout in
-            layout.candidates.indices.contains(initialRow) ? layout.candidates[initialRow] : nil
+            layout.candidates.indices.contains(resolvedInitialRow) ? layout.candidates[resolvedInitialRow] : nil
         }
         lastCandidateBuildDiagnostics = CandidateBuildDiagnostics(
             trigger: CandidateBuildDiagnosticsSupport.triggerLabel(trigger),
             reading: reading,
             outcome: outcome,
-            fixedSlot: CandidateBuildDiagnosticsSupport.fixedSlotLabel(fixedSlot),
             hiraganaPreferred: hiraganaPreferredSet.contains(reading),
             hiraganaBuiltin: HiraganaPreferredBuiltins.words[reading] != nil,
             exactMatchHighHistory: sources.exactMatchHighHistory,
@@ -503,11 +440,11 @@ extension InputHandler {
             azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8)),
             azooKeyApiOrder: Array(sources.azooKeyApiOrder.prefix(8)),
             initialRowPolicy: CandidateBuildDiagnosticsSupport.policyLabel(policy),
-            initialRow: initialRow,
+            initialRow: resolvedInitialRow,
             initialText: initialText,
             fixedEnd: scoredLayout?.fixedEnd ?? 0,
             historyEnd: scoredLayout?.historyEnd ?? 0,
-            sections: scored.prefix(8).map { CandidateBuildDiagnosticsSupport.scoredSourceLabel($0) },
+            scoredSources: scored.prefix(8).map { CandidateBuildDiagnosticsSupport.scoredSourceLabel($0) },
             deferAzooKeyWhileTyping: deferAzooKeyWhileTyping
         )
     }

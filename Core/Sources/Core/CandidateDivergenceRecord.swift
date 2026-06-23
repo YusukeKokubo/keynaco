@@ -19,7 +19,7 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
     public let confirmedSource: String
     /// `.show` 時の初期選択行。ユーザーがスクロールしていれば `selectedRow` と異なる。
     public let initialRow: Int
-    /// 初期行を選んだ理由。"promotedPrefixHistory" / "exactMatchHistory" / "userDictExact" / "prefixFocus" / "azooKey" / "afterFixed"。
+    /// 初期行を選んだ理由。"hiraganaPreferred" / "hiraganaBuiltin" / "exactMatchHistory" / "historyPrefix" / "userDictExact" / "azooKey" / "scoreOrder"。
     public let initialRowReason: String
 
     /// Z1 と確定がズレた要因。

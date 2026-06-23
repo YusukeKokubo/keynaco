@@ -389,9 +389,9 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertEqual(handler.sessionTextBuffer, "")
     }
 
-    // MARK: - 前方一致の初期フォーカス（品詞別モーラ閾値 / whileTyping のみ）
+    // MARK: - explicit 初期行（打鍵中はスコア順先頭）
 
-    func testWhileTyping_prefixHistoryFocusesNoun() {
+    func testWhileTyping_prefixHistoryUsesScoreOrder() {
         setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
         handler.db.recordPrefixes(reading: "だけんすうげん", output: "打鍵数削減")
         handler.db.updatePOSClassification(output: "打鍵数削減", pos: "noun", lcid: 1285)
@@ -403,7 +403,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertEqual(
             payload.candidates[payload.initialRow],
             "打鍵数削減",
-            "前方一致履歴の名詞に初期フォーカスするはず: \(payload.candidates)"
+            "スコア順先頭の前方一致履歴に初期フォーカスするはず: \(payload.candidates)"
         )
     }
 
@@ -420,51 +420,6 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
             payload.candidates[payload.initialRow],
             "ダケンス",
             "Space（explicit）では従来どおり AzooKey 先頭を選ぶ: \(payload.candidates)"
-        )
-    }
-
-    func testWhileTyping_userDictPrefixDoesNotFocusWithoutClassification() {
-        setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
-        handler.db.addUserDict(input: "だけん", output: "カスタム語")
-
-        typeRomaji("dakensu")
-        guard let payload = handler.buildCandidateList(trigger: .whileTyping).showPayload else {
-            XCTFail("候補を出すはず"); return
-        }
-        XCTAssertNotEqual(
-            payload.candidates[payload.initialRow],
-            "カスタム語",
-            "pos/lcid 未設定のユーザー辞書は unknown（5 モーラ必要）のため 4 モーラではフォーカスしない: \(payload.candidates)"
-        )
-    }
-
-    func testWhileTyping_skipsVerbPrefixHistoryBelowThreeMorae() {
-        setUpWithConverter(SnapStub(["田部"]))
-        handler.db.recordPrefixes(reading: "たべる", output: "食べる")
-        handler.db.updatePOSClassification(output: "食べる", pos: "verb", lcid: 100)
-
-        typeRomaji("tabe")
-        guard let payload = handler.buildCandidateList(trigger: .whileTyping).showPayload else { return }
-        XCTAssertNotEqual(
-            payload.candidates[payload.initialRow],
-            "食べる",
-            "2 モーラでは動詞履歴にフォーカスしない: \(payload.candidates)"
-        )
-    }
-
-    func testWhileTyping_prefixHistoryFocusesNounWithPosOnly() {
-        setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
-        handler.db.recordPrefixes(reading: "だけんすうげん", output: "打鍵数削減")
-        handler.db.updatePOSClassification(output: "打鍵数削減", pos: "noun", lcid: nil)
-
-        typeRomaji("dakensu")
-        guard let payload = handler.buildCandidateList(trigger: .whileTyping).showPayload else {
-            XCTFail("候補を出すはず"); return
-        }
-        XCTAssertEqual(
-            payload.candidates[payload.initialRow],
-            "打鍵数削減",
-            "pos のみでも名詞前方一致にフォーカスするはず: \(payload.candidates)"
         )
     }
 }

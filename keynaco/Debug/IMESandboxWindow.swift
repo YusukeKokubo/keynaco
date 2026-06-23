@@ -815,7 +815,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             lines.append("【初期行決定】")
             lines.append("trigger                  : \(build.trigger)")
             lines.append("outcome                  : \(build.outcome.rawValue)")
-            lines.append("fixedSlot                : \(build.fixedSlot)")
             lines.append("hiraganaPreferred(DB)    : \(build.hiraganaPreferred)")
             lines.append("hiraganaBuiltin          : \(build.hiraganaBuiltin)")
             lines.append("exactMatchHighHistory    : \(build.exactMatchHighHistory)")
@@ -830,9 +829,9 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                 lines.append("selectedRow≠initialRow   : \(s.selectedRow) (ユーザー操作または再構築後)")
             }
             lines.append("deferAzooKeyWhileTyping  : \(build.deferAzooKeyWhileTyping)")
-            lines.append("sections                 :")
-            for section in build.sections {
-                lines.append("  \(section)")
+            lines.append("scoredSources            :")
+            for source in build.scoredSources {
+                lines.append("  \(source)")
             }
         }
         lines.append("")
@@ -892,7 +891,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                 return ""
             }
             for key in [
-                "trigger", "outcome", "fixedSlot", "initialRowPolicy", "initialText",
+                "trigger", "outcome", "initialRowPolicy", "initialText",
             ] {
                 let val = buildStr(key)
                 if !val.isEmpty { lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(val)") }
@@ -910,9 +909,9 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             ] {
                 lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(buildStr(key))")
             }
-            if let sections = build["sections"] as? [String], !sections.isEmpty {
-                lines.append("sections                 :")
-                for section in sections { lines.append("  \(section)") }
+            if let sources = build["scoredSources"] as? [String], !sources.isEmpty {
+                lines.append("scoredSources            :")
+                for source in sources { lines.append("  \(source)") }
             }
             if let entries = dict["candidateEntries"] as? [[String: Any]], !entries.isEmpty {
                 lines.append("")
