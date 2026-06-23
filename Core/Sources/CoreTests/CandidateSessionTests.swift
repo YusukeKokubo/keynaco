@@ -5,7 +5,7 @@ final class CandidateSessionTests: XCTestCase {
 
     func testShowAndDismiss() {
         var s = CandidateSession()
-        s.apply(.show(candidates: ["a", "b"], historyEnd: 0, initialRow: 1, fixedEnd: 0))
+        s.apply(.show(candidates: ["a", "b"], initialRow: 1, fixedEnd: 0))
         XCTAssertTrue(s.isVisible)
         XCTAssertEqual(s.selectedRow, 1)
         XCTAssertEqual(s.selectedText, "b")
@@ -16,7 +16,7 @@ final class CandidateSessionTests: XCTestCase {
 
     func testSelectNextWraps() {
         var s = CandidateSession()
-        s.apply(.show(candidates: ["a", "b"], historyEnd: 0, initialRow: 0, fixedEnd: 0))
+        s.apply(.show(candidates: ["a", "b"], initialRow: 0, fixedEnd: 0))
         s.apply(.selectNext)
         XCTAssertEqual(s.selectedRow, 1)
         XCTAssertTrue(s.isExplicitlySelected)
@@ -27,7 +27,7 @@ final class CandidateSessionTests: XCTestCase {
     func testPanelInteractionPhases() {
         var s = CandidateSession()
         XCTAssertEqual(s.panelInteraction, .hidden)
-        s.apply(.show(candidates: ["a"], historyEnd: 0, initialRow: 0, fixedEnd: 0))
+        s.apply(.show(candidates: ["a"], initialRow: 0, fixedEnd: 0))
         XCTAssertEqual(s.panelInteraction, .passive)
         s.apply(.selectNext)
         XCTAssertEqual(s.panelInteraction, .explicit)
@@ -35,11 +35,16 @@ final class CandidateSessionTests: XCTestCase {
         XCTAssertEqual(s.panelInteraction, .hidden)
     }
 
-    func testDeleteSelectedShrinksHistoryEnd() {
+    func testDeleteSelectedRemovesHistoryRow() {
         var s = CandidateSession()
-        s.apply(.show(candidates: ["fix", "hist"], historyEnd: 2, initialRow: 1, fixedEnd: 1))
+        s.apply(.show(
+            candidates: ["fix", "hist"],
+            initialRow: 1,
+            fixedEnd: 1,
+            candidateSources: [.hiraganaBuiltin, .historyExact]
+        ))
         s.apply(.deleteSelected)
         XCTAssertEqual(s.candidates, ["fix"])
-        XCTAssertEqual(s.historyEnd, 1)
+        XCTAssertEqual(s.candidateSources, [.hiraganaBuiltin])
     }
 }

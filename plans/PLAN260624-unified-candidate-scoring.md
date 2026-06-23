@@ -25,7 +25,7 @@ related_commit: eb90b5a
 | `maxHighHistoryCount` 3 | prefix 件数 cap | スコア順 top-N に統合可能 |
 | `HistoryPrefixPromotion` | exact より前へ | セクション順と二重管理 |
 | `CandidateSectionBuilder` | exact / promoted / high / dict 分離 | sectionOrder が 3 種 |
-| `CandidateLayout` | flatten + historyEnd | section 依存 |
+| `CandidateLayout` | flatten + `candidateSources` | 削除済み |
 | `InitialRowPolicyResolver` | 初期行（exact > promoted > prefix focus > azooKey） | 並びと別ロジック |
 | `CandidateFixedSlot.hiragana` | ひらがな先頭固定 | スコア外の特例 |
 | `whileTypingInitialRow` | モーラ閾値で履歴行フィルタ | スコアと別ゲート |
@@ -127,7 +127,7 @@ initialRow = 0   // 原則先頭。explicit 時のみ別途検討
 
 | 例外 | 理由 |
 |------|------|
-| `historyEnd` 境界 | Shift+Delete 対象 = `source` が history* の行 |
+| Shift+Delete | `candidateSources` の `history*` 行のみ（`historyEnd` インデックスは削除済み） |
 | 打鍵中 機能語 dismiss | `HiraganaPreferredBuiltins` 先頭 → UI 非表示（concept 指針 1） |
 | `.explicit` vs `.whileTyping` | dismiss / defer AzooKey はトリガー依存のまま |
 | 外来語記号 → カタカナ初期行 | スコア化可能だが Phase 2（読み属性ボーナス） |

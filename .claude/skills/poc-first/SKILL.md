@@ -55,7 +55,7 @@ sandbox での典型パターン:
 ```python
 send({"reset": True})
 r = send({"type_string": "...", "then": "space",
-          "fields": ["candidates", "selectedText", "historyEnd", "fixedEnd"]})
+          "fields": ["candidates", "selectedText", "fixedEnd", "candidateEntries"]})
 print(r["candidates"][:5])  # 前提条件を確認
 ```
 

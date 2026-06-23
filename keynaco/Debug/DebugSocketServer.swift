@@ -173,7 +173,6 @@ final class DebugSocketServer: @unchecked Sendable {
         "candidateVisible": "bool",
         "selectedRow": "int",
         "selectedText": "string|null",
-        "historyEnd": "int",
         "fixedEnd": "int",
         "candidates": "array<string>",
         "committedHistory": "array<string>",
@@ -753,7 +752,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
         "isAsciiMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
-        "historyEnd", "fixedEnd", "candidates", "committedHistory",
+        "fixedEnd", "candidates", "committedHistory",
         "candidateEntries", "changed", "explain",
         "ok", "matched", "timedOut", "waitField", "state", "steps", "last",
     ]
@@ -782,7 +781,7 @@ final class DebugSocketServer: @unchecked Sendable {
                 "command": [
                     "type_string": "kanzi",
                     "then": "space",
-                    "fields": ["candidates", "historyEnd"]
+                    "fields": ["candidates", "candidateEntries"]
                 ]
             ],
             [
@@ -1051,7 +1050,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "isExplicitlySelected": snap.isExplicitlySelected,
             "candidateVisible":   snap.candidateVisible,
             "selectedRow":        snap.selectedRow,
-            "historyEnd":         snap.historyEnd,
             "fixedEnd":           snap.fixedEnd,
             "candidates":         snap.candidates,
             "committedHistory":   snap.committedHistory,
@@ -1063,8 +1061,6 @@ final class DebugSocketServer: @unchecked Sendable {
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,
                 sources: handler.candidateSession.candidateSources,
-                fixedEnd: snap.fixedEnd,
-                historyEnd: snap.historyEnd,
                 azooKeyApiOrder: handler.candidateSession.azooKeyApiOrder
             ),
             "pendingAzooKey":     azooKeyScheduler.hasPendingWork,
@@ -1088,8 +1084,6 @@ final class DebugSocketServer: @unchecked Sendable {
     static func makeCandidateEntries(
         candidates: [String],
         sources: [ScoredCandidate.Source] = [],
-        fixedEnd: Int,
-        historyEnd: Int,
         azooKeyApiOrder: [String] = []
     ) -> [[String: Any]] {
         let rankByText: [String: Int]
@@ -1098,11 +1092,10 @@ final class DebugSocketServer: @unchecked Sendable {
         } else {
             rankByText = Dictionary(azooKeyApiOrder.enumerated().map { ($0.element, $0.offset + 1) }, uniquingKeysWith: { first, _ in first })
         }
-        let useSources = sources.count == candidates.count
         return candidates.enumerated().map { idx, text in
-            let section = useSources
+            let section = sources.indices.contains(idx)
                 ? CandidateRowMetadata.section(for: sources[idx]).rawValue
-                : CandidateRowMetadata.section(row: idx, fixedEnd: fixedEnd, historyEnd: historyEnd).rawValue
+                : CandidateRowSection.dictionary.rawValue
             var entry: [String: Any] = [
                 "index": idx,
                 "text": text,
@@ -1117,7 +1110,7 @@ final class DebugSocketServer: @unchecked Sendable {
         "inserted", "markedText", "composedHiragana", "pendingRomaji", "composingText",
         "isAsciiMode", "isBracketMode",
         "isExplicitlySelected", "candidateVisible", "selectedRow", "selectedText",
-        "historyEnd", "fixedEnd", "candidates", "committedHistory",
+        "fixedEnd", "candidates", "committedHistory",
         "candidateEntries", "candidateBuild"
     ]
 

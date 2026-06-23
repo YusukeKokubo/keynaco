@@ -67,10 +67,10 @@ flowchart LR
 | 未確定ローマ字 | `CompositionState.pendingRomaji` | まだひらがなに変換されていないローマ字（例: `k`・`sh` 途中） |
 | 確定経路 | `CommitTrigger` | 確定の起因（`.enter`・`.rightArrow`・`.modeSwitch`・`.deactivate`）。`commitComposition` の呼び出し側が明示する |
 | 候補フェーズ | `CandidatePanelInteraction` | `isVisible × isExplicitlySelected` から導出される3状態（`.hidden` / `.passive` / `.explicit`）。パネルの表示有無と操作種別を一元化する |
-| 行セクション | `CandidateRowSection` | 候補リストを `fixedEnd` / `historyEnd` で3ゾーンに分割した区分（`.fixed` / `.history` / `.dictionary`）。Shift+Delete 可否と区切り線描画の基準 |
+| 行セクション | `CandidateRowSection` | 候補行の UI 区分（`.fixed` / `.history` / `.dictionary`）。`ScoredCandidate.Source`（`candidateSources`）から導出。Shift+Delete 可否と区切り線描画の基準 |
 | 構築トリガー | `CandidateListTrigger` | `buildCandidateList` の呼び出し起因（`.whileTyping` / `.explicit`）。候補フェーズとは別概念 |
 | 候補先行表示 | `AzooKeyCachePeek` | AzooKey の非同期変換結果が届く前に、直前のキャッシュ（完全一致 or 短い読みの prefix）を暫定候補として即時表示する仕組み。完全一致ヒット時は非同期リクエストを省略する |
-| 候補ランキング | `azooKeyApiOrder` | Zenzai（zenz-v3）が推論した候補の並び順。AzooKey が候補テキストを生成し、Zenzai がその順位を決めるという役割分担を指す。keynaco 側では「AzooKey からもらった順番列」として扱い、`CandidateSectionBuilder` が exactMatchHistory のソートと azooKeyDict の並びに適用する |
+| 候補ランキング | `azooKeyApiOrder` | Zenzai（zenz-v3）が推論した候補の並び順。AzooKey が候補テキストを生成し、Zenzai がその順位を決める。keynaco 側では `CandidateScoreBuilder` が AzooKey rank スコアと exact 履歴の Zenzai tie-break に使う |
 
 ## 候補フェーズの詳細
 
@@ -86,26 +86,27 @@ flowchart LR
 
 ## 候補リストのセクション構造
 
-候補リストは2つの整数インデックス `fixedEnd` / `historyEnd` で3ゾーンに分割される（`CandidateLayout` が保証する不変条件: `0 <= fixedEnd <= historyEnd <= candidates.count`）。
+候補列は `CandidateScoreBuilder` のスコア降順で flatten される。各行の `ScoredCandidate.Source`（`candidateSources`）が正本。
 
-| 行セクション | 行範囲 | 内容 | Shift+Delete |
-|-------------|--------|------|-------------|
-| `.fixed` | `row < fixedEnd` | ひらがな固定・ユーザー辞書 | 不可 |
-| `.history` | `fixedEnd <= row < historyEnd` | 高スコア履歴 | 可 |
-| `.dictionary` | `row >= historyEnd` | AzooKey辞書・数値・日時・カタカナ | 不可 |
+| 行セクション | 判定（`CandidateRowMetadata.section(for:)`） | Shift+Delete |
+|-------------|---------------------------------------------|-------------|
+| `.fixed` | `hiraganaBuiltin` / `hiraganaPreferred` | 不可 |
+| `.history` | `historyExact` / `historyPrefix` | 可 |
+| `.dictionary` | 上記以外（`userDict`・`azooKey`・`number`・`dateTime` 等） | 不可 |
 
-`CandidateLayout` はビルド時に `CandidateSection.Kind`（8種）を `sectionOrder` に従って平坦化してからインデックスを確定する。各 Kind と行セクションの対応は下表のとおり。
+スコアの概略（詳細は `CandidateScoreBuilder` の `///`）:
 
-| `CandidateSection.Kind` | 行セクション | 備考 |
-|------------------------|-------------|------|
-| `.fixedHiragana` | fixed | `hiraganaPreferred` 時の先頭固定 |
-| `.userDict` | fixed | ユーザー辞書 |
-| `.exactMatchHistory` | history | 読み完全一致履歴。Zenzai 順でソート後に先頭へ |
-| `.highHistory` | history | 前方一致などその他高スコア履歴 |
-| `.number` | dictionary | 数値変換 |
-| `.dateTime` | dictionary | 日時変換 |
-| `.azooKeyDict` | dictionary | AzooKey 辞書候補（Zenzai 推論結果込み） |
-| `.katakana` | dictionary | カタカナ変換（末尾固定） |
+| source | スコア目安 |
+|--------|-----------|
+| ユーザー辞書 exact | 50 |
+| ユーザー辞書 prefix | 30 |
+| ひらがな builtin bonus | 80 |
+| ひらがな preferred bonus | 100 |
+| 履歴（DB スコア + 表示 floor） | DB 値、最低 AzooKey rank 0 超 |
+| AzooKey rank *n* | `10 / (1 + n)` |
+| 数値 / 日時 | 5 |
+
+`fixedEnd` は先頭から連続する hiragana preferred 行数（Zenzai プロモート診断用）。sandbox / Debug JSON では `candidateEntries[].section` を見る。
 
 ## 注意点
 

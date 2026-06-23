@@ -17,7 +17,6 @@ public extension InputHandler {
             candidateVisible: session.isVisible,
             selectedRow: session.selectedRow,
             selectedText: session.selectedText,
-            historyEnd: session.historyEnd,
             fixedEnd: session.fixedEnd,
             candidates: session.candidates,
             committedHistory: Array(committedHistory.suffix(5)),

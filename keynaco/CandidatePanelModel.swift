@@ -15,13 +15,8 @@ struct CandidatePanelModel: Equatable {
     var selectedRow: Int { session.selectedRow }
     var isExplicitlySelected: Bool { session.isExplicitlySelected }
     var fixedEnd: Int { session.fixedEnd }
-    var historyEnd: Int { session.historyEnd }
     var candidateSources: [ScoredCandidate.Source] { session.candidateSources }
     var isPresented: Bool { session.isVisible && !session.candidates.isEmpty }
-
-    private var usesSourceMetadata: Bool {
-        candidateSources.count == candidates.count
-    }
 
     /// 候補行に対応する Zenzai 内部順位（1 始まり）。Zenzai 非アクティブ時 / 該当行が AzooKey 候補でないときは nil。
     func zenzaiRank(for row: Int) -> Int? {
@@ -32,35 +27,19 @@ struct CandidatePanelModel: Equatable {
     }
 
     func section(for row: Int) -> CandidateRowSection {
-        if usesSourceMetadata {
-            return CandidateRowMetadata.section(row: row, sources: candidateSources)
-        }
-        return CandidateRowMetadata.section(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
+        CandidateRowMetadata.section(row: row, sources: candidateSources)
     }
 
     func showsDeleteButton(at row: Int) -> Bool {
-        if usesSourceMetadata {
-            return CandidateRowMetadata.showsDeleteButton(row: row, sources: candidateSources)
-        }
-        return CandidateRowMetadata.showsDeleteButton(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
+        CandidateRowMetadata.showsDeleteButton(row: row, sources: candidateSources)
     }
 
     func isHistoryRow(_ row: Int) -> Bool {
-        if usesSourceMetadata {
-            return CandidateRowMetadata.isHistoryRow(row: row, sources: candidateSources)
-        }
-        return CandidateRowMetadata.isHistoryRow(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
+        CandidateRowMetadata.isHistoryRow(row: row, sources: candidateSources)
     }
 
     func showsSectionDivider(at row: Int) -> Bool {
-        if usesSourceMetadata {
-            return CandidateRowMetadata.showsSectionDivider(row: row, sources: candidateSources)
-        }
-        return CandidateRowMetadata.showsSectionDivider(
-            row: row,
-            historyEnd: historyEnd,
-            candidateCount: candidates.count
-        )
+        CandidateRowMetadata.showsSectionDivider(row: row, sources: candidateSources)
     }
 
     /// 行右端のセクションラベル。セクション境界行のみ非空。

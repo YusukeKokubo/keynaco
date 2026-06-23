@@ -21,7 +21,7 @@ extension InputHandler {
         guard deferAzooKeyWhileTyping,
               candidate.isVisible,
               !candidate.isExplicitlySelected,
-              candidate.historyEnd == candidate.fixedEnd else { return false }
+              candidate.candidateSources.contains(where: CandidateScoreBuilder.isHistorySource) else { return false }
         let cands = candidateSession.candidates
         guard !cands.isEmpty else { return false }
         return !cands.contains(where: KanaUtils.containsCJKIdeograph)
@@ -402,7 +402,6 @@ extension InputHandler {
         #endif
         return .show(
             candidates: scoredLayout.candidates,
-            historyEnd: scoredLayout.historyEnd,
             initialRow: initialRow,
             fixedEnd: scoredLayout.fixedEnd,
             azooKeyApiOrder: apiOrder,
@@ -441,7 +440,6 @@ extension InputHandler {
             initialRow: resolvedInitialRow,
             initialText: initialText,
             fixedEnd: scoredLayout?.fixedEnd ?? 0,
-            historyEnd: scoredLayout?.historyEnd ?? 0,
             scoredSources: scored.prefix(8).map { CandidateBuildDiagnosticsSupport.scoredSourceLabel($0) },
             deferAzooKeyWhileTyping: deferAzooKeyWhileTyping
         )

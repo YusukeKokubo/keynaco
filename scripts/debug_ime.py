@@ -331,7 +331,7 @@ class IMEClient:
             lines.append(f"  modes            : {', '.join(modes)}")
         if r.get("candidateVisible"):
             sel = r.get("selectedRow", 0)
-            lines.append(f"  candidates (sel={sel}, histEnd={r.get('historyEnd',0)}, fixEnd={r.get('fixedEnd',0)}):")
+            lines.append(f"  candidates (sel={sel}, fixEnd={r.get('fixedEnd',0)}):")
             for i, c in enumerate(r.get("candidates", [])):
                 mark = " ★" if i == sel else ""
                 lines.append(f"    [{i}] {c}{mark}")

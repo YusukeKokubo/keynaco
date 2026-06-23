@@ -15,7 +15,6 @@ public struct InputHandlerSnapshot: Sendable {
     public var candidateVisible: Bool
     public var selectedRow: Int
     public var selectedText: String?
-    public var historyEnd: Int
     public var fixedEnd: Int
     public var candidates: [String]
 

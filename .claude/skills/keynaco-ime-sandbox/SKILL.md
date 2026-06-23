@@ -6,7 +6,7 @@ description: |
   次のような場面で積極的に使うこと:
   - 「"kanzi" と入力したら何候補が出るか」など特定の入力列の挙動を確認したいとき
   - Successor モード・ブラケットモードの動作を検証したいとき
-  - 候補の並び順・historyEnd・fixedEnd の値を確認したいとき
+  - 候補の並び順・`candidateEntries`・`fixedEnd` を確認したいとき
   - 複数の入力パターンを比較して IME のロジックを調べたいとき
   - ユーザーが「このシーケンスを試して」「このケースをデバッグして」と言ったとき
   - Zenzai top-1 プロモーションの動作を検証したいとき（set_left_context + isZenzaiEnabled を使う）
@@ -108,7 +108,7 @@ send({"reset": True})
 | sequence 中間ステップ assert | `{"sequence": [{"type_string":"kanzi","assert":{"composedHiragana":"かんじ"}}, {"key":"space","assert":{"candidateVisible":true}}]}` |
 | 部分一致 assert | `{"key":"space","assert_contains":{"candidates":"漢字"}}` / `{"assert_contains":{"candidates":["漢字","感じ"]}}` |
 | 否定 assert | `{"state":true,"assert_not":{"isAsciiMode":true}}` |
-| スキーマ assert | `{"state":true,"assert_schema":{"candidates":"array<string>","historyEnd":"int"}}` |
+| スキーマ assert | `{"state":true,"assert_schema":{"candidates":"array<string>","candidateEntries":"array<object>"}}` |
 | 正規表現 assert | `{"state":true,"assert_regex":{"markedText":"^\\\".*\\\"$"}}` |
 | 非同期待機 | `{"wait_until":{"field":"candidates","minCount":1,"timeoutMs":1500}}` |
 | 非同期アサート（待機+検証） | `{"assert_eventually":{"field":"candidates","contains":"漢字","timeoutMs":1500}}` |
@@ -118,10 +118,10 @@ send({"reset": True})
 | 失敗/タイムアウト期待 | `{"test_suite":[{"expect_error":true, ...}]}` / `{"expect_timeout":true, ...}` |
 | スイートの静的検証 | `{"lint_suite":[...], "before_each":[...]}`（実行せずに問題点を返す） |
 | 変数展開（再利用） | `{"sequence":[...], "vars":{"needle":"漢字"}}` と `{{needle}}` |
-| ステップ結果の capture | `{"capture":{"top":"selectedText","h":"historyEnd"}}`（`sequence` の `vars` に保存） |
+| ステップ結果の capture | `{"capture":{"top":"selectedText","fe":"fixedEnd"}}`（`sequence` の `vars` に保存） |
 | 名前付きキー | `{"key": "space"}` / `{"key": "enter"}` / `{"key": "down"}` 等 |
 | Shift+名前付きキー | `{"key": "backspace", "mods": 131072}` |
-| フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]}` |
+| フィールド絞り込み | `{"type_string": "kanzi", "then": "space", "fields": ["candidates", "candidateEntries"]}` |
 | インラインアサート | `{"type_string": "kanzi", "assert": {"composedHiragana": "かんじ"}}` |
 | 履歴シード | `{"seed_history": {"input": "かんじ", "output": "漢字", "times": 3}}` |
 | sessionTextBuffer 確認 | `{"state": true, "fields": ["sessionTextBuffer", "committedHistory"]}` — 文末後も buffer が残るか（[PLAN260525](../../plans/PLAN260525-session-text-buffer.md)） |
@@ -133,7 +133,7 @@ send({"reset": True})
 **使用例:**
 ```python
 # "kanzi" を入力して Space で変換 → 候補だけ得る（fields で絞り込み）
-r = send({"type_string": "kanzi", "then": "space", "fields": ["candidates", "historyEnd"]})
+r = send({"type_string": "kanzi", "then": "space", "fields": ["candidates", "candidateEntries"]})
 print(r["candidates"][:5])
 
 # assert でインライン検証 → 失敗時は {"assertion_failed": [...], "state": {...}} が返る
@@ -142,7 +142,7 @@ if "assertion_failed" in r:
     print("FAIL:", r["assertion_failed"])
 
 # スキーマ検証（型崩れ検知）
-r_schema = send({"state": True, "assert_schema": {"candidates": "array<string>", "historyEnd": "int"}})
+r_schema = send({"state": True, "assert_schema": {"candidates": "array<string>", "candidateEntries": "array<object>"}})
 print("schema_ok?", "assertion_failed" not in r_schema)
 
 # 正規表現検証（JSON化した値に対して評価）
@@ -298,15 +298,13 @@ eisu(英数)=102  kana(かな)=104
   "candidateVisible": true,
   "selectedRow": 0,
   "selectedText": "漢字",
-  "historyEnd": 3,               // 履歴セクション末尾インデックス
-  "fixedEnd": 2,                 // 固定候補（かな/カタカナ）末尾
+  "fixedEnd": 1,                 // 先頭から連続する hiragana preferred 行数（Zenzai 診断用）
   "candidates": ["漢字", "感じ", ...],
   "committedHistory": ["今日", "は"],
-  "predictionEnd": 0,            // 予測ブロック末尾（本番の CandidateWindow と同様）
-  "isZenzaiEnabled": true,        // AzooKeyConverter の zenzaiEnabled フラグ
-  "leftSideContext": "申請書を",  // 現在の leftSideContext（空なら Zenzai プロモートなし）
-  "candidateEntries": [          // candidates の行ごとのメタデータ
-    {"index": 0, "text": "漢字", "section": "fixed|prediction|history|dictionary_or_special"}
+  "isZenzaiEnabled": true,
+  "leftSideContext": "申請書を",
+  "candidateEntries": [          // 行ごとの section（正本）。fixed / history / dictionary
+    {"index": 0, "text": "漢字", "section": "history"}
   ],
   "changed": ["candidateVisible", "candidates"], // 直前のキー処理で変化した主要フィールド
   "explain": {                   // explain=true のときだけ追加される要約
@@ -337,10 +335,11 @@ eisu(英数)=102  kana(かな)=104
 
 `test_suite` の失敗シナリオには `reproCommand` が付く。失敗ケースだけを切り出して再実行できる（`before_each` / `after_each` / `vars` / `useRealDB` を保持）。
 
-**候補リストの構造:**
-- `[0, fixedEnd)` — ひらがな・カタカナ固定候補
-- `[fixedEnd, historyEnd)` — ユーザー辞書 + 履歴候補（Shift+Delete 削除可能）
-- `[historyEnd, ...)` — AzooKey 辞書候補
+**候補リストの構造（flatten 後）:**
+- 候補列は `CandidateScoreBuilder` のスコア降順
+- 各行のセクションは `candidateEntries[].section`（= `ScoredCandidate.Source` から導出）
+- Shift+Delete 可: `section == "history"` の行のみ
+- `fixedEnd`: 先頭連続 hiragana preferred 行数（索引レンジではない）
 
 ## テストケース設計の落とし穴
 
@@ -431,7 +430,7 @@ send({"reset": True})
 send({"seed_history": {"input": "かんじゃ", "output": "幹事", "times": 5}})
 send({"type_string": "kanzi"})                    # 打鍵のみ
 send({"wait_azoo_key": {"timeoutMs": 3000}})      # prefetch 完了待ち
-r = send({"key": "space", "fields": ["candidates", "historyEnd", "candidateEntries"]})
+r = send({"key": "space", "fields": ["candidates", "candidateEntries"]})
 ```
 
 **健全性チェック**: ベースライン（シードなし）と比べて `len(candidates)` が桁違いに少ないときは、まず `wait_azoo_key` を挟んで再測する。
@@ -452,12 +451,12 @@ top3 漏れケースは `times` でスコア差をつけ、4 件目は**辞書�
 
 ## 候補リスト変更の検証ワークフロー（推奨）
 
-`CandidateSectionBuilder` や履歴枠の変更後は、次の順で確認する。
+`CandidateScoreBuilder` / flatten 変更後は、次の順で確認する。
 
-1. **ユニットテスト** — `Core/Sources/CoreTests/CandidateSectionBuilderTests.swift` に再現ケースを足す（正本）
+1. **ユニットテスト** — `CandidateScoreBuilderTests` / `InputHandlerCandidateSnapshotTests` に再現ケースを足す（正本）
 2. **sandbox ベースライン** — シードなしで検証語が AzooKey に出ることを確認（罠8）
 3. **sandbox シナリオ** — `seed_history` → `type_string` → `wait_azoo_key` → `key: space`（罠7）
-4. **assert** — `assert_contains` より `candidateEntries` の `section` と `historyEnd` 境界
+4. **assert** — `candidateEntries[].section` と候補順（スコア interleave を許容）
 
 ```python
 # top3 漏れ → 辞書に残る（c73e8d9 以降の代表例）
@@ -467,10 +466,8 @@ for inp, out, n in [("かんじゃ","幹事",5), ("かんじゃく","弱点",5),
         send({"seed_history": {"input": inp, "output": out, "times": 1}})
 send({"type_string": "kanzi"})
 send({"wait_azoo_key": {"timeoutMs": 3000}})
-r = send({"key": "space", "fields": ["candidates", "historyEnd", "candidateEntries"]})
-he = r["historyEnd"]
+r = send({"key": "space", "fields": ["candidates", "candidateEntries"]})
 entries = {e["text"]: e["section"] for e in r["candidateEntries"]}
-assert "感じ" not in r["candidates"][:he]
 assert entries.get("感じ") == "dictionary"
 ```
 
@@ -496,7 +493,7 @@ for i, step in enumerate(r["steps"]):
 ```python
 r = send({"type_string": "kanzi", "then": "space"})
 print(f"candidates: {r['candidates'][:10]}")
-print(f"historyEnd={r['historyEnd']}, fixedEnd={r['fixedEnd']}")
+print(f"fixedEnd={r['fixedEnd']}")
 ```
 
 `seed_history` あり・辞書セクションの件数も見るときは罠7の手順（`wait_azoo_key` 挟み）を使う。
@@ -582,10 +579,10 @@ send({"seed_history": {"input": "しんせい", "output": "申請フォーム", 
 
 r = send({"type_string": "shinsei", "then": "space",
           "fields": ["isZenzaiEnabled", "leftSideContext",
-                     "fixedEnd", "historyEnd", "selectedRow", "selectedText", "candidateEntries"]})
+                     "fixedEnd", "selectedRow", "selectedText", "candidateEntries"]})
 
 print(f"isZenzaiEnabled={r['isZenzaiEnabled']}, leftSideContext={r['leftSideContext']!r}")
-print(f"fixedEnd={r['fixedEnd']}, historyEnd={r['historyEnd']}")
+print(f"fixedEnd={r['fixedEnd']}")
 print(f"selectedRow={r['selectedRow']}, selectedText={r['selectedText']!r}")
 # fixedEnd >= 1 かつ selectedRow == 0 なら Zenzai top-1 が初期選択されている
 ```

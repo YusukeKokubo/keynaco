@@ -7,22 +7,12 @@ public enum CandidateRowSection: String, Equatable, Sendable {
     case dictionary
 }
 
-/// 候補行のセクション判定と UI メタデータ。
+/// 候補行のセクション判定と UI メタデータ。`ScoredCandidate.Source` が正本。
 public enum CandidateRowMetadata {
 
     public static func section(for source: ScoredCandidate.Source) -> CandidateRowSection {
         if CandidateScoreBuilder.isHiraganaPreferredSource(source) { return .fixed }
         if CandidateScoreBuilder.isHistorySource(source) { return .history }
-        return .dictionary
-    }
-
-    public static func section(
-        row: Int,
-        fixedEnd: Int,
-        historyEnd: Int
-    ) -> CandidateRowSection {
-        if row < fixedEnd { return .fixed }
-        if row < historyEnd { return .history }
         return .dictionary
     }
 
@@ -38,11 +28,6 @@ public enum CandidateRowMetadata {
         CandidateScoreBuilder.isHistorySource(source)
     }
 
-    /// `fixedEnd <= row < historyEnd` の履歴行（レガシー連続ブロック用）。
-    public static func isHistoryRow(row: Int, fixedEnd: Int, historyEnd: Int) -> Bool {
-        row >= fixedEnd && row < historyEnd
-    }
-
     public static func isHistoryRow(
         row: Int,
         sources: [ScoredCandidate.Source]
@@ -51,20 +36,11 @@ public enum CandidateRowMetadata {
         return isHistoryDeletable(source: sources[row])
     }
 
-    public static func showsDeleteButton(row: Int, fixedEnd: Int, historyEnd: Int) -> Bool {
-        isHistoryRow(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
-    }
-
     public static func showsDeleteButton(
         row: Int,
         sources: [ScoredCandidate.Source]
     ) -> Bool {
         isHistoryRow(row: row, sources: sources)
-    }
-
-    /// 履歴ブロック末尾と辞書ブロックの境界に区切り線を出すか（レガシー連続ブロック用）。
-    public static func showsSectionDivider(row: Int, historyEnd: Int, candidateCount: Int) -> Bool {
-        row == historyEnd - 1 && historyEnd < candidateCount
     }
 
     public static func showsSectionDivider(
@@ -75,20 +51,15 @@ public enum CandidateRowMetadata {
         return section(for: sources[row]) != section(for: sources[row + 1])
     }
 
-    /// 先頭から連続する fixed / history 行数（sandbox・診断の後方互換）。
-    public static func legacyBoundaries(
+    /// 先頭から連続する hiragana preferred 行数（Zenzai 診断用）。
+    public static func legacyFixedEnd(
         sources: [ScoredCandidate.Source]
-    ) -> (fixedEnd: Int, historyEnd: Int) {
+    ) -> Int {
         var fixedEnd = 0
         while fixedEnd < sources.count,
               CandidateScoreBuilder.isHiraganaPreferredSource(sources[fixedEnd]) {
             fixedEnd += 1
         }
-        var historyEnd = fixedEnd
-        while historyEnd < sources.count,
-              CandidateScoreBuilder.isHistorySource(sources[historyEnd]) {
-            historyEnd += 1
-        }
-        return (fixedEnd, historyEnd)
+        return fixedEnd
     }
 }

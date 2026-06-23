@@ -129,23 +129,22 @@ fast + slow 両方（CI・リリース前）:
 
 各クラス・関数・主要変数の振る舞いと不変条件は `///` ドキュメントコメントが正本（`fetchHistoryScoredMerged` の SUM 集計禁止、`recordPrefixes` の同一 output 最長読み統合、`isExplicitlySelected` の意味、`RomajiConverter` の `nn` 両方消費など）。
 
-### 候補表示の優先順位（`buildCandidateList`）
+### 候補表示（`CandidateScoreBuilder` + flatten）
 
-1. ひらがな / カタカナ固定（`hiraganaPreferred`・外来語記号）
-2. ユーザー辞書（完全一致）
-3. 履歴（`fetchHistoryScoredMerged`: `LIKE 'reading%'` で SUM 集計、時間減衰スコア閾値以上）。読み完全一致履歴（`exactMatchHighHistory`）は Zenzai の `azooKeyApiOrder` で内部ソートされる
-4. 数字候補 / 日時候補
-5. AzooKey 辞書候補（Zenzai 推論結果はこのセクション内のスコアに込み）
+`CandidateScoreBuilder.build` が履歴・ユーザー辞書・AzooKey・数値/日時・ひらがな bonus を単一スコア列に統合し、`CandidateScoredLayout` がスコア降順で flatten する。行ごとの `ScoredCandidate.Source`（`candidateSources`）がセクション判定と Shift+Delete の正本。
 
-`fixedEnd <= row < historyEnd` の行のみ Shift+Delete で履歴 DB から削除可能（ユーザー辞書行は保護）。
+| source 種別 | 行セクション | Shift+Delete |
+|-------------|-------------|-------------|
+| `hiraganaBuiltin` / `hiraganaPreferred` | fixed | 不可 |
+| `historyExact` / `historyPrefix` | history | 可 |
+| その他（`userDict`・`azooKey`・`number`・`dateTime` 等） | dictionary | 不可 |
 
-### 打鍵中の前方一致初期行（`InitialRowPolicyResolver`）
+`fixedEnd` は先頭から連続する hiragana preferred 行数（Zenzai 診断用）。sandbox では `candidateEntries[].section` を見る。
 
-- `.whileTyping` のみ: 前方一致履歴/ユーザー辞書 prefix の初期フォーカスは品詞別モーラ閾値（名詞・固有名詞 2 / 動詞 3 / その他 5）。助詞・助動詞は対象外（`docs/concept.md` 指針 1・機能語 UI dismiss と整合）
-- 読み完全一致履歴は閾値なしで最優先。explicit（Space）は prefix focus 無効
-- 品詞: `rankForPrefixFocus`（`lcid` → `pos` → `.unknown`）。確定直後は `schedulePOSClassification` 非同期で `lcid` NULL があり得る
-- `whileTypingInitialRow`: 閾値未満の前方一致履歴は初期行からスキップ。フォーカス可能行がなければ dismiss
-- 記録: `plans/PLAN260614-prefix-focus-mora-thresholds.md`
+### 初期行（`InitialRowPolicyResolver`）
+
+- `.explicit`（Space 等）: 読み完全一致履歴 → ユーザー辞書 exact → 読みそのもの → AzooKey 先頭の順で `firstMatching`
+- `.whileTyping`: スコア順先頭（`afterFixed`、通常 row 0）。builtin 助詞のみ候補なら dismiss
 
 ## パフォーマンス計測
 

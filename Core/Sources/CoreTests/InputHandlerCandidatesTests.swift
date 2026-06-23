@@ -415,31 +415,33 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
     }
 
-    // MARK: - historyEnd 境界: Shift+Delete の削除可否
-    // See: docs/domain/glossary.md#historyend
-    // See: docs/domain/scenarios.md#s-06-shiftdelete-で履歴削除
+    // MARK: - candidateSources: Shift+Delete の削除可否
 
-    func testShiftDeleteInsideHistoryEndDeletesCandidate() {
-        // selectedRow < historyEnd → .deleteSelected を返す
+    func testShiftDeleteOnHistorySourceDeletesCandidate() {
         typeRomaji("ka")
-        let ctx = CandidateContext(isVisible: true, selectedRow: 1, selectedText: nil,
-                                   isExplicitlySelected: true, historyEnd: 2)
+        let ctx = CandidateContext(
+            isVisible: true, selectedRow: 1, selectedText: nil,
+            isExplicitlySelected: true,
+            candidateSources: [.historyExact, .historyPrefix]
+        )
         let (_, action) = handler.handle(keyCode: KeyCode.backspace, characters: nil, baseCharacters: nil,
                                           modifiers: .shift, candidate: ctx, client: client)
         guard case .deleteSelected = action else {
-            XCTFail("historyEnd 未満の Shift+Delete は .deleteSelected を返すはず: \(action)"); return
+            XCTFail("history source の Shift+Delete は .deleteSelected を返すはず: \(action)"); return
         }
     }
 
-    func testShiftDeleteOutsideHistoryEndDoesNothing() {
-        // selectedRow >= historyEnd → .none を返す（AzooKey 専用候補は削除不可）
+    func testShiftDeleteOnDictionarySourceDoesNothing() {
         typeRomaji("ka")
-        let ctx = CandidateContext(isVisible: true, selectedRow: 5, selectedText: nil,
-                                   isExplicitlySelected: true, historyEnd: 2)
+        let ctx = CandidateContext(
+            isVisible: true, selectedRow: 0, selectedText: nil,
+            isExplicitlySelected: true,
+            candidateSources: [.azooKey(rank: 0), .azooKey(rank: 1)]
+        )
         let (_, action) = handler.handle(keyCode: KeyCode.backspace, characters: nil, baseCharacters: nil,
                                           modifiers: .shift, candidate: ctx, client: client)
         guard case .none = action else {
-            XCTFail("historyEnd 以降の Shift+Delete は .none を返すはず: \(action)"); return
+            XCTFail("辞書 source の Shift+Delete は .none を返すはず: \(action)"); return
         }
         XCTAssertTrue(client.inserted.isEmpty, "削除不可なので確定テキストは挿入されないはず")
     }
@@ -469,8 +471,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             selectedRow: udRow,
             selectedText: "Acme Corp",
             isExplicitlySelected: true,
-            historyEnd: payload.historyEnd,
-            fixedEnd: payload.fixedEnd
+            candidateSources: payload.candidateSources
         )
         let (_, action) = handler.handle(
             keyCode: KeyCode.backspace, characters: nil, baseCharacters: nil,

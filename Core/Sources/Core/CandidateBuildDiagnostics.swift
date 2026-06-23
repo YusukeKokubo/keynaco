@@ -26,7 +26,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
     public var initialRow: Int
     public var initialText: String?
     public var fixedEnd: Int
-    public var historyEnd: Int
     /// `"historyPrefix:情報共有(93.00)"` 形式のスコア付き source 要約。
     public var scoredSources: [String]
 
@@ -65,7 +64,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             "initialRowPolicy": initialRowPolicy,
             "initialRow": initialRow,
             "fixedEnd": fixedEnd,
-            "historyEnd": historyEnd,
             "scoredSources": scoredSources,
             "deferAzooKeyWhileTyping": deferAzooKeyWhileTyping,
             "logSuffix": logSuffix,

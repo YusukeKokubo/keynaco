@@ -707,12 +707,11 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
     private nonisolated static func candidateEventSuffix(from dict: [String: Any]) -> String {
         guard dict["candidateVisible"] as? Bool == true else { return "" }
 
-        let hEnd = dict["historyEnd"] as? Int ?? 0
-        let fEnd = dict["fixedEnd"]   as? Int ?? 0
+        let fEnd = dict["fixedEnd"] as? Int ?? 0
         let cands = dict["candidates"] as? [String] ?? []
         let top   = cands.prefix(5).joined(separator: " ")
         let ellipsis = cands.count > 5 ? " …" : ""
-        var suffix = "  hEnd:\(hEnd) fEnd:\(fEnd)  [\(top)\(ellipsis)]"
+        var suffix = "  fEnd:\(fEnd)  [\(top)\(ellipsis)]"
 
         if let build = dict["candidateBuild"] as? [String: Any],
            let logSuffix = build["logSuffix"] as? String {
@@ -764,7 +763,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             "isExplicitlySelected": s.isExplicitlySelected,
             "candidateVisible":    s.candidateVisible,
             "selectedRow":         s.selectedRow,
-            "historyEnd":          s.historyEnd,
             "fixedEnd":            s.fixedEnd,
             "candidates":          s.candidates,
             "committedHistory":    s.committedHistory,
@@ -805,7 +803,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("visible      : \(s.candidateVisible)")
         lines.append("selectedRow  : \(s.selectedRow)")
         lines.append("selectedText : \(s.selectedText ?? "(nil)")")
-        lines.append("historyEnd   : \(s.historyEnd)")
         lines.append("fixedEnd     : \(s.fixedEnd)")
         for (i, c) in s.candidates.enumerated() {
             lines.append("  [\(i)] \(c)\(i == s.selectedRow ? " ★" : "")")
@@ -873,7 +870,6 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         lines.append("visible      : \(bool("candidateVisible"))")
         lines.append("selectedRow  : \(int("selectedRow"))")
         lines.append("selectedText : \(dict["selectedText"] as? String ?? "(nil)")")
-        lines.append("historyEnd   : \(int("historyEnd"))")
         lines.append("fixedEnd     : \(int("fixedEnd"))")
         let cands = arr("candidates")
         let selRow = int("selectedRow")

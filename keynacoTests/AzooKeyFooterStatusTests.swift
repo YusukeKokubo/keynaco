@@ -7,7 +7,6 @@ final class AzooKeyFooterStatusTests: XCTestCase {
     private func session(
         visible: Bool = true,
         candidates: [String] = [],
-        historyEnd: Int = 0,
         fixedEnd: Int = 0,
         azooKeyApiOrder: [String] = [],
         bracketCandidates: [String]? = nil
@@ -15,7 +14,6 @@ final class AzooKeyFooterStatusTests: XCTestCase {
         var s = CandidateSession()
         s.candidates = candidates
         s.isVisible = visible
-        s.historyEnd = historyEnd
         s.fixedEnd = fixedEnd
         s.azooKeyApiOrder = azooKeyApiOrder
         s.bracketCandidates = bracketCandidates
@@ -23,7 +21,7 @@ final class AzooKeyFooterStatusTests: XCTestCase {
     }
 
     func testHiddenWhenNotVisible() {
-        let s = session(visible: false, candidates: ["漢字"], historyEnd: 0)
+        let s = session(visible: false, candidates: ["漢字"])
         XCTAssertNil(AzooKeyFooterStatus.resolve(session: s, isAzooKeyPending: false, isZenzaiRankingActive: false))
     }
 
@@ -33,7 +31,7 @@ final class AzooKeyFooterStatusTests: XCTestCase {
     }
 
     func testFetchingWhenPending() {
-        let s = session(candidates: ["かんじ", "カンジ"], historyEnd: 2, fixedEnd: 2)
+        let s = session(candidates: ["かんじ", "カンジ"], fixedEnd: 2)
         XCTAssertEqual(
             AzooKeyFooterStatus.resolve(session: s, isAzooKeyPending: true, isZenzaiRankingActive: false),
             .fetching
@@ -41,7 +39,7 @@ final class AzooKeyFooterStatusTests: XCTestCase {
     }
 
     func testFetchingOverridesProvisionalDictionary() {
-        let s = session(candidates: ["履歴", "漢字"], historyEnd: 1, fixedEnd: 0)
+        let s = session(candidates: ["履歴", "漢字"])
         XCTAssertEqual(
             AzooKeyFooterStatus.resolve(session: s, isAzooKeyPending: true, isZenzaiRankingActive: true),
             .fetching
@@ -49,7 +47,7 @@ final class AzooKeyFooterStatusTests: XCTestCase {
     }
 
     func testDictionaryWhenLoadedWithoutZenzai() {
-        let s = session(candidates: ["履歴", "漢字"], historyEnd: 1, fixedEnd: 0)
+        let s = session(candidates: ["履歴", "漢字"])
         XCTAssertEqual(
             AzooKeyFooterStatus.resolve(session: s, isAzooKeyPending: false, isZenzaiRankingActive: false),
             .dictionary
@@ -59,8 +57,6 @@ final class AzooKeyFooterStatusTests: XCTestCase {
     func testZenzaiWhenRankingActive() {
         let s = session(
             candidates: ["履歴", "漢字"],
-            historyEnd: 1,
-            fixedEnd: 0,
             azooKeyApiOrder: ["漢字"]
         )
         XCTAssertEqual(
@@ -70,14 +66,14 @@ final class AzooKeyFooterStatusTests: XCTestCase {
     }
 
     func testNilWhenOnlyHistoryOrKana() {
-        let s = session(candidates: ["あい", "アイ"], historyEnd: 2, fixedEnd: 2)
+        let s = session(candidates: ["あい", "アイ"], fixedEnd: 2)
         XCTAssertNil(
             AzooKeyFooterStatus.resolve(session: s, isAzooKeyPending: false, isZenzaiRankingActive: false)
         )
     }
 
     func testIsAzooKeyPendingBeforeSchedulerStarts() {
-        let s = session(candidates: ["かんじ", "カンジ"], historyEnd: 2, fixedEnd: 2)
+        let s = session(candidates: ["かんじ", "カンジ"], fixedEnd: 2)
         XCTAssertTrue(
             AzooKeyFooterStatus.isAzooKeyPending(pendingReading: "かんじ", schedulerPending: false)
         )
@@ -95,7 +91,7 @@ final class AzooKeyFooterStatusTests: XCTestCase {
     }
 
     func testIsAzooKeyPendingWithProvisionalDictionary() {
-        let s = session(candidates: ["かん", "漢"], historyEnd: 1, fixedEnd: 0)
+        let s = session(candidates: ["かん", "漢"])
         XCTAssertTrue(
             AzooKeyFooterStatus.isAzooKeyPending(pendingReading: "かんじ", schedulerPending: false)
         )

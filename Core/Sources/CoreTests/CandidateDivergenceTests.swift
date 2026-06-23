@@ -12,7 +12,6 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
     ) {
         handler.candidateSession.apply(.show(
             candidates: candidates,
-            historyEnd: 0,
             initialRow: initialRow,
             fixedEnd: 0,
             azooKeyApiOrder: apiOrder,

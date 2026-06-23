@@ -162,7 +162,6 @@ final class CandidateScoredLayoutTests: XCTestCase {
         XCTAssertEqual(Array(layout.candidates.prefix(3)), ["情報共有", "上", "情"])
         XCTAssertEqual(Array(layout.sources.prefix(3)), [.historyPrefix, .historyExact, .azooKey(rank: 0)])
         XCTAssertEqual(layout.fixedEnd, 0)
-        XCTAssertEqual(layout.historyEnd, 2)
     }
 
     func testHiraganaBonusInterleavesByScoreNotTier() {
@@ -184,7 +183,6 @@ final class CandidateScoredLayoutTests: XCTestCase {
         XCTAssertEqual(Array(layout.candidates.prefix(3)), ["の", "ノックアウト", "ノ"])
         XCTAssertEqual(layout.sources.count, layout.candidates.count)
         XCTAssertEqual(layout.fixedEnd, 1)
-        XCTAssertEqual(layout.historyEnd, 2)
     }
 
     func testNumberCandidatesMergeByScore() {

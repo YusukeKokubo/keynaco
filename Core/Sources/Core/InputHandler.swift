@@ -5,7 +5,6 @@ public enum CandidateAction: Sendable {
     case none
     case show(
         candidates: [String],
-        historyEnd: Int,
         initialRow: Int,
         fixedEnd: Int,
         /// AzooKey API が返した順序（LCID ソート前）。Zenzai 有効 + 左文脈ありのときのみ非空。
@@ -24,15 +23,14 @@ extension CandidateAction {
     /// `.show` の連想値。それ以外は `nil`。
     var showPayload: (
         candidates: [String],
-        historyEnd: Int,
         initialRow: Int,
         fixedEnd: Int,
         azooKeyApiOrder: [String],
         initialIsExplicitlySelected: Bool,
         candidateSources: [ScoredCandidate.Source]
     )? {
-        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let apiOrder, let initialExplicit, let sources) = self {
-            return (candidates, historyEnd, initialRow, fixedEnd, apiOrder, initialExplicit, sources)
+        if case .show(let candidates, let initialRow, let fixedEnd, let apiOrder, let initialExplicit, let sources) = self {
+            return (candidates, initialRow, fixedEnd, apiOrder, initialExplicit, sources)
         }
         return nil
     }
@@ -48,9 +46,7 @@ public struct CandidateContext: Sendable {
     /// `false` のときは文字入力しても候補を確定せず組成に追加する。
     /// Enter は `isExplicitlySelected` に関係なく `selectedText`（現在の視覚的選択）をそのまま確定する。
     public private(set) var isExplicitlySelected: Bool
-    /// 履歴セクションの末尾インデックス（これ未満の行が履歴）
-    public private(set) var historyEnd: Int
-    /// ユーザー辞書+カナ固定行の末尾インデックス（レガシー UI 区切り）
+    /// 先頭から連続するひらがな preferred 行数（Zenzai 診断・UI 補助）。
     public private(set) var fixedEnd: Int
     /// 行ごとの source。Shift+Delete とセクション描画の正本。
     public private(set) var candidateSources: [ScoredCandidate.Source] = []
@@ -60,7 +56,6 @@ public struct CandidateContext: Sendable {
         selectedRow: Int,
         selectedText: String?,
         isExplicitlySelected: Bool = false,
-        historyEnd: Int = 0,
         fixedEnd: Int = 0,
         candidateSources: [ScoredCandidate.Source] = []
     ) {
@@ -68,21 +63,18 @@ public struct CandidateContext: Sendable {
         self.selectedRow = selectedRow
         self.selectedText = selectedText
         self.isExplicitlySelected = isExplicitlySelected
-        self.historyEnd = historyEnd
         self.fixedEnd = fixedEnd
         self.candidateSources = candidateSources
     }
 
     public func isHistoryDeletable(at row: Int) -> Bool {
-        if candidateSources.indices.contains(row) {
-            return CandidateRowMetadata.isHistoryDeletable(source: candidateSources[row])
-        }
-        return fixedEnd <= row && row < historyEnd
+        guard candidateSources.indices.contains(row) else { return false }
+        return CandidateRowMetadata.isHistoryDeletable(source: candidateSources[row])
     }
 
     public static let hidden = CandidateContext(
         isVisible: false, selectedRow: 0, selectedText: nil,
-        isExplicitlySelected: false, historyEnd: 0, fixedEnd: 0, candidateSources: []
+        isExplicitlySelected: false, fixedEnd: 0, candidateSources: []
     )
 
     /// `CandidateSession.panelInteraction` と同じ導出（`handle()` へのスナップショット用）。
@@ -336,8 +328,6 @@ public struct InputHandler {
             }
         } else if row < candidateSession.fixedEnd {
             confirmedSource = "fixed"
-        } else if row < candidateSession.historyEnd {
-            confirmedSource = "history"
         } else {
             confirmedSource = "dict"
         }
