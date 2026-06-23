@@ -105,6 +105,8 @@ extension InputHandler {
         let userDictPrefix: [String]
         let exactMatchHighHistory: [String]
         let highHistory: [String]
+        let exactMatchScores: [String: Double]
+        let prefixHistoryScores: [String: Double]
         let highHistoryCount: Int
         let historyOutputSet: Set<String>
         let exactMatchHistoryOutputs: Set<String>
@@ -122,6 +124,8 @@ extension InputHandler {
         let userDictPrefix: [String]
         let exactMatchHighHistory: [String]
         let highHistory: [String]
+        let exactMatchScores: [String: Double]
+        let prefixHistoryScores: [String: Double]
         let highHistoryCount: Int
         let historyOutputSet: Set<String>
         let exactMatchHistoryOutputs: Set<String>
@@ -155,10 +159,13 @@ extension InputHandler {
         let exactMatchHistoryOutputs = Set(exactMatchScored.map { $0.output })
         var exactMatchHighHistory: [String] = []
         var highHistory: [String] = []
+        var exactMatchScores: [String: Double] = [:]
+        var prefixHistoryScores: [String: Double] = [:]
         var historyOutputSet = Set<String>()
         var seenExact = Set<String>()
         var seenOther = Set<String>()
         for row in exactMatchScored {
+            exactMatchScores[row.output] = row.score
             if row.score >= Self.historyRecencyScoreCutoff,
                seenExact.insert(row.output).inserted {
                 exactMatchHighHistory.append(row.output)
@@ -170,6 +177,7 @@ extension InputHandler {
                   !exactMatchHistoryOutputs.contains(row.output),
                   highHistory.count < Self.maxHighHistoryCount,
                   seenOther.insert(row.output).inserted else { continue }
+            prefixHistoryScores[row.output] = row.score
             highHistory.append(row.output)
         }
         return CheapCandidateSources(
@@ -178,6 +186,8 @@ extension InputHandler {
             userDictPrefix: userDictPrefix,
             exactMatchHighHistory: exactMatchHighHistory,
             highHistory: highHistory,
+            exactMatchScores: exactMatchScores,
+            prefixHistoryScores: prefixHistoryScores,
             highHistoryCount: exactMatchHighHistory.count + highHistory.count,
             historyOutputSet: historyOutputSet,
             exactMatchHistoryOutputs: exactMatchHistoryOutputs
@@ -213,6 +223,8 @@ extension InputHandler {
             userDictPrefix: cheap.userDictPrefix,
             exactMatchHighHistory: cheap.exactMatchHighHistory,
             highHistory: cheap.highHistory,
+            exactMatchScores: cheap.exactMatchScores,
+            prefixHistoryScores: cheap.prefixHistoryScores,
             highHistoryCount: cheap.highHistoryCount,
             historyOutputSet: cheap.historyOutputSet,
             exactMatchHistoryOutputs: cheap.exactMatchHistoryOutputs
@@ -265,6 +277,20 @@ extension InputHandler {
             return .dismiss
         }
 
+        let bestExactScore = HistoryPrefixPromotion.bestExactScore(
+            exactMatchHighHistory: sources.exactMatchHighHistory,
+            exactMatchScores: sources.exactMatchScores
+        )
+        let promotedPrefixHistory = trigger == .whileTyping
+            ? HistoryPrefixPromotion.promotedItems(
+                prefixHistory: sources.highHistory,
+                prefixScores: sources.prefixHistoryScores,
+                bestExactScore: bestExactScore
+            )
+            : []
+        let promotedSet = Set(promotedPrefixHistory)
+        let remainingHighHistory = sources.highHistory.filter { !promotedSet.contains($0) }
+
         let built = CandidateSectionBuilder.build(CandidateSectionBuildInput(
             reading: h,
             hiragana: hiragana,
@@ -272,7 +298,8 @@ extension InputHandler {
             azooKeyApiOrder: sources.azooKeyApiOrder,
             userDictRaw: sources.userDictRaw,
             exactMatchHighHistory: sources.exactMatchHighHistory,
-            highHistory: sources.highHistory,
+            promotedPrefixHistory: promotedPrefixHistory,
+            highHistory: remainingHighHistory,
             historyOutputSet: sources.historyOutputSet,
             exactMatchHistoryOutputs: sources.exactMatchHistoryOutputs,
             fixedSlot: fixedSlot,
@@ -295,12 +322,16 @@ extension InputHandler {
                 rankForOutput: prefixFocusRank
             )
             : nil
+        let promotedPrefixFocusCandidate = trigger == .whileTyping
+            ? promotedPrefixHistory.first
+            : nil
         let policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
             reading: h,
             fixedSlot: fixedSlot,
             exactMatchHighHistory: sources.exactMatchHighHistory,
             userDictExact: sources.userDictExact,
             prefixFocusCandidate: prefixFocusCandidate,
+            promotedPrefixFocusCandidate: promotedPrefixFocusCandidate,
             azooKeyCandidates: sources.azooKeyCandidates,
             candidateList: previewLayout.candidates
         ))
@@ -311,6 +342,7 @@ extension InputHandler {
         )
         let computedRow = layout.initialRow
         let exactMatchHistorySet = Set(sources.exactMatchHighHistory)
+        let scorePromotedHistorySet = Set(promotedPrefixHistory)
         let whileTypingRow = trigger == .whileTyping
             ? InitialRowPolicyResolver.whileTypingInitialRow(
                 candidates: layout.candidates,
@@ -319,6 +351,7 @@ extension InputHandler {
                 computedRow: computedRow,
                 reading: h,
                 exactMatchHistory: exactMatchHistorySet,
+                scorePromotedHistory: scorePromotedHistorySet,
                 rankForOutput: prefixFocusRank
             )
             : computedRow
@@ -376,7 +409,9 @@ extension InputHandler {
 
         let zenzaiActive = azooKeyConverter.isZenzaiEnabled && leftContext.azooKeyValue != nil
         let apiOrder = zenzaiActive ? sources.azooKeyApiOrder : []
-        if !sources.exactMatchHighHistory.isEmpty {
+        if promotedPrefixFocusCandidate != nil {
+            lastInitialRowReason = "promotedPrefixHistory"
+        } else if !sources.exactMatchHighHistory.isEmpty {
             lastInitialRowReason = "exactMatchHistory"
         } else if !sources.userDictExact.isEmpty {
             lastInitialRowReason = "userDictExact"

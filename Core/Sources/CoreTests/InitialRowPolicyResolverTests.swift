@@ -9,6 +9,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         exactMatchHighHistory: [String] = [],
         userDictExact: [String] = [],
         prefixFocusCandidate: String? = nil,
+        promotedPrefixFocusCandidate: String? = nil,
         azooKeyCandidates: [String] = [],
         candidateList: [String] = []
     ) -> InitialRowPolicy {
@@ -18,6 +19,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
             exactMatchHighHistory: exactMatchHighHistory,
             userDictExact: userDictExact,
             prefixFocusCandidate: prefixFocusCandidate,
+            promotedPrefixFocusCandidate: promotedPrefixFocusCandidate,
             azooKeyCandidates: azooKeyCandidates,
             candidateList: candidateList
         ))
@@ -150,7 +152,7 @@ final class InitialRowPolicyResolverTests: XCTestCase {
         )
     }
 
-    /// 完全一致履歴は前方一致フォーカスより優先する。
+    /// 完全一致履歴は前方一致フォーカスより優先する（昇格 prefix なし）。
     func testExactMatchHistoryBeatsPrefixFocus() {
         XCTAssertEqual(
             resolve(
@@ -159,6 +161,34 @@ final class InitialRowPolicyResolverTests: XCTestCase {
                 azooKeyCandidates: ["愛"]
             ),
             .firstMatching("感じ")
+        )
+    }
+
+    /// スコア昇格した前方一致は完全一致履歴より優先する。
+    func testPromotedPrefixFocusBeatsExactMatchHistory() {
+        XCTAssertEqual(
+            resolve(
+                reading: "じょう",
+                exactMatchHighHistory: ["上"],
+                promotedPrefixFocusCandidate: "情報共有",
+                azooKeyCandidates: ["情"],
+                candidateList: ["情報共有", "上", "情"]
+            ),
+            .firstMatching("情報共有")
+        )
+    }
+
+    /// 昇格 prefix が深い位置（行 8 以降）なら exact にフォールスルー。
+    func testPromotedPrefixFocusBlockedWhenTooDeep() {
+        let deepList = (0..<8).map { "row\($0)" } + ["情報共有"]
+        XCTAssertEqual(
+            resolve(
+                reading: "じょう",
+                exactMatchHighHistory: ["上"],
+                promotedPrefixFocusCandidate: "情報共有",
+                candidateList: deepList
+            ),
+            .firstMatching("上")
         )
     }
 

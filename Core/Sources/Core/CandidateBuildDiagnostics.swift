@@ -105,6 +105,7 @@ enum CandidateBuildDiagnosticsSupport {
         case .fixedHiragana: return "fixedHiragana"
         case .userDict: return "userDict"
         case .exactMatchHistory: return "exactMatchHistory"
+        case .promotedPrefixHistory: return "promotedPrefixHistory"
         case .highHistory: return "highHistory"
         case .number: return "number"
         case .dateTime: return "dateTime"

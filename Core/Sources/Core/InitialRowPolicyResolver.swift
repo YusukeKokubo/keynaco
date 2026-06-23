@@ -15,6 +15,8 @@ struct InitialRowPolicyInput: Equatable, Sendable {
     let userDictExact: [String]
     /// 打鍵中のみ: 前方一致履歴/ユーザー辞書のうち品詞・モーラ数条件を満たす初期フォーカス候補。
     let prefixFocusCandidate: String?
+    /// 打鍵中のみ: スコア昇格した前方一致のうち品詞・モーラ数条件を満たす初期フォーカス候補。exact より優先。
+    let promotedPrefixFocusCandidate: String?
     /// AzooKey 辞書が返した候補（読み完全一致）。履歴・ユーザー辞書が無いとき先頭を初期選択。
     let azooKeyCandidates: [String]
     /// セクション統合後の候補列（初期行判定用）。
@@ -72,7 +74,7 @@ enum InitialRowPolicyResolver {
     }
 
     /// 打鍵中: 閾値未満の前方一致履歴行を初期行から外し、辞書/カタカナ側へ進める。
-    /// 読み完全一致履歴は閾値なしで維持する。フォーカス可能な行が無ければ nil（候補 UI 非表示）。
+    /// 読み完全一致履歴とスコア昇格 prefix は閾値なしで維持する。フォーカス可能な行が無ければ nil（候補 UI 非表示）。
     static func whileTypingInitialRow(
         candidates: [String],
         fixedEnd: Int,
@@ -80,6 +82,7 @@ enum InitialRowPolicyResolver {
         computedRow: Int,
         reading: String,
         exactMatchHistory: Set<String>,
+        scorePromotedHistory: Set<String> = [],
         rankForOutput: (String) -> LcidRank
     ) -> Int? {
         guard !candidates.isEmpty, fixedEnd <= historyEnd else { return computedRow }
@@ -89,6 +92,7 @@ enum InitialRowPolicyResolver {
             guard index >= fixedEnd, index < historyEnd else { return false }
             let text = candidates[index]
             if exactMatchHistory.contains(text) { return true }
+            if scorePromotedHistory.contains(text) { return true }
             return acceptsPrefixFocus(readingMoraCount: moraCount, rank: rankForOutput(text))
         }
 
@@ -111,6 +115,11 @@ enum InitialRowPolicyResolver {
         case .hiragana:
             return .firstMatching(input.reading)
         case .none:
+            if let focus = input.promotedPrefixFocusCandidate,
+               let row = input.candidateList.firstIndex(of: focus),
+               row <= Self.maxPrefixFocusRow {
+                return .firstMatching(focus)
+            }
             if let first = input.exactMatchHighHistory.first {
                 return .firstMatching(first)
             }

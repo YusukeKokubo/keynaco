@@ -8,6 +8,8 @@ struct CandidateSectionBuildInput: Sendable {
     let azooKeyApiOrder: [String]
     let userDictRaw: [String]
     let exactMatchHighHistory: [String]
+    /// 打鍵中: スコア昇格した前方一致履歴（`highHistory` の部分集合）。
+    let promotedPrefixHistory: [String]
     let highHistory: [String]
     /// `fetchHistoryScoredMerged` の全 output（固定ひらがな枠の重複判定用）。
     let historyOutputSet: Set<String>
@@ -37,7 +39,7 @@ enum CandidateSectionBuilder {
             case (nil, nil):     return false
             }
         }
-        let allHighHistory = sortedExactHistory + input.highHistory
+        let allHighHistory = input.promotedPrefixHistory + sortedExactHistory + input.highHistory
         let azooKeyUniq = input.azooKeyCandidates.filter { candidate in
             // 履歴セクションに載る語は辞書と二重表示しない（top3 漏れの前方一致は辞書に残す）。
             !allHighHistory.contains(candidate)
@@ -58,6 +60,10 @@ enum CandidateSectionBuilder {
 
         addSection(.userDict, from: input.userDictRaw, seen: &seen, into: &sections)
 
+        if !input.promotedPrefixHistory.isEmpty {
+            sections.append(CandidateSection(kind: .promotedPrefixHistory, items: input.promotedPrefixHistory))
+        }
+
         if !azooKeyUniq.isEmpty {
             sections.append(CandidateSection(kind: .azooKeyDict, items: azooKeyUniq))
         }
@@ -73,9 +79,14 @@ enum CandidateSectionBuilder {
         addSection(.number, from: input.numberCandidates, seen: &seen, into: &sections)
         addSection(.dateTime, from: input.dateTimeCandidates, seen: &seen, into: &sections)
 
-        let sectionOrder: [CandidateSection.Kind] = sortedExactHistory.isEmpty
-            ? CandidateLayout.defaultSectionOrder
-            : CandidateLayout.exactMatchFirstSectionOrder
+        let sectionOrder: [CandidateSection.Kind]
+        if !input.promotedPrefixHistory.isEmpty {
+            sectionOrder = CandidateLayout.prefixPromotedSectionOrder
+        } else if sortedExactHistory.isEmpty {
+            sectionOrder = CandidateLayout.defaultSectionOrder
+        } else {
+            sectionOrder = CandidateLayout.exactMatchFirstSectionOrder
+        }
 
         return CandidateSectionBuildResult(sections: sections, sectionOrder: sectionOrder)
     }

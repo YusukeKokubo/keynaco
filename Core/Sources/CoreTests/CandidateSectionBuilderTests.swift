@@ -31,6 +31,7 @@ final class CandidateSectionBuilderTests: XCTestCase {
             azooKeyApiOrder: azooKeyApiOrder,
             userDictRaw: userDictRaw,
             exactMatchHighHistory: exactMatchHighHistory,
+            promotedPrefixHistory: [],
             highHistory: highHistory,
             historyOutputSet: historyOutputSet,
             exactMatchHistoryOutputs: exactMatchHistoryOutputs,
@@ -130,6 +131,30 @@ final class CandidateSectionBuilderTests: XCTestCase {
         let l = layout(from: input)
         XCTAssertEqual(l.candidates, ["の", "辞書A", "辞書B"])
         XCTAssertEqual(l.fixedEnd, 1)
+    }
+
+    func testPromotedPrefixHistoryBeforeExactAndAzooKey() {
+        let input = CandidateSectionBuildInput(
+            reading: "じょう",
+            hiragana: "じょう",
+            azooKeyCandidates: ["情", "条", "状"],
+            azooKeyApiOrder: ["情", "条", "状"],
+            userDictRaw: [],
+            exactMatchHighHistory: ["上"],
+            promotedPrefixHistory: ["情報共有", "情報"],
+            highHistory: ["状態"],
+            historyOutputSet: ["上", "情報共有", "情報", "状態"],
+            exactMatchHistoryOutputs: ["上"],
+            fixedSlot: .none,
+            numberCandidates: [],
+            dateTimeCandidates: []
+        )
+        let built = CandidateSectionBuilder.build(input)
+        XCTAssertEqual(built.sectionOrder, CandidateLayout.prefixPromotedSectionOrder)
+        let l = layout(from: input)
+        XCTAssertEqual(Array(l.candidates.prefix(3)), ["情報共有", "情報", "上"])
+        XCTAssertTrue(l.candidates.contains("情"))
+        XCTAssertEqual(l.historyEnd, 3)
     }
 
     func testExactMatchHistorySortedByZenzaiRank() {

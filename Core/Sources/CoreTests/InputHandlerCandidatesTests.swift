@@ -544,6 +544,32 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         )
     }
 
+    /// 高スコア前方一致履歴が低スコア exact より先頭に来る（打鍵中）。
+    func testHighScorePrefixHistoryPromotedOverExactMatchWhileTyping() {
+        setUpWithConverter(BaseAzooKeyStub())
+
+        for _ in 0..<30 {
+            handler.db.record(input: "じょうほうきょうゆう", output: "情報共有")
+        }
+        for _ in 0..<3 {
+            handler.db.record(input: "じょう", output: "上")
+        }
+
+        typeRomaji("jou")
+        let action = handler.buildCandidateList(trigger: .whileTyping)
+
+        guard let payload = action.showPayload else {
+            XCTFail("candidates should be shown: \(action)"); return
+        }
+        guard let idxShared = payload.candidates.firstIndex(of: "情報共有"),
+              let idxUe = payload.candidates.firstIndex(of: "上") else {
+            XCTFail("both should appear: \(payload.candidates)"); return
+        }
+        XCTAssertLessThan(idxShared, idxUe, "情報共有 should precede 上: \(payload.candidates)")
+        XCTAssertEqual(payload.candidates[payload.initialRow], "情報共有",
+                       "initial row should be promoted prefix: \(payload.candidates)")
+    }
+
     // MARK: - 日時候補
 
     func testKyouIncludesDateCandidates() {

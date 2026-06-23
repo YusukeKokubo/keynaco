@@ -5,6 +5,8 @@ struct CandidateSection: Sendable {
         case fixedHiragana  // ひらがな先頭固定（hiraganaPreferred 時）
         case userDict       // ユーザー辞書
         case exactMatchHistory // 読み完全一致の履歴
+        /// 打鍵中: merged スコアが exact より十分高い前方一致履歴（exact より前に出す）
+        case promotedPrefixHistory
         case highHistory    // 前方一致などその他の高スコア履歴
         case number         // 数値変換
         case dateTime       // 日時変換
@@ -65,6 +67,21 @@ struct CandidateLayout: Sendable {
         .highHistory,
     ]
 
+    /// 高スコア前方一致が exact より優先される打鍵中。昇格 prefix → exact → 辞書 → 残り prefix。
+    static let prefixPromotedSectionOrder: [CandidateSection.Kind] = [
+        .fixedHiragana,
+        .userDict,
+        .promotedPrefixHistory,
+        .exactMatchHistory,
+        .number, .dateTime,
+        .azooKeyDict,
+        .highHistory,
+    ]
+
+    private static let historyEndSectionKinds: Set<CandidateSection.Kind> = [
+        .promotedPrefixHistory, .exactMatchHistory,
+    ]
+
     init(
         sections: [CandidateSection],
         sectionOrder: [CandidateSection.Kind],
@@ -88,7 +105,7 @@ struct CandidateLayout: Sendable {
             if Self.fixedSectionKinds.contains(kind) {
                 fixedEndAcc = result.count
             }
-            if kind == .exactMatchHistory {
+            if Self.historyEndSectionKinds.contains(kind) {
                 historyEndAcc = result.count
             }
         }
