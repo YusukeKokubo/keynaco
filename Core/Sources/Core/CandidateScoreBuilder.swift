@@ -9,8 +9,19 @@ enum CandidateScoreBuilder {
     static let userDictExactScore = 50.0
     /// ユーザー辞書 prefix（POC 値。Phase 1 暫定）。
     static let userDictPrefixScore = 30.0
+    /// ユーザー設定 hiraganaPreferred（POC 値。Phase 2 暫定）。
+    static let hiraganaUserBonus = 100.0
+    /// 組み込み助詞等 HiraganaPreferredBuiltins（POC 値。Phase 2 暫定）。
+    static let hiraganaBuiltinBonus = 80.0
+
+    enum HiraganaBonusKind: Sendable, Equatable {
+        case userSetting
+        case builtin
+    }
 
     struct BuildInput: Sendable {
+        let reading: String
+        let hiraganaBonus: HiraganaBonusKind?
         let exactMatchHighHistory: [String]
         let highHistory: [String]
         let exactMatchScores: [String: Double]
@@ -72,6 +83,23 @@ enum CandidateScoreBuilder {
             ))
         }
 
+        if let bonusKind = input.hiraganaBonus {
+            let bonusScore = bonusKind == .userSetting
+                ? Self.hiraganaUserBonus
+                : Self.hiraganaBuiltinBonus
+            let bonusSource: ScoredCandidate.Source = bonusKind == .userSetting
+                ? .hiraganaPreferred
+                : .hiraganaBuiltin
+            let text = input.reading
+            if let existing = byText[text], isHistorySource(existing.source) {
+                if bonusScore >= existing.score {
+                    byText[text] = ScoredCandidate(text: text, score: bonusScore, source: bonusSource)
+                }
+            } else {
+                upsert(ScoredCandidate(text: text, score: bonusScore, source: bonusSource))
+            }
+        }
+
         let historyTexts = Set(byText.keys)
         for (rank, text) in input.azooKeyCandidates.enumerated() {
             guard !historyTexts.contains(text) else { continue }
@@ -91,6 +119,13 @@ enum CandidateScoreBuilder {
     static func isHistorySource(_ source: ScoredCandidate.Source) -> Bool {
         switch source {
         case .historyExact, .historyPrefix: return true
+        default: return false
+        }
+    }
+
+    static func isHiraganaPreferredSource(_ source: ScoredCandidate.Source) -> Bool {
+        switch source {
+        case .hiraganaPreferred, .hiraganaBuiltin: return true
         default: return false
         }
     }

@@ -4,13 +4,9 @@ import Foundation
 enum CandidateScoredLayout {
 
     struct Input: Sendable {
-        let hiragana: String
-        let fixedSlot: CandidateFixedSlot
         let scored: [ScoredCandidate]
         let numberCandidates: [String]
         let dateTimeCandidates: [String]
-        /// 固定ひらがな枠の重複判定用。
-        let historyOutputSet: Set<String>
     }
 
     struct Result: Sendable {
@@ -19,20 +15,22 @@ enum CandidateScoredLayout {
         let historyEnd: Int
     }
 
-    /// 履歴ブロック（score 降順）→ 辞書ブロック（score 降順）の 2 段。`historyEnd` は Shift+Delete 用。
+    /// ひらがな優先 → 履歴 → 数値/日時 → 辞書の 4 段。`fixedEnd` は hiraganaPreferred 行の末尾。
     static func assemble(_ input: Input) -> Result {
+        let hiraganaItems = input.scored.filter { CandidateScoreBuilder.isHiraganaPreferredSource($0.source) }
         let historyItems = input.scored.filter { CandidateScoreBuilder.isHistorySource($0.source) }
-        let dictItems = input.scored.filter { !CandidateScoreBuilder.isHistorySource($0.source) }
+        let dictItems = input.scored.filter {
+            !CandidateScoreBuilder.isHistorySource($0.source)
+                && !CandidateScoreBuilder.isHiraganaPreferredSource($0.source)
+        }
 
         var candidates: [String] = []
         var seen = Set<String>()
-        var fixedEnd = 0
 
-        if input.fixedSlot == .hiragana {
-            candidates.append(input.hiragana)
-            seen.insert(input.hiragana)
-            fixedEnd = 1
+        for item in hiraganaItems where seen.insert(item.text).inserted {
+            candidates.append(item.text)
         }
+        let fixedEnd = candidates.count
 
         for item in historyItems where seen.insert(item.text).inserted {
             candidates.append(item.text)

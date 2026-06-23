@@ -242,6 +242,12 @@ extension InputHandler {
         isHiraganaPreferred(reading) ? .hiragana : .none
     }
 
+    private func hiraganaBonusKind(for reading: String) -> CandidateScoreBuilder.HiraganaBonusKind? {
+        if hiraganaPreferredSet.contains(reading) { return .userSetting }
+        if HiraganaPreferredBuiltins.words[reading] != nil { return .builtin }
+        return nil
+    }
+
     private mutating func assembleCandidateList(
         from sources: CandidateListSources,
         trigger: CandidateListTrigger
@@ -250,18 +256,16 @@ extension InputHandler {
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
-        let hiragana = state.composedHiragana
-        let fixedSlot = resolveFixedSlot(reading: h)
+        let isHiraganaPref = isHiraganaPreferred(h)
 
         // 打鍵中で出すべき素材がゼロなら候補窓自体出さない（AzooKey 結果待ちの placeholder は廃止）。
-        // hiraganaPreferred 経路（fixedSlot=.hiragana）は明示的な意図なので維持する。
         if trigger == .whileTyping,
-           fixedSlot == .none,
            sources.highHistoryCount == 0,
            sources.azooKeyCandidates.isEmpty,
            sources.userDictRaw.isEmpty,
            dateTimeCandidates.isEmpty,
-           numberCandidates.isEmpty {
+           numberCandidates.isEmpty,
+           hiraganaBonusKind(for: h) == nil {
             #if DEBUG
             recordCandidateBuildDiagnostics(
                 trigger: trigger,
@@ -277,9 +281,28 @@ extension InputHandler {
             return .dismiss
         }
 
+        // 打鍵中: 組み込み助詞等は UI 非表示（concept 指針 1）。
+        if trigger == .whileTyping, hiraganaBonusKind(for: h) == .builtin {
+            #if DEBUG
+            recordCandidateBuildDiagnostics(
+                trigger: trigger,
+                reading: h,
+                outcome: .dismissedFunctionalWord,
+                fixedSlot: isHiraganaPref ? .hiragana : .none,
+                sources: sources,
+                scored: [],
+                scoredLayout: nil,
+                policy: .afterFixed
+            )
+            #endif
+            return .dismiss
+        }
+
         let zenzaiActive = azooKeyConverter.isZenzaiEnabled && leftContext.azooKeyValue != nil
         let apiOrder = zenzaiActive ? sources.azooKeyApiOrder : []
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: h,
+            hiraganaBonus: hiraganaBonusKind(for: h),
             exactMatchHighHistory: sources.exactMatchHighHistory,
             highHistory: sources.highHistory,
             exactMatchScores: sources.exactMatchScores,
@@ -290,12 +313,9 @@ extension InputHandler {
             azooKeyApiOrder: apiOrder
         ))
         let scoredLayout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
-            hiragana: hiragana,
-            fixedSlot: fixedSlot,
             scored: scored,
             numberCandidates: numberCandidates,
-            dateTimeCandidates: dateTimeCandidates,
-            historyOutputSet: sources.historyOutputSet
+            dateTimeCandidates: dateTimeCandidates
         ))
         let prefixFocusRank = { (output: String) in
             InitialRowPolicyResolver.rankForPrefixFocus(output: output, db: db)
@@ -309,24 +329,13 @@ extension InputHandler {
             )
             : nil
         let policy: InitialRowPolicy
-        switch fixedSlot {
-        case .hiragana:
-            policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
-                reading: h,
-                fixedSlot: fixedSlot,
-                exactMatchHighHistory: [],
-                userDictExact: [],
-                prefixFocusCandidate: nil,
-                promotedPrefixFocusCandidate: nil,
-                azooKeyCandidates: [],
-                candidateList: scoredLayout.candidates
-            ))
-        case .none:
-            // 統一スコア順: 先頭候補（fixed 直後）を初期行とする。explicit 時のみ従来 resolver で AzooKey 等を補正。
-            if trigger == .explicit {
+        if trigger == .explicit {
+            if isHiraganaPref {
+                policy = .firstMatching(h)
+            } else {
                 policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
                     reading: h,
-                    fixedSlot: fixedSlot,
+                    fixedSlot: .none,
                     exactMatchHighHistory: sources.exactMatchHighHistory,
                     userDictExact: sources.userDictExact,
                     prefixFocusCandidate: nil,
@@ -334,9 +343,9 @@ extension InputHandler {
                     azooKeyCandidates: sources.azooKeyCandidates,
                     candidateList: scoredLayout.candidates
                 ))
-            } else {
-                policy = .afterFixed
             }
+        } else {
+            policy = .afterFixed
         }
         let exactMatchHistorySet = Set(sources.exactMatchHighHistory)
         let bestExactScore = sources.exactMatchHighHistory
@@ -379,7 +388,7 @@ extension InputHandler {
                 trigger: trigger,
                 reading: h,
                 outcome: .dismissedEmpty,
-                fixedSlot: fixedSlot,
+                fixedSlot: isHiraganaPref ? .hiragana : .none,
                 sources: sources,
                 scored: scored,
                 scoredLayout: scoredLayout,
@@ -395,7 +404,7 @@ extension InputHandler {
                 trigger: trigger,
                 reading: h,
                 outcome: .dismissedEmpty,
-                fixedSlot: fixedSlot,
+                fixedSlot: isHiraganaPref ? .hiragana : .none,
                 sources: sources,
                 scored: scored,
                 scoredLayout: scoredLayout,
@@ -406,7 +415,7 @@ extension InputHandler {
         }
 
         // 打鍵中のみ: 第一候補が機能語（助詞・助動詞等）ならサジェスト UI を出さない。
-        // 明示トリガ（Space・未表示時）は候補を出す。
+        // builtin は assemble 前段で dismiss 済み。ここは userSetting の hiraganaPreferred 用フォールバック。
         if trigger == .whileTyping,
            initialRow < scoredLayout.candidates.count,
            HiraganaPreferredBuiltins.words[scoredLayout.candidates[initialRow]] != nil {
@@ -415,7 +424,7 @@ extension InputHandler {
                 trigger: trigger,
                 reading: h,
                 outcome: .dismissedFunctionalWord,
-                fixedSlot: fixedSlot,
+                fixedSlot: isHiraganaPref ? .hiragana : .none,
                 sources: sources,
                 scored: scored,
                 scoredLayout: scoredLayout,
@@ -447,7 +456,7 @@ extension InputHandler {
             trigger: trigger,
             reading: h,
             outcome: .shown,
-            fixedSlot: fixedSlot,
+            fixedSlot: isHiraganaPref ? .hiragana : .none,
             sources: sources,
             scored: scored,
             scoredLayout: scoredLayout,

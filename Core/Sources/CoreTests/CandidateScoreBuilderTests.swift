@@ -4,6 +4,8 @@ import XCTest
 final class CandidateScoreBuilderTests: XCTestCase {
 
     private func build(
+        reading: String = "じょう",
+        hiraganaBonus: CandidateScoreBuilder.HiraganaBonusKind? = nil,
         exact: [String] = [],
         exactScores: [String: Double] = [:],
         prefix: [String] = [],
@@ -14,6 +16,8 @@ final class CandidateScoreBuilderTests: XCTestCase {
         azooOrder: [String] = []
     ) -> [ScoredCandidate] {
         CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: reading,
+            hiraganaBonus: hiraganaBonus,
             exactMatchHighHistory: exact,
             highHistory: prefix,
             exactMatchScores: exactScores,
@@ -95,12 +99,52 @@ final class CandidateScoreBuilderTests: XCTestCase {
         )
         XCTAssertEqual(scored.map(\.text), ["愛"])
     }
+
+    func testHiraganaBuiltinBonusBeatsWrongHistory() {
+        let scored = build(
+            reading: "の",
+            hiraganaBonus: .builtin,
+            prefix: ["ノックアウト"],
+            prefixScores: ["ノックアウト": 25],
+            azooKey: ["ノ", "之"]
+        )
+        XCTAssertEqual(scored.first?.text, "の")
+        XCTAssertEqual(scored.first?.source, .hiraganaBuiltin)
+        XCTAssertEqual(scored.first?.score, CandidateScoreBuilder.hiraganaBuiltinBonus)
+    }
+
+    func testHiraganaBonusUsesMaxWithExactHistory() {
+        let scored = build(
+            reading: "の",
+            hiraganaBonus: .builtin,
+            exact: ["の"],
+            exactScores: ["の": 120],
+            azooKey: ["ノ"]
+        )
+        XCTAssertEqual(scored.filter { $0.text == "の" }.count, 1)
+        XCTAssertEqual(scored.first(where: { $0.text == "の" })?.source, .historyExact)
+        XCTAssertEqual(scored.first(where: { $0.text == "の" })?.score, 120)
+    }
+
+    func testHiraganaBonusReplacesLowExactHistory() {
+        let scored = build(
+            reading: "の",
+            hiraganaBonus: .builtin,
+            exact: ["の"],
+            exactScores: ["の": 5],
+            azooKey: ["ノ"]
+        )
+        XCTAssertEqual(scored.first(where: { $0.text == "の" })?.source, .hiraganaBuiltin)
+        XCTAssertEqual(scored.first(where: { $0.text == "の" })?.score, 80)
+    }
 }
 
 final class CandidateScoredLayoutTests: XCTestCase {
 
     func testHistoryBlockBeforeDictionaryBlock() {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "じょう",
+            hiraganaBonus: nil,
             exactMatchHighHistory: ["上"],
             highHistory: ["情報共有"],
             exactMatchScores: ["上": 9],
@@ -111,29 +155,35 @@ final class CandidateScoredLayoutTests: XCTestCase {
             azooKeyApiOrder: []
         ))
         let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
-            hiragana: "じょう",
-            fixedSlot: .none,
             scored: scored,
             numberCandidates: [],
-            dateTimeCandidates: [],
-            historyOutputSet: ["上", "情報共有"]
+            dateTimeCandidates: []
         ))
         XCTAssertEqual(Array(layout.candidates.prefix(3)), ["情報共有", "上", "情"])
         XCTAssertEqual(layout.fixedEnd, 0)
         XCTAssertEqual(layout.historyEnd, 2)
     }
 
-    func testHiraganaFixedSlotPrepended() {
-        let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
-            hiragana: "の",
-            fixedSlot: .hiragana,
-            scored: [],
-            numberCandidates: [],
-            dateTimeCandidates: [],
-            historyOutputSet: []
+    func testHiraganaPreferredTierPrependedBeforeHistory() {
+        let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "の",
+            hiraganaBonus: .builtin,
+            exactMatchHighHistory: [],
+            highHistory: ["ノックアウト"],
+            exactMatchScores: [:],
+            prefixHistoryScores: ["ノックアウト": 25],
+            userDictExact: [],
+            userDictPrefix: [],
+            azooKeyCandidates: ["ノ", "之"],
+            azooKeyApiOrder: []
         ))
-        XCTAssertEqual(layout.candidates, ["の"])
+        let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
+            scored: scored,
+            numberCandidates: [],
+            dateTimeCandidates: []
+        ))
+        XCTAssertEqual(Array(layout.candidates.prefix(3)), ["の", "ノックアウト", "ノ"])
         XCTAssertEqual(layout.fixedEnd, 1)
-        XCTAssertEqual(layout.historyEnd, 1)
+        XCTAssertEqual(layout.historyEnd, 2)
     }
 }
