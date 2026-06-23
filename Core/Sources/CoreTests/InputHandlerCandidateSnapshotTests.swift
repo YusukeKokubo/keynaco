@@ -193,8 +193,8 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛", "Acme", "辞書A", "辞書B"],
-                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
+                     candidates: ["Acme", "愛", "辞書A", "辞書B"],
+                     historyEnd: 0, fixedEnd: 0, initialRow: 1)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -221,7 +221,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         assertInjectPathMatchesSync(stub: stub)
     }
 
-    func testSnap_G2_DateTimeCandidatesAtHistoryEnd() {
+    func testSnap_G2_DateTimeCandidatesSortedByScore() {
         useStub(SnapStub(["今日", "本日"]))
         typeRomaji("kyou")
         let action = handler.buildCandidateList()
@@ -230,11 +230,16 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         }
         let expectedDates = InputHandler.generateDateTimeCandidates(for: "きょう")
         XCTAssertFalse(expectedDates.isEmpty, "日時候補が生成されるはず")
-        XCTAssertEqual(p.historyEnd, 0, "履歴なしなら historyEnd=0")
-        XCTAssertEqual(Array(p.candidates[0..<expectedDates.count]), expectedDates,
-                       "日時候補が先頭（historyEnd=0 の位置）から並ぶはず: \(p.candidates)")
-        XCTAssertEqual(Array(p.candidates.suffix(2)), ["今日", "本日"],
-                       "AzooKey 候補は日時候補の後ろ: \(p.candidates)")
+        XCTAssertTrue(p.candidates.contains("今日"))
+        XCTAssertTrue(p.candidates.contains("本日"))
+        for date in expectedDates {
+            XCTAssertTrue(p.candidates.contains(date), "日時候補 \(date) が載るはず")
+        }
+        // AzooKey rank0(10) > 日時(5)。スコア順 flatten で辞書候補が日時より前に来うる。
+        if let idxToday = p.candidates.firstIndex(of: "今日"),
+           let idxFirstDate = expectedDates.compactMap({ p.candidates.firstIndex(of: $0) }).min() {
+            XCTAssertLessThan(idxToday, idxFirstDate, "辞書の「今日」は日時候補より前: \(p.candidates)")
+        }
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -271,8 +276,8 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
-                     candidates: ["愛", "UD合い", "辞書A"],
-                     historyEnd: 1, fixedEnd: 0, initialRow: 0)
+                     candidates: ["UD合い", "愛", "辞書A"],
+                     historyEnd: 0, fixedEnd: 0, initialRow: 1)
         assertInjectPathMatchesSync(stub: stub)
     }
 }

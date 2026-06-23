@@ -5,46 +5,33 @@ enum CandidateScoredLayout {
 
     struct Input: Sendable {
         let scored: [ScoredCandidate]
-        let numberCandidates: [String]
-        let dateTimeCandidates: [String]
     }
 
     struct Result: Sendable {
         let candidates: [String]
+        let sources: [ScoredCandidate.Source]
+        /// UI 区切り用（先頭から連続する fixed / history ブロック）。Shift+Delete は `sources` を正本とする。
         let fixedEnd: Int
         let historyEnd: Int
     }
 
-    /// ひらがな優先 → 履歴 → 数値/日時 → 辞書の 4 段。`fixedEnd` は hiraganaPreferred 行の末尾。
+    /// スコア降順リストをそのまま flatten。`fixedEnd` / `historyEnd` は後方互換の連続ブロック境界。
     static func assemble(_ input: Input) -> Result {
-        let hiraganaItems = input.scored.filter { CandidateScoreBuilder.isHiraganaPreferredSource($0.source) }
-        let historyItems = input.scored.filter { CandidateScoreBuilder.isHistorySource($0.source) }
-        let dictItems = input.scored.filter {
-            !CandidateScoreBuilder.isHistorySource($0.source)
-                && !CandidateScoreBuilder.isHiraganaPreferredSource($0.source)
-        }
-
         var candidates: [String] = []
+        var sources: [ScoredCandidate.Source] = []
         var seen = Set<String>()
 
-        for item in hiraganaItems where seen.insert(item.text).inserted {
+        for item in input.scored where seen.insert(item.text).inserted {
             candidates.append(item.text)
-        }
-        let fixedEnd = candidates.count
-
-        for item in historyItems where seen.insert(item.text).inserted {
-            candidates.append(item.text)
-        }
-        let historyEnd = candidates.count
-
-        for text in input.numberCandidates + input.dateTimeCandidates where seen.insert(text).inserted {
-            candidates.append(text)
+            sources.append(item.source)
         }
 
-        for item in dictItems where seen.insert(item.text).inserted {
-            candidates.append(item.text)
-        }
-
-        return Result(candidates: candidates, fixedEnd: fixedEnd, historyEnd: historyEnd)
+        let (fixedEnd, historyEnd) = CandidateRowMetadata.legacyBoundaries(sources: sources)
+        return Result(
+            candidates: candidates,
+            sources: sources,
+            fixedEnd: fixedEnd,
+            historyEnd: historyEnd
+        )
     }
 }

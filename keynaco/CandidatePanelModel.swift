@@ -16,7 +16,12 @@ struct CandidatePanelModel: Equatable {
     var isExplicitlySelected: Bool { session.isExplicitlySelected }
     var fixedEnd: Int { session.fixedEnd }
     var historyEnd: Int { session.historyEnd }
+    var candidateSources: [ScoredCandidate.Source] { session.candidateSources }
     var isPresented: Bool { session.isVisible && !session.candidates.isEmpty }
+
+    private var usesSourceMetadata: Bool {
+        candidateSources.count == candidates.count
+    }
 
     /// 候補行に対応する Zenzai 内部順位（1 始まり）。Zenzai 非アクティブ時 / 該当行が AzooKey 候補でないときは nil。
     func zenzaiRank(for row: Int) -> Int? {
@@ -27,23 +32,31 @@ struct CandidatePanelModel: Equatable {
     }
 
     func section(for row: Int) -> CandidateRowSection {
-        CandidateRowMetadata.section(
-            row: row,
-            fixedEnd: fixedEnd,
-            historyEnd: historyEnd
-        )
+        if usesSourceMetadata {
+            return CandidateRowMetadata.section(row: row, sources: candidateSources)
+        }
+        return CandidateRowMetadata.section(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
     }
 
     func showsDeleteButton(at row: Int) -> Bool {
-        CandidateRowMetadata.showsDeleteButton(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
+        if usesSourceMetadata {
+            return CandidateRowMetadata.showsDeleteButton(row: row, sources: candidateSources)
+        }
+        return CandidateRowMetadata.showsDeleteButton(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
     }
 
     func isHistoryRow(_ row: Int) -> Bool {
-        CandidateRowMetadata.isHistoryRow(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
+        if usesSourceMetadata {
+            return CandidateRowMetadata.isHistoryRow(row: row, sources: candidateSources)
+        }
+        return CandidateRowMetadata.isHistoryRow(row: row, fixedEnd: fixedEnd, historyEnd: historyEnd)
     }
 
     func showsSectionDivider(at row: Int) -> Bool {
-        CandidateRowMetadata.showsSectionDivider(
+        if usesSourceMetadata {
+            return CandidateRowMetadata.showsSectionDivider(row: row, sources: candidateSources)
+        }
+        return CandidateRowMetadata.showsSectionDivider(
             row: row,
             historyEnd: historyEnd,
             candidateCount: candidates.count
@@ -52,13 +65,11 @@ struct CandidatePanelModel: Equatable {
 
     /// 行右端のセクションラベル。セクション境界行のみ非空。
     func sectionLabel(for row: Int) -> String {
-        switch section(for: row) {
-        case .history where row == fixedEnd:
-            return "履歴"
-        case .dictionary where row == historyEnd && row < candidates.count:
-            return "辞書"
-        default:
-            return ""
+        guard showsSectionDivider(at: row) else { return "" }
+        switch section(for: row + 1) {
+        case .history: return "履歴"
+        case .dictionary: return "辞書"
+        default: return ""
         }
     }
 

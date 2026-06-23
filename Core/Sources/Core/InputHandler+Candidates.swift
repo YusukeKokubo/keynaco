@@ -302,22 +302,21 @@ extension InputHandler {
             userDictExact: sources.userDictExact,
             userDictPrefix: sources.userDictPrefix,
             azooKeyCandidates: sources.azooKeyCandidates,
-            azooKeyApiOrder: apiOrder
-        ))
-        let scoredLayout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
-            scored: scored,
+            azooKeyApiOrder: apiOrder,
             numberCandidates: numberCandidates,
             dateTimeCandidates: dateTimeCandidates
+        ))
+        let scoredLayout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
+            scored: scored
         ))
         let policy: InitialRowPolicy
         let initialRow: Int
         if trigger == .whileTyping {
             policy = .afterFixed
-            initialRow = scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0
+            initialRow = 0
         } else if isHiraganaPref {
             policy = .firstMatching(h)
-            initialRow = scoredLayout.candidates.firstIndex(of: h)
-                ?? (scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0)
+            initialRow = scoredLayout.candidates.firstIndex(of: h) ?? 0
         } else {
             policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
                 reading: h,
@@ -328,10 +327,9 @@ extension InputHandler {
             ))
             switch policy {
             case .firstMatching(let text):
-                initialRow = scoredLayout.candidates.firstIndex(of: text)
-                    ?? (scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0)
+                initialRow = scoredLayout.candidates.firstIndex(of: text) ?? 0
             case .afterFixed:
-                initialRow = scoredLayout.fixedEnd < scoredLayout.candidates.count ? scoredLayout.fixedEnd : 0
+                initialRow = 0
             }
         }
         let exactMatchHistorySet = Set(sources.exactMatchHighHistory)
@@ -371,19 +369,20 @@ extension InputHandler {
             return .dismiss
         }
 
-        if initialRow < scoredLayout.fixedEnd {
+        if initialRow < scoredLayout.sources.count,
+           CandidateScoreBuilder.isHiraganaPreferredSource(scoredLayout.sources[initialRow]) {
             lastInitialRowReason = isHiraganaPref ? "hiraganaPreferred" : "hiraganaBuiltin"
-        } else if !sources.exactMatchHighHistory.isEmpty, initialRow < scoredLayout.historyEnd,
-                  exactMatchHistorySet.contains(scoredLayout.candidates[initialRow]) {
-            lastInitialRowReason = "exactMatchHistory"
-        } else if initialRow < scoredLayout.historyEnd,
-                  scored.first(where: { $0.text == scoredLayout.candidates[initialRow] })?.source == .historyPrefix {
-            lastInitialRowReason = "historyPrefix"
-        } else if !sources.userDictExact.isEmpty,
-                  initialRow < scoredLayout.candidates.count,
+        } else if initialRow < scoredLayout.sources.count,
+                  CandidateScoreBuilder.isHistorySource(scoredLayout.sources[initialRow]) {
+            if exactMatchHistorySet.contains(scoredLayout.candidates[initialRow]) {
+                lastInitialRowReason = "exactMatchHistory"
+            } else {
+                lastInitialRowReason = "historyPrefix"
+            }
+        } else if initialRow < scoredLayout.candidates.count,
                   sources.userDictExact.contains(scoredLayout.candidates[initialRow]) {
             lastInitialRowReason = "userDictExact"
-        } else if initialRow >= scoredLayout.historyEnd,
+        } else if initialRow < scoredLayout.candidates.count,
                   sources.azooKeyCandidates.contains(scoredLayout.candidates[initialRow]) {
             lastInitialRowReason = "azooKey"
         } else {
@@ -407,7 +406,8 @@ extension InputHandler {
             initialRow: initialRow,
             fixedEnd: scoredLayout.fixedEnd,
             azooKeyApiOrder: apiOrder,
-            initialIsExplicitlySelected: trigger == .explicit
+            initialIsExplicitlySelected: trigger == .explicit,
+            candidateSources: scoredLayout.sources
         )
     }
 
@@ -422,9 +422,7 @@ extension InputHandler {
         policy: InitialRowPolicy,
         initialRow: Int? = nil
     ) {
-        let resolvedInitialRow = initialRow ?? scoredLayout.flatMap { layout in
-            layout.fixedEnd < layout.candidates.count ? layout.fixedEnd : 0
-        } ?? 0
+        let resolvedInitialRow = initialRow ?? 0
         let initialText = scoredLayout.flatMap { layout in
             layout.candidates.indices.contains(resolvedInitialRow) ? layout.candidates[resolvedInitialRow] : nil
         }

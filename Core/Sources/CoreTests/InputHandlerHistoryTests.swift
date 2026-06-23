@@ -106,10 +106,10 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
             payload.candidates.contains("感じ"),
             "読み完全一致の履歴は top3 枠外でも候補に載るはず: \(payload.candidates)"
         )
-        XCTAssertTrue(
-            payload.candidates.prefix(payload.historyEnd).contains("感じ"),
-            "履歴セクションに載るはず: \(payload.candidates.prefix(payload.historyEnd))"
-        )
+        XCTAssertTrue(payload.candidates.contains("感じ"))
+        if let idx = payload.candidates.firstIndex(of: "感じ") {
+            XCTAssertTrue(CandidateScoreBuilder.isHistorySource(handler.candidateSession.candidateSources[idx]))
+        }
         if let otherIdx = payload.candidates.firstIndex(of: "幹事"),
            let kanjiIdx = payload.candidates.firstIndex(of: "感じ") {
             XCTAssertLessThan(kanjiIdx, otherIdx, "読み完全一致は前方一致のみの履歴より先に並ぶ")
@@ -125,7 +125,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertTrue(payload.candidates.prefix(payload.historyEnd).contains("東京"),
+        XCTAssertTrue(payload.candidates.contains("東京"),
                       "前回確定した「東京」が次回変換で履歴候補として現れるはず")
     }
 

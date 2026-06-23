@@ -13,6 +13,8 @@ enum CandidateScoreBuilder {
     static let hiraganaUserBonus = 100.0
     /// 組み込み助詞等 HiraganaPreferredBuiltins（POC 値。Phase 2 暫定）。
     static let hiraganaBuiltinBonus = 80.0
+    /// 数値・日時特殊変換（POC 値。PLAN260624）。
+    static let specialCandidateScore = 5.0
 
     enum HiraganaBonusKind: Sendable, Equatable {
         case userSetting
@@ -31,10 +33,17 @@ enum CandidateScoreBuilder {
         let azooKeyCandidates: [String]
         /// Zenzai 込み API 順。空なら rank ボーナスなし。
         let azooKeyApiOrder: [String]
+        let numberCandidates: [String]
+        let dateTimeCandidates: [String]
     }
 
     static func azooKeyScore(rank: Int) -> Double {
         10.0 / (1.0 + Double(rank))
+    }
+
+    /// 載せた履歴は AzooKey rank 0 より前に並べる（flatten 後も辞書より優先）。
+    private static func historyDisplayScore(_ dbScore: Double) -> Double {
+        max(dbScore, azooKeyScore(rank: 0) + 0.001)
     }
 
     /// 全ソースを flatten → dedup（最高スコア）→ スコア降順。
@@ -58,13 +67,13 @@ enum CandidateScoreBuilder {
         for output in input.exactMatchHighHistory {
             guard let score = input.exactMatchScores[output],
                   score >= historyScoreCutoff else { continue }
-            upsert(ScoredCandidate(text: output, score: score, source: .historyExact))
+            upsert(ScoredCandidate(text: output, score: historyDisplayScore(score), source: .historyExact))
         }
 
         for output in input.highHistory {
             guard let score = input.prefixHistoryScores[output],
                   score >= historyScoreCutoff else { continue }
-            upsert(ScoredCandidate(text: output, score: score, source: .historyPrefix))
+            upsert(ScoredCandidate(text: output, score: historyDisplayScore(score), source: .historyPrefix))
         }
 
         for output in input.userDictExact {
@@ -108,6 +117,13 @@ enum CandidateScoreBuilder {
                 score: azooKeyScore(rank: rank),
                 source: .azooKey(rank: rank)
             ))
+        }
+
+        for text in input.numberCandidates {
+            upsert(ScoredCandidate(text: text, score: specialCandidateScore, source: .number))
+        }
+        for text in input.dateTimeCandidates {
+            upsert(ScoredCandidate(text: text, score: specialCandidateScore, source: .dateTime))
         }
 
         let sorted = insertionOrder.compactMap { byText[$0] }.sorted { lhs, rhs in

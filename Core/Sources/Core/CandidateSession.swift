@@ -36,6 +36,7 @@ public struct CandidateSession: Sendable, Equatable {
     public var isExplicitlySelected = false
     public var historyEnd = 0
     public var fixedEnd = 0
+    public var candidateSources: [ScoredCandidate.Source] = []
     /// AzooKey API が返した順序（LCID ソート前）。Zenzai 有効 + 左文脈ありの `.show` でのみ非空。
     /// 候補ウィンドウで「Zenzai のソート順位」を小さく表示するための情報。
     public var azooKeyApiOrder: [String] = []
@@ -63,7 +64,8 @@ public struct CandidateSession: Sendable, Equatable {
             selectedText: selectedText,
             isExplicitlySelected: isExplicitlySelected,
             historyEnd: historyEnd,
-            fixedEnd: fixedEnd
+            fixedEnd: fixedEnd,
+            candidateSources: candidateSources
         )
     }
 
@@ -77,6 +79,7 @@ public struct CandidateSession: Sendable, Equatable {
         isExplicitlySelected = false
         historyEnd = 0
         fixedEnd = 0
+        candidateSources = []
         azooKeyApiOrder = []
         bracketCandidates = nil
     }
@@ -86,6 +89,7 @@ public struct CandidateSession: Sendable, Equatable {
     public mutating func removeCandidate(at row: Int) {
         guard candidates.indices.contains(row) else { return }
         candidates.remove(at: row)
+        if candidateSources.indices.contains(row) { candidateSources.remove(at: row) }
         if row < historyEnd { historyEnd -= 1 }
         if candidates.isEmpty {
             reset()
@@ -99,7 +103,7 @@ public struct CandidateSession: Sendable, Equatable {
         switch action {
         case .none:
             break
-        case .show(let cands, let he, let initial, let fe, let apiOrder, let initialExplicit):
+        case .show(let cands, let he, let initial, let fe, let apiOrder, let initialExplicit, let rowSources):
             candidates = cands
             isVisible = !cands.isEmpty
             let clampedInitial = cands.isEmpty ? 0 : min(initial, cands.count - 1)
@@ -107,6 +111,7 @@ public struct CandidateSession: Sendable, Equatable {
             initialRow = clampedInitial
             historyEnd = he
             fixedEnd = fe
+            candidateSources = rowSources
             azooKeyApiOrder = apiOrder
             isExplicitlySelected = initialExplicit
         case .dismiss:
@@ -123,6 +128,7 @@ public struct CandidateSession: Sendable, Equatable {
             guard isVisible, candidates.indices.contains(selectedRow) else { break }
             let row = selectedRow
             candidates.remove(at: row)
+            if candidateSources.indices.contains(row) { candidateSources.remove(at: row) }
             if row < historyEnd { historyEnd -= 1 }
             if candidates.isEmpty {
                 reset()

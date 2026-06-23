@@ -1062,6 +1062,7 @@ final class DebugSocketServer: @unchecked Sendable {
             "surroundingAfter":   mockClient.documentAfter,
             "candidateEntries":   Self.makeCandidateEntries(
                 candidates: snap.candidates,
+                sources: handler.candidateSession.candidateSources,
                 fixedEnd: snap.fixedEnd,
                 historyEnd: snap.historyEnd,
                 azooKeyApiOrder: handler.candidateSession.azooKeyApiOrder
@@ -1086,6 +1087,7 @@ final class DebugSocketServer: @unchecked Sendable {
 
     static func makeCandidateEntries(
         candidates: [String],
+        sources: [ScoredCandidate.Source] = [],
         fixedEnd: Int,
         historyEnd: Int,
         azooKeyApiOrder: [String] = []
@@ -1096,15 +1098,15 @@ final class DebugSocketServer: @unchecked Sendable {
         } else {
             rankByText = Dictionary(azooKeyApiOrder.enumerated().map { ($0.element, $0.offset + 1) }, uniquingKeysWith: { first, _ in first })
         }
+        let useSources = sources.count == candidates.count
         return candidates.enumerated().map { idx, text in
+            let section = useSources
+                ? CandidateRowMetadata.section(for: sources[idx]).rawValue
+                : CandidateRowMetadata.section(row: idx, fixedEnd: fixedEnd, historyEnd: historyEnd).rawValue
             var entry: [String: Any] = [
                 "index": idx,
                 "text": text,
-                "section": CandidateRowMetadata.section(
-                    row: idx,
-                    fixedEnd: fixedEnd,
-                    historyEnd: historyEnd
-                ).rawValue
+                "section": section
             ]
             if let rank = rankByText[text] { entry["zenzaiRank"] = rank }
             return entry

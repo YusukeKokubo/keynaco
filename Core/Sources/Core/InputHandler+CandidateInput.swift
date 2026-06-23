@@ -58,7 +58,7 @@ extension InputHandler {
             return (true, .dismiss)
         case KeyCode.backspace where modifiers.contains(.shift):
             let row = candidate.selectedRow
-            if candidate.fixedEnd <= row && row < candidate.historyEnd { return (true, .deleteSelected) }
+            if candidate.isHistoryDeletable(at: row) { return (true, .deleteSelected) }
             return (true, .none)
         default:
             if isBackspace { return doBackspace(client: client) }

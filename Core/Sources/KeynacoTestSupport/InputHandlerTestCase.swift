@@ -207,6 +207,7 @@ class InputHandlerTestCase: XCTestCase {
                 file: file,
                 line: line
             )
+            XCTAssertEqual(l.candidateSources, r.candidateSources, "candidateSources", file: file, line: line)
         default:
             XCTFail("Expected matching actions but got \(lhs) vs \(rhs)", file: file, line: line)
         }

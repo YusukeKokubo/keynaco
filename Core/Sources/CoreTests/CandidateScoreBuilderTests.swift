@@ -25,7 +25,9 @@ final class CandidateScoreBuilderTests: XCTestCase {
             userDictExact: userExact,
             userDictPrefix: userPrefix,
             azooKeyCandidates: azooKey,
-            azooKeyApiOrder: azooOrder
+            azooKeyApiOrder: azooOrder,
+            numberCandidates: [],
+            dateTimeCandidates: []
         ))
     }
 
@@ -37,9 +39,9 @@ final class CandidateScoreBuilderTests: XCTestCase {
             prefixScores: ["情報共有": 93],
             azooKey: ["情", "条"]
         )
-        XCTAssertEqual(scored.map(\.text), ["情報共有", "情", "上", "条"])
+        XCTAssertEqual(scored.map(\.text), ["情報共有", "上", "情", "条"])
         XCTAssertEqual(scored[0].source, .historyPrefix)
-        XCTAssertEqual(scored[2].source, .historyExact)
+        XCTAssertEqual(scored[1].source, .historyExact)
     }
 
     func testUserDictExactScoreBetweenHistoryAndAzooKey() {
@@ -49,9 +51,9 @@ final class CandidateScoreBuilderTests: XCTestCase {
             userExact: ["UD語"],
             azooKey: ["辞書A"]
         )
-        XCTAssertEqual(scored.map(\.text), ["UD語", "辞書A", "低"])
+        XCTAssertEqual(scored.map(\.text), ["UD語", "低", "辞書A"])
         XCTAssertEqual(scored[0].score, CandidateScoreBuilder.userDictExactScore)
-        XCTAssertEqual(scored[1].score, CandidateScoreBuilder.azooKeyScore(rank: 0))
+        XCTAssertEqual(scored[1].score, CandidateScoreBuilder.azooKeyScore(rank: 0) + 0.001, accuracy: 0.0001)
     }
 
     func testDedupKeepsHigherScoreSource() {
@@ -141,7 +143,7 @@ final class CandidateScoreBuilderTests: XCTestCase {
 
 final class CandidateScoredLayoutTests: XCTestCase {
 
-    func testHistoryBlockBeforeDictionaryBlock() {
+    func testGlobalScoreOrderPreservesRanking() {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: "じょう",
             hiraganaBonus: nil,
@@ -152,19 +154,18 @@ final class CandidateScoredLayoutTests: XCTestCase {
             userDictExact: [],
             userDictPrefix: [],
             azooKeyCandidates: ["情"],
-            azooKeyApiOrder: []
-        ))
-        let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
-            scored: scored,
+            azooKeyApiOrder: [],
             numberCandidates: [],
             dateTimeCandidates: []
         ))
+        let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(scored: scored))
         XCTAssertEqual(Array(layout.candidates.prefix(3)), ["情報共有", "上", "情"])
+        XCTAssertEqual(Array(layout.sources.prefix(3)), [.historyPrefix, .historyExact, .azooKey(rank: 0)])
         XCTAssertEqual(layout.fixedEnd, 0)
         XCTAssertEqual(layout.historyEnd, 2)
     }
 
-    func testHiraganaPreferredTierPrependedBeforeHistory() {
+    func testHiraganaBonusInterleavesByScoreNotTier() {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: "の",
             hiraganaBonus: .builtin,
@@ -175,15 +176,34 @@ final class CandidateScoredLayoutTests: XCTestCase {
             userDictExact: [],
             userDictPrefix: [],
             azooKeyCandidates: ["ノ", "之"],
-            azooKeyApiOrder: []
-        ))
-        let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
-            scored: scored,
+            azooKeyApiOrder: [],
             numberCandidates: [],
             dateTimeCandidates: []
         ))
+        let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(scored: scored))
         XCTAssertEqual(Array(layout.candidates.prefix(3)), ["の", "ノックアウト", "ノ"])
+        XCTAssertEqual(layout.sources.count, layout.candidates.count)
         XCTAssertEqual(layout.fixedEnd, 1)
         XCTAssertEqual(layout.historyEnd, 2)
+    }
+
+    func testNumberCandidatesMergeByScore() {
+        let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "1234",
+            hiraganaBonus: nil,
+            exactMatchHighHistory: [],
+            highHistory: [],
+            exactMatchScores: [:],
+            prefixHistoryScores: [:],
+            userDictExact: [],
+            userDictPrefix: [],
+            azooKeyCandidates: [],
+            azooKeyApiOrder: [],
+            numberCandidates: ["1234", "１２３４"],
+            dateTimeCandidates: []
+        ))
+        let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(scored: scored))
+        XCTAssertEqual(layout.candidates, ["1234", "１２３４"])
+        XCTAssertEqual(layout.sources, [.number, .number])
     }
 }

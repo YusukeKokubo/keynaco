@@ -1,8 +1,8 @@
 import Foundation
 
 /// 候補リスト統一スコアランキングの中間表現（PLAN260624）。
-struct ScoredCandidate: Sendable, Equatable {
-    enum Source: Sendable, Equatable {
+public struct ScoredCandidate: Sendable, Equatable {
+    public enum Source: Sendable, Equatable {
         case historyExact
         case historyPrefix
         case userDict(isExact: Bool)
@@ -13,7 +13,13 @@ struct ScoredCandidate: Sendable, Equatable {
         case dateTime
     }
 
-    let text: String
-    let score: Double
-    let source: Source
+    public let text: String
+    public let score: Double
+    public let source: Source
+
+    public init(text: String, score: Double, source: Source) {
+        self.text = text
+        self.score = score
+        self.source = source
+    }
 }

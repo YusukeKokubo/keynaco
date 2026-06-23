@@ -9,9 +9,9 @@ public enum CandidateAction: Sendable {
         initialRow: Int,
         fixedEnd: Int,
         /// AzooKey API が返した順序（LCID ソート前）。Zenzai 有効 + 左文脈ありのときのみ非空。
-        /// 各候補の AzooKey 内部順位（≒ Zenzai 込みのスコア順）を UI で表示するための情報。
         azooKeyApiOrder: [String] = [],
-        initialIsExplicitlySelected: Bool = false
+        initialIsExplicitlySelected: Bool = false,
+        candidateSources: [ScoredCandidate.Source] = []
     )
     case dismiss
     case selectNext
@@ -28,10 +28,11 @@ extension CandidateAction {
         initialRow: Int,
         fixedEnd: Int,
         azooKeyApiOrder: [String],
-        initialIsExplicitlySelected: Bool
+        initialIsExplicitlySelected: Bool,
+        candidateSources: [ScoredCandidate.Source]
     )? {
-        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let apiOrder, let initialExplicit) = self {
-            return (candidates, historyEnd, initialRow, fixedEnd, apiOrder, initialExplicit)
+        if case .show(let candidates, let historyEnd, let initialRow, let fixedEnd, let apiOrder, let initialExplicit, let sources) = self {
+            return (candidates, historyEnd, initialRow, fixedEnd, apiOrder, initialExplicit, sources)
         }
         return nil
     }
@@ -49,8 +50,10 @@ public struct CandidateContext: Sendable {
     public private(set) var isExplicitlySelected: Bool
     /// 履歴セクションの末尾インデックス（これ未満の行が履歴）
     public private(set) var historyEnd: Int
-    /// ユーザー辞書+カナ固定行の末尾インデックス（これ未満の行は Shift+Delete 不可）
+    /// ユーザー辞書+カナ固定行の末尾インデックス（レガシー UI 区切り）
     public private(set) var fixedEnd: Int
+    /// 行ごとの source。Shift+Delete とセクション描画の正本。
+    public private(set) var candidateSources: [ScoredCandidate.Source] = []
 
     public init(
         isVisible: Bool,
@@ -58,7 +61,8 @@ public struct CandidateContext: Sendable {
         selectedText: String?,
         isExplicitlySelected: Bool = false,
         historyEnd: Int = 0,
-        fixedEnd: Int = 0
+        fixedEnd: Int = 0,
+        candidateSources: [ScoredCandidate.Source] = []
     ) {
         self.isVisible = isVisible
         self.selectedRow = selectedRow
@@ -66,11 +70,19 @@ public struct CandidateContext: Sendable {
         self.isExplicitlySelected = isExplicitlySelected
         self.historyEnd = historyEnd
         self.fixedEnd = fixedEnd
+        self.candidateSources = candidateSources
+    }
+
+    public func isHistoryDeletable(at row: Int) -> Bool {
+        if candidateSources.indices.contains(row) {
+            return CandidateRowMetadata.isHistoryDeletable(source: candidateSources[row])
+        }
+        return fixedEnd <= row && row < historyEnd
     }
 
     public static let hidden = CandidateContext(
         isVisible: false, selectedRow: 0, selectedText: nil,
-        isExplicitlySelected: false, historyEnd: 0, fixedEnd: 0
+        isExplicitlySelected: false, historyEnd: 0, fixedEnd: 0, candidateSources: []
     )
 
     /// `CandidateSession.panelInteraction` と同じ導出（`handle()` へのスナップショット用）。
@@ -316,7 +328,13 @@ public struct InputHandler {
         let candidatesTop = Array(candidateSession.candidates.prefix(8))
         let row = candidateSession.selectedRow
         let confirmedSource: String
-        if row < candidateSession.fixedEnd {
+        if candidateSession.candidateSources.indices.contains(row) {
+            switch CandidateRowMetadata.section(for: candidateSession.candidateSources[row]) {
+            case .fixed: confirmedSource = "fixed"
+            case .history: confirmedSource = "history"
+            case .dictionary: confirmedSource = "dict"
+            }
+        } else if row < candidateSession.fixedEnd {
             confirmedSource = "fixed"
         } else if row < candidateSession.historyEnd {
             confirmedSource = "history"

@@ -201,7 +201,10 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(payload.candidates.contains("あい"), "ひらがなが履歴候補として現れるはず")
-        XCTAssertEqual(payload.candidates[payload.initialRow], "あい", "履歴候補「あい」が初期選択")
+        guard let idx = payload.candidates.firstIndex(of: "あい") else {
+            XCTFail("履歴候補「あい」が載るはず"); return
+        }
+        XCTAssertEqual(payload.initialRow, idx, "履歴候補「あい」が初期選択")
     }
 
     func testKatakanaInHistoryAppearsAsHistoryCandidate() {
@@ -212,7 +215,10 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(payload.candidates.contains("アイ"), "カタカナが履歴候補として現れるはず")
-        XCTAssertEqual(payload.candidates[payload.initialRow], "アイ", "履歴候補「アイ」が初期選択")
+        guard let idx = payload.candidates.firstIndex(of: "アイ") else {
+            XCTFail("履歴候補「アイ」が載るはず"); return
+        }
+        XCTAssertEqual(payload.initialRow, idx, "履歴候補「アイ」が初期選択")
     }
 
     func testReturnCommitsVisuallySelectedCandidateWithoutExplicitNav() {
