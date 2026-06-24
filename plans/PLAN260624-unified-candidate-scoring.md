@@ -1,12 +1,14 @@
 ---
-status: draft
+status: implemented
 created: 2026-06-24
+related_commit: 729ca0e
 supersedes_triage:
   - PLAN260623-high-score-prefix-over-exact.md
-related_commit: eb90b5a
 ---
 
 # PLAN260624: 候補リストの統一スコアランキング
+
+> **実装ノート (2026-06-24)**: Phase 1〜3 すべて完了。コミットシリーズ `39ef182`（feat: unify ranking via score builder）→ `1954938`（hiraganaPreferred score 化）→ `3228ef7`（section builder 削除）→ `f49ab9d`（flatten global score order）→ `729ca0e`（drop historyEnd）。`HistoryPrefixPromotion` / `CandidateSectionBuilder` / `CandidateLayout` / `CandidateFixedSlot` は全削除。挙動の正本は `CandidateScoreBuilder` + `ScoredCandidate` のコードとテスト。下記「未決」項目の最終値はコード参照。
 
 ## 目的
 

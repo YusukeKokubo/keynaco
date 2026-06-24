@@ -1,10 +1,13 @@
 ---
-status: implemented
+status: superseded
 created: 2026-06-23
-related_commit:
+related_commit: eb90b5a
+superseded_by: PLAN260624-unified-candidate-scoring.md
 ---
 
 # PLAN260623: 高スコア前方一致履歴を完全一致より優先（打鍵中）
+
+> **NOTE (2026-06-24)**: 本 PLAN の `HistoryPrefixPromotion` / `prefixPromotedSectionOrder` / `promotedPrefixHistory` は 1 日後の [PLAN260624](PLAN260624-unified-candidate-scoring.md) 統一スコアランキング（コミット `39ef182`〜`729ca0e`）で削除済み。「高 score prefix が低 score exact より上」という挙動は score-based flatten で自然に維持されとる。以下「設計」セクションは現コードと一致しない。
 
 ## 目的
 
