@@ -78,7 +78,7 @@ public extension InputHandler {
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if !state.isComposing {
             bracketCandidates = options
-            return (true, .show(candidates: options, initialRow: 0, fixedEnd: 0))
+            return (true, .show(candidates: options, fixedEnd: 0))
         }
         flushPendingRomaji()
         state.composedHiragana += options[0]

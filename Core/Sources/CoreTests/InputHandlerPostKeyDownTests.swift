@@ -6,7 +6,7 @@ final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
 
     func testProductionOverloadAppliesCandidateActionWhenNotConsumed() {
         handler.candidateSession.apply(
-            .show(candidates: ["a", "b"], initialRow: 0, fixedEnd: 0)
+            .show(candidates: ["a", "b"], fixedEnd: 0)
         )
         var imkCache = handler.leftContextIMKCache
         handler.applyPostKeyDownCandidateAndIMK(
@@ -25,7 +25,7 @@ final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
 
     func testSandboxOverloadAlwaysAppliesCandidateAction() {
         handler.candidateSession.apply(
-            .show(candidates: ["a", "b"], initialRow: 0, fixedEnd: 0)
+            .show(candidates: ["a", "b"], fixedEnd: 0)
         )
         handler.applyPostKeyDownCandidateAndIMK(
             consumed: false,

@@ -293,7 +293,6 @@ extension InputHandler {
         #endif
         return .show(
             candidates: scoredLayout.candidates,
-            initialRow: 0,
             fixedEnd: scoredLayout.fixedEnd,
             azooKeyApiOrder: apiOrder,
             initialIsExplicitlySelected: trigger == .explicit,

@@ -16,7 +16,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
 
     private func assertLayout(
         _ action: CandidateAction,
-        candidates: [String], fixedEnd: Int, initialRow: Int,
+        candidates: [String], fixedEnd: Int,
         file: StaticString = #file, line: UInt = #line
     ) {
         guard let p = action.showPayload else {
@@ -24,7 +24,6 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         }
         XCTAssertEqual(p.candidates, candidates, "candidates", file: file, line: line)
         XCTAssertEqual(p.fixedEnd, fixedEnd, "fixedEnd", file: file, line: line)
-        XCTAssertEqual(p.initialRow, initialRow, "initialRow", file: file, line: line)
     }
 
     // MARK: - A: 基本ケース（固定セクションなし）
@@ -34,7 +33,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -44,7 +43,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛", "辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -58,7 +57,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛情", "愛媛", "愛知", "辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -71,7 +70,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -85,7 +84,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["愛", "辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -96,7 +95,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "辞書A", "辞書B"],
-                     fixedEnd: 1, initialRow: 0)
+                     fixedEnd: 1)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -106,7 +105,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("no")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "ノックアウト", "辞書A", "辞書B"],
-                     fixedEnd: 1, initialRow: 0)
+                     fixedEnd: 1)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -119,7 +118,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // 第一行の `の` は Shift+Delete 不可。
         assertLayout(handler.buildCandidateList(),
                      candidates: ["の", "辞書A", "辞書B"],
-                     fixedEnd: 1, initialRow: 0)
+                     fixedEnd: 1)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -129,7 +128,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("toka")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["とか", "UD戸籍", "辞書A", "辞書B"],
-                     fixedEnd: 1, initialRow: 0)
+                     fixedEnd: 1)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -144,7 +143,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         XCTAssertEqual(handler.state.composedHiragana, "とーたる")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -157,7 +156,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         type(chars: "r", base: "r"); type(chars: "u", base: "u")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["トータル", "辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -169,7 +168,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         XCTAssertEqual(handler.state.composedHiragana, "ねいてぃぶ")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -182,7 +181,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // ユーザー辞書 exact は履歴 exact と同等扱いで初期選択される。
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -194,7 +193,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // PLAN260624b/c: userDict exact が score 順で row 0
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "愛", "辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -204,7 +203,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "辞書B"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -217,7 +216,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         XCTAssertEqual(handler.state.composedHiragana, "1234")
         assertLayout(handler.buildCandidateList(),
                      candidates: ["1234", "１２３４", "1,234", "１，２３４"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -260,7 +259,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         typeRomaji("ai")
         assertLayout(handler.buildCandidateList(trigger: .whileTyping),
                      candidates: ["愛"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub, trigger: .whileTyping)
     }
 
@@ -278,7 +277,7 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         // PLAN260624b: userDict exact が score 順で履歴 exact より上
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "愛", "辞書A"],
-                     fixedEnd: 0, initialRow: 0)
+                     fixedEnd: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 }

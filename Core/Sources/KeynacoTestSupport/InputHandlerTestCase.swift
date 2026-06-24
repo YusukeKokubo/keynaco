@@ -197,7 +197,6 @@ class InputHandlerTestCase: XCTestCase {
         case let (.show(l), .show(r)):
             XCTAssertEqual(l.candidates, r.candidates, "candidates", file: file, line: line)
             XCTAssertEqual(l.fixedEnd, r.fixedEnd, "fixedEnd", file: file, line: line)
-            XCTAssertEqual(l.initialRow, r.initialRow, "initialRow", file: file, line: line)
             XCTAssertEqual(l.azooKeyApiOrder, r.azooKeyApiOrder, "azooKeyApiOrder", file: file, line: line)
             XCTAssertEqual(
                 l.initialIsExplicitlySelected,

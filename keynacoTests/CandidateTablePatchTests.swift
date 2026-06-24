@@ -49,7 +49,6 @@ final class CandidateTablePatchTests: XCTestCase {
         var session = CandidateSession()
         session.apply(.show(
             candidates: candidates,
-            initialRow: 0,
             fixedEnd: min(2, candidates.count)
         ))
         return CandidatePanelSnapshot(model: CandidatePanelModel(session: session))

@@ -30,7 +30,8 @@ public struct CandidateSession: Sendable, Equatable {
     /// 論理表示中（`NSWindow.isVisible` とは別。候補パネルを出すべき状態）。
     public var isVisible = false
     public var selectedRow = 0
-    /// `.show` 時に決定した初期選択行。ユーザーが ↑↓/Space で動かしても変わらない。
+    /// `.show` 時の初期選択行（常に 0）。ユーザーが ↑↓/Space で動かしても変わらない。
+    /// divergence ログで `selectedRow` との差分観測に使う。
     public var initialRow = 0
     public var isExplicitlySelected = false
     public var fixedEnd = 0
@@ -97,12 +98,11 @@ public struct CandidateSession: Sendable, Equatable {
         switch action {
         case .none:
             break
-        case .show(let cands, let initial, let fe, let apiOrder, let initialExplicit, let rowSources):
+        case .show(let cands, let fe, let apiOrder, let initialExplicit, let rowSources):
             candidates = cands
             isVisible = !cands.isEmpty
-            let clampedInitial = cands.isEmpty ? 0 : min(initial, cands.count - 1)
-            selectedRow = clampedInitial
-            initialRow = clampedInitial
+            selectedRow = 0
+            initialRow = 0
             fixedEnd = fe
             candidateSources = rowSources
             azooKeyApiOrder = apiOrder

@@ -6,17 +6,17 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
 
     private func showCandidates(
         _ candidates: [String],
-        initialRow: Int,
+        selectedRow: Int = 0,
         apiOrder: [String],
         isExplicit: Bool
     ) {
         handler.candidateSession.apply(.show(
             candidates: candidates,
-            initialRow: initialRow,
             fixedEnd: 0,
             azooKeyApiOrder: apiOrder,
             initialIsExplicitlySelected: isExplicit
         ))
+        handler.candidateSession.selectedRow = selectedRow
     }
 
     /// Z1（azooKeyApiOrder.first）と実確定が違うとき、pendingDivergenceRecord に 1 件残る。
@@ -24,7 +24,7 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
         typeRomaji("yabai")
         showCandidates(
             ["やばい", "ヤバイ", "ヤバい"],
-            initialRow: 1,
+            selectedRow: 1,
             apiOrder: ["やばい", "ヤバイ", "ヤバい"],
             isExplicit: true
         )
@@ -44,7 +44,6 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
         typeRomaji("yabai")
         showCandidates(
             ["やばい", "ヤバイ"],
-            initialRow: 0,
             apiOrder: ["やばい", "ヤバイ"],
             isExplicit: false
         )
@@ -123,7 +122,7 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
         typeRomaji("yabai")
         showCandidates(
             ["やばい", "ヤバイ"],
-            initialRow: 1,
+            selectedRow: 1,
             apiOrder: [],
             isExplicit: true
         )

@@ -89,7 +89,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertGreaterThan(payload.candidates.count, 2, "azooKey が候補を返すはず")
-        XCTAssertEqual(payload.initialRow, 0, "履歴/予測なしのとき initialRow はひらがな固定候補（0）")
+        XCTAssertEqual(handler.candidateSession.initialRow, 0)
     }
 
     func testInitialRowSkipsFixedCandidatesWhenHistoryExists() {
@@ -100,7 +100,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "愛", "スコア順先頭の履歴候補が初期選択")
     }
 
@@ -113,7 +112,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "の", "誤履歴があってもひらがな固定を初期選択")
     }
 
@@ -124,7 +122,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "の")
         if let katakanaIdx = payload.candidates.firstIndex(of: "ノ") {
             XCTAssertNotEqual(0, katakanaIdx, "ひらがな履歴時はカタカナ行を row 0 にしない")
@@ -138,7 +135,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "とか")
     }
 
@@ -149,7 +145,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "では")
     }
 
@@ -160,7 +155,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail(".show を返すはず"); return
         }
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "これ")
     }
 
@@ -189,7 +183,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
         XCTAssertEqual(payload.fixedEnd, 0)
         XCTAssertEqual(payload.candidates, ["今回のことは誤解である"])
-        XCTAssertEqual(payload.initialRow, 0)
     }
 
     func testHiraganaInHistoryAppearsAsHistoryCandidate() {
@@ -200,7 +193,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(payload.candidates.contains("あい"), "ひらがなが履歴候補として現れるはず")
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "あい", "スコア順先頭の履歴候補が初期選択")
     }
 
@@ -212,7 +204,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertTrue(payload.candidates.contains("アイ"), "カタカナが履歴候補として現れるはず")
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "アイ", "スコア順先頭の履歴候補が初期選択")
     }
 
@@ -554,7 +545,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail("candidates should be shown: \(action)"); return
         }
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(
             payload.candidates[0], "用",
             "「よう→用」が最高スコアの完全一致なので初期選択は「用」のはず。"
@@ -585,7 +575,6 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail("both should appear: \(payload.candidates)"); return
         }
         XCTAssertLessThan(idxShared, idxUe, "情報共有 should precede 上: \(payload.candidates)")
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(payload.candidates[0], "情報共有",
                        "row 0 should be highest-score prefix history: \(payload.candidates)")
     }

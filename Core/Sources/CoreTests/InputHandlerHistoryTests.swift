@@ -446,7 +446,6 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         }
         // PLAN260624b: explicit/whileTyping どちらも score 順先頭。
         // prefix 履歴の score が AzooKey rank 0 より高ければ履歴側にフォーカス。
-        XCTAssertEqual(payload.initialRow, 0)
         XCTAssertEqual(
             payload.candidates[0],
             "打鍵数削減",

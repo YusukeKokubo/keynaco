@@ -5,7 +5,6 @@ public enum CandidateAction: Sendable {
     case none
     case show(
         candidates: [String],
-        initialRow: Int,
         fixedEnd: Int,
         /// AzooKey API が返した順序（LCID ソート前）。Zenzai 有効 + 左文脈ありのときのみ非空。
         azooKeyApiOrder: [String] = [],
@@ -22,14 +21,13 @@ extension CandidateAction {
     /// `.show` の連想値。それ以外は `nil`。
     var showPayload: (
         candidates: [String],
-        initialRow: Int,
         fixedEnd: Int,
         azooKeyApiOrder: [String],
         initialIsExplicitlySelected: Bool,
         candidateSources: [ScoredCandidate.Source]
     )? {
-        if case .show(let candidates, let initialRow, let fixedEnd, let apiOrder, let initialExplicit, let sources) = self {
-            return (candidates, initialRow, fixedEnd, apiOrder, initialExplicit, sources)
+        if case .show(let candidates, let fixedEnd, let apiOrder, let initialExplicit, let sources) = self {
+            return (candidates, fixedEnd, apiOrder, initialExplicit, sources)
         }
         return nil
     }
