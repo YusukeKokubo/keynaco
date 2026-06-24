@@ -116,7 +116,7 @@ memory・ドキュメントに書かれた識別子（関数名・フラグ名�
 
 ## 候補リストの振る舞いはユニットテストを正本にし、sandbox は手順付きで補助する
 
-`CandidateSectionBuilder`・履歴枠・辞書重複排除のような**リスト組み立て**の変更は、まず `CandidateSectionBuilderTests`（stub 入力）で再現ケースを書く。sandbox は E2E の補助で、`seed_history` → 変換 → `candidateEntries.section` の確認に使う。
+`CandidateSectionBuilder`（PLAN260624 で `CandidateScoreBuilder` に置換済）・履歴枠・辞書重複排除のような**リスト組み立て**の変更は、まず builder の単体テスト（stub 入力）で再現ケースを書く。sandbox は E2E の補助で、`seed_history` → 変換 → `candidateEntries.section` の確認に使う。
 
 **なぜ**: リスト組み立ては純粋関数に近く、ユニットテストが速くて決定的。sandbox は AzooKey 実辞書・非同期 prefetch・Zenzai に依存し、手順を誤ると「実装バグ」に見える嘘（辞書候補が 2 件だけ等）を返す。正本と補助の役割を分けないと、修正が正しくても sandbox だけ失敗し続ける。
 
@@ -138,7 +138,7 @@ memory・ドキュメントに書かれた識別子（関数名・フラグ名�
 
 「実機の振る舞いとコード読みが乖離する」とき、AzooKey のような提供側ライブラリの内部を読む前に、**呼び出し側の最外側 post-processing を一行 bypass** して提供側の生戻り値を観測する。filter・ソート・並び替え・プロモート系の post-process は keynaco 側にいくつも積み上がっており、どの段でズレてるかを直接見るのが一番速い。
 
-**なぜ**: keynaco 側で何段もの post-process（`filterCandidatesForDisplay` → `sortAzooKeyCandidates` 等→ `CandidateSectionBuilder` → `InitialRowPolicyResolver` …）が AzooKey の戻り値を変形している。「AzooKey が悪いか keynaco が悪いか」は、内部読みより **最外側を一個ずつ無効化して観測**する方が決定的。Zenzai モデル / 文脈 / ライブラリ revision の比較は数十分かかるが、一行 `return candidates.map { ... }` は数分。試す順序を逆にすると無駄が積み上がる。
+**なぜ**: keynaco 側で何段もの post-process（`filterCandidatesForDisplay` → `sortAzooKeyCandidates` 等→ `CandidateSectionBuilder` → `InitialRowPolicyResolver` …。`CandidateSectionBuilder` は PLAN260624 で `CandidateScoreBuilder` + `CandidateScoredLayout` に置換済）が AzooKey の戻り値を変形している。「AzooKey が悪いか keynaco が悪いか」は、内部読みより **最外側を一個ずつ無効化して観測**する方が決定的。Zenzai モデル / 文脈 / ライブラリ revision の比較は数十分かかるが、一行 `return candidates.map { ... }` は数分。試す順序を逆にすると無駄が積み上がる。
 
 *由来: 長文ひらがなでカタカナが Z1 になる問題で、v3.1 ↔ v3.2 モデル比較・leftSideContext 比較・Zenzai OFF と段階的に切り分けて「AzooKey ライブラリ起因」と確定しかけたが、ユーザーから「これは AzooKey のランク問題ではなく keynaco 側の後処理の問題だということ？」と指摘されて `filterCandidatesForDisplay` を一行 bypass。生 AzooKey 順では「確認が必要ですね」が Z1、カタカナは下位だと判明し、`eb5e31b` の exact プロモートが真因と一発確定（`5b192e5`/`ea50b1a`）*
 
@@ -190,7 +190,7 @@ memory・ドキュメントに書かれた識別子（関数名・フラグ名�
 
 **なぜ**: フォールバック撤廃の判断は「フォールバックが消えても OK」を確認する。だが「フォールバックと同じ条件分岐に依存しとった別経路」までは撤廃の判断対象に入ってない。ユニットテストは個別経路を独立に検証することが多く、「同じ if 文の枝に複数経路が乗っている」状態は捕まえにくい——独立に書いたテストは個別に通っても、本番で同時実行されると意図しない経路が dismiss に流れる。境界の確認は実機が一番速い。
 
-*由来: `addsDefaultFixedHiragana` 撤廃（`7986157`）で `whileTyping` の早期 dismiss 条件を追加したとき、最初 `fixedSlot == .none` のガードを忘れた。ユニットテスト全緑だったが、実機 sandbox で `no`/`wo`/`toka` を打つと、hiraganaPreferred 経路（`の`/`を`/`とか` は builtin で明示的にひらがな優先）まで dismiss されて Enter で `の` が確定できなくなっとった。修正で `fixedSlot == .none` を dismiss 条件に追加し回復。同じ if 文の中に「フォールバック撤廃で消したい経路」と「明示意図で残したい経路」が同居しとった*
+*由来: `addsDefaultFixedHiragana` 撤廃（`7986157`）で `whileTyping` の早期 dismiss 条件を追加したとき、最初 `fixedSlot == .none` のガードを忘れた。ユニットテスト全緑だったが、実機 sandbox で `no`/`wo`/`toka` を打つと、hiraganaPreferred 経路（`の`/`を`/`とか` は builtin で明示的にひらがな優先）まで dismiss されて Enter で `の` が確定できなくなっとった。修正で `fixedSlot == .none` を dismiss 条件に追加し回復。同じ if 文の中に「フォールバック撤廃で消したい経路」と「明示意図で残したい経路」が同居しとった*（注: `fixedSlot` は PLAN260624 で削除済。現コードでは `hiraganaBonusKind` がひらがな優先のスコア加算を担う）
 
 ---
 
