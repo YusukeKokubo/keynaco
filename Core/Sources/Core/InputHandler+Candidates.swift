@@ -342,7 +342,6 @@ extension InputHandler {
             userDictExact: sources.userDictExact,
             azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8)),
             azooKeyApiOrder: Array(sources.azooKeyApiOrder.prefix(8)),
-            initialRow: 0,
             initialText: initialText,
             fixedEnd: scoredLayout?.fixedEnd ?? 0,
             scoredSources: scored.prefix(8).map { CandidateBuildDiagnosticsSupport.scoredSourceLabel($0) },

@@ -21,7 +21,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
     public var azooKeyCandidates: [String]
     public var azooKeyApiOrder: [String]
 
-    public var initialRow: Int
     public var initialText: String?
     public var fixedEnd: Int
     /// `"historyPrefix:情報共有(93.00)"` 形式のスコア付き source 要約。
@@ -37,7 +36,7 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             let hist = historyEntries.first?.output ?? "-"
             let azoo = azooKeyCandidates.first ?? "-"
             let pref = hiraganaPreferred || hiraganaBuiltin ? 1 : 0
-            return " init:[\(initialRow)]\(initText) hist1:\(hist) azoo1:\(azoo) hirPref:\(pref)"
+            return " init:[0]\(initText) hist1:\(hist) azoo1:\(azoo) hirPref:\(pref)"
         case .dismissedEmpty:
             return " init:dismiss(empty)"
         case .dismissedFunctionalWord:
@@ -62,7 +61,7 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             "userDictExact": userDictExact,
             "azooKeyCandidates": azooKeyCandidates,
             "azooKeyApiOrder": azooKeyApiOrder,
-            "initialRow": initialRow,
+            "initialRow": 0,
             "fixedEnd": fixedEnd,
             "scoredSources": scoredSources,
             "deferAzooKeyWhileTyping": deferAzooKeyWhileTyping,

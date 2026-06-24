@@ -334,7 +334,7 @@ public struct InputHandler {
             candidates: candidatesTop,
             leftContext: leftContext.azooKeyValue,
             confirmedSource: confirmedSource,
-            initialRow: candidateSession.initialRow,
+            initialRow: 0,
             initialRowReason: lastInitialRowReason.rawValue,
             scoredSources: scoredSources
         )

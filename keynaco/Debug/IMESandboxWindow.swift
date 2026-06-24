@@ -824,10 +824,9 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             lines.append("userDictExact            : \(build.userDictExact)")
             lines.append("azooKeyCandidates        : \(build.azooKeyCandidates)")
             lines.append("azooKeyApiOrder          : \(build.azooKeyApiOrder)")
-            lines.append("initialRow               : \(build.initialRow)")
             lines.append("initialText              : \(build.initialText ?? "(nil)")")
-            if s.candidateVisible, build.initialRow != s.selectedRow {
-                lines.append("selectedRow≠initialRow   : \(s.selectedRow) (ユーザー操作または再構築後)")
+            if s.candidateVisible, s.selectedRow != 0 {
+                lines.append("selectedRow≠0            : \(s.selectedRow) (ユーザー操作または再構築後)")
             }
             lines.append("deferAzooKeyWhileTyping  : \(build.deferAzooKeyWhileTyping)")
             lines.append("scoredSources            :")

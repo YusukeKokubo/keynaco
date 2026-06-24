@@ -8,7 +8,6 @@ final class CandidateSessionTests: XCTestCase {
         s.apply(.show(candidates: ["a", "b"], fixedEnd: 0))
         XCTAssertTrue(s.isVisible)
         XCTAssertEqual(s.selectedRow, 0)
-        XCTAssertEqual(s.initialRow, 0)
         XCTAssertEqual(s.selectedText, "a")
         s.apply(.dismiss)
         XCTAssertFalse(s.isVisible)

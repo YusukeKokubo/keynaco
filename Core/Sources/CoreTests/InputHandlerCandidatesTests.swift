@@ -89,7 +89,7 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
             XCTFail(".show を返すはず"); return
         }
         XCTAssertGreaterThan(payload.candidates.count, 2, "azooKey が候補を返すはず")
-        XCTAssertEqual(handler.candidateSession.initialRow, 0)
+        XCTAssertEqual(handler.candidateSession.selectedRow, 0)
     }
 
     func testInitialRowSkipsFixedCandidatesWhenHistoryExists() {

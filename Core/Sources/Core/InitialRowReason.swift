@@ -1,6 +1,6 @@
 import Foundation
 
-/// `assembleCandidateList` で row 0 を選んだ理由。`divergence_log.jsonl` の
+/// row 0（スコア降順先頭）を選んだ理由。`divergence_log.jsonl` の
 /// `initial_row_reason` フィールドに `rawValue` が書き出される（wire format は String）。
 ///
 /// 実コードが emit する集合はこの enum に閉じる。新しい理由を増やすときは
