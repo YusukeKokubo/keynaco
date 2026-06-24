@@ -15,18 +15,6 @@ extension InputHandler {
         buildCandidateListInternal(forReading: nil, trigger: trigger)
     }
 
-    /// AzooKey 非同期取得待ちの仮候補（かなのみ・履歴/辞書セクションなし）か。
-    /// Phase 3.5 で打鍵中に出すプレースホルダ。Space が `.selectNext` になると辞書に届かないため明示変換へ昇格する。
-    func isAzooKeyPendingKanaPlaceholder(_ candidate: CandidateContext) -> Bool {
-        guard deferAzooKeyWhileTyping,
-              candidate.isVisible,
-              !candidate.isExplicitlySelected,
-              candidate.candidateSources.contains(where: CandidateScoreBuilder.isHistorySource) else { return false }
-        let cands = candidateSession.candidates
-        guard !cands.isEmpty else { return false }
-        return !cands.contains(where: KanaUtils.containsCJKIdeograph)
-    }
-
     /// `deferAzooKeyWhileTyping` が有効な `.whileTyping` だけ AzooKey を遅延し `pendingAzooKeyReading` をセットする。
     mutating func buildCandidateListForTrigger(_ trigger: CandidateListTrigger) -> CandidateAction {
         if trigger == .whileTyping, deferAzooKeyWhileTyping {

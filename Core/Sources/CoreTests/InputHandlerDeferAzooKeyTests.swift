@@ -58,7 +58,7 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
         XCTAssertEqual(stub.lastRichCandidates, true)
     }
 
-    /// 打鍵中のかなプレースホルダ表示中に Space を押したら明示変換（辞書取得）へ昇格する。
+    /// 完全一致キャッシュヒット時は pending を立てず辞書候補を即表示する。
     func testDefer_exactCacheHitSkipsPendingAndShowsDictionary() {
         let stub = CachePeekStub()
         setUpWithConverter(stub)
@@ -102,6 +102,29 @@ final class InputHandlerDeferAzooKeyTests: InputHandlerTestCase {
         XCTAssertTrue(show.candidates.contains("低頻度"),
                       "Space should fetch dictionary explicitly: \(show.candidates)")
         XCTAssertTrue(show.initialIsExplicitlySelected)
+    }
+
+    /// AzooKey 未取得で履歴だけ（かなのみ）表示中の passive Space も explicit リビルドへ昇格する。
+    func testDefer_spaceOnHistoryOnlyKanaPlaceholderRebuildsExplicit() {
+        let stub = SnapStub(["愛", "合い"])
+        setUpWithConverter(stub)
+        handler.deferAzooKeyWhileTyping = true
+        handler.db.record(input: "あい", output: "アイ")
+        typeRomaji("ai")
+        applyCandidateAction(handler.buildCandidateListWithoutAzooKey(trigger: .whileTyping).action)
+        XCTAssertFalse(handler.candidateSession.isExplicitlySelected)
+        XCTAssertEqual(handler.candidateSession.candidates, ["アイ"])
+        XCTAssertFalse(handler.candidateSession.candidates.contains(where: KanaUtils.containsCJKIdeograph))
+        let ctx = handler.candidateSession.makeContext()
+        let (_, action) = handleAndApply(
+            keyCode: KeyCode.space, characters: " ", baseCharacters: " ", candidate: ctx
+        )
+        guard case .show(let show) = action else {
+            return XCTFail("expected .show from explicit space, got \(action)")
+        }
+        XCTAssertTrue(show.initialIsExplicitlySelected)
+        XCTAssertTrue(show.candidates.contains("愛"),
+                      "explicit リビルドで辞書候補が載るはず: \(show.candidates)")
     }
 }
 
