@@ -1,6 +1,7 @@
 ---
-status: in-progress
+status: implemented
 created: 2026-06-24
+related_commit: 63272a3
 ---
 
 # PLAN260624c: `isHiraganaPref` の `firstMatching` 分岐削除
