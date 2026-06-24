@@ -85,4 +85,72 @@ final class ResolverEquivalenceTests: XCTestCase {
         )
         XCTAssertEqual(top, "これで")
     }
+
+    /// PLAN260624c: hiraganaPreferred (userSetting) で reading 行が必ず score 上 row 0
+    func testUserSettingHiraganaBonusKeepsReadingAtRow0() {
+        let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "ない",
+            hiraganaBonus: .userSetting,
+            exactMatchHighHistory: ["内"],
+            highHistory: [],
+            exactMatchScores: ["内": 8.0],
+            prefixHistoryScores: [:],
+            userDictExact: [],
+            userDictPrefix: [],
+            azooKeyCandidates: ["無い", "ナイ"],
+            azooKeyApiOrder: [],
+            numberCandidates: [],
+            dateTimeCandidates: []
+        ))
+        let top = CandidateScoredLayout
+            .assemble(CandidateScoredLayout.Input(scored: scored))
+            .candidates.first
+        XCTAssertEqual(top, "ない", "userSetting bonus(100) が history(<= 10.001) を上回り row 0")
+    }
+
+    /// PLAN260624c (rejected.md R-2): builtin reading に対する高 SUM の prefix history は
+    /// builtin bonus(80) を超え、scoreBuilder 単体では reading 行が row 0 から外れる。
+    /// このため `if isHiraganaPref { firstMatching }` 分岐が必要 — `initialRow = 0` 一行化は不可。
+    func testBuiltinReadingLosesRow0WhenPrefixHistoryDominates() {
+        let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "は",
+            hiraganaBonus: .builtin,
+            exactMatchHighHistory: [],
+            highHistory: ["話"],
+            exactMatchScores: [:],
+            prefixHistoryScores: ["話": 138.7],
+            userDictExact: [],
+            userDictPrefix: [],
+            azooKeyCandidates: ["は", "歯"],
+            azooKeyApiOrder: [],
+            numberCandidates: [],
+            dateTimeCandidates: []
+        ))
+        let top = CandidateScoredLayout
+            .assemble(CandidateScoredLayout.Input(scored: scored))
+            .candidates.first
+        XCTAssertEqual(top, "話", "prefix history(138.7) が builtin bonus(80) を上回り score 上は row 0 = 話")
+    }
+
+    /// PLAN260624c: hiraganaPreferred (builtin) で reading 行が score 上 row 0
+    func testBuiltinHiraganaBonusKeepsReadingAtRow0() {
+        let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "て",
+            hiraganaBonus: .builtin,
+            exactMatchHighHistory: ["手"],
+            highHistory: [],
+            exactMatchScores: ["手": 3.5],
+            prefixHistoryScores: [:],
+            userDictExact: [],
+            userDictPrefix: [],
+            azooKeyCandidates: ["手", "出"],
+            azooKeyApiOrder: [],
+            numberCandidates: [],
+            dateTimeCandidates: []
+        ))
+        let top = CandidateScoredLayout
+            .assemble(CandidateScoredLayout.Input(scored: scored))
+            .candidates.first
+        XCTAssertEqual(top, "て", "builtin bonus(80) が history(<= 10.001) を上回り row 0")
+    }
 }

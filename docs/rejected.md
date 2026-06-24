@@ -77,6 +77,33 @@ Zenzai 順序:                          表示順（lcid ソート後）:
 
 ---
 
+## R-2 `isHiraganaPref` の `firstMatching` 分岐削除（2026-06-24 不採用）
+
+**概要**: PLAN260624 系の仕様シンプル化路線で、`InputHandler+Candidates.swift` の hiraganaPreferred 用初期行決定分岐を削除し、`initialRow = 0` の一行に純化する案。実 DB の history exact score 分布を見て「最大 7.9 << builtin bonus 80」と判断し、安全と仮定して着手した（PLAN260624c）。
+
+**検証で何が起こったか**: 実機 sandbox で `は`・`と`・`で`・`か` の 1 文字 reading + Space を打つと、reading 行ではなく長い prefix history が selectedRow に来た:
+
+| 入力 | 旧仕様 (firstMatching) | 新仕様 (initialRow = 0) |
+|------|---------------------|---------------------|
+| `は` | row 1 = `は` | row 0 = `話` (prefix score 138) |
+| `と` | row 3 = `と` | row 0 = `取引先` (prefix score 321) |
+| `で` | row 2 = `で` | row 0 = `できる` |
+| `か` | row 4 = `か` | row 0 = `確認して` (prefix score 234) |
+
+**不採用の理由**:
+
+- **prefix history の SUM スコアを見落とした**: 実 DB の history exact は max 7.9 だが、`LIKE 'は%'` で得られる prefix history は `はなし`→`話` などの SUM 集計で 100〜300+ に達する。`historyDisplayScore` 経由ではなく素のスコアでも `hiraganaBuiltinBonus = 80` を上回る
+- **Space 1 打で助詞を入れる意図と衝突**: `docs/concept.md` 指針 1（機能語サジェスト UI 非表示）と一貫しない。短い reading で頻繁に Enter する助詞ユーザーには毎回矢印キーで戻す手間が発生
+- **シンプル化で得るものより失う体感が大きい**: コード差し引きは 4 行のみ、得る抽象化は「仕様一文化」のみ。失うのは「Space 1 打で助詞」という日常操作の一貫性
+
+**残すもの**: `if isHiraganaPref { firstMatching(h) }` 分岐は維持。reading が `hiraganaPreferredSet` か `HiraganaPreferredBuiltins.words` に含まれるとき、reading 行を明示的に初期選択する。
+
+**学び**: 仕様シンプル化判断で実 DB を見るときは exact 単独でなく **prefix history の SUM スコアも測る**。sandbox で実機の `selectedRow` 挙動を確認するまで「リスク無し」と判断しない。
+
+> 関連: [PLAN260624c-drop-hiragana-firstmatching.md](../plans/PLAN260624c-drop-hiragana-firstmatching.md) abandoned、`InputHandler+Candidates.swift` `isHiraganaPref` 分岐
+
+---
+
 ## R-1 `hiddenPendingN`（`nn` 後の非表示 pending n）（2026-06-16 削除）
 
 **概要**: `"nn"` → `ん` のあと、2 つ目の `n` を非表示の pending として残し、続く母音・`y`・`n` と組み合わせてナ行・拗音を作る実装。`CompositionState.hiddenPendingN` フラグで `composingText`・確定・Backspace・Enter 時 trailing romaji 判定を横断管理していた（2026-05 頃導入。当時「標準 IME 準拠」と称した）。
