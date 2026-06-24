@@ -1,6 +1,7 @@
 ---
-status: in-progress
+status: implemented
 created: 2026-06-24
+related_commit: 9e9c179
 ---
 
 # PLAN260624b: `InitialRowPolicyResolver` の `.explicit` 経路整理
