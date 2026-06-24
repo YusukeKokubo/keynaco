@@ -48,7 +48,7 @@ MARKED_TEXT_SUITE: dict = {
                 {"wait_azoo_key": True},
                 {"key": "space"},
             ],
-            "assert": {"candidateVisible": True, "markedText": "感じ", "selectedText": "感じ"},
+            "assert": {"candidateVisible": True, "markedText": "漢字", "selectedText": "漢字"},
         },
         {
             "name": "down-syncs-selected-while-composing",
@@ -58,15 +58,14 @@ MARKED_TEXT_SUITE: dict = {
                 {"key": "space"},
                 {"key": "down"},
             ],
-            "assert": {"markedText": "漢字", "selectedText": "漢字", "isExplicitlySelected": True},
+            "assert": {"markedText": "幹事", "selectedText": "幹事", "isExplicitlySelected": True},
         },
         {
-            "name": "kanzi-space-down-enter-kanji",
+            "name": "kanzi-space-enter-kanji",
             "cmds": [
                 {"type_string": "kanzi"},
                 {"wait_azoo_key": True},
                 {"key": "space"},
-                {"key": "down"},
                 {"key": "enter"},
             ],
             "assert_contains": {"inserted": "漢字"},
@@ -157,20 +156,22 @@ def run_integrity_checks(sock: socket.socket, buf: bytearray) -> int:
 
     send(sock, buf, {"type_string": "kanzi"})
     send(sock, buf, {"wait_azoo_key": True})
-    r_type = send(sock, buf, {"state": True})
-    cands_before = list(r_type.get("candidates", []))
+    r_passive = send(sock, buf, {"state": True})
     r_space = send(sock, buf, {"key": "space"})
+    cands_before = list(r_passive.get("candidates", []))
     cands_after = list(r_space.get("candidates", []))
     if cands_before != cands_after:
         failures.append(
-            f"space-rebuild: candidates changed\n  before={cands_before[:5]}\n  after={cands_after[:5]}"
+            f"passive-to-explicit-space: candidates changed\n  before={cands_before[:5]}\n  after={cands_after[:5]}"
         )
-    if err := assert_marked_equals_selected(r_space, "after-space"):
-        failures.append(err)
-    if r_space.get("selectedRow", 0) <= r_type.get("selectedRow", 0):
+    if not r_space.get("isExplicitlySelected"):
+        failures.append("passive-to-explicit-space: expected isExplicitlySelected=true after Space")
+    if r_space.get("selectedRow", 0) != 0:
         failures.append(
-            f"space-advance: expected row increase, got {r_type.get('selectedRow')} -> {r_space.get('selectedRow')}"
+            f"passive-to-explicit-space: expected explicit rebuild at row 0, got row {r_space.get('selectedRow')}"
         )
+    if err := assert_marked_equals_selected(r_space, "after-passive-space"):
+        failures.append(err)
 
     send(sock, buf, {"reset": True})
     send(sock, buf, {"seed_history": {"input": "じっそう", "output": "実装", "times": 5}})
@@ -198,7 +199,7 @@ def run_integrity_checks(sock: socket.socket, buf: bytearray) -> int:
     for msg in failures:
         print(f"  FAIL  {msg}")
     if not failures:
-        print("  PASS  integrity checks (space list + shift-delete marked)")
+        print("  PASS  integrity checks (passive→explicit Space + shift-delete marked)")
     return len(failures)
 
 
@@ -216,7 +217,7 @@ def print_results(suite: dict) -> int:
             failed += 1
             for line in scenario.get("compactFailures", []):
                 print(f"       {line}")
-            state = scenario.get("lastState") or {}
+            state = scenario.get("lastState") or scenario.get("last") or {}
             print(
                 f"       markedText={state.get('markedText')!r} "
                 f"selectedText={state.get('selectedText')!r}"

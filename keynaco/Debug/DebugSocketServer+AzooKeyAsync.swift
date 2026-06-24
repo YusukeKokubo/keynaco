@@ -61,7 +61,7 @@ extension DebugSocketServer {
             trigger: .whileTyping
         )
         if case .none = action { return }
-        handler.candidateSession.apply(action)
+        handler.applyCandidateAction(action, client: mockClient)
     }
 
     func handleWaitAzooKeyAsync(cmd: [String: Any]) async -> [String: Any] {
