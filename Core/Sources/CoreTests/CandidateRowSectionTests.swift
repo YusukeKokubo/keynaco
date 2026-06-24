@@ -9,13 +9,13 @@ final class CandidateRowSectionTests: XCTestCase {
         XCTAssertEqual(CandidateRowMetadata.section(for: .azooKey(rank: 0)), .dictionary)
     }
 
-    func testLegacyFixedEndContiguousPrefix() {
+    func testFixedEndContiguousPrefix() {
         let sources: [ScoredCandidate.Source] = [
             .hiraganaBuiltin,
             .historyPrefix,
             .azooKey(rank: 0),
         ]
-        XCTAssertEqual(CandidateRowMetadata.legacyFixedEnd(sources: sources), 1)
+        XCTAssertEqual(CandidateRowMetadata.fixedEnd(sources: sources), 1)
     }
 
     func testHistoryDeleteUsesSourceNotContiguousIndex() {

@@ -52,7 +52,7 @@ public enum CandidateRowMetadata {
     }
 
     /// 先頭から連続する hiragana preferred 行数（Zenzai 診断用）。
-    public static func legacyFixedEnd(
+    public static func fixedEnd(
         sources: [ScoredCandidate.Source]
     ) -> Int {
         var fixedEnd = 0

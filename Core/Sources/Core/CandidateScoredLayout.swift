@@ -28,7 +28,7 @@ enum CandidateScoredLayout {
         return Result(
             candidates: candidates,
             sources: sources,
-            fixedEnd: CandidateRowMetadata.legacyFixedEnd(sources: sources)
+            fixedEnd: CandidateRowMetadata.fixedEnd(sources: sources)
         )
     }
 }
