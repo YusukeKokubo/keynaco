@@ -175,7 +175,6 @@ extension InputHandler {
             historyOutputSet.insert(row.output)
             guard row.score >= Self.historyRecencyScoreCutoff,
                   !exactMatchHistoryOutputs.contains(row.output),
-                  highHistory.count < Self.maxHighHistoryCount,
                   seenOther.insert(row.output).inserted else { continue }
             prefixHistoryScores[row.output] = row.score
             highHistory.append(row.output)
@@ -233,8 +232,6 @@ extension InputHandler {
 
     /// これ未満の履歴スコアは候補に載せない（DB の `recencyExpr` と同じ尺度）。
     private static let historyRecencyScoreCutoff = 0.5
-    /// 候補ヘッドの過剰膨張を抑える前方一致履歴の上限件数。
-    private static let maxHighHistoryCount = 3
 
     private func hiraganaBonusKind(for reading: String) -> CandidateScoreBuilder.HiraganaBonusKind? {
         if hiraganaPreferredSet.contains(reading) { return .userSetting }
