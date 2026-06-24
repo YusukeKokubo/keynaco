@@ -12,7 +12,7 @@ extension InputHandler {
 
     /// - Parameter trigger: `.whileTyping` は打鍵中のサジェスト、`.explicit` は Space（未表示時）等。
     mutating func buildCandidateList(trigger: CandidateListTrigger = .explicit) -> CandidateAction {
-        buildCandidateListInternal(forReading: nil, trigger: trigger)
+        assembleCandidateList(from: collectCandidateSources(trigger: trigger), trigger: trigger)
     }
 
     /// `deferAzooKeyWhileTyping` が有効な `.whileTyping` だけ AzooKey を遅延し `pendingAzooKeyReading` をセットする。
@@ -41,9 +41,12 @@ extension InputHandler {
             : nil
         let peekRaw = peek?.candidates ?? []
         let pendingReading: String? = needsAzooKey && peek?.needsAsyncFetch != false ? h : nil
-        let sources = collectLocalCandidateSources(reading: h)
-            .withAzooKey(candidates: peekRaw.texts, apiOrder: peekRaw.texts)
-        let action = assembleCandidateList(from: sources, trigger: trigger)
+        let action = assembleFromSources(
+            reading: h,
+            azooKeyCandidates: peekRaw.texts,
+            azooKeyApiOrder: peekRaw.texts,
+            trigger: trigger
+        )
         return (action, pendingReading)
     }
 
@@ -57,24 +60,24 @@ extension InputHandler {
         trigger: CandidateListTrigger = .whileTyping
     ) -> CandidateAction {
         guard state.composedHiragana == reading else { return .none }
-        let sources = collectLocalCandidateSources(reading: reading)
-            .withAzooKey(
-                candidates: azooKeyCandidates.texts,
-                apiOrder: azooKeyCandidates.texts
-            )
-        let action = assembleCandidateList(from: sources, trigger: trigger)
+        let action = assembleFromSources(
+            reading: reading,
+            azooKeyCandidates: azooKeyCandidates.texts,
+            azooKeyApiOrder: azooKeyCandidates.texts,
+            trigger: trigger
+        )
         clearPendingAzooKeyReading()
         return action
     }
 
-    private mutating func buildCandidateListInternal(
-        forReading reading: String?,
+    private mutating func assembleFromSources(
+        reading: String,
+        azooKeyCandidates: [String],
+        azooKeyApiOrder: [String],
         trigger: CandidateListTrigger
     ) -> CandidateAction {
-        let sources = collectCandidateSources(
-            trigger: trigger,
-            readingOverride: reading
-        )
+        let sources = collectLocalCandidateSources(reading: reading)
+            .withAzooKey(candidates: azooKeyCandidates, apiOrder: azooKeyApiOrder)
         return assembleCandidateList(from: sources, trigger: trigger)
     }
 
@@ -105,10 +108,9 @@ extension InputHandler {
     }
 
     private mutating func collectCandidateSources(
-        trigger: CandidateListTrigger,
-        readingOverride: String? = nil
+        trigger: CandidateListTrigger
     ) -> CandidateListSources {
-        let h = readingOverride ?? state.composedHiragana
+        let h = state.composedHiragana
         let azooKeyCandidates = fetchAzooKeyCandidates(reading: h, trigger: trigger)
         return collectLocalCandidateSources(reading: h)
             .withAzooKey(candidates: azooKeyCandidates, apiOrder: azooKeyCandidates)

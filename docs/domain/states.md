@@ -9,7 +9,8 @@
 | **ASCII** | `isAsciiMode = true` |
 | **待機** | `isAsciiMode = false`、組成空、特殊モードなし |
 | **組成中** | `composedHiragana` または `pendingRomaji` が非空 |
-| **候補選択中** | 組成中 + `isExplicitlySelected = true`（↑↓ 操作済み）|
+| **候補サジェスト中** | 組成中 + 候補窓表示 + `isExplicitlySelected = false`（`.passive`） |
+| **候補選択中** | 組成中 + `isExplicitlySelected = true`（`.explicit`。↑↓ / Tab / Space リビルド後）|
 | **括弧モード** | `CandidateSession.bracketCandidates != nil`（`InputHandler.candidateSession`。組成空で `[`/`(`/`!`/`?`/`/`/`.`/`,` 等の記号キーを入力） |
 
 ## 状態遷移図
@@ -27,10 +28,15 @@ stateDiagram-v2
     組成中 --> 待機 : Escape（クリア）
     組成中 --> ASCII : 英数キー（確定してから遷移）
 
-    組成中 --> 候補選択中 : ↑↓ キー
+    組成中 --> 候補サジェスト中 : 打鍵中サジェスト（`.whileTyping`）
+    候補サジェスト中 --> 候補サジェスト中 : 打鍵継続
+    候補サジェスト中 --> 候補選択中 : Space / ↑↓（explicit 開始）
+    候補サジェスト中 --> 待機 : Enter / Escape
+
+    組成中 --> 候補選択中 : Space（候補非表示時）/ ↑↓
     候補選択中 --> 候補選択中 : ↑↓ キー（移動）
     候補選択中 --> 待機 : Enter（選択候補を確定）
-    候補選択中 --> 候補選択中 : Space（次候補）
+    候補選択中 --> 候補選択中 : Space（次候補。`isExplicitlySelected=true` のみ）
     候補選択中 --> 待機 : →（組成テキストをひらがなのまま確定）
     候補選択中 --> 待機 : Escape（クリア）
 
@@ -39,9 +45,9 @@ stateDiagram-v2
     括弧モード --> 待機 : Enter（選択候補を確定）
     括弧モード --> 待機 : Escape / Backspace（キャンセル）
     括弧モード --> 組成中 : その他キー（選択候補を確定してから通常入力）
-
-    組成中 --> 候補選択中 : Space（候補窓表示 / 次候補）
 ```
+
+**Space の補足**: 候補窓表示中でも `isExplicitlySelected=false`（`.passive`）なら Space は次候補ではなく explicit リビルド。↑↓ / Tab で explicit 移行後の Space のみ次候補。
 
 ## キー処理パイプライン（候補・marked text）
 
@@ -82,7 +88,7 @@ flowchart LR
 | `.passive` | true | false | 通常入力（サジェスト表示のみ） |
 | `.explicit` | true | true | 先に選択候補を確定してから入力 |
 
-`.passive` に遷移するのは `.whileTyping` トリガーの `buildCandidateList` 経由のみ。Space（候補非表示時）・↑↓ は `.explicit` で開始する。
+`.passive` に遷移するのは `.whileTyping` トリガーの `buildCandidateList` 経由のみ。Space（候補非表示時）・↑↓ は `.explicit` で開始する。候補窓が `.passive` のまま表示中に Space を押すと explicit リビルド（次候補ではない）。
 
 ## 候補リストのセクション構造
 
