@@ -87,15 +87,11 @@ extension InputHandler {
 
     private struct CheapCandidateSources {
         let userDictRaw: [String]
-        /// `userDictRaw` のうち読み完全一致だけを抜き出した配列。初期選択行の判定に使う。
         let userDictExact: [String]
-        /// 読み前方一致のユーザー辞書（初期フォーカス判定用）。
         let userDictPrefix: [String]
         /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
         let historyEntries: [HistoryEntry]
         let highHistoryCount: Int
-        let historyOutputSet: Set<String>
-        let exactMatchHistoryOutputs: Set<String>
     }
 
     private struct CandidateListSources {
@@ -104,15 +100,11 @@ extension InputHandler {
         /// AzooKey API の返却順（Zenzai 込み）。Zenzai 順位ラベル表示等に使う。
         let azooKeyApiOrder: [String]
         let userDictRaw: [String]
-        /// 読み完全一致のユーザー辞書（初期選択行判定用）。
         let userDictExact: [String]
-        /// 読み前方一致のユーザー辞書（初期フォーカス判定用）。
         let userDictPrefix: [String]
         /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
         let historyEntries: [HistoryEntry]
         let highHistoryCount: Int
-        let historyOutputSet: Set<String>
-        let exactMatchHistoryOutputs: Set<String>
     }
 
     private mutating func collectCandidateSources(
@@ -145,7 +137,6 @@ extension InputHandler {
         // 1 output に exact / prefix 両方の score を集約（PLAN260624d）。
         var entriesByOutput: [String: HistoryEntry] = [:]
         var insertionOrder: [String] = []
-        var historyOutputSet = Set<String>()
         var exactCount = 0
         var prefixCount = 0
         for row in exactMatchScored where row.score >= CandidateScoreBuilder.historyScoreCutoff {
@@ -157,7 +148,6 @@ extension InputHandler {
                 ?? HistoryEntry(output: row.output, score: .exact(row.score))
         }
         for row in historyScored {
-            historyOutputSet.insert(row.output)
             guard row.score >= CandidateScoreBuilder.historyScoreCutoff,
                   !exactMatchHistoryOutputs.contains(row.output) else { continue }
             if entriesByOutput[row.output] == nil {
@@ -173,9 +163,7 @@ extension InputHandler {
             userDictExact: userDictExact,
             userDictPrefix: userDictPrefix,
             historyEntries: historyEntries,
-            highHistoryCount: exactCount + prefixCount,
-            historyOutputSet: historyOutputSet,
-            exactMatchHistoryOutputs: exactMatchHistoryOutputs
+            highHistoryCount: exactCount + prefixCount
         )
     }
 
@@ -207,9 +195,7 @@ extension InputHandler {
             userDictExact: cheap.userDictExact,
             userDictPrefix: cheap.userDictPrefix,
             historyEntries: cheap.historyEntries,
-            highHistoryCount: cheap.highHistoryCount,
-            historyOutputSet: cheap.historyOutputSet,
-            exactMatchHistoryOutputs: cheap.exactMatchHistoryOutputs
+            highHistoryCount: cheap.highHistoryCount
         )
     }
 

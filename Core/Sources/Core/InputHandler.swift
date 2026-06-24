@@ -16,7 +16,6 @@ public enum CandidateAction: Sendable {
     case selectNext
     case selectPrev
     case deleteSelected
-    case replaceCandidates([String])
 }
 
 extension CandidateAction {

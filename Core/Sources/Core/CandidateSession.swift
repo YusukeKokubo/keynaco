@@ -22,7 +22,6 @@ public enum CandidatePanelInteraction: Equatable, Sendable {
 /// |------|-------------|------------------------|
 /// | `apply(.show)`（候補非空） | `true` | `initialIsExplicitlySelected`（`.explicit` トリガのみ `true`） |
 /// | `apply(.selectNext)` / `.selectPrev` | 維持 | `true` |
-/// | `apply(.replaceCandidates)` | 候補非空なら `true` | `false` |
 /// | `apply(.dismiss)` / `reset()` | `false` | `false` |
 /// | `removeCandidate` / `.deleteSelected` で空 | `false`（`reset()`） | `false` |
 public struct CandidateSession: Sendable, Equatable {
@@ -129,12 +128,6 @@ public struct CandidateSession: Sendable, Equatable {
             } else {
                 selectedRow = min(selectedRow, candidates.count - 1)
             }
-        case .replaceCandidates(let cands):
-            candidates = cands
-            isVisible = !cands.isEmpty
-            selectedRow = 0
-            isExplicitlySelected = false
-            azooKeyApiOrder = []
         }
     }
 }
