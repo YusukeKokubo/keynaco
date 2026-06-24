@@ -116,6 +116,40 @@ final class CandidateScoreBuilderTests: XCTestCase {
         XCTAssertEqual(scored.map(\.text), ["愛"])
     }
 
+    /// **不変条件回帰テスト**: 履歴は dbScore がいくら低くても `azooKeyScore(rank: 0) + 0.001`
+    /// 以上に底上げされる（`historyDisplayScore`）。これにより載った履歴は AzooKey 先頭より
+    /// 必ず前に並ぶ。floor を外すと低スコア履歴が AzooKey の後ろに沈む。
+    func testHistoryAlwaysAheadOfAzooKeyRankZero() {
+        let scored = build(
+            exact: ["低"],
+            exactScores: ["低": 0.6],  // cutoff 直上、azooKeyScore(0)=10 より遥かに低い
+            azooKey: ["A", "B", "C"]
+        )
+        XCTAssertEqual(scored.first?.text, "低", "低スコア履歴でも azooKey rank 0 より前")
+        XCTAssertGreaterThan(
+            scored[0].score, CandidateScoreBuilder.azooKeyScore(rank: 0),
+            "履歴の display score は必ず azooKey rank 0 より大きい"
+        )
+    }
+
+    /// **不変条件回帰テスト**: 同 output に exact / prefix 両方の score が乗っている `.both` で、
+    /// upsert の dedup は「高スコア優先 → 同点なら sourceSortKey 小（= exact 側）」で解決する。
+    /// production の `collectCheapCandidateSources` は exact 優先で抜くため `.both` は稀だが、
+    /// builder 単体としての契約は維持する。
+    func testHistoryEntryWithBothScoresPrefersExactOnTie() {
+        let entry = HistoryEntry(output: "漢字", score: .both(exact: 50, prefix: 50))
+        let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "かんじ",
+            hiraganaBonus: nil,
+            historyEntries: [entry],
+            userDictExact: [], userDictPrefix: [],
+            azooKeyCandidates: [], azooKeyApiOrder: [],
+            numberCandidates: [], dateTimeCandidates: []
+        ))
+        XCTAssertEqual(scored.filter { $0.text == "漢字" }.count, 1, "重複行は dedup されるはず")
+        XCTAssertEqual(scored.first?.source, .historyExact, "同点なら sourceSortKey 小 = exact 側が勝つ")
+    }
+
     func testHiraganaBuiltinBonusBeatsWrongHistory() {
         let scored = build(
             reading: "の",

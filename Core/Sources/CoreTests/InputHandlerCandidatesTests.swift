@@ -415,6 +415,22 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
     }
 
+    /// **不変条件回帰テスト**: pre-build dismiss（reading が機能語）は通らないが、
+    /// 履歴で row 0 が機能語 text に押し上げられた場合の post-build dismiss を pin。
+    /// pre/post で同じ `isBuiltinFunctionalWord` predicate を使っとる前提が崩れると失敗する。
+    func testWhileTypingDismissesWhenRow0TextIsFunctionalWordViaHistory() {
+        setUpWithConverter(BaseAzooKeyStub())  // AzooKey 候補ゼロで history を確実に row 0 にする
+        // reading "あ" は builtin でない / 出力 "の" は builtin。
+        for _ in 0..<10 { handler.db.record(input: "あ", output: "の") }
+
+        let (_, action) = type(chars: "a", base: "a")
+        guard case .dismiss = action else {
+            XCTFail(
+                "row 0 text が機能語なら whileTyping は dismiss されるはず（post-build dismiss）: \(action)"
+            ); return
+        }
+    }
+
     // MARK: - candidateSources: Shift+Delete の削除可否
 
     func testShiftDeleteOnHistorySourceDeletesCandidate() {

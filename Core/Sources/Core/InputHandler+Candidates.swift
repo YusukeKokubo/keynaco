@@ -160,7 +160,7 @@ extension InputHandler {
         var historyOutputSet = Set<String>()
         var exactCount = 0
         var prefixCount = 0
-        for row in exactMatchScored where row.score >= Self.historyRecencyScoreCutoff {
+        for row in exactMatchScored where row.score >= CandidateScoreBuilder.historyScoreCutoff {
             if entriesByOutput[row.output] == nil {
                 insertionOrder.append(row.output)
                 exactCount += 1
@@ -170,7 +170,7 @@ extension InputHandler {
         }
         for row in historyScored {
             historyOutputSet.insert(row.output)
-            guard row.score >= Self.historyRecencyScoreCutoff,
+            guard row.score >= CandidateScoreBuilder.historyScoreCutoff,
                   !exactMatchHistoryOutputs.contains(row.output) else { continue }
             if entriesByOutput[row.output] == nil {
                 insertionOrder.append(row.output)
@@ -224,9 +224,6 @@ extension InputHandler {
             exactMatchHistoryOutputs: cheap.exactMatchHistoryOutputs
         )
     }
-
-    /// これ未満の履歴スコアは候補に載せない（DB の `recencyExpr` と同じ尺度）。
-    private static let historyRecencyScoreCutoff = 0.5
 
     private func hiraganaBonusKind(for reading: String) -> CandidateScoreBuilder.HiraganaBonusKind? {
         if hiraganaPreferredSet.contains(reading) { return .userSetting }
