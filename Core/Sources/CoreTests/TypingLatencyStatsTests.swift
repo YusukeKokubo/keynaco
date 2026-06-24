@@ -271,6 +271,26 @@ final class TypingLatencyStatsTests: XCTestCase {
         XCTAssertEqual(TypingLatencyStats.readRecentLines(from: fileURL).count, 1)
     }
 
+    func testAppendToLogFlushesOnPeekCountWithoutCandidateConfirmations() throws {
+        var now = Date(timeIntervalSince1970: 2_000_000)
+        let stats = TypingLatencyStats()
+        stats.nowProvider = { now }
+        let fileURL = temporaryLogURL()
+
+        for _ in 0..<9 { stats.recordCachePeek(.miss, readingLength: 2) }
+        XCTAssertFalse(stats.appendToLog(fileURL: fileURL, appVersion: "0.9.2"))
+
+        stats.recordCachePeek(.prefix, readingLength: 2)
+        XCTAssertTrue(stats.appendToLog(fileURL: fileURL, appVersion: "0.9.2"))
+
+        let dict = try JSONSerialization.jsonObject(
+            with: Data(TypingLatencyStats.readRecentLines(from: fileURL).last!.utf8)
+        ) as! [String: Any]
+        XCTAssertEqual(dict["version"] as? String, "0.9.2")
+        XCTAssertEqual(dict["total_peeks"] as? Int, 10)
+        XCTAssertNil(dict["candidate_confirmations"])
+    }
+
     func testReadRecentLinesReturnsLastTwenty() throws {
         let fileURL = temporaryLogURL()
         var lines: [String] = []

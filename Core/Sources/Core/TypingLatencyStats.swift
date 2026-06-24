@@ -11,6 +11,9 @@ public final class TypingLatencyStats: @unchecked Sendable {
     /// 候補ウィンドウ表示中の確定が `minConfirmationsForFlush` 回に達したらフラッシュ。
     public static let minConfirmationsForFlush = 5
     public static let minFlushInterval: TimeInterval = 300
+    /// 素通り確定が多いセッション向け: peek 回数がこの値以上なら候補確定数に関わらずフラッシュ。
+    public static let minPeeksForFlush = 10
+    public static let minPeeksFlushInterval: TimeInterval = 180
 
     public struct Snapshot: Equatable, Sendable {
         public let cacheExact: Int
@@ -184,17 +187,34 @@ public final class TypingLatencyStats: @unchecked Sendable {
         lock.withLock { resetLocked() }
     }
 
-    /// 通常フラッシュ: 候補確定 `minConfirmationsForFlush` 回以上 + 5 分インターバル。
+    /// 通常フラッシュ: (1) 候補確定 5 回 + 5 分、(2) peek 10 回 + 3 分のいずれか。
     @discardableResult
     public func appendToLog(fileURL: URL, appVersion: String) -> Bool {
-        let prepared = buildFlushPayloadLocked(appVersion: appVersion, minConfirmations: Self.minConfirmationsForFlush, minInterval: Self.minFlushInterval)
-        return writePrepared(prepared, to: fileURL)
+        let strategies: [(minConfirmations: Int, minPeeks: Int, minInterval: TimeInterval)] = [
+            (Self.minConfirmationsForFlush, 0, Self.minFlushInterval),
+            (0, Self.minPeeksForFlush, Self.minPeeksFlushInterval),
+        ]
+        for strategy in strategies {
+            let prepared = buildFlushPayloadLocked(
+                appVersion: appVersion,
+                minConfirmations: strategy.minConfirmations,
+                minPeeks: strategy.minPeeks,
+                minInterval: strategy.minInterval
+            )
+            if writePrepared(prepared, to: fileURL) { return true }
+        }
+        return false
     }
 
     /// 強制フラッシュ: 件数条件なし・インターバルなし。アプリ非アクティブ時に短セッションのデータを保全する。
     @discardableResult
     public func appendToLogForced(fileURL: URL, appVersion: String) -> Bool {
-        let prepared = buildFlushPayloadLocked(appVersion: appVersion, minConfirmations: 0, minInterval: 0)
+        let prepared = buildFlushPayloadLocked(
+            appVersion: appVersion,
+            minConfirmations: 0,
+            minPeeks: 0,
+            minInterval: 0
+        )
         return writePrepared(prepared, to: fileURL)
     }
 
@@ -235,13 +255,20 @@ public final class TypingLatencyStats: @unchecked Sendable {
         return Array(lines.suffix(limit))
     }
 
-    private func buildFlushPayloadLocked(appVersion: String, minConfirmations: Int, minInterval: TimeInterval) -> (dict: [String: Any], flushTime: Date)? {
+    private func buildFlushPayloadLocked(
+        appVersion: String,
+        minConfirmations: Int,
+        minPeeks: Int,
+        minInterval: TimeInterval
+    ) -> (dict: [String: Any], flushTime: Date)? {
         lock.withLock {
             let confirmations = confirmationDepths.count
             let totalPeeks = cacheExact + cachePrefix + cacheMiss
             let hasData = confirmations > 0 || totalPeeks > 0
             if minConfirmations > 0 {
                 guard confirmations >= minConfirmations else { return nil }
+            } else if minPeeks > 0 {
+                guard totalPeeks >= minPeeks else { return nil }
             } else {
                 guard hasData else { return nil }
             }

@@ -18,8 +18,11 @@ public final class FetchLogger: @unchecked Sendable {
     private let lock = NSLock()
     private var buffer: [[String: Any]] = []
     private var appVersionStorage = "0.0.0"
+    private let outputURL: URL
 
-    public init() {}
+    public init(outputURL: URL = FetchLogger.logURL) {
+        self.outputURL = outputURL
+    }
 
     public var appVersion: String {
         get { lock.withLock { appVersionStorage } }
@@ -51,6 +54,7 @@ public final class FetchLogger: @unchecked Sendable {
             "lock_wait_ms": Int(lockWaitMs.rounded()),
             "rich": rich,
             "zenzai": zenzaiEnabled,
+            "wasted": false,
         ]
         lock.withLock {
             dict["version"] = appVersionStorage
@@ -60,6 +64,18 @@ public final class FetchLogger: @unchecked Sendable {
             buffer.append(dict)
             if buffer.count >= Self.flushThreshold {
                 flushLocked()
+            }
+        }
+    }
+
+    /// debounce 中に世代が進み fetch 結果が破棄された行を `wasted: true` に更新する。
+    /// 直近の未フラッシュ行を後方から `reading` で探す（通常は fetch 直後に呼ばれる）。
+    public func markLastFetchWasted(matchingReading reading: String) {
+        lock.withLock {
+            for index in buffer.indices.reversed() {
+                guard buffer[index]["reading"] as? String == reading else { continue }
+                buffer[index]["wasted"] = true
+                return
             }
         }
     }
@@ -114,7 +130,7 @@ public final class FetchLogger: @unchecked Sendable {
         let toWrite = buffer
         buffer.removeAll()
         for dict in toWrite {
-            Self.writeJSONLine(dict, to: Self.logURL)
+            Self.writeJSONLine(dict, to: outputURL)
         }
     }
 

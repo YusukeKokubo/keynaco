@@ -166,6 +166,21 @@ def main():
         nonrich = [f for f in fetch_rows if not f.get("rich")]
         print(f"  rich fetch: {len(rich)} / non-rich: {len(nonrich)}")
 
+    print()
+    print("=" * 60)
+    print("  fetch_log の wasted fetch（debounce 破棄）")
+    print("=" * 60)
+    if not fetch_rows:
+        print("  fetch_log 未生成 or データなし")
+    else:
+        wasted = [f for f in fetch_rows if f.get("wasted")]
+        print(f"  wasted: {len(wasted)} / 全 fetch {len(fetch_rows)} "
+              f"（{len(wasted)/len(fetch_rows)*100:.1f}%）")
+        for f in sorted(wasted, key=lambda r: -r.get("fetch_ms", 0))[:10]:
+            iso = (f.get("ts_iso") or "")[11:19]
+            print(f"  [{iso}] fetch={f['fetch_ms']:4d}ms  reading_len={f['reading_len']}  "
+                  f"'{f['reading']}'")
+
 
 if __name__ == "__main__":
     main()

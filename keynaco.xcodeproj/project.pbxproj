@@ -24,6 +24,7 @@
 		4608E7508D63979CA6ABD403 /* InputSource.tiff in Resources */ = {isa = PBXBuildFile; fileRef = 7D792FEB7E1E5625244BE8C4 /* InputSource.tiff */; };
 		48F352724005237B685D8E35 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = AC5B60092B9315A5731AEF44 /* README.md */; };
 		57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19DE79F93A3BDB8CDBC90A08 /* AppDelegate.swift */; };
+		A1B2C3D4E5F6071829ABCD03 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829ABCD04 /* AppVersion.swift */; };
 		6341605E1C0AA49D7B745FD7 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184564CC6D61C061C6BEF041 /* SettingsWindowController.swift */; };
 		8A9990EB76F54E21875AA952 /* ZenzaiSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C150B0401BC4C609E82079A /* ZenzaiSettings.swift */; };
 		67352544F047475D84590AFE /* ZenzaiViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CD4B32B2C294E56820A1632 /* ZenzaiViewController.swift */; };
@@ -79,6 +80,7 @@
 		65C24D0073941540F51238C4 /* DebugSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSocketServer.swift; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A02 /* DebugSocketServer+Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+Commands.swift"; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071829ABCD02 /* DebugPOSClassifierV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugPOSClassifierV2.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071829ABCD04 /* AppVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A04 /* DebugSocketServer+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSocketServer+Snapshot.swift"; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60718293A06 /* SocketMockClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketMockClient.swift; sourceTree = "<group>"; };
 		7C150B0401BC4C609E82079A /* ZenzaiSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenzaiSettings.swift; sourceTree = "<group>"; };
@@ -139,6 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				19DE79F93A3BDB8CDBC90A08 /* AppDelegate.swift */,
+				A1B2C3D4E5F6071829ABCD04 /* AppVersion.swift */,
 				443A77590841CE5845242FCF /* Assets.xcassets */,
 				AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */,
 				B260613A4B5C6D7E01000002 /* CandidateTablePatch.swift */,
@@ -365,6 +368,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				57AA3BCD20BCDBFEB02DF617 /* AppDelegate.swift in Sources */,
+				A1B2C3D4E5F6071829ABCD03 /* AppVersion.swift in Sources */,
 					8490235378A97D53521A6CAB /* CandidateWindow.swift in Sources */,
 				B260613A4B5C6D7E01000001 /* CandidateTablePatch.swift in Sources */,
 				B2C3D4E5F60718293A4B5C01 /* CandidatePanelModel.swift in Sources */,
@@ -424,7 +428,7 @@
 				CODE_SIGN_ENTITLEMENTS = keynaco/keynaco.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R2ZZ3ALJ36;
 				ENABLE_APP_SANDBOX = YES;
 				INFOPLIST_FILE = keynaco/Info.plist;
@@ -468,7 +472,7 @@
 				CODE_SIGN_ENTITLEMENTS = keynaco/keynaco.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R2ZZ3ALJ36;
 				ENABLE_APP_SANDBOX = YES;
 				INFOPLIST_FILE = keynaco/Info.plist;

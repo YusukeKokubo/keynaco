@@ -28,7 +28,7 @@ class InputController: IMKInputController, @unchecked Sendable {
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        let version = AppVersion.logLabel
         handler.azooKeyConverter.fetchLogger.appVersion = version
         let ic = self
         MainActor.assumeIsolated {
@@ -133,7 +133,7 @@ class InputController: IMKInputController, @unchecked Sendable {
         cancelAzooKeyAsyncWork()
         handler.flushDiaryBuffer()
         commitComposition(sender)
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        let version = AppVersion.logLabel
         handler.azooKeyConverter.latencyStats.appendToLogForced(
             fileURL: DatabaseManager.latencyLogURL,
             appVersion: version
@@ -366,10 +366,18 @@ class InputController: IMKInputController, @unchecked Sendable {
 
     private func flushPendingInputRecord(penalized: Bool = false) {
         guard let pending = pendingInputRecord else { return }
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
         let record = penalized ? pending.addingAnomaly("penalized") : pending
-        inputQualityLogger.append(record: record, appVersion: version)
+        inputQualityLogger.append(record: record, appVersion: AppVersion.logLabel)
         pendingInputRecord = nil
+        tryFlushLatencyLog()
+    }
+
+    /// 確定ごとに latency セッションをフラッシュ試行（閾値未達なら no-op）。
+    private func tryFlushLatencyLog() {
+        handler.azooKeyConverter.latencyStats.appendToLog(
+            fileURL: DatabaseManager.latencyLogURL,
+            appVersion: AppVersion.logLabel
+        )
     }
 
     private func checkAndStorePendingSessionRecord() {
@@ -378,8 +386,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             handler.pendingSessionRecord = nil
         }
         if let divergence = handler.pendingDivergenceRecord {
-            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-            divergenceLogger.append(record: divergence, appVersion: version)
+            divergenceLogger.append(record: divergence, appVersion: AppVersion.logLabel)
             handler.pendingDivergenceRecord = nil
         }
     }

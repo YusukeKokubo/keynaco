@@ -102,11 +102,17 @@ final class AzooKeyAsyncScheduler {
             // 非空 = fetch が走った → ここで cancel/世代不一致なら結果破棄 = wasted。
             let didRunFetch = !candidates.isEmpty
             guard !Task.isCancelled else {
-                if didRunFetch { converter.latencyStats.recordWastedFetch() }
+                if didRunFetch {
+                    converter.latencyStats.recordWastedFetch()
+                    converter.fetchLogger.markLastFetchWasted(matchingReading: capturedReading)
+                }
                 return
             }
             guard candidateGeneration == generation else {
-                if didRunFetch { converter.latencyStats.recordWastedFetch() }
+                if didRunFetch {
+                    converter.latencyStats.recordWastedFetch()
+                    converter.fetchLogger.markLastFetchWasted(matchingReading: capturedReading)
+                }
                 return
             }
             pendingTask = nil
