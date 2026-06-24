@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in-progress
 created: 2026-06-24
 ---
 
@@ -77,18 +77,20 @@ scoreBuilder で吸収可能な分岐 3 つを削除し、reading-prefer 分岐�
 
 ## 推奨案 C の Phase
 
-- [ ] **Phase 1**: scoreBuilder の tie-break で吸収可能なケースを特定
-  - `testExactMatchHistorySelectedFirst`
-  - `testUserDictExactSelectedWhenNoHistory`
-  - `testHistoryBeatsUserDictExact`
-  - `testAzooKeyFirstSelectedWhenNoHistoryNoUserDict`
-  - `testAzooKeyFirstUnchangedWhenNotPrefixOfReading`
-  - これらが scoreBuilder の score 順 + tie-break で row 0 に来ることをユニットテストで確認
-- [ ] **Phase 2**: resolver から該当分岐を削除し、`afterFixed` を返すよう簡素化
+- [x] **Phase 1**: scoreBuilder の tie-break で吸収可能なケースを特定（`ResolverEquivalenceTests` 追加）
+  - ✅ **吸収可**: exact 単独 / userDict 単独 / azooKey 単独 / azooKey not prefix of reading
+  - ❌ **drift 検出**: history > userDict（scoreBuilder では history=10.001 < userDict=50 で逆転）
+  - ❌ **drift 検出**: reading > azooKey prefix（scoreBuilder に reading 全体ブースト無し、短い azooKey 勝ち）
+- [ ] **Phase 2**: drift 2 件の対応方針を決める（**実装着手の前提**）
+  - **drift A (history > userDict)**: PLAN260624「未決 1」の POC 未確定が原因。divergence_log で実機の使用頻度を確認し、以下のいずれか
+    - (a) `userDictExactScore` を `historyDisplayScore` 下限未満（例: 5.0）に下げる
+    - (b) `historyDisplayScore` の下限を `userDictExactScore + 0.001` に上げる
+    - (c) 「history > userDict」期待を捨てる（実機で頻度ゼロに近いなら）
+  - **drift B (reading > azooKey prefix)**: resolver の特殊分岐として残す（推奨案 C の主旨）
+- [ ] **Phase 3**: resolver から吸収可能な分岐を削除し、reading-prefer 分岐だけ残す
   - `exactMatchHighHistory` / `userDictExact` 引数を `InitialRowPolicyInput` から外す
   - `azooKeyCandidates.first` の単純分岐も削除
-- [ ] **Phase 3**: reading-prefer-over-azooKey-prefix 分岐だけ残す
-  - resolver は 1 メソッド・5 行程度になる想定
+  - resolver は 1 メソッド・10 行程度になる想定
 - [ ] **Phase 4**: `lastInitialRowReason` の値整理
   - 旧値: `exactMatchHistory` / `historyPrefix` / `userDictExact` / `azooKey` / `hiraganaPreferred` / `hiraganaBuiltin` / `afterFixed` / `scoreOrder`
   - 整理後: `scoreOrder` / `hiraganaPreferred` / `readingPreferOverAzooKeyPrefix` / `afterFixed` の 4 種程度
