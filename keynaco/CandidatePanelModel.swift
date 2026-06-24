@@ -13,8 +13,6 @@ struct CandidatePanelModel: Equatable {
 
     var candidates: [String] { session.candidates }
     var selectedRow: Int { session.selectedRow }
-    var isExplicitlySelected: Bool { session.isExplicitlySelected }
-    var fixedEnd: Int { session.fixedEnd }
     var candidateSources: [ScoredCandidate.Source] { session.candidateSources }
     var isPresented: Bool { session.isVisible && !session.candidates.isEmpty }
 

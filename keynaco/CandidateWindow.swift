@@ -86,7 +86,6 @@ final class CandidateWindow: NSPanel {
     private let progressIndicator = NSProgressIndicator()
     private var model: CandidatePanelModel?
 
-    var onSelect: ((String) -> Void)?
     /// 削除ボタンが押された時のコールバック（候補テキスト, 行番号）
     var onDelete: ((String, Int) -> Void)?
 

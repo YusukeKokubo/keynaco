@@ -91,7 +91,7 @@ extension InputHandler {
         let userDictPrefix: [String]
         /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
         let historyEntries: [HistoryEntry]
-        let highHistoryCount: Int
+        let historyEntryCount: Int
 
         func withAzooKey(candidates: [String], apiOrder: [String]) -> CandidateListSources {
             CandidateListSources(
@@ -102,7 +102,7 @@ extension InputHandler {
                 userDictExact: userDictExact,
                 userDictPrefix: userDictPrefix,
                 historyEntries: historyEntries,
-                highHistoryCount: highHistoryCount
+                historyEntryCount: historyEntryCount
             )
         }
     }
@@ -157,7 +157,7 @@ extension InputHandler {
             userDictExact: userDictExact,
             userDictPrefix: userDictPrefix,
             historyEntries: historyEntries,
-            highHistoryCount: exactCount + prefixCount
+            historyEntryCount: exactCount + prefixCount
         )
     }
 
@@ -198,7 +198,7 @@ extension InputHandler {
 
         // 打鍵中で出すべき素材がゼロなら候補窓自体出さない（AzooKey 結果待ちの placeholder は廃止）。
         if trigger == .whileTyping,
-           sources.highHistoryCount == 0,
+           sources.historyEntryCount == 0,
            sources.azooKeyCandidates.isEmpty,
            sources.userDictRaw.isEmpty,
            dateTimeCandidates.isEmpty,

@@ -61,7 +61,6 @@ public struct CandidateSession: Sendable, Equatable {
             selectedRow: selectedRow,
             selectedText: selectedText,
             isExplicitlySelected: isExplicitlySelected,
-            fixedEnd: fixedEnd,
             candidateSources: candidateSources
         )
     }

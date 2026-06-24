@@ -45,8 +45,6 @@ public struct CandidateContext: Sendable {
     /// `false` のときは文字入力しても候補を確定せず組成に追加する。
     /// Enter は `isExplicitlySelected` に関係なく `selectedText`（現在の視覚的選択）をそのまま確定する。
     public private(set) var isExplicitlySelected: Bool
-    /// 先頭から連続するひらがな preferred 行数（Zenzai 診断・UI 補助）。
-    public private(set) var fixedEnd: Int
     /// 行ごとの source。Shift+Delete とセクション描画の正本。
     public private(set) var candidateSources: [ScoredCandidate.Source] = []
 
@@ -55,14 +53,12 @@ public struct CandidateContext: Sendable {
         selectedRow: Int,
         selectedText: String?,
         isExplicitlySelected: Bool = false,
-        fixedEnd: Int = 0,
         candidateSources: [ScoredCandidate.Source] = []
     ) {
         self.isVisible = isVisible
         self.selectedRow = selectedRow
         self.selectedText = selectedText
         self.isExplicitlySelected = isExplicitlySelected
-        self.fixedEnd = fixedEnd
         self.candidateSources = candidateSources
     }
 
@@ -73,7 +69,7 @@ public struct CandidateContext: Sendable {
 
     public static let hidden = CandidateContext(
         isVisible: false, selectedRow: 0, selectedText: nil,
-        isExplicitlySelected: false, fixedEnd: 0, candidateSources: []
+        isExplicitlySelected: false, candidateSources: []
     )
 
     /// `CandidateSession.panelInteraction` と同じ導出（`handle()` へのスナップショット用）。
@@ -322,8 +318,6 @@ public struct InputHandler {
             case .history: confirmedSource = "history"
             case .dictionary: confirmedSource = "dict"
             }
-        } else if row < candidateSession.fixedEnd {
-            confirmedSource = "fixed"
         } else {
             confirmedSource = "dict"
         }
