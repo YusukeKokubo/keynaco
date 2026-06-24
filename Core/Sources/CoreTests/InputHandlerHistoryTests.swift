@@ -162,6 +162,34 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         XCTAssertTrue(merged.contains("東京"), "確定後、LIKE 前方一致で履歴ヒットするはず")
     }
 
+    /// **不変条件回帰テスト**: `fetchHistoryScoredMerged` は異なる読み長の同 output 行を
+    /// `SUM` で合算する。`MAX` 等に書き換わると、長い読みで確定した実績が短い読みの prefix 検索に
+    /// 寄与しなくなり履歴ランキングが壊れる。
+    ///
+    /// 2 行を `prefix` で合致させて SUM が 1 行ぶんを超えることを境界で守る。
+    func testScoredMergedSumsAcrossDifferentReadingLengths() {
+        let t0: Int64 = 1_700_000_000
+        handler.db.clock = { t0 }
+
+        // 同じ output「東」を別読みで 2 行記録（INSERT で別行になる）
+        handler.db.record(input: "とう", output: "東")
+        handler.db.record(input: "とうきょう", output: "東")
+
+        // 両行とも `LIKE 'とう%'` でヒットする
+        let merged = handler.db.fetchHistoryScoredMerged(reading: "とう")
+        guard let touEntry = merged.first(where: { $0.output == "東" }) else {
+            XCTFail("「東」が prefix 検索でヒットしなかった: \(merged)"); return
+        }
+
+        // recencyExpr: 1 行 = count * (1.0 + recencyShortBonus) = 1 * 3.0 = 3.0
+        // SUM (2 行) ≈ 6.0、MAX (1 行) ≈ 3.0
+        // 境界を 4.0 に置けば MAX 化への退行を確実に検出できる
+        XCTAssertGreaterThan(
+            touEntry.score, 4.0,
+            "異なる読み長の同 output は SUM で合算されるはず（MAX に書き換わると壊れる）: score=\(touEntry.score)"
+        )
+    }
+
     // MARK: - ネガティブフィードバック（確定直後 Backspace でカウント減算）
     // See: docs/domain/glossary.md#databasemanager
 

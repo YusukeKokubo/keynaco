@@ -242,6 +242,13 @@ extension InputHandler {
         return nil
     }
 
+    /// `s` が組み込み助詞・助動詞等（concept 指針 1 でサジェストを抑制したい機能語）かを判定。
+    /// reading の判定（pre-build dismiss）と top row text の判定（post-build dismiss）で
+    /// 同じ predicate を共有する。
+    private static func isBuiltinFunctionalWord(_ s: String) -> Bool {
+        HiraganaPreferredBuiltins.words[s] != nil
+    }
+
     private mutating func assembleCandidateList(
         from sources: CandidateListSources,
         trigger: CandidateListTrigger
@@ -325,11 +332,14 @@ extension InputHandler {
             return .dismiss
         }
 
-        // 打鍵中のみ: 第一候補が機能語（助詞・助動詞等）ならサジェスト UI を出さない。
-        // builtin は assemble 前段で dismiss 済み。ここは userSetting の hiraganaPreferred 用フォールバック。
+        // 打鍵中のみ: 第一候補（行 0）の text が機能語ならサジェスト UI を出さない。
+        // pre-build 側（reading が機能語）は assemble 前段で dismiss 済み。
+        // こちらが拾うのは「reading は機能語でないが row 0 の text がたまたま機能語」の経路:
+        //   - history/userDict/azooKey で機能語 text が row 0 に押し上げられたケース
+        //   - userSetting hiraganaPreferred で機能語以外の reading が機能語 text を生むケース
         if trigger == .whileTyping,
            initialRow < scoredLayout.candidates.count,
-           HiraganaPreferredBuiltins.words[scoredLayout.candidates[initialRow]] != nil {
+           Self.isBuiltinFunctionalWord(scoredLayout.candidates[initialRow]) {
             #if DEBUG
             recordCandidateBuildDiagnostics(
                 trigger: trigger,

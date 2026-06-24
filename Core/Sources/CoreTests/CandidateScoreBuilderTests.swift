@@ -152,6 +152,37 @@ final class CandidateScoreBuilderTests: XCTestCase {
         XCTAssertEqual(scored.first(where: { $0.text == "の" })?.source, .hiraganaBuiltin)
         XCTAssertEqual(scored.first(where: { $0.text == "の" })?.score, 80)
     }
+
+    /// **境界回帰テスト**: bonus 置換は `bonusScore >= existing.score`（`>=`、同点で bonus 勝ち）。
+    /// `>` に書き換わると同点ケースで history 側が残り、UI 上のセクション帰属が無音で変わる。
+    func testHiraganaBuiltinBonusWinsOnExactTieWithHistory() {
+        let scored = build(
+            reading: "の",
+            hiraganaBonus: .builtin,
+            exact: ["の"],
+            exactScores: ["の": CandidateScoreBuilder.hiraganaBuiltinBonus],
+            azooKey: ["ノ"]
+        )
+        let target = scored.first(where: { $0.text == "の" })
+        XCTAssertEqual(
+            target?.source, .hiraganaBuiltin,
+            "bonus 同点では bonus 側が勝つ（`>=` の境界）。`>` に変えるとこのテストが落ちる"
+        )
+        XCTAssertEqual(target?.score, CandidateScoreBuilder.hiraganaBuiltinBonus)
+    }
+
+    func testHiraganaUserBonusWinsOnExactTieWithHistory() {
+        let scored = build(
+            reading: "の",
+            hiraganaBonus: .userSetting,
+            exact: ["の"],
+            exactScores: ["の": CandidateScoreBuilder.hiraganaUserBonus],
+            azooKey: ["ノ"]
+        )
+        let target = scored.first(where: { $0.text == "の" })
+        XCTAssertEqual(target?.source, .hiraganaPreferred)
+        XCTAssertEqual(target?.score, CandidateScoreBuilder.hiraganaUserBonus)
+    }
 }
 
 final class CandidateScoredLayoutTests: XCTestCase {

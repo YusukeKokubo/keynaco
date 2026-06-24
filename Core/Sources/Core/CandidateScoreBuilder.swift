@@ -129,8 +129,14 @@ enum CandidateScoreBuilder {
             upsert(ScoredCandidate(text: text, score: specialCandidateScore, source: .dateTime))
         }
 
+        let azooKeyRankByText: [String: Int]? = input.azooKeyApiOrder.isEmpty
+            ? nil
+            : Dictionary(
+                input.azooKeyApiOrder.enumerated().map { ($0.element, $0.offset) },
+                uniquingKeysWith: { first, _ in first }
+            )
         let sorted = insertionOrder.compactMap { byText[$0] }.sorted { lhs, rhs in
-            compare(lhs, rhs, azooKeyApiOrder: input.azooKeyApiOrder)
+            compare(lhs, rhs, azooKeyRankByText: azooKeyRankByText)
         }
         return sorted
     }
@@ -165,7 +171,7 @@ enum CandidateScoreBuilder {
     private static func compare(
         _ lhs: ScoredCandidate,
         _ rhs: ScoredCandidate,
-        azooKeyApiOrder: [String]
+        azooKeyRankByText: [String: Int]?
     ) -> Bool {
         if lhs.score != rhs.score { return lhs.score > rhs.score }
         let lp = sourceSortKey(lhs.source)
@@ -175,11 +181,7 @@ enum CandidateScoreBuilder {
             return lr < rr
         }
         if case .historyExact = lhs.source, case .historyExact = rhs.source,
-           !azooKeyApiOrder.isEmpty {
-            let rankByText = Dictionary(
-                azooKeyApiOrder.enumerated().map { ($0.element, $0.offset) },
-                uniquingKeysWith: { first, _ in first }
-            )
+           let rankByText = azooKeyRankByText {
             switch (rankByText[lhs.text], rankByText[rhs.text]) {
             case let (la?, ra?): return la < ra
             case (.some, nil): return true
