@@ -407,7 +407,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         )
     }
 
-    func testExplicit_prefixFocusDoesNotApply() {
+    func testExplicit_alsoFocusesScoreOrderPrefixHistory() {
         setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
         handler.db.recordPrefixes(reading: "だけんすうげん", output: "打鍵数削減")
         handler.db.updatePOSClassification(output: "打鍵数削減", pos: "noun", lcid: 1285)
@@ -416,10 +416,12 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         guard let payload = handler.buildCandidateList(trigger: .explicit).showPayload else {
             XCTFail("候補を出すはず"); return
         }
+        // PLAN260624b: explicit/whileTyping どちらも score 順先頭。
+        // prefix 履歴の score が AzooKey rank 0 より高ければ履歴側にフォーカス。
         XCTAssertEqual(
             payload.candidates[payload.initialRow],
-            "ダケンス",
-            "Space（explicit）では従来どおり AzooKey 先頭を選ぶ: \(payload.candidates)"
+            "打鍵数削減",
+            "Space（explicit）も score 順先頭: \(payload.candidates)"
         )
     }
 }

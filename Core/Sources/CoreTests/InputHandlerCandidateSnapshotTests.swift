@@ -191,9 +191,10 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.addUserDict(input: "あい", output: "Acme")
         handler.db.record(input: "あい", output: "愛")
         typeRomaji("ai")
+        // PLAN260624b: userDict exact が score 順で履歴 exact より上（明示登録 > 偶然の頻度）
         assertLayout(handler.buildCandidateList(),
                      candidates: ["Acme", "愛", "辞書A", "辞書B"],
-                     fixedEnd: 0, initialRow: 1)
+                     fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 
@@ -274,9 +275,10 @@ final class InputHandlerCandidateSnapshotTests: InputHandlerTestCase {
         handler.db.record(input: "あい", output: "愛")
         handler.db.addUserDict(input: "あい", output: "UD合い")
         typeRomaji("ai")
+        // PLAN260624b: userDict exact が score 順で履歴 exact より上
         assertLayout(handler.buildCandidateList(),
                      candidates: ["UD合い", "愛", "辞書A"],
-                     fixedEnd: 0, initialRow: 1)
+                     fixedEnd: 0, initialRow: 0)
         assertInjectPathMatchesSync(stub: stub)
     }
 }

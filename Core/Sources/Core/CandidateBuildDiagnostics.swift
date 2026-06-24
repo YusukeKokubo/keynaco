@@ -22,7 +22,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
     public var azooKeyCandidates: [String]
     public var azooKeyApiOrder: [String]
 
-    public var initialRowPolicy: String
     public var initialRow: Int
     public var initialText: String?
     public var fixedEnd: Int
@@ -36,11 +35,10 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
         switch outcome {
         case .shown:
             let initText = initialText ?? "?"
-            let policy = initialRowPolicy
             let hist = exactMatchHighHistory.first ?? "-"
             let azoo = azooKeyCandidates.first ?? "-"
             let pref = hiraganaPreferred || hiraganaBuiltin ? 1 : 0
-            return " init:[\(initialRow)]\(initText) policy:\(policy) hist1:\(hist) azoo1:\(azoo) hirPref:\(pref)"
+            return " init:[\(initialRow)]\(initText) hist1:\(hist) azoo1:\(azoo) hirPref:\(pref)"
         case .dismissedEmpty:
             return " init:dismiss(empty)"
         case .dismissedFunctionalWord:
@@ -61,7 +59,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             "userDictExact": userDictExact,
             "azooKeyCandidates": azooKeyCandidates,
             "azooKeyApiOrder": azooKeyApiOrder,
-            "initialRowPolicy": initialRowPolicy,
             "initialRow": initialRow,
             "fixedEnd": fixedEnd,
             "scoredSources": scoredSources,
@@ -74,13 +71,6 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
 }
 
 enum CandidateBuildDiagnosticsSupport {
-    static func policyLabel(_ policy: InitialRowPolicy) -> String {
-        switch policy {
-        case .firstMatching(let s): return "firstMatching(\(s))"
-        case .afterFixed: return "afterFixed"
-        }
-    }
-
     static func scoredSourceLabel(_ candidate: ScoredCandidate) -> String {
         let source: String
         switch candidate.source {

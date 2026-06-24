@@ -264,8 +264,7 @@ extension InputHandler {
                 outcome: .dismissedEmpty,
                 sources: sources,
                 scored: [],
-                scoredLayout: nil,
-                policy: .afterFixed
+                scoredLayout: nil
             )
             #endif
             return .dismiss
@@ -280,8 +279,7 @@ extension InputHandler {
                 outcome: .dismissedFunctionalWord,
                 sources: sources,
                 scored: [],
-                scoredLayout: nil,
-                policy: .afterFixed
+                scoredLayout: nil
             )
             #endif
             return .dismiss
@@ -306,30 +304,12 @@ extension InputHandler {
         let scoredLayout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
             scored: scored
         ))
-        let policy: InitialRowPolicy
         let initialRow: Int
-        if trigger == .whileTyping {
-            policy = .afterFixed
-            initialRow = 0
-        } else if isHiraganaPref {
-            policy = .firstMatching(h)
+        if isHiraganaPref {
             initialRow = scoredLayout.candidates.firstIndex(of: h) ?? 0
         } else {
-            policy = InitialRowPolicyResolver.resolve(InitialRowPolicyInput(
-                reading: h,
-                exactMatchHighHistory: sources.exactMatchHighHistory,
-                userDictExact: sources.userDictExact,
-                azooKeyCandidates: sources.azooKeyCandidates,
-                candidateList: scoredLayout.candidates
-            ))
-            switch policy {
-            case .firstMatching(let text):
-                initialRow = scoredLayout.candidates.firstIndex(of: text) ?? 0
-            case .afterFixed:
-                initialRow = 0
-            }
+            initialRow = 0
         }
-        let exactMatchHistorySet = Set(sources.exactMatchHighHistory)
         guard !scoredLayout.candidates.isEmpty else {
             #if DEBUG
             recordCandidateBuildDiagnostics(
@@ -339,7 +319,6 @@ extension InputHandler {
                 sources: sources,
                 scored: scored,
                 scoredLayout: scoredLayout,
-                policy: policy,
                 initialRow: initialRow
             )
             #endif
@@ -359,7 +338,6 @@ extension InputHandler {
                 sources: sources,
                 scored: scored,
                 scoredLayout: scoredLayout,
-                policy: policy,
                 initialRow: initialRow
             )
             #endif
@@ -369,19 +347,6 @@ extension InputHandler {
         if initialRow < scoredLayout.sources.count,
            CandidateScoreBuilder.isHiraganaPreferredSource(scoredLayout.sources[initialRow]) {
             lastInitialRowReason = isHiraganaPref ? "hiraganaPreferred" : "hiraganaBuiltin"
-        } else if initialRow < scoredLayout.sources.count,
-                  CandidateScoreBuilder.isHistorySource(scoredLayout.sources[initialRow]) {
-            if exactMatchHistorySet.contains(scoredLayout.candidates[initialRow]) {
-                lastInitialRowReason = "exactMatchHistory"
-            } else {
-                lastInitialRowReason = "historyPrefix"
-            }
-        } else if initialRow < scoredLayout.candidates.count,
-                  sources.userDictExact.contains(scoredLayout.candidates[initialRow]) {
-            lastInitialRowReason = "userDictExact"
-        } else if initialRow < scoredLayout.candidates.count,
-                  sources.azooKeyCandidates.contains(scoredLayout.candidates[initialRow]) {
-            lastInitialRowReason = "azooKey"
         } else {
             lastInitialRowReason = "scoreOrder"
         }
@@ -393,7 +358,6 @@ extension InputHandler {
             sources: sources,
             scored: scored,
             scoredLayout: scoredLayout,
-            policy: policy,
             initialRow: initialRow
         )
         #endif
@@ -415,7 +379,6 @@ extension InputHandler {
         sources: CandidateListSources,
         scored: [ScoredCandidate],
         scoredLayout: CandidateScoredLayout.Result?,
-        policy: InitialRowPolicy,
         initialRow: Int? = nil
     ) {
         let resolvedInitialRow = initialRow ?? 0
@@ -433,7 +396,6 @@ extension InputHandler {
             userDictExact: sources.userDictExact,
             azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8)),
             azooKeyApiOrder: Array(sources.azooKeyApiOrder.prefix(8)),
-            initialRowPolicy: CandidateBuildDiagnosticsSupport.policyLabel(policy),
             initialRow: resolvedInitialRow,
             initialText: initialText,
             fixedEnd: scoredLayout?.fixedEnd ?? 0,
