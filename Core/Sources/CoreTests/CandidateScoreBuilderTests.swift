@@ -15,13 +15,26 @@ final class CandidateScoreBuilderTests: XCTestCase {
         azooKey: [String] = [],
         azooOrder: [String] = []
     ) -> [ScoredCandidate] {
-        CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+        var byOutput: [String: HistoryEntry] = [:]
+        var order: [String] = []
+        for o in exact {
+            byOutput[o] = HistoryEntry(output: o, exactScore: exactScores[o], prefixScore: nil)
+            order.append(o)
+        }
+        for o in prefix where byOutput[o] == nil {
+            byOutput[o] = HistoryEntry(output: o, exactScore: nil, prefixScore: prefixScores[o])
+            order.append(o)
+        }
+        for o in prefix {
+            if let prev = byOutput[o], prev.prefixScore == nil {
+                byOutput[o] = HistoryEntry(output: o, exactScore: prev.exactScore, prefixScore: prefixScores[o])
+            }
+        }
+        let entries = order.compactMap { byOutput[$0] }
+        return CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: reading,
             hiraganaBonus: hiraganaBonus,
-            exactMatchHighHistory: exact,
-            highHistory: prefix,
-            exactMatchScores: exactScores,
-            prefixHistoryScores: prefixScores,
+            historyEntries: entries,
             userDictExact: userExact,
             userDictPrefix: userPrefix,
             azooKeyCandidates: azooKey,
@@ -147,10 +160,10 @@ final class CandidateScoredLayoutTests: XCTestCase {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: "じょう",
             hiraganaBonus: nil,
-            exactMatchHighHistory: ["上"],
-            highHistory: ["情報共有"],
-            exactMatchScores: ["上": 9],
-            prefixHistoryScores: ["情報共有": 93],
+            historyEntries: [
+                HistoryEntry(output: "上", exactScore: 9),
+                HistoryEntry(output: "情報共有", prefixScore: 93),
+            ],
             userDictExact: [],
             userDictPrefix: [],
             azooKeyCandidates: ["情"],
@@ -168,10 +181,7 @@ final class CandidateScoredLayoutTests: XCTestCase {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: "の",
             hiraganaBonus: .builtin,
-            exactMatchHighHistory: [],
-            highHistory: ["ノックアウト"],
-            exactMatchScores: [:],
-            prefixHistoryScores: ["ノックアウト": 25],
+            historyEntries: [HistoryEntry(output: "ノックアウト", prefixScore: 25)],
             userDictExact: [],
             userDictPrefix: [],
             azooKeyCandidates: ["ノ", "之"],
@@ -189,10 +199,7 @@ final class CandidateScoredLayoutTests: XCTestCase {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: "1234",
             hiraganaBonus: nil,
-            exactMatchHighHistory: [],
-            highHistory: [],
-            exactMatchScores: [:],
-            prefixHistoryScores: [:],
+            historyEntries: [],
             userDictExact: [],
             userDictPrefix: [],
             azooKeyCandidates: [],

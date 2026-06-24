@@ -103,10 +103,8 @@ extension InputHandler {
         let userDictExact: [String]
         /// 読み前方一致のユーザー辞書（初期フォーカス判定用）。
         let userDictPrefix: [String]
-        let exactMatchHighHistory: [String]
-        let highHistory: [String]
-        let exactMatchScores: [String: Double]
-        let prefixHistoryScores: [String: Double]
+        /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
+        let historyEntries: [HistoryEntry]
         let highHistoryCount: Int
         let historyOutputSet: Set<String>
         let exactMatchHistoryOutputs: Set<String>
@@ -115,17 +113,15 @@ extension InputHandler {
     private struct CandidateListSources {
         let h: String
         let azooKeyCandidates: [String]
-        /// AzooKey API の返却順（Zenzai 込み）。Zenzai 順位ラベル表示と `exactMatchHighHistory` の並べ替えに使う。
+        /// AzooKey API の返却順（Zenzai 込み）。Zenzai 順位ラベル表示等に使う。
         let azooKeyApiOrder: [String]
         let userDictRaw: [String]
         /// 読み完全一致のユーザー辞書（初期選択行判定用）。
         let userDictExact: [String]
         /// 読み前方一致のユーザー辞書（初期フォーカス判定用）。
         let userDictPrefix: [String]
-        let exactMatchHighHistory: [String]
-        let highHistory: [String]
-        let exactMatchScores: [String: Double]
-        let prefixHistoryScores: [String: Double]
+        /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
+        let historyEntries: [HistoryEntry]
         let highHistoryCount: Int
         let historyOutputSet: Set<String>
         let exactMatchHistoryOutputs: Set<String>
@@ -157,37 +153,47 @@ extension InputHandler {
         let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
         let exactMatchScored = db.fetchHistoryExactScored(reading: historyKey)
         let exactMatchHistoryOutputs = Set(exactMatchScored.map { $0.output })
-        var exactMatchHighHistory: [String] = []
-        var highHistory: [String] = []
-        var exactMatchScores: [String: Double] = [:]
-        var prefixHistoryScores: [String: Double] = [:]
+
+        // 1 output に exact / prefix 両方の score を集約（PLAN260624d）。
+        var entriesByOutput: [String: HistoryEntry] = [:]
+        var insertionOrder: [String] = []
         var historyOutputSet = Set<String>()
-        var seenExact = Set<String>()
-        var seenOther = Set<String>()
-        for row in exactMatchScored {
-            exactMatchScores[row.output] = row.score
-            if row.score >= Self.historyRecencyScoreCutoff,
-               seenExact.insert(row.output).inserted {
-                exactMatchHighHistory.append(row.output)
+        var exactCount = 0
+        var prefixCount = 0
+        for row in exactMatchScored where row.score >= Self.historyRecencyScoreCutoff {
+            if entriesByOutput[row.output] == nil {
+                insertionOrder.append(row.output)
+                exactCount += 1
             }
+            let prev = entriesByOutput[row.output]
+            entriesByOutput[row.output] = HistoryEntry(
+                output: row.output,
+                exactScore: row.score,
+                prefixScore: prev?.prefixScore
+            )
         }
         for row in historyScored {
             historyOutputSet.insert(row.output)
             guard row.score >= Self.historyRecencyScoreCutoff,
-                  !exactMatchHistoryOutputs.contains(row.output),
-                  seenOther.insert(row.output).inserted else { continue }
-            prefixHistoryScores[row.output] = row.score
-            highHistory.append(row.output)
+                  !exactMatchHistoryOutputs.contains(row.output) else { continue }
+            if entriesByOutput[row.output] == nil {
+                insertionOrder.append(row.output)
+                prefixCount += 1
+            }
+            let prev = entriesByOutput[row.output]
+            entriesByOutput[row.output] = HistoryEntry(
+                output: row.output,
+                exactScore: prev?.exactScore,
+                prefixScore: row.score
+            )
         }
+        let historyEntries = insertionOrder.compactMap { entriesByOutput[$0] }
         return CheapCandidateSources(
             userDictRaw: userDictRaw,
             userDictExact: userDictExact,
             userDictPrefix: userDictPrefix,
-            exactMatchHighHistory: exactMatchHighHistory,
-            highHistory: highHistory,
-            exactMatchScores: exactMatchScores,
-            prefixHistoryScores: prefixHistoryScores,
-            highHistoryCount: exactMatchHighHistory.count + highHistory.count,
+            historyEntries: historyEntries,
+            highHistoryCount: exactCount + prefixCount,
             historyOutputSet: historyOutputSet,
             exactMatchHistoryOutputs: exactMatchHistoryOutputs
         )
@@ -220,10 +226,7 @@ extension InputHandler {
             userDictRaw: cheap.userDictRaw,
             userDictExact: cheap.userDictExact,
             userDictPrefix: cheap.userDictPrefix,
-            exactMatchHighHistory: cheap.exactMatchHighHistory,
-            highHistory: cheap.highHistory,
-            exactMatchScores: cheap.exactMatchScores,
-            prefixHistoryScores: cheap.prefixHistoryScores,
+            historyEntries: cheap.historyEntries,
             highHistoryCount: cheap.highHistoryCount,
             historyOutputSet: cheap.historyOutputSet,
             exactMatchHistoryOutputs: cheap.exactMatchHistoryOutputs
@@ -288,10 +291,7 @@ extension InputHandler {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: h,
             hiraganaBonus: hiraganaBonusKind(for: h),
-            exactMatchHighHistory: sources.exactMatchHighHistory,
-            highHistory: sources.highHistory,
-            exactMatchScores: sources.exactMatchScores,
-            prefixHistoryScores: sources.prefixHistoryScores,
+            historyEntries: sources.historyEntries,
             userDictExact: sources.userDictExact,
             userDictPrefix: sources.userDictPrefix,
             azooKeyCandidates: sources.azooKeyCandidates,
@@ -394,8 +394,7 @@ extension InputHandler {
             outcome: outcome,
             hiraganaPreferred: hiraganaPreferredSet.contains(reading),
             hiraganaBuiltin: HiraganaPreferredBuiltins.words[reading] != nil,
-            exactMatchHighHistory: sources.exactMatchHighHistory,
-            highHistory: sources.highHistory,
+            historyEntries: sources.historyEntries,
             userDictExact: sources.userDictExact,
             azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8)),
             azooKeyApiOrder: Array(sources.azooKeyApiOrder.prefix(8)),

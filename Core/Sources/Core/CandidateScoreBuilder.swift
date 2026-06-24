@@ -24,10 +24,8 @@ enum CandidateScoreBuilder {
     struct BuildInput: Sendable {
         let reading: String
         let hiraganaBonus: HiraganaBonusKind?
-        let exactMatchHighHistory: [String]
-        let highHistory: [String]
-        let exactMatchScores: [String: Double]
-        let prefixHistoryScores: [String: Double]
+        /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
+        let historyEntries: [HistoryEntry]
         let userDictExact: [String]
         let userDictPrefix: [String]
         let azooKeyCandidates: [String]
@@ -64,16 +62,21 @@ enum CandidateScoreBuilder {
             }
         }
 
-        for output in input.exactMatchHighHistory {
-            guard let score = input.exactMatchScores[output],
-                  score >= historyScoreCutoff else { continue }
-            upsert(ScoredCandidate(text: output, score: historyDisplayScore(score), source: .historyExact))
-        }
-
-        for output in input.highHistory {
-            guard let score = input.prefixHistoryScores[output],
-                  score >= historyScoreCutoff else { continue }
-            upsert(ScoredCandidate(text: output, score: historyDisplayScore(score), source: .historyPrefix))
+        for entry in input.historyEntries {
+            if let score = entry.exactScore, score >= historyScoreCutoff {
+                upsert(ScoredCandidate(
+                    text: entry.output,
+                    score: historyDisplayScore(score),
+                    source: .historyExact
+                ))
+            }
+            if let score = entry.prefixScore, score >= historyScoreCutoff {
+                upsert(ScoredCandidate(
+                    text: entry.output,
+                    score: historyDisplayScore(score),
+                    source: .historyPrefix
+                ))
+            }
         }
 
         for output in input.userDictExact {

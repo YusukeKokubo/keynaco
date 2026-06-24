@@ -16,8 +16,7 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
 
     public var hiraganaPreferred: Bool
     public var hiraganaBuiltin: Bool
-    public var exactMatchHighHistory: [String]
-    public var highHistory: [String]
+    public var historyEntries: [HistoryEntry]
     public var userDictExact: [String]
     public var azooKeyCandidates: [String]
     public var azooKeyApiOrder: [String]
@@ -35,7 +34,7 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
         switch outcome {
         case .shown:
             let initText = initialText ?? "?"
-            let hist = exactMatchHighHistory.first ?? "-"
+            let hist = historyEntries.first?.output ?? "-"
             let azoo = azooKeyCandidates.first ?? "-"
             let pref = hiraganaPreferred || hiraganaBuiltin ? 1 : 0
             return " init:[\(initialRow)]\(initText) hist1:\(hist) azoo1:\(azoo) hirPref:\(pref)"
@@ -54,8 +53,12 @@ public struct CandidateBuildDiagnostics: Sendable, Equatable {
             "outcome": outcome.rawValue,
             "hiraganaPreferred": hiraganaPreferred,
             "hiraganaBuiltin": hiraganaBuiltin,
-            "exactMatchHighHistory": exactMatchHighHistory,
-            "highHistory": highHistory,
+            "historyEntries": historyEntries.map { entry -> [String: Any] in
+                var d: [String: Any] = ["output": entry.output]
+                if let e = entry.exactScore { d["exact"] = e }
+                if let p = entry.prefixScore { d["prefix"] = p }
+                return d
+            },
             "userDictExact": userDictExact,
             "azooKeyCandidates": azooKeyCandidates,
             "azooKeyApiOrder": azooKeyApiOrder,

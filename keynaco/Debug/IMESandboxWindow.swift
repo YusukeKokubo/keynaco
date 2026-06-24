@@ -814,8 +814,13 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             lines.append("outcome                  : \(build.outcome.rawValue)")
             lines.append("hiraganaPreferred(DB)    : \(build.hiraganaPreferred)")
             lines.append("hiraganaBuiltin          : \(build.hiraganaBuiltin)")
-            lines.append("exactMatchHighHistory    : \(build.exactMatchHighHistory)")
-            lines.append("highHistory              : \(build.highHistory)")
+            let historyDesc = build.historyEntries.map { e -> String in
+                var parts: [String] = []
+                if let s = e.exactScore { parts.append("exact:\(String(format: "%.2f", s))") }
+                if let s = e.prefixScore { parts.append("prefix:\(String(format: "%.2f", s))") }
+                return "\(e.output)(\(parts.joined(separator: ",")))"
+            }
+            lines.append("historyEntries           : \(historyDesc)")
             lines.append("userDictExact            : \(build.userDictExact)")
             lines.append("azooKeyCandidates        : \(build.azooKeyCandidates)")
             lines.append("azooKeyApiOrder          : \(build.azooKeyApiOrder)")
@@ -899,7 +904,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
             }
             lines.append("initialRow               : \(buildStr("initialRow"))")
             for key in [
-                "exactMatchHighHistory", "highHistory", "userDictExact",
+                "historyEntries", "userDictExact",
                 "azooKeyCandidates", "azooKeyApiOrder",
             ] {
                 lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(buildStr(key))")

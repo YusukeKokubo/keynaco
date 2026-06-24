@@ -29,7 +29,7 @@ extension DatabaseManager {
 
     /// 読みに完全一致する履歴候補をスコア付きで返す。
     /// `fetchHistoryScoredMerged`（prefix SUM 集計）と異なり、`input = reading` のスコアのみを返す。
-    /// `exactMatchHighHistory` の判定に使う。
+    /// `HistoryEntry.exactScore` の判定に使う。
     func fetchHistoryExactScored(reading: String) -> [(output: String, score: Double)] {
         dbQueue.sync {
             let now = self.nowEpoch()
