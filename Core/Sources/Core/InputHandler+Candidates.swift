@@ -91,7 +91,6 @@ extension InputHandler {
         let userDictPrefix: [String]
         /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
         let historyEntries: [HistoryEntry]
-        let historyEntryCount: Int
 
         func withAzooKey(candidates: [String], apiOrder: [String]) -> CandidateListSources {
             CandidateListSources(
@@ -101,8 +100,7 @@ extension InputHandler {
                 userDictRaw: userDictRaw,
                 userDictExact: userDictExact,
                 userDictPrefix: userDictPrefix,
-                historyEntries: historyEntries,
-                historyEntryCount: historyEntryCount
+                historyEntries: historyEntries
             )
         }
     }
@@ -128,12 +126,9 @@ extension InputHandler {
         // 1 output に exact / prefix 両方の score を集約（PLAN260624d）。
         var entriesByOutput: [String: HistoryEntry] = [:]
         var insertionOrder: [String] = []
-        var exactCount = 0
-        var prefixCount = 0
         for row in exactMatchScored where row.score >= CandidateScoreBuilder.historyScoreCutoff {
             if entriesByOutput[row.output] == nil {
                 insertionOrder.append(row.output)
-                exactCount += 1
             }
             entriesByOutput[row.output] = entriesByOutput[row.output]?.addingExact(row.score)
                 ?? HistoryEntry(output: row.output, score: .exact(row.score))
@@ -143,7 +138,6 @@ extension InputHandler {
                   !exactMatchHistoryOutputs.contains(row.output) else { continue }
             if entriesByOutput[row.output] == nil {
                 insertionOrder.append(row.output)
-                prefixCount += 1
             }
             entriesByOutput[row.output] = entriesByOutput[row.output]?.addingPrefix(row.score)
                 ?? HistoryEntry(output: row.output, score: .prefix(row.score))
@@ -156,8 +150,7 @@ extension InputHandler {
             userDictRaw: userDictRaw,
             userDictExact: userDictExact,
             userDictPrefix: userDictPrefix,
-            historyEntries: historyEntries,
-            historyEntryCount: exactCount + prefixCount
+            historyEntries: historyEntries
         )
     }
 
@@ -198,7 +191,7 @@ extension InputHandler {
 
         // 打鍵中で出すべき素材がゼロなら候補窓自体出さない（AzooKey 結果待ちの placeholder は廃止）。
         if trigger == .whileTyping,
-           sources.historyEntryCount == 0,
+           sources.historyEntries.isEmpty,
            sources.azooKeyCandidates.isEmpty,
            sources.userDictRaw.isEmpty,
            dateTimeCandidates.isEmpty,
@@ -250,7 +243,6 @@ extension InputHandler {
         // のケースでは score 順で漢字側が row 0 になるが、助詞入力は whileTyping の
         // builtin dismiss 経由 (Space 不要、Enter で marked text 直接確定) で完結
         // するため、Space 経由の selectedRow が変わっても実動線に影響なし。
-        let initialRow = 0
         guard !scoredLayout.candidates.isEmpty else {
             #if DEBUG
             recordCandidateBuildDiagnostics(
@@ -259,8 +251,7 @@ extension InputHandler {
                 outcome: .dismissedEmpty,
                 sources: sources,
                 scored: scored,
-                scoredLayout: scoredLayout,
-                initialRow: initialRow
+                scoredLayout: scoredLayout
             )
             #endif
             return .dismiss
@@ -272,19 +263,17 @@ extension InputHandler {
         //   - history/userDict/azooKey で機能語 text が row 0 に押し上げられたケース
         //   - userSetting hiraganaPreferred で機能語以外の reading が機能語 text を生むケース
         if trigger == .whileTyping,
-           initialRow < scoredLayout.candidates.count,
-           Self.isBuiltinFunctionalWord(scoredLayout.candidates[initialRow]) {
+           Self.isBuiltinFunctionalWord(scoredLayout.candidates[0]) {
             return dismissBuiltinFunctionalWordWhileTyping(
                 reading: h,
                 sources: sources,
                 scored: scored,
-                scoredLayout: scoredLayout,
-                initialRow: initialRow
+                scoredLayout: scoredLayout
             )
         }
 
-        if initialRow < scoredLayout.sources.count {
-            switch scoredLayout.sources[initialRow] {
+        if scoredLayout.sources.indices.contains(0) {
+            switch scoredLayout.sources[0] {
             case .hiraganaPreferred: lastInitialRowReason = .hiraganaPreferred
             case .hiraganaBuiltin: lastInitialRowReason = .hiraganaBuiltin
             default: lastInitialRowReason = .scoreOrder
@@ -299,13 +288,12 @@ extension InputHandler {
             outcome: .shown,
             sources: sources,
             scored: scored,
-            scoredLayout: scoredLayout,
-            initialRow: initialRow
+            scoredLayout: scoredLayout
         )
         #endif
         return .show(
             candidates: scoredLayout.candidates,
-            initialRow: initialRow,
+            initialRow: 0,
             fixedEnd: scoredLayout.fixedEnd,
             azooKeyApiOrder: apiOrder,
             initialIsExplicitlySelected: trigger == .explicit,
@@ -318,8 +306,7 @@ extension InputHandler {
         reading: String,
         sources: CandidateListSources,
         scored: [ScoredCandidate] = [],
-        scoredLayout: CandidateScoredLayout.Result? = nil,
-        initialRow: Int = 0
+        scoredLayout: CandidateScoredLayout.Result? = nil
     ) -> CandidateAction {
         #if DEBUG
         recordCandidateBuildDiagnostics(
@@ -328,8 +315,7 @@ extension InputHandler {
             outcome: .dismissedFunctionalWord,
             sources: sources,
             scored: scored,
-            scoredLayout: scoredLayout,
-            initialRow: initialRow
+            scoredLayout: scoredLayout
         )
         #endif
         return .dismiss
@@ -342,12 +328,10 @@ extension InputHandler {
         outcome: CandidateBuildDiagnostics.Outcome,
         sources: CandidateListSources,
         scored: [ScoredCandidate],
-        scoredLayout: CandidateScoredLayout.Result?,
-        initialRow: Int? = nil
+        scoredLayout: CandidateScoredLayout.Result?
     ) {
-        let resolvedInitialRow = initialRow ?? 0
         let initialText = scoredLayout.flatMap { layout in
-            layout.candidates.indices.contains(resolvedInitialRow) ? layout.candidates[resolvedInitialRow] : nil
+            layout.candidates.first
         }
         lastCandidateBuildDiagnostics = CandidateBuildDiagnostics(
             trigger: CandidateBuildDiagnosticsSupport.triggerLabel(trigger),
@@ -359,7 +343,7 @@ extension InputHandler {
             userDictExact: sources.userDictExact,
             azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8)),
             azooKeyApiOrder: Array(sources.azooKeyApiOrder.prefix(8)),
-            initialRow: resolvedInitialRow,
+            initialRow: 0,
             initialText: initialText,
             fixedEnd: scoredLayout?.fixedEnd ?? 0,
             scoredSources: scored.prefix(8).map { CandidateBuildDiagnosticsSupport.scoredSourceLabel($0) },
