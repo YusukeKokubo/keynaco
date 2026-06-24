@@ -1,12 +1,9 @@
 import XCTest
 @testable import KeynacoCore
 
-/// PLAN260624b Phase 1〜3: 旧 `InitialRowPolicyResolver` の挙動を
-/// `CandidateScoreBuilder` + `CandidateScoredLayout` に統合した後の row 0 を保証する。
-///
-/// resolver 完全削除（`.explicit` でも row 0 = layout.candidates.first）の仕様を
-/// 各 source 種別ごとに固定する回帰テスト。
-final class ResolverEquivalenceTests: XCTestCase {
+/// 統一スコアリング後の row 0（`CandidateScoredLayout.candidates.first`）を
+/// source 種別ごとに固定する回帰テスト。
+final class CandidateRow0Tests: XCTestCase {
 
     private func topCandidate(
         reading: String,
@@ -54,7 +51,6 @@ final class ResolverEquivalenceTests: XCTestCase {
     }
 
     /// userDict exact > 低 score 履歴 exact（PLAN260624b 仕様変更）
-    /// 旧 resolver では「履歴 > userDict」だったが、シンプル化方針として
     /// scoreBuilder のスコア順を採用。明示登録 > 偶然の低頻度履歴。
     func testUserDictExactBeatsLowScoreHistoryExact() {
         let top = topCandidate(
@@ -76,8 +72,6 @@ final class ResolverEquivalenceTests: XCTestCase {
     }
 
     /// AzooKey が reading の真部分文字列を rank 0 で返した場合も短い方が勝つ
-    /// （PLAN260624b 仕様変更: 実機 sandbox で AzooKey/Zenzai はこのケースを
-    /// 出さないため、resolver の特殊ロジックは dead code と判定）
     func testAzooKeyShorterPrefixTakesRow0() {
         let top = topCandidate(
             reading: "これでは",

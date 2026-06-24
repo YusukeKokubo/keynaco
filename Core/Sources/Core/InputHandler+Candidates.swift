@@ -177,7 +177,7 @@ extension InputHandler {
 
     private func hiraganaBonusKind(for reading: String) -> CandidateScoreBuilder.HiraganaBonusKind? {
         if hiraganaPreferredSet.contains(reading) { return .userSetting }
-        if HiraganaPreferredBuiltins.words[reading] != nil { return .builtin }
+        if Self.isBuiltinFunctionalWord(reading) { return .builtin }
         return nil
     }
 
@@ -221,17 +221,10 @@ extension InputHandler {
         if trigger == .whileTyping,
            Self.isBuiltinFunctionalWord(h),
            !hiraganaPreferredSet.contains(h) {
-            #if DEBUG
-            recordCandidateBuildDiagnostics(
-                trigger: trigger,
+            return dismissBuiltinFunctionalWordWhileTyping(
                 reading: h,
-                outcome: .dismissedFunctionalWord,
-                sources: sources,
-                scored: [],
-                scoredLayout: nil
+                sources: sources
             )
-            #endif
-            return .dismiss
         }
 
         let zenzaiActive = azooKeyConverter.isZenzaiEnabled && leftContext.azooKeyValue != nil
@@ -281,18 +274,13 @@ extension InputHandler {
         if trigger == .whileTyping,
            initialRow < scoredLayout.candidates.count,
            Self.isBuiltinFunctionalWord(scoredLayout.candidates[initialRow]) {
-            #if DEBUG
-            recordCandidateBuildDiagnostics(
-                trigger: trigger,
+            return dismissBuiltinFunctionalWordWhileTyping(
                 reading: h,
-                outcome: .dismissedFunctionalWord,
                 sources: sources,
                 scored: scored,
                 scoredLayout: scoredLayout,
                 initialRow: initialRow
             )
-            #endif
-            return .dismiss
         }
 
         if initialRow < scoredLayout.sources.count {
@@ -325,6 +313,28 @@ extension InputHandler {
         )
     }
 
+    /// whileTyping の機能語 dismiss（pre-build: reading / post-build: row 0 text）。
+    private mutating func dismissBuiltinFunctionalWordWhileTyping(
+        reading: String,
+        sources: CandidateListSources,
+        scored: [ScoredCandidate] = [],
+        scoredLayout: CandidateScoredLayout.Result? = nil,
+        initialRow: Int = 0
+    ) -> CandidateAction {
+        #if DEBUG
+        recordCandidateBuildDiagnostics(
+            trigger: .whileTyping,
+            reading: reading,
+            outcome: .dismissedFunctionalWord,
+            sources: sources,
+            scored: scored,
+            scoredLayout: scoredLayout,
+            initialRow: initialRow
+        )
+        #endif
+        return .dismiss
+    }
+
     #if DEBUG
     private mutating func recordCandidateBuildDiagnostics(
         trigger: CandidateListTrigger,
@@ -344,7 +354,7 @@ extension InputHandler {
             reading: reading,
             outcome: outcome,
             hiraganaPreferred: hiraganaPreferredSet.contains(reading),
-            hiraganaBuiltin: HiraganaPreferredBuiltins.words[reading] != nil,
+            hiraganaBuiltin: Self.isBuiltinFunctionalWord(reading),
             historyEntries: sources.historyEntries,
             userDictExact: sources.userDictExact,
             azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8)),

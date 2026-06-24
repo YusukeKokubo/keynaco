@@ -61,7 +61,7 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
             selectedRow: 1, wasExplicit: true,
             candidates: ["はし", "箸"], leftContext: nil,
             confirmedSource: "dict", initialRow: 0,
-            initialRowReason: "azooKey"
+            initialRowReason: InitialRowReason.scoreOrder.rawValue
         )
         XCTAssertNil(record.rescuedBy)
         XCTAssertNil(record.asDictionary()["rescued_by"] as? String)
@@ -74,7 +74,7 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
             selectedRow: 0, wasExplicit: false,
             candidates: ["処理", "しょり"], leftContext: nil,
             confirmedSource: "history", initialRow: 0,
-            initialRowReason: "exactMatchHistory"
+            initialRowReason: InitialRowReason.scoreOrder.rawValue
         )
         XCTAssertEqual(record.rescuedBy, "history")
         XCTAssertEqual(record.asDictionary()["rescued_by"] as? String, "history")
@@ -86,7 +86,8 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
             ts: 0, reading: "あい", z1: "愛", confirmed: "藍",
             selectedRow: 1, wasExplicit: true,
             candidates: ["愛", "藍"], leftContext: nil,
-            confirmedSource: "dict", initialRow: 0, initialRowReason: "scoreOrder",
+            confirmedSource: "dict", initialRow: 0,
+            initialRowReason: InitialRowReason.scoreOrder.rawValue,
             scoredSources: ["azooKey(0):愛(10.00)", "userDictExact:藍(50.00)"]
         )
         let dict = record.asDictionary()
@@ -100,7 +101,8 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
             ts: 0, reading: "あい", z1: "愛", confirmed: "藍",
             selectedRow: 1, wasExplicit: true,
             candidates: ["愛", "藍"], leftContext: nil,
-            confirmedSource: "dict", initialRow: 0, initialRowReason: "scoreOrder"
+            confirmedSource: "dict", initialRow: 0,
+            initialRowReason: InitialRowReason.scoreOrder.rawValue
         )
         XCTAssertNil(record.asDictionary()["scored_sources"])
     }
