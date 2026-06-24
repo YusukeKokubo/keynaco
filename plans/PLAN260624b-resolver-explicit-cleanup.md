@@ -1,10 +1,12 @@
 ---
 status: implemented
 created: 2026-06-24
-related_commit: 9e9c179
+related_commit: c08a148
 ---
 
 # PLAN260624b: `InitialRowPolicyResolver` の `.explicit` 経路整理
+
+> **後続クリーンアップ (2026-06-24)**: resolver 削除後のデッドコード整理 6 コミット（`09ba9c2`…`c08a148`）。`ResolverEquivalenceTests` → `CandidateRow0Tests`、`states.md` の passive/explicit Space、`assembleFromSources` 統合、機能語 dismiss ヘルパ化。E2E 回帰は `./scripts/test_candidate_cleanup_sandbox.sh`。
 
 ## 背景
 
@@ -76,7 +78,7 @@ static func resolve(_ input: InitialRowPolicyInput) -> InitialRowPolicy {
 
 ## Phase
 
-- [x] **Phase 1**: scoreBuilder の tie-break で吸収可能なケースを特定（`ResolverEquivalenceTests` 追加）
+- [x] **Phase 1**: scoreBuilder の tie-break で吸収可能なケースを特定（`CandidateRow0Tests` 追加）
   - ✅ **吸収可**: exact 単独 / userDict 単独 / azooKey 単独 / azooKey not prefix of reading
   - ❌ **drift 検出**: history > userDict（scoreBuilder では history=10.001 < userDict=50 で逆転）
   - ❌ **drift 検出**: reading > azooKey prefix（scoreBuilder に reading 全体ブースト無し、短い azooKey 勝ち）
@@ -85,7 +87,7 @@ static func resolve(_ input: InitialRowPolicyInput) -> InitialRowPolicy {
   - **drift A**: divergence_log に `initialRowReason` フィールド無し（後付け計測は時間コスト大）。シンプル化方針として「userDict > 低頻度履歴」を採用（ユーザー明示登録 > 偶然の低頻度履歴は直感的にも筋通る）
 - [x] **Phase 3**: resolver 完全削除
   - `InitialRowPolicyResolver.swift` 削除
-  - `InitialRowPolicyResolverTests.swift` 削除（`ResolverEquivalenceTests` に挙動を吸収）
+  - `InitialRowPolicyResolverTests.swift` 削除（`CandidateRow0Tests` に row 0 回帰を移管）
   - `InputHandler+Candidates.swift` の resolver 呼び出しを `initialRow = 0` に置換
   - `CandidateBuildDiagnostics.initialRowPolicy` フィールド削除（debug 内向きのみ、divergence_log には載ってないので影響なし）
   - 仕様変更に伴う既存テスト 3 件更新（`testSnap_E2_UserDictWithHighHistory` / `testSnap_I1_AllSectionsCombined` / `testExplicit_alsoFocusesScoreOrderPrefixHistory`）
