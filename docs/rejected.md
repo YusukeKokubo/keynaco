@@ -33,7 +33,7 @@ Zenzai 順序:                          表示順（lcid ソート後）:
 - `AzooKeyConverterTests.testPrimaryLcidByTextReadsFromCacheAfterRequest`
 - `BaseAzooKeyStub` / `AzooKeyAsyncSchedulerTests` の `primaryLcidByText` スタブ実装
 
-**残すもの**: `LcidRank`（`InitialRowPolicyResolver.rankForPrefixFocus` の品詞別モーラ閾値で使用）、`AzooKeyLcidMapper.rank(for:)`（同上の正本）、`AzooKeyConverter.primaryLcid(from:)`（`lcidForCommitted` 経由で履歴の lcid 記録に使用）。
+**残すもの**: `AzooKeyLcidMapper.classification(for:)`（POS 分類・backfill）、`AzooKeyConverter.primaryLcid(from:)`（`lcidForCommitted` 経由で履歴の lcid 記録に使用）。`LcidRank` / `rank(for:)` は prefix focus・lcid ソート削除に伴い 2026-06-24 廃止。
 
 **再検討するなら**: Zenzai が完全にオフかつ文脈なしの状況でも、AzooKey 生候補で助詞が冒頭に並ぶような目立つ崩れが観測されたとき。ただしその場合も「すべての候補を品詞でソート」ではなく「助詞・助動詞を末尾に回す」だけのフィルタにすべき。Zenzai が有効な経路には絶対に噛ませない。
 
@@ -203,7 +203,7 @@ konnyaku →  k+o=こ  /  n+n=ん  /  y+a=や  /  k+u=く  →  こんやく  �
 - **常時コスト**: タイブレーク発火の有無に関わらず、毎クエリで lcid/pos サブクエリ2本を実行（DB 単体は軽いが設計上の無駄）
 - **`forHistory` / `from(lcid:)` の二系統**: 読めるが意図の説明が要る
 
-**残すもの**: Phase A（AzooKey 辞書 lcid ソート）、Phase D（`history.lcid` 列・backfill・設定 UI）。`LcidRank` は辞書ソート専用に継続。
+**残すもの**: Phase D（`history.lcid` 列・backfill・設定 UI）。Phase A/B/C の lcid ソート・`LcidRank` は P-7 および 2026-06-24 の整理で廃止。
 
 **再検討するなら**: 同スコア帯の行だけ lcid を遅延取得する、または履歴枠を広げて効果を体感できるか先に POC する。
 

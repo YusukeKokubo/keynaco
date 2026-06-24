@@ -891,7 +891,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
                 return ""
             }
             for key in [
-                "trigger", "outcome", "initialRowPolicy", "initialText",
+                "trigger", "outcome", "initialText",
             ] {
                 let val = buildStr(key)
                 if !val.isEmpty { lines.append("\(key.padding(toLength: 25, withPad: " ", startingAt: 0)): \(val)") }

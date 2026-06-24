@@ -141,10 +141,10 @@ fast + slow 両方（CI・リリース前）:
 
 `fixedEnd` は先頭から連続する hiragana preferred 行数（Zenzai 診断用）。sandbox では `candidateEntries[].section` を見る。
 
-### 初期行（`InitialRowPolicyResolver`）
+### 初期行
 
-- `.explicit`（Space 等）: 読み完全一致履歴 → ユーザー辞書 exact → 読みそのもの → AzooKey 先頭の順で `firstMatching`
-- `.whileTyping`: スコア順先頭（`afterFixed`、通常 row 0）。builtin 助詞のみ候補なら dismiss
+- `.explicit` / `.whileTyping` とも **スコア降順 row 0**（`CandidateScoreBuilder` + `CandidateScoredLayout`）
+- `.whileTyping` で組み込み助詞 reading、または row 0 が機能語なら dismiss（concept 指針 1）
 
 ## パフォーマンス計測
 
@@ -180,7 +180,7 @@ Instruments によるプロファイリングは IME では実用的でない（
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。Shift+`,`/`.` は `characters` が `<`/`>` となり Bracket モード（`＜`/`＞` 候補）に入る
 - **z シーケンス**: `z` + 記号/矢印キーで特殊文字を挿入（`zCharMap` / `zArrowMap` 定義）。`InputHandlerZSequenceTests.swift` 参照。
 - **Bracket モード（`?` / `(` / `[` / `{` / `「` / `,` / `.` 等）**: 組成なし・ASCII モードでない状態でトリガー。`bracketOptions` マップで対応文字ペアを定義。US キーボードの `?` は `Shift+/`（`baseCharacters="/"`）なのでキーボード判定が必要（`InputHandler+Candidates.swift` 参照）。
-- **Space（keyCode 49）**: 組成中・候補非表示なら候補窓表示（`buildCandidateList(trigger: .explicit)`）。候補表示中なら次候補（リスト再構築なし）。未吸収ローマ字があるときだけ組み込み後に `.explicit` で再構築。
+- **Space（keyCode 49）**: 組成中・候補非表示なら候補窓表示（`buildCandidateList(trigger: .explicit)`）。候補表示中は passive なら explicit リビルド、explicit 選択済みなら次候補。未吸収ローマ字があるときは組み込み後に `.explicit` で再構築。
 
 ## macOS 26 IME の罠
 

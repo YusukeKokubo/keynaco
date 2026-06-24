@@ -134,7 +134,7 @@ final class CandidateScoreBuilderTests: XCTestCase {
 
     /// **不変条件回帰テスト**: 同 output に exact / prefix 両方の score が乗っている `.both` で、
     /// upsert の dedup は「高スコア優先 → 同点なら sourceSortKey 小（= exact 側）」で解決する。
-    /// production の `collectCheapCandidateSources` は exact 優先で抜くため `.both` は稀だが、
+    /// production の `collectLocalCandidateSources` は exact 優先で抜くため `.both` は稀だが、
     /// builder 単体としての契約は維持する。
     func testHistoryEntryWithBothScoresPrefersExactOnTie() {
         let entry = HistoryEntry(output: "漢字", score: .both(exact: 50, prefix: 50))

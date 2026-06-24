@@ -41,13 +41,8 @@ extension InputHandler {
             : nil
         let peekRaw = peek?.candidates ?? []
         let pendingReading: String? = needsAzooKey && peek?.needsAsyncFetch != false ? h : nil
-        let cheap = collectCheapCandidateSources(readingOverride: h)
-        let sources = makeCandidateListSources(
-            h: h,
-            cheap: cheap,
-            azooKeyCandidates: peekRaw.texts,
-            azooKeyApiOrder: peekRaw.texts
-        )
+        let sources = collectLocalCandidateSources(reading: h)
+            .withAzooKey(candidates: peekRaw.texts, apiOrder: peekRaw.texts)
         let action = assembleCandidateList(from: sources, trigger: trigger)
         return (action, pendingReading)
     }
@@ -62,13 +57,11 @@ extension InputHandler {
         trigger: CandidateListTrigger = .whileTyping
     ) -> CandidateAction {
         guard state.composedHiragana == reading else { return .none }
-        let cheap = collectCheapCandidateSources(readingOverride: reading)
-        let sources = makeCandidateListSources(
-            h: reading,
-            cheap: cheap,
-            azooKeyCandidates: azooKeyCandidates.texts,
-            azooKeyApiOrder: azooKeyCandidates.texts
-        )
+        let sources = collectLocalCandidateSources(reading: reading)
+            .withAzooKey(
+                candidates: azooKeyCandidates.texts,
+                apiOrder: azooKeyCandidates.texts
+            )
         let action = assembleCandidateList(from: sources, trigger: trigger)
         clearPendingAzooKeyReading()
         return action
@@ -85,15 +78,6 @@ extension InputHandler {
         return assembleCandidateList(from: sources, trigger: trigger)
     }
 
-    private struct CheapCandidateSources {
-        let userDictRaw: [String]
-        let userDictExact: [String]
-        let userDictPrefix: [String]
-        /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
-        let historyEntries: [HistoryEntry]
-        let highHistoryCount: Int
-    }
-
     private struct CandidateListSources {
         let h: String
         let azooKeyCandidates: [String]
@@ -105,6 +89,19 @@ extension InputHandler {
         /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
         let historyEntries: [HistoryEntry]
         let highHistoryCount: Int
+
+        func withAzooKey(candidates: [String], apiOrder: [String]) -> CandidateListSources {
+            CandidateListSources(
+                h: h,
+                azooKeyCandidates: candidates,
+                azooKeyApiOrder: apiOrder,
+                userDictRaw: userDictRaw,
+                userDictExact: userDictExact,
+                userDictPrefix: userDictPrefix,
+                historyEntries: historyEntries,
+                highHistoryCount: highHistoryCount
+            )
+        }
     }
 
     private mutating func collectCandidateSources(
@@ -112,22 +109,14 @@ extension InputHandler {
         readingOverride: String? = nil
     ) -> CandidateListSources {
         let h = readingOverride ?? state.composedHiragana
-        let cheap = collectCheapCandidateSources(readingOverride: readingOverride)
         let azooKeyCandidates = fetchAzooKeyCandidates(reading: h, trigger: trigger)
-        return makeCandidateListSources(
-            h: h,
-            cheap: cheap,
-            azooKeyCandidates: azooKeyCandidates,
-            azooKeyApiOrder: azooKeyCandidates
-        )
+        return collectLocalCandidateSources(reading: h)
+            .withAzooKey(candidates: azooKeyCandidates, apiOrder: azooKeyCandidates)
     }
 
-    private mutating func collectCheapCandidateSources(
-        readingOverride: String? = nil
-    ) -> CheapCandidateSources {
-        let h = readingOverride ?? state.composedHiragana
-        let isAscii = h.allSatisfy({ $0.isASCII })
-        let historyKey = (!h.isEmpty && isAscii) ? h.lowercased() : h
+    private mutating func collectLocalCandidateSources(reading: String) -> CandidateListSources {
+        let isAscii = reading.allSatisfy({ $0.isASCII })
+        let historyKey = (!reading.isEmpty && isAscii) ? reading.lowercased() : reading
         let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
         let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
@@ -158,7 +147,10 @@ extension InputHandler {
                 ?? HistoryEntry(output: row.output, score: .prefix(row.score))
         }
         let historyEntries = insertionOrder.compactMap { entriesByOutput[$0] }
-        return CheapCandidateSources(
+        return CandidateListSources(
+            h: reading,
+            azooKeyCandidates: [],
+            azooKeyApiOrder: [],
             userDictRaw: userDictRaw,
             userDictExact: userDictExact,
             userDictPrefix: userDictPrefix,
@@ -179,24 +171,6 @@ extension InputHandler {
             richCandidates: richCandidates
         )
         return raw.texts
-    }
-
-    private func makeCandidateListSources(
-        h: String,
-        cheap: CheapCandidateSources,
-        azooKeyCandidates: [String],
-        azooKeyApiOrder: [String] = []
-    ) -> CandidateListSources {
-        CandidateListSources(
-            h: h,
-            azooKeyCandidates: azooKeyCandidates,
-            azooKeyApiOrder: azooKeyApiOrder,
-            userDictRaw: cheap.userDictRaw,
-            userDictExact: cheap.userDictExact,
-            userDictPrefix: cheap.userDictPrefix,
-            historyEntries: cheap.historyEntries,
-            highHistoryCount: cheap.highHistoryCount
-        )
     }
 
     private func hiraganaBonusKind(for reading: String) -> CandidateScoreBuilder.HiraganaBonusKind? {
@@ -241,8 +215,10 @@ extension InputHandler {
             return .dismiss
         }
 
-        // 打鍵中: 組み込み助詞等は UI 非表示（concept 指針 1）。
-        if trigger == .whileTyping, hiraganaBonusKind(for: h) == .builtin {
+        // 打鍵中: 組み込み助詞等の reading は UI 非表示（concept 指針 1）。
+        if trigger == .whileTyping,
+           Self.isBuiltinFunctionalWord(h),
+           !hiraganaPreferredSet.contains(h) {
             #if DEBUG
             recordCandidateBuildDiagnostics(
                 trigger: trigger,
