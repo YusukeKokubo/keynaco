@@ -165,12 +165,8 @@ extension InputHandler {
                 insertionOrder.append(row.output)
                 exactCount += 1
             }
-            let prev = entriesByOutput[row.output]
-            entriesByOutput[row.output] = HistoryEntry(
-                output: row.output,
-                exactScore: row.score,
-                prefixScore: prev?.prefixScore
-            )
+            entriesByOutput[row.output] = entriesByOutput[row.output]?.addingExact(row.score)
+                ?? HistoryEntry(output: row.output, score: .exact(row.score))
         }
         for row in historyScored {
             historyOutputSet.insert(row.output)
@@ -180,12 +176,8 @@ extension InputHandler {
                 insertionOrder.append(row.output)
                 prefixCount += 1
             }
-            let prev = entriesByOutput[row.output]
-            entriesByOutput[row.output] = HistoryEntry(
-                output: row.output,
-                exactScore: prev?.exactScore,
-                prefixScore: row.score
-            )
+            entriesByOutput[row.output] = entriesByOutput[row.output]?.addingPrefix(row.score)
+                ?? HistoryEntry(output: row.output, score: .prefix(row.score))
         }
         let historyEntries = insertionOrder.compactMap { entriesByOutput[$0] }
         return CheapCandidateSources(

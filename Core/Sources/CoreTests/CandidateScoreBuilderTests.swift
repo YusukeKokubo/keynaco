@@ -18,17 +18,18 @@ final class CandidateScoreBuilderTests: XCTestCase {
         var byOutput: [String: HistoryEntry] = [:]
         var order: [String] = []
         for o in exact {
-            byOutput[o] = HistoryEntry(output: o, exactScore: exactScores[o], prefixScore: nil)
+            guard let s = exactScores[o] else { continue }
+            byOutput[o] = HistoryEntry(output: o, score: .exact(s))
             order.append(o)
         }
         for o in prefix where byOutput[o] == nil {
-            byOutput[o] = HistoryEntry(output: o, exactScore: nil, prefixScore: prefixScores[o])
+            guard let s = prefixScores[o] else { continue }
+            byOutput[o] = HistoryEntry(output: o, score: .prefix(s))
             order.append(o)
         }
         for o in prefix {
-            if let prev = byOutput[o], prev.prefixScore == nil {
-                byOutput[o] = HistoryEntry(output: o, exactScore: prev.exactScore, prefixScore: prefixScores[o])
-            }
+            guard let s = prefixScores[o], let prev = byOutput[o], prev.prefixScore == nil else { continue }
+            byOutput[o] = prev.addingPrefix(s)
         }
         let entries = order.compactMap { byOutput[$0] }
         return CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
@@ -192,8 +193,8 @@ final class CandidateScoredLayoutTests: XCTestCase {
             reading: "じょう",
             hiraganaBonus: nil,
             historyEntries: [
-                HistoryEntry(output: "上", exactScore: 9),
-                HistoryEntry(output: "情報共有", prefixScore: 93),
+                HistoryEntry(output: "上", score: .exact(9)),
+                HistoryEntry(output: "情報共有", score: .prefix(93)),
             ],
             userDictExact: [],
             userDictPrefix: [],
@@ -212,7 +213,7 @@ final class CandidateScoredLayoutTests: XCTestCase {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: "の",
             hiraganaBonus: .builtin,
-            historyEntries: [HistoryEntry(output: "ノックアウト", prefixScore: 25)],
+            historyEntries: [HistoryEntry(output: "ノックアウト", score: .prefix(25))],
             userDictExact: [],
             userDictPrefix: [],
             azooKeyCandidates: ["ノ", "之"],

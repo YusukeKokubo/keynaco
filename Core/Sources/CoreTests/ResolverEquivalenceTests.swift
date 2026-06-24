@@ -16,7 +16,7 @@ final class ResolverEquivalenceTests: XCTestCase {
         azooKey: [String] = []
     ) -> String? {
         let entries = exact.compactMap { o in
-            exactScores[o].map { HistoryEntry(output: o, exactScore: $0) }
+            exactScores[o].map { HistoryEntry(output: o, score: .exact($0)) }
         }
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: reading,
