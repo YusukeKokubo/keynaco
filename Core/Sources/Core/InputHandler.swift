@@ -331,6 +331,11 @@ public struct InputHandler {
         } else {
             confirmedSource = "dict"
         }
+        #if DEBUG
+        let scoredSources = lastCandidateBuildDiagnostics?.scoredSources
+        #else
+        let scoredSources: [String]? = nil
+        #endif
         pendingDivergenceRecord = CandidateDivergenceRecord(
             ts: nowMs,
             reading: reading,
@@ -342,7 +347,8 @@ public struct InputHandler {
             leftContext: leftContext.azooKeyValue,
             confirmedSource: confirmedSource,
             initialRow: candidateSession.initialRow,
-            initialRowReason: lastInitialRowReason
+            initialRowReason: lastInitialRowReason,
+            scoredSources: scoredSources
         )
     }
 

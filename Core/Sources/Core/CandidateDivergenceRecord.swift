@@ -22,6 +22,11 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
     /// 初期行を選んだ理由。"hiraganaPreferred" / "hiraganaBuiltin" / "exactMatchHistory" / "historyPrefix" / "userDictExact" / "azooKey" / "scoreOrder"。
     public let initialRowReason: String
 
+    /// 候補ごとの source + score の compact 表現（例: `"historyExact:漢字(8.50)"`）。
+    /// Debug ビルドのみ。後から score 設計（`userDictExactScore` 等の固定値）の妥当性を
+    /// シミュレートするための判断材料として残す。先頭 8 件まで。
+    public let scoredSources: [String]?
+
     /// Z1 と確定がズレた要因。
     ///
     /// - `nil`（= `was_explicit=true`）: ユーザーが手で候補を navigate して選んだ。**真の UX 損失**で、
@@ -45,7 +50,8 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
         leftContext: String?,
         confirmedSource: String,
         initialRow: Int,
-        initialRowReason: String
+        initialRowReason: String,
+        scoredSources: [String]? = nil
     ) {
         self.ts = ts
         self.reading = reading
@@ -58,6 +64,7 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
         self.confirmedSource = confirmedSource
         self.initialRow = initialRow
         self.initialRowReason = initialRowReason
+        self.scoredSources = scoredSources
     }
 
     public func asDictionary() -> [String: Any] {
@@ -75,6 +82,7 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
         ]
         if let leftContext { dict["left_context"] = leftContext }
         if let rescued = rescuedBy { dict["rescued_by"] = rescued }
+        if let scoredSources { dict["scored_sources"] = scoredSources }
         return dict
     }
 }

@@ -80,6 +80,31 @@ final class CandidateDivergenceTests: InputHandlerTestCase {
         XCTAssertEqual(record.asDictionary()["rescued_by"] as? String, "history")
     }
 
+    /// scoredSources が divergence_log JSON に含まれる（score 設計の事後シミュレーション用）。
+    func testScoredSourcesEmittedInDictionary() {
+        let record = CandidateDivergenceRecord(
+            ts: 0, reading: "あい", z1: "愛", confirmed: "藍",
+            selectedRow: 1, wasExplicit: true,
+            candidates: ["愛", "藍"], leftContext: nil,
+            confirmedSource: "dict", initialRow: 0, initialRowReason: "scoreOrder",
+            scoredSources: ["azooKey(0):愛(10.00)", "userDictExact:藍(50.00)"]
+        )
+        let dict = record.asDictionary()
+        XCTAssertEqual(dict["scored_sources"] as? [String],
+                       ["azooKey(0):愛(10.00)", "userDictExact:藍(50.00)"])
+    }
+
+    /// scoredSources が nil なら JSON キーごと省略（後方互換）。
+    func testScoredSourcesOmittedWhenNil() {
+        let record = CandidateDivergenceRecord(
+            ts: 0, reading: "あい", z1: "愛", confirmed: "藍",
+            selectedRow: 1, wasExplicit: true,
+            candidates: ["愛", "藍"], leftContext: nil,
+            confirmedSource: "dict", initialRow: 0, initialRowReason: "scoreOrder"
+        )
+        XCTAssertNil(record.asDictionary()["scored_sources"])
+    }
+
     /// confirmedSource が空文字なら rescuedBy=nil（旧形式互換）。
     func testRescuedByNilWhenSourceEmpty() {
         let record = CandidateDivergenceRecord(
