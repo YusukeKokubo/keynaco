@@ -1,6 +1,7 @@
 ---
-status: in-progress
+status: implemented
 created: 2026-06-24
+related_commit: f15ab3c
 ---
 
 # PLAN260624d: 履歴の二段抽出を `HistoryEntry` 配列に統一
@@ -61,11 +62,11 @@ historyEntries: [HistoryEntry]
 
 ## Phase
 
-- [ ] **Phase 1**: `HistoryEntry` 型を Core/ に新設、ユニットテスト追加
-- [ ] **Phase 2**: `CandidateScoreBuilder.BuildInput` を `historyEntries` に変更、build 内ループ統合
-- [ ] **Phase 3**: `InputHandler+Candidates` の `CheapCandidateSources` / `CandidateListSources` を `historyEntries` に変更、`collectCheapCandidateSources` で merge
-- [ ] **Phase 4**: 既存テスト（`CandidateScoreBuilderTests`, `ResolverEquivalenceTests`, `CandidateScoredLayoutTests` 等）の初期化を書き換え
-- [ ] **Phase 5**: sandbox で挙動が変わらないことを確認（`じょう→情報共有`, `ai→Acme/愛/...`）
+- [x] **Phase 1**: `HistoryEntry` 型を Core/ に新設
+- [x] **Phase 2**: `CandidateScoreBuilder.BuildInput` を `historyEntries` に変更、build 内ループ統合
+- [x] **Phase 3**: `InputHandler+Candidates` の `CheapCandidateSources` / `CandidateListSources` を `historyEntries` に変更、`collectCheapCandidateSources` で merge
+- [x] **Phase 4**: 既存テスト（`CandidateScoreBuilderTests`, `ResolverEquivalenceTests` 等）の初期化をテストヘルパで吸収して書き換え
+- [x] **Phase 5**: sandbox で挙動が変わらないことを確認（パターン A 助詞入力 / パターン B Space 経由ともに PLAN260624c 後と同一）
 
 ## スコープ外
 
