@@ -53,11 +53,11 @@ Step 1 (誤変換検出削除)
 
 ## 完了条件（Phase 2 全体）
 
-- [ ] Step 1–4 のコード変更完了
-- [ ] `cd Core && swift test` パス
-- [ ] `xcodebuild test -scheme keynaco -destination "platform=macOS"` パス
-- [ ] 該当 `docs/domain/*.md` と `CLAUDE.md` を各 Step で更新
-- [ ] `/keynaco-ime-sandbox` で Successor 基本フロー回帰（名詞確定 → 1 打目 → 候補表示 → 確定）
+- [x] Step 1–4 のコード変更完了
+- [x] `cd Core && swift test` パス
+- [x] `xcodebuild test -scheme keynaco -destination "platform=macOS"` パス
+- [x] 該当 `docs/domain/*.md` と `CLAUDE.md` を各 Step で更新
+- [x] `/keynaco-ime-sandbox` で Successor 基本フロー回帰（名詞確定 → 1 打目 → 候補表示 → 確定）
 
 ## 見積もり（削除 LOC 概算）
 

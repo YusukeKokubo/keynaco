@@ -69,6 +69,6 @@ sandbox:
 
 ## 完了条件
 
-- [ ] `boundary_pref` 関連コード削除
-- [ ] テスト更新・パス
-- [ ] glossary / architecture 更新
+- [x] `boundary_pref` 関連コード削除
+- [x] テスト更新・パス
+- [x] glossary / architecture 更新
