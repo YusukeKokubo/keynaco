@@ -20,7 +20,7 @@ public struct CandidateDivergenceRecord: Sendable, Equatable {
     /// `.show` 時の初期選択行。ユーザーがスクロールしていれば `selectedRow` と異なる。
     public let initialRow: Int
     /// 初期行を選んだ理由（`InitialRowReason.rawValue`）。production で emit される値は
-    /// `afterFixed` / `hiraganaPreferred` / `hiraganaBuiltin` / `scoreOrder` の 4 種。
+    /// `hiraganaPreferred` / `hiraganaBuiltin` / `scoreOrder` の 3 種。
     public let initialRowReason: String
 
     /// 候補ごとの source + score の compact 表現（例: `"historyExact:漢字(8.50)"`）。

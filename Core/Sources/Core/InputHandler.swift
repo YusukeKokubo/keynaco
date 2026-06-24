@@ -139,10 +139,7 @@ public struct InputHandler {
     /// インスタンス状態へ移さない（意図的なグローバルモード）。
     public nonisolated(unsafe) static var isAsciiMode = false
 
-    /// ひらがな優先語彙セット（DB `hiragana_preferred` テーブルから読み込み、設定変更時に再取得）。
-    ///
-    /// 役割: この集合に含まれる読みのとき、履歴スコア・予測候補の有無に関わらず
-    /// `initialRow` をひらがな行にする（`assembleCandidateList`）。
+    /// 役割: この集合に含まれる読みには `CandidateScoreBuilder` の hiragana bonus（score 100）を付与する。
     public var hiraganaPreferredSet: Set<String> = []
     static let sentenceTerminators: Set<String> = ["。", "！", "？"]
     /// 文脈をリセットせず、かつ N-gram・履歴にも記録しない句読点。
@@ -196,7 +193,7 @@ public struct InputHandler {
     /// `commitComposition` で Z1 ≠ confirmed を検出した直近 1 件。`InputController` が引き取って flush する。
     public var pendingDivergenceRecord: CandidateDivergenceRecord? = nil
     /// 直近 `assembleCandidateList` で決定した初期行の理由。divergence log に `rawValue` で付与する。
-    var lastInitialRowReason: InitialRowReason = .afterFixed
+    var lastInitialRowReason: InitialRowReason = .scoreOrder
     /// 直近 `doBackspace` で `penalizeAll` が実行されたか。次キーで `InputController` が前セッション record に反映。
     public var lastKeyDownDidPenalize = false
     /// 左文脈の解決結果。`LeftContextSource` で組み立て、`InputController` / サンドボックスが各 keyDown 前に設定。
