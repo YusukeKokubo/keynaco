@@ -591,8 +591,8 @@ print(f"selectedRow={r['selectedRow']}, selectedText={r['selectedText']!r}")
 - `isZenzaiEnabled=false` → 設定画面で Zenzai をオンにする
 - `leftSideContext=''` → `set_left_context` でコンテキストをセットする
 - `fixedEnd=0` → Zenzai プロモートなし（上 2 点を確認）
-- `fixedEnd>=1, selectedRow>0` → initialRow がプロモート行をスキップしとる（バグ候補）
-- `fixedEnd>=1, selectedRow=0` → 正常（Zenzai top-1 が初期表示）
+- `fixedEnd>=1, selectedRow=0` → 正常（`.show` 直後は常に row 0。Zenzai 診断用 fixed 範囲あり）
+- `fixedEnd>=1, selectedRow>0` → ユーザーが ↑↓/Space で移動済み（正常。initial row ポリシーは廃止済み）
 
 ## 注意点
 

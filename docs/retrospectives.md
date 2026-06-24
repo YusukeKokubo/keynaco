@@ -172,7 +172,7 @@ memory・ドキュメントに書かれた識別子（関数名・フラグ名�
 
 ## キーの意味は文脈依存——`isExplicitlySelected` で「次候補」と「明示変換要求」を分ける
 
-候補ウィンドウ表示中の Space を「次候補」と一律に解釈する設計は、AzooKey が**自動表示した候補**にも適用されて意図しない確定を引き起こす。**ユーザーが一度も明示選択していない状態（`candidateSession.isExplicitlySelected == false`）の Space は「次候補」ではなく「明示変換要求」**として扱い、`buildCandidateList(.explicit)` で initialRow=0 から再開する。↓・Tab・Space のうちユーザーが触ったあと（`true` 移行後）は通常通り `.selectNext` に進める。
+候補ウィンドウ表示中の Space を「次候補」と一律に解釈する設計は、AzooKey が**自動表示した候補**にも適用されて意図しない確定を引き起こす。**ユーザーが一度も明示選択していない状態（`candidateSession.isExplicitlySelected == false`）の Space は「次候補」ではなく「明示変換要求」**として扱い、`buildCandidateList(.explicit)` で `selectedRow=0` から再開する（`.show` は常にスコア順 row 0）。↓・Tab・Space のうちユーザーが触ったあと（`true` 移行後）は通常通り `.selectNext` に進める。
 
 **なぜ**: 「候補表示中」と「ユーザーが候補を見て選んだ」は別。AzooKey 非同期 fetch 完了で自動的に候補窓が出るパスがあるため、画面に見えている＝ユーザー意図、と短絡できない。`isExplicitlySelected` フラグはこの区別のためにある。これを参照せずキー操作を分岐すると、自動表示の Z1 を Space で素通りする事故が起きる。
 

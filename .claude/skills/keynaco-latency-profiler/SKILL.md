@@ -77,7 +77,7 @@ JSONL 形式（1行1セッション）。セッションは「5確定以上 + 5�
 
 ## 分析の進め方
 
-まず `scripts/analyze.py` を実行して全体像を把握する。スクリプトは以下を出力する：
+まず `.claude/skills/keynaco-latency-profiler/scripts/analyze.py` を実行して全体像を把握する。スクリプトは以下を出力する：
 
 ```bash
 # 全セッション集計

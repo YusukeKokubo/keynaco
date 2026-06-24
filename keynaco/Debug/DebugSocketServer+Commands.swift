@@ -532,7 +532,7 @@ extension DebugSocketServer {
         return Self.finalize(["stats": snap.asDictionary()], cmd: cmd)
     }
 
-    /// `{"diagnostics": true}` で直近 `assembleCandidateList` の入力・policy・initialRow を返す。
+    /// `{"diagnostics": true}` で直近 `assembleCandidateList` の入力・`initialText`・`scoredSources` 等を返す。
     func handleDiagnostics(cmd: [String: Any]) -> [String: Any] {
         if let diag = handler.lastCandidateBuildDiagnostics {
             return Self.finalize(["diagnostics": diag.asDictionary()], cmd: cmd)

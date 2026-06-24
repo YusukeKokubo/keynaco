@@ -115,7 +115,7 @@ Plan を Phase / マイグレーション段階に分けて書く場合は、各
 
 ### Phase 3: dead code 削除
 - [x] HistoryPrefixPromotion.swift 削除
-- [ ] InitialRowPolicyResolver 縮小  ← まだ残っとる
+- [x] InitialRowPolicyResolver 削除
 ```
 
 **ルール**:

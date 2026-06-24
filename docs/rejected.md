@@ -59,7 +59,7 @@ Zenzai 順序:                          表示順（lcid ソート後）:
 - 残すと「`hiraganaInHistory` で何かが切り替わっとる」と読み手に誤解させる
 - ログ（`input_log.jsonl` / `latency_log.jsonl`）に flag の効果を測定できる計装がなく、効果検証も不可能だった
 
-**残すもの**: `isHiraganaPreferred` 自体（`hiraganaPreferredSet` ＋ `HiraganaPreferredBuiltins`）、`fixedSlot=.hiragana` 経路、function-word による打鍵中 dismiss（`HiraganaPreferredBuiltins.words[layout.candidates[initialRow]] != nil`）。
+**残すもの**（当時）: `isHiraganaPreferred` 自体（`hiraganaPreferredSet` ＋ `HiraganaPreferredBuiltins`）、`fixedSlot=.hiragana` 経路、function-word による打鍵中 dismiss。現行（PLAN260624 以降）の dismiss は `isBuiltinFunctionalWord(scoredLayout.candidates[0])`（row 0 固定）。
 
 **削除した周辺**:
 
