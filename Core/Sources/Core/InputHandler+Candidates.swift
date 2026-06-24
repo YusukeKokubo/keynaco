@@ -348,12 +348,12 @@ extension InputHandler {
 
         if initialRow < scoredLayout.sources.count {
             switch scoredLayout.sources[initialRow] {
-            case .hiraganaPreferred: lastInitialRowReason = "hiraganaPreferred"
-            case .hiraganaBuiltin: lastInitialRowReason = "hiraganaBuiltin"
-            default: lastInitialRowReason = "scoreOrder"
+            case .hiraganaPreferred: lastInitialRowReason = .hiraganaPreferred
+            case .hiraganaBuiltin: lastInitialRowReason = .hiraganaBuiltin
+            default: lastInitialRowReason = .scoreOrder
             }
         } else {
-            lastInitialRowReason = "scoreOrder"
+            lastInitialRowReason = .scoreOrder
         }
         #if DEBUG
         recordCandidateBuildDiagnostics(
