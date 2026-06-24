@@ -247,8 +247,6 @@ extension InputHandler {
         let numberCandidates = InputHandler.generateNumberCandidates(for: h)
         let dateTimeCandidates = InputHandler.generateDateTimeCandidates(for: h)
 
-        let isHiraganaPref = isHiraganaPreferred(h)
-
         // 打鍵中で出すべき素材がゼロなら候補窓自体出さない（AzooKey 結果待ちの placeholder は廃止）。
         if trigger == .whileTyping,
            sources.highHistoryCount == 0,
@@ -304,12 +302,14 @@ extension InputHandler {
         let scoredLayout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
             scored: scored
         ))
-        let initialRow: Int
-        if isHiraganaPref {
-            initialRow = scoredLayout.candidates.firstIndex(of: h) ?? 0
-        } else {
-            initialRow = 0
-        }
+        // 初期行は score 順先頭で確定（PLAN260624b/c）。
+        // hiraganaPreferred (userSetting/builtin) の reading は scoreBuilder の
+        // hiraganaBonus(100/80) で大半が row 0 に来る。`は`/`と`/`で`/`か` のような
+        // 短い reading + 超高 score の prefix history (例: `は` → `話` SUM 138.7)
+        // のケースでは score 順で漢字側が row 0 になるが、助詞入力は whileTyping の
+        // builtin dismiss 経由 (Space 不要、Enter で marked text 直接確定) で完結
+        // するため、Space 経由の selectedRow が変わっても実動線に影響なし。
+        let initialRow = 0
         guard !scoredLayout.candidates.isEmpty else {
             #if DEBUG
             recordCandidateBuildDiagnostics(
@@ -344,9 +344,12 @@ extension InputHandler {
             return .dismiss
         }
 
-        if initialRow < scoredLayout.sources.count,
-           CandidateScoreBuilder.isHiraganaPreferredSource(scoredLayout.sources[initialRow]) {
-            lastInitialRowReason = isHiraganaPref ? "hiraganaPreferred" : "hiraganaBuiltin"
+        if initialRow < scoredLayout.sources.count {
+            switch scoredLayout.sources[initialRow] {
+            case .hiraganaPreferred: lastInitialRowReason = "hiraganaPreferred"
+            case .hiraganaBuiltin: lastInitialRowReason = "hiraganaBuiltin"
+            default: lastInitialRowReason = "scoreOrder"
+            }
         } else {
             lastInitialRowReason = "scoreOrder"
         }

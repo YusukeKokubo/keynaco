@@ -108,9 +108,10 @@ final class ResolverEquivalenceTests: XCTestCase {
         XCTAssertEqual(top, "ない", "userSetting bonus(100) が history(<= 10.001) を上回り row 0")
     }
 
-    /// PLAN260624c (rejected.md R-2): builtin reading に対する高 SUM の prefix history は
-    /// builtin bonus(80) を超え、scoreBuilder 単体では reading 行が row 0 から外れる。
-    /// このため `if isHiraganaPref { firstMatching }` 分岐が必要 — `initialRow = 0` 一行化は不可。
+    /// PLAN260624c: builtin reading に対する高 SUM の prefix history は builtin bonus(80) を
+    /// 超えるため、scoreBuilder の row 0 は漢字側に来る。これは仕様: Space を意図的に押した
+    /// 時は変換意図として row 0 (= 漢字) がフォーカスされる。助詞入力の実動線は whileTyping
+    /// の builtin dismiss 経由で Space を経由しないため影響なし。
     func testBuiltinReadingLosesRow0WhenPrefixHistoryDominates() {
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: "は",

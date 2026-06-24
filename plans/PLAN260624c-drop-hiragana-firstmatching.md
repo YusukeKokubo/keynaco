@@ -1,7 +1,6 @@
 ---
-status: abandoned
+status: in-progress
 created: 2026-06-24
-related_rejected: R-2
 ---
 
 # PLAN260624c: `isHiraganaPref` の `firstMatching` 分岐削除
@@ -42,13 +41,30 @@ let initialRow = 0
 
 ## Phase
 
-- [x] **Phase 1**: hiraganaPreferred + 高 score 履歴で reading 行が score 上で row 0 に来るユニットテスト追加（exact のみで通った）
-- [x] **Phase 2**: `isHiraganaPref` の `firstMatching` 分岐削除（実装→ロールバック）
-- [x] **Phase 3**: sandbox で `の`/`は`/`ない`等の挙動が変わらないこと確認 → **`は`・`と`・`で`・`か` で prefix history が reading 行を上回る** ことが判明、ロールバック
+- [x] **Phase 1**: hiraganaPreferred + 高 score 履歴で reading 行が score 上で row 0 に来るユニットテスト追加
+- [x] **Phase 2**: `isHiraganaPref` の `firstMatching` 分岐削除（一度ロールバック → ユーザー指摘で再適用）
+- [x] **Phase 3**: sandbox で実動線確認
 
-## 結果
+## 経緯と教訓
 
-**Abandoned**: `docs/rejected.md` R-2 に記録。リスク評価で **prefix history の SUM スコア**を見落としたのが原因。実 DB の `LIKE 'は%'` で 100+ score の prefix history が出るケースが頻繁にあり、builtin bonus(80) を上回る。シンプル化で得る 4 行削減より、Space 1 打で助詞を入れる日常操作の一貫性が大事。
+### 一度 abandoned → 再開した
+
+最初の Phase 3 sandbox で「`は`・`と`・`で`・`か` で Space を押すと row 0 が漢字（`話`/`取引先`/`できる`/`確認して`）になる」のを観測し、`docs/concept.md` 指針 1 (機能語サジェスト) と衝突すると判断してロールバック・`rejected.md` R-2 として記録した。
+
+ユーザー指摘で再検証したところ、**助詞入力の実動線が Space を経由しない**ことが判明:
+
+| 操作 | 候補窓 | 結果 |
+|------|--------|------|
+| `ha` + Enter（実動線） | 出ない（whileTyping で builtin dismiss） | `は` 確定 |
+| `ha` + Space + Enter（普段やらない操作） | 出る、selectedRow が変化 | 旧:`は` / 新:`話` |
+
+`whileTyping` の builtin dismiss が S1 適用前後で不変。Space を意図的に押すのは「変換意図」なので、漢字側が row 0 になる方がむしろ Space の意味と一貫する。
+
+### 教訓
+
+- 「動線」を sandbox で検証する時は **ユーザーが実際にやる操作シーケンス**で見る。`ha + Space + 観察` は分析用の操作で、実動線ではない
+- 設計意図 (「助詞は候補ウィンドウなしで Enter 確定するために hiraganaPreferred リストを作った」) を確認せず、観察した状態から動線を逆推論したのが間違い
+- `R-2` rejected エントリは撤回（仕様シンプル化に成功したと結論を訂正）
 
 ## スコープ外
 
