@@ -91,7 +91,7 @@ frontmatter の status と関連フィールドの組み合わせに対する不
 
 | status | 必須フィールド | 検出方法 |
 |---|---|---|
-| `implemented` | `related_commit`（git history に実在） | Step 3 |
+| `implemented` | `related_commit`（git history に実在）、本文に `- [ ]` が残っとらん | Step 3 |
 | `abandoned` | `related_rejected`（rejected.md にエントリ実在） | Step 3 |
 | `superseded` | `superseded_by`（plans/ に実在） | Step 3 |
 

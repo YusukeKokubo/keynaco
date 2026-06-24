@@ -140,25 +140,27 @@ initialRow = 0   // 原則先頭。explicit 時のみ別途検討
 
 ### Phase 1: 履歴 + 辞書 + AzooKey
 
-- `CandidateScoreBuilder.build(reading:trigger:sources:) -> [ScoredCandidate]`
-- `CandidateSectionBuilder` を置換または内部で score builder 呼び出し
-- 既存テストの期待順序を score モデルに書き換え
-- sandbox: `じょう` / `よう` / `kanzi` / `の`
+- [x] `CandidateScoreBuilder.build(reading:trigger:sources:) -> [ScoredCandidate]` 導入（`39ef182`）
+- [x] `CandidateSectionBuilder` を score builder で置換（`3228ef7` で削除）
+- [x] 既存テストの期待順序を score モデルに書き換え
+- [x] sandbox: `じょう` / `よう` / `kanzi` / `の` 検証済み
 
-**完了条件**: PLAN260623 の `じょう→情報共有` ケースが **promoted セクションなし** で先頭付近に出る。
+**完了条件**: PLAN260623 の `じょう→情報共有` ケースが **promoted セクションなし** で先頭付近に出る。 → 達成
 
 ### Phase 2: hiraganaPreferred スコア化
 
-- `fixedSlot=.hiragana` 削除
-- `HiraganaPreferredBuiltins` dismiss ロジックは維持
-- 回帰: `InputHandlerCandidatesTests` の hiraganaPreferred 系、`の` + 履歴ノックアウト
+- [x] `fixedSlot=.hiragana` 削除（`1954938`）
+- [x] `HiraganaPreferredBuiltins` dismiss ロジックは維持
+- [x] 回帰: `InputHandlerCandidatesTests` の hiraganaPreferred 系、`の` + 履歴ノックアウト
 
 ### Phase 3:  dead code 削除
 
-- `HistoryPrefixPromotion.swift`
-- `InitialRowPolicyResolver` の大部分（`prefixFocusCandidate` / `whileTypingInitialRow` を score 式に統合できるなら削除）
-- 3 種 `sectionOrder`
-- `CandidateBuildDiagnostics` の section ラベル → `source` ラベル
+- [x] `HistoryPrefixPromotion.swift` 削除（`39ef182`〜`3228ef7`）
+- [x] 3 種 `sectionOrder` 削除（`f49ab9d`）
+- [x] `maxHighHistoryCount = 3` cap 撤去（`12d7b83`）
+- [x] `CandidateRowMetadata.legacyFixedEnd` → `fixedEnd` リネーム（`695e66a`）
+- [x] `InitialRowPolicyResolver` の大部分削除 — **部分的に保留**: `.explicit` の `testPrefersFullReadingOverAzooKeyShorterPrefix`（AzooKey が reading の真部分文字列で reading 自体が候補にある場合 reading 優先）が score builder で表現困難。別 PR で対応
+- [x] `CandidateBuildDiagnostics` の section ラベル → `source` ラベル — **保留**: divergence_log.jsonl の外向きキーは後方互換のため touch しない判断（変数名 `exactMatchHighHistory` / `highHistory` も同じ理由で保持）
 
 ## テスト戦略
 

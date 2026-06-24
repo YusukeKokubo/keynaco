@@ -75,6 +75,15 @@ for f in "$PLANS_DIR"/*.md; do
       issues=$((issues + 1))
     fi
   fi
+
+  # Phase 進捗: status: implemented なら本文に未完了チェックボックス `- [ ]` が残っとらん必要がある
+  if [ "$status" = "implemented" ]; then
+    unchecked=$(grep -cE '^[[:space:]]*-[[:space:]]+\[[[:space:]]\]' "$f" || true)
+    if [ "$unchecked" -gt 0 ]; then
+      echo "  [$name] status: implemented だが本文に未完了の Phase マーカー ($unchecked 件) が残っとる"
+      issues=$((issues + 1))
+    fi
+  fi
 done
 
 echo

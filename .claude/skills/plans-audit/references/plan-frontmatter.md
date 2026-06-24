@@ -100,6 +100,33 @@ related_rejected: E-1
 # PLAN260429: Backspace 再変換
 ```
 
+## Phase 進捗マーカー（推奨）
+
+Plan を Phase / マイグレーション段階に分けて書く場合は、各 Phase 見出しの直下に Markdown チェックボックスを置く。`status: implemented` を付ける前に **すべて `- [x]` が埋まっとるか** を audit が機械的に検出する。
+
+```markdown
+### Phase 1: 履歴・辞書統合
+- [x] CandidateScoreBuilder 導入
+- [x] 既存テストの期待順序を更新
+
+### Phase 2: hiraganaPreferred スコア化
+- [x] fixedSlot=.hiragana 削除
+- [x] HiraganaPreferredBuiltins dismiss 維持
+
+### Phase 3: dead code 削除
+- [x] HistoryPrefixPromotion.swift 削除
+- [ ] InitialRowPolicyResolver 縮小  ← まだ残っとる
+```
+
+**ルール**:
+
+- Phase 区切りを使わん小さい plan では不要（チェックボックスを書かない plan は audit が静観する）
+- `- [ ]` / `- [x]` を含む plan で `status: implemented` を付けるなら、`- [ ]` がゼロになっとる必要がある（`verify_references.sh` が検出）
+- Phase 単位で `- [x]` が部分的なときは `status: in-progress` のまま据え置く
+- 「触らない判断」をした項目は `- [~] 触らない判断` のように note 付き斜線で書くか、Phase ごと削除する。`- [ ]` のまま残すと永遠に audit に挙がる
+
+**なぜ**: PLAN260624 で「Phase 3 dead code 削除」のうち `maxHighHistoryCount` 撤去だけ漏れて 1 日放置された。frontmatter `status: implemented` は付いとったが、本文の Phase リストとの整合性を見る仕組みが無かったため気づけなかった。チェックボックスは見た目に進捗が分かり、grep でも機械チェックできる。
+
 ## 既存記述との互換性
 
 既存の `**状態**: オープン` / `**状態**: 完了` のような markdown 記述は legacy 扱いで認識する。新規 plan は frontmatter を優先する。
