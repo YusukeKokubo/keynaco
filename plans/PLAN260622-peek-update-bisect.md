@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: abandoned
 created: 2026-06-22
 objective_axis: latency
 baseline_at: 2026-06-22T17:51:00
@@ -7,6 +7,7 @@ baseline_window: 24h
 sample_threshold:
   sessions: 5
   confirmations: 100
+related_rejected: PLAN260622-bisect-instrumentation-lost
 ---
 
 # PLAN260622: peek_update p95 tail の bisect 計測
@@ -124,23 +125,27 @@ bisect 計測で「どのサブステップが tail を作っとるか」が分�
 
 サンプル不足の場合は `status: in-progress` のまま保留。`status: implemented` を付けるのはゲート通過後のみ。
 
-## 進捗（status: in-progress 中）
+## 進捗
 
 - 2026-06-22T18:23: ベースライン計測完了（24h、72 セッション）
-- 2026-06-22T18:23: 実装完了（`TypingLatencyStats` サブステップ配列 + `KeydownLatencySignpost` の `SubStep` enum + `InputController.runKeyDown` 4 計測点）
-- 2026-06-22T18:23: `./scripts/test_core.sh` 524 件全通過、`xcodebuild build` SUCCEEDED 確認
+- 2026-06-22T18:23: 実装完了（`TypingLatencyStats` サブステップ配列 + `KeydownLatencySignpost` の `SubStep` enum + `InputController.runKeyDown` 4 計測点）。`./scripts/test_core.sh` 524 件全通過、`xcodebuild build` SUCCEEDED、`/deploy` で実機反映
+- **2026-06-22 ～ 2026-06-25 の間に bisect 計装ソースが消失**。`git log` で確認した結果、`de06b52 docs(plans): track PLAN260622 peek-update-bisect draft` で plan ファイルだけが track され、`TypingLatencyStats.swift` / `KeydownLatencySignpost.swift` / `InputController.swift` への変更は**どのコミットにも入っとらん**。同期間に候補表示まわりの refactor 16 コミット + `09d1c02` の latency log 改善が並行で進行しており、いずれかのタイミングでコミット前の変更が失われた
+- 2026-06-25T09:30: After 計測実行。bisect 指標（`peek_handle_p50_ms` 等）は欠損のため、サブステップ別 tail 主因の判定は不可能
 
-## 残課題（検証ゲート通過待ち）
+## abandoned 理由
 
-1. `/deploy` で実機反映
-2. 24h 以上の通常打鍵でログ蓄積（サンプル閾値: セッション数 ≥ 5 AND 確定数 ≥ 100）
-3. `python3 .claude/skills/keynaco-latency-profiler/scripts/analyze.py --ts-start <verified_at - 86400>` で再計測
-4. **計装オーバーヘッドの確認**: 既存指標 `peek_update_p50_ms` / `peek_update_p95_ms` がベースライン（2.0ms / 39.4ms）から大きく動いとらんことを確認
-5. **新規指標の出力確認**: `peek_handle_p50_ms` / `peek_apply_effects_p50_ms` / `peek_window_apply_p50_ms` / `peek_left_context_p50_ms` が全セッションに出とるか
-6. tail spike セッション（peek_update_p95_ms ≥ 20ms）で主因サブステップを特定
+検証ゲートで要求される指標（`peek_handle_p50_ms` / `peek_apply_effects_p50_ms` / `peek_window_apply_p50_ms` / `peek_left_context_p50_ms`）が実機ログに出力されてない。原因は実装の commit 漏れ。plan の仮説そのものは依然有効だが、本 plan のサイクルとしては検証不可能のため abandoned とし、再着手時は新規 plan を切る。
 
-ゲート通過後に `status: implemented` に更新し、サブステップ別 p95 の Before/After 表をここに追記する。
+## 学び（次サイクルへ）
 
-## 結果（status: implemented で追記）
+| 失敗 | 再発防止 |
+|---|---|
+| draft plan → 実装 → deploy はやったが**コミットを挟まんかった**で、refactor の並行進行で working tree が変わる過程で実装が消えた | サイクルの Step 4 を「実装 + コミット」に明示。コミット後に deploy する |
+| 並行作業（refactor）の存在に気づきつつ、自分のブランチ独立性を確認しなかった | サイクル開始時に `git status` / `git log` で並行作業の有無を必ず確認する |
 
-未計測。
+## 副次観察（PLAN260622 直接の対象外だが、After 計測で見えたこと）
+
+PLAN260622 の bisect は失敗したが、06-22 ベースライン → 06-25 (22 コミット累積後) のレイテンシ全般を比較すると、refactor + logging 改善で **fetch_complete p95 が 318 → 259ms と -19% 改善**、**重いセッション率（fetch_complete p95 ≥ 300ms）が 59.7% → 29.5% と半減**。詳細は `/tmp/perf-cycle/PLAN260622-after-*.txt`。
+
+新しい外れ値の懸念: `lock_wait` max が 532ms → 1739ms に悪化（2026-06-24T01:14:55 クラスタで「じこうし」「じっこうして」連続入力中に Zenzai 推論直列化で詰まり）。次サイクル候補。
+
