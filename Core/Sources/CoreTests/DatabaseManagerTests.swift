@@ -205,6 +205,23 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(entries.first?.input, "とうきょう")
     }
 
+    /// `recordPrefixes` の入口ガードを迂回して `recordPrefixesOnQueue` を直接呼んでも、
+    /// 内部 guard で truncation pattern が弾かれる（defense in depth）。
+    /// (B) shorter 統合が既存の短い行を巻き取らないことを保証。
+    func testRecordPrefixesOnQueueDefenseInDepth() {
+        db.record(input: "ない", output: "ない")
+        db.record(input: "ない", output: "ない")  // count=2
+
+        db.dispatchWrite {
+            self.db.recordPrefixesOnQueue(reading: "ないので", output: "ない", now: 0)
+        }
+
+        let entries = db.fetchAllHistory().filter { $0.output == "ない" }
+        XCTAssertEqual(entries.count, 1, "短い行は無傷")
+        XCTAssertEqual(entries.first?.input, "ない")
+        XCTAssertEqual(entries.first?.count, 2, "(B) shorter 統合に吸われていない")
+    }
+
     /// reading と output が等しい hiragana 確定（passthrough）は既存ロジックで弾かれる。
     /// truncation ガードは strict prefix（reading が長い）のみが対象。
     func testIsTruncationCommitEdgeCases() {

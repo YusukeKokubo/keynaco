@@ -476,7 +476,12 @@ extension DatabaseManager {
     /// あっても、新しい正当な短い reading の確定をそこへ吸わせない（longer 統合の filter で除外）。
     /// truncation row 自身は `recordPrefixes` のガードで再生も防いでいるため、放置しても育たず、
     /// 旧 DB 由来のものは `scripts/cleanup_history_db.py --truncations` で掃除する。
+    ///
+    /// **defense in depth**: 入口で `recordPrefixes` のガードが (reading, output) 自体が truncation
+    /// pattern のケースを弾くが、ここでも同じ判定で念のため早期 return しておく。これにより
+    /// (B) shorter 統合経路でも既存の短い行を巻き取らない。
     func recordPrefixesOnQueue(reading: String, output: String, now: Int64) {
+        guard !Self.isTruncationCommit(reading: reading, output: output) else { return }
         let rows = fetchHistoryInputsForOutputOnQueue(output: output)
         if let longer = rows
             .filter({ Self.isReadingPrefix(reading, of: $0.input) })

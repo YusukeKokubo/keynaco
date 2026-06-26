@@ -292,3 +292,23 @@ memory・ドキュメントに書かれた識別子（関数名・フラグ名�
 
 *由来: 2026-06 プロファイリングセッション。divergence ログ誤読（前項）と組み合わさって、ひらがなパススルーらしき履歴 295 行を一括削除する寸前まで進んだ。SQLite を直接 SELECT したら、削除候補に「のびしろ → 伸びしろ (count=11)」のような価値ある学習が含まれとった。`--apply` する前にユーザーが「任せる」と言うていたが、それでも本人が中身を見れたのは偶然だった*
 
+---
+
+## 学習ルールは reading と output の長さ非対称を疑う
+
+履歴・辞書の学習ロジック（`recordPrefixesOnQueue` の同 output 統合・user dict 学習・Zenzai 学習等）を設計するときは、「reading の長さと output の長さの関係」を必ず明示的に確認する。reading ≪ output（長い文を短い表記で確定）は普通だが、**reading ≫ output（output が reading の真の prefix）は途中確定 = 学習対象外**として扱う。
+
+**なぜ**: 統合・吸収系のロジックは「同じ output に対する別 reading は同じ語の表記揺れ」を暗黙の前提にしている。けれどユーザーが reading の最後まで打たずに途中確定する経路（autoShow 誤確定・pending romaji 残し・短い接頭辞だけ意図確定）は、output が reading の途中までしか表現してない。これを同じ「表記揺れ」として吸わせると、誤確定行が正のフィードバックで肥大化する（count が育つほど autoShow row 0 に居座り、ますます誤確定を呼ぶ）。「output ⊂ reading かつ output 長 < reading 長」を境界として弾く。
+
+*由来: `(input="ないので", output="ない")` 行が count=50 まで育って自動で row 0 に居座っとった件。元は古い `penalized` ロジックで 1 回誤確定が生まれ、以降 `recordPrefixesOnQueue` の (A) longer 統合と (B) shorter 統合の両方が「同じ output 短い reading の正当確定」までこの行に吸わせて育てた。`DatabaseManager.isTruncationCommit` を二段ガード（入口 `recordPrefixes` + 防御 `recordPrefixesOnQueue` 内部）で塞ぎ、`scripts/cleanup_history_db.py --truncations` で既存行を掃除。同パターン: `(さんん, さん, 32)`・`(ありがとうございます, ありがとう, 4)` 等 8 行が同時に発見された*
+
+---
+
+## 外部スクリプトで DB を直編集したら keynaco を再起動する
+
+`scripts/cleanup_history_db.py` や `sqlite3` CLI で `~/Library/Application Support/keynaco/history.db` を直接書き換えた直後は、必ず **keynaco プロセスを再起動** してから sandbox や実機の挙動を確認する。再起動せんと「変更が DB に書かれた」と「IME の返す候補に反映された」がズレて、デバッグが空回りする。
+
+**なぜ**: keynaco は起動時に `DatabaseManager.shared` を作って WAL モードで DB を開きっぱなしにする（プロセス長期駐留）。`cache_size = -4096`（4MB page cache）を抱えとるため、別プロセスの DELETE/UPDATE が即時に反映されないケースがある。WAL の reader snapshot か page cache か根本未特定だが、再起動で確実に解消する。sandbox の `useRealDB: true` は **「スナップショットではなく `DatabaseManager.shared` 直結」**（[`.claude/skills/keynaco-ime-sandbox/SKILL.md`](../.claude/skills/keynaco-ime-sandbox/SKILL.md) 参照）なので、cleanup 直後の sandbox 結果は同じ古い cache を見続ける。
+
+*由来: truncation cleanup（`(ないので, ない)` 削除）後の sandbox で row 0 が依然 "ない" のままで、scoredSources に `historyExact:ない(151.63)` が出続けた件。DB を `mode=ro` で SELECT すると行は確実に消えとった。`PRAGMA wal_checkpoint(FULL)` も `busy=1` を返し、keynaco プロセスが reader を抱えとった。`/deploy` で再ビルド・再起動した後の sandbox で row 0 が "ないので" に戻り正常確認。根本原因（WAL reader snapshot か page cache か）は未特定だが、再起動で必ず解消する*
+
