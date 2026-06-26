@@ -2,6 +2,7 @@ build/
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
 DerivedData/
+__pycache__/
 .DS_Store
 .claude/*
 !.claude/commands/

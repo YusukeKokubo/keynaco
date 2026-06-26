@@ -266,9 +266,9 @@ print(waited["matched"], waited["state"]["candidates"])
 | コマンド | 説明 |
 |---------|------|
 | `{"reset": true}` | インメモリ DB でリセット。必要なら `seed_history` でデータを注入する。 |
-| `{"reset": true, "useRealDB": true}` | 実体の `~/Library/Application Support/keynaco/history.db` を一時コピーして開く。変換履歴・ユーザー辞書などがそのまま使える。 |
+| `{"reset": true, "useRealDB": true}` | 実体の `~/Library/Application Support/keynaco/history.db` を `DatabaseManager.shared` 経由で直接共有する。変換履歴・ユーザー辞書などがそのまま使える。**スナップショットではない** — sandbox 内の `seed_history` や確定操作は本番 DB をそのまま書き換えるため、検証用途のシードは原則 in-memory（`useRealDB` なし）で行う。 |
 
-`history.db` が存在しない、またはコピー失敗（DB ロック等）のときは `useRealDB` は無視され、上と同じインメモリ DB にフォールバックする。スナップショットにはユーザーの変換履歴・語彙が含まれるため、ログ共有時は取り扱いに注意する。
+ユーザーの変換履歴・語彙が含まれるため、ログ共有時は取り扱いに注意する。
 
 **modifier フラグ（mods）:** Shift=131072、Command=1048576、Option=524288。複数は OR で合成。
 
@@ -597,7 +597,7 @@ print(f"selectedRow={r['selectedRow']}, selectedText={r['selectedText']!r}")
 ## 注意点
 
 - **IMK パイプラインをバイパス**するため、クライアントアプリ依存の挙動（Electron の Enter 問題など）は再現しない
-- デフォルトのリセットではソケットサーバーは**インメモリ DB**。本番の `history.db` は **`{"reset": true, "useRealDB": true}`** を使ったときのみ一時コピーで参照する
+- デフォルトのリセットではソケットサーバーは**インメモリ DB**。**`{"reset": true, "useRealDB": true}`** を使うと `DatabaseManager.shared` 経由で本番 `history.db` をそのまま共有する（コピーではない）。sandbox 内の `seed_history` / 確定が本番 DB を書き換える点に注意
 - デフォルトの `leftSideContext` は `LeftContextSource.resolveSandbox` で `sessionTextBuffer` + `mockClient.documentBefore` を結合（`set_surrounding.before` で設定可）。`set_surrounding` / `set_left_context` / `{"state": true}` / キー処理の各レスポンスで再計算済みの `leftSideContext` が返る。確定直後 Backspace（IME 非消費）では直前確定語を `documentBefore` から削除して本番 IMK の `before` 更新を模倣する
 - **LLM は Debug ビルドのサーバー上で動く**（上記「LLM（Debug ビルド）」）。完了タイミングを見るときは `{"state": true}` ポーリング
 - セッションをまたぐときは必ず `{"reset": true}` を送信して状態をリセットすること（`reset` で LLM フェッチもキャンセルされ `llmEpoch` が進む）
