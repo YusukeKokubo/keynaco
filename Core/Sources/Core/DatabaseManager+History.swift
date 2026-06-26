@@ -383,9 +383,25 @@ extension DatabaseManager {
             r = reading; o = output
         }
         guard !Self.isHiraganaPassthrough(reading: r, output: o) else { return }
+        guard !Self.isTruncationCommit(reading: r, output: o) else { return }
         dispatchWrite {
             self.recordPrefixesOnQueue(reading: r, output: o, now: self.nowEpoch())
         }
+    }
+
+    /// `output` が `reading` の真の prefix（reading が output で始まり長い）のとき true。
+    /// 例: reading="ないので" / output="ない"、reading="ありがとうございます" / output="ありがとう"。
+    ///
+    /// このパターンの確定は autoShow に誘導された誤確定（ユーザーが reading を打ち切る前に
+    /// 短い hiragana 候補が row 0 になって確定された）か、pending romaji を含む途中確定
+    /// （reading="やるしかないのd"）であり、`recordPrefixesOnQueue` の統合ルール
+    /// （(A) longer：同一 output の長い既存行へ count 合算 / (B) shorter：短い既存行を吸収）
+    /// に巻き込まれて行のスコアが正のフィードバックで肥大化する。学習価値が低く、害が大きいため
+    /// 記録しない。意図して短い形を確定したいなら reading 側を短く打てばよい。
+    static func isTruncationCommit(reading: String, output: String) -> Bool {
+        output != reading
+            && output.count < reading.count
+            && reading.hasPrefix(output)
     }
 
     /// `short` が `long` の厳密前方一致か。ラテン文字を含む場合は大文字小文字を無視する。
@@ -455,10 +471,16 @@ extension DatabaseManager {
     }
 
     /// dbQueue 上で同一 output の前方一致読みを最長1行に統合して記録する。
+    ///
+    /// 既存の `(input=output の strict prefix)` な truncation row（過去の誤確定で生まれた行）が
+    /// あっても、新しい正当な短い reading の確定をそこへ吸わせない（longer 統合の filter で除外）。
+    /// truncation row 自身は `recordPrefixes` のガードで再生も防いでいるため、放置しても育たず、
+    /// 旧 DB 由来のものは `scripts/cleanup_history_db.py --truncations` で掃除する。
     func recordPrefixesOnQueue(reading: String, output: String, now: Int64) {
         let rows = fetchHistoryInputsForOutputOnQueue(output: output)
         if let longer = rows
             .filter({ Self.isReadingPrefix(reading, of: $0.input) })
+            .filter({ !Self.isTruncationCommit(reading: $0.input, output: output) })
             .max(by: { $0.input.count < $1.input.count }) {
             upsertHistoryOnQueue(input: longer.input, output: output, addCount: 1, usedAt: now)
             return

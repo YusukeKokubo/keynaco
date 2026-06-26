@@ -138,6 +138,89 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertFalse(DatabaseManager.isReadingPrefix("FS、", of: "fs"))
     }
 
+    // MARK: - 途中確定（truncation）パターンのガード
+
+    /// reading="ないので" / output="ない" のような output が reading の真の prefix な確定は
+    /// autoShow 誤確定 or pending romaji 残しの途中確定であり、recordPrefixesOnQueue の
+    /// 統合ルールに巻き込まれて行が肥大化する。記録しないこと。
+    func testRecordPrefixesSkipsTruncationCommit() {
+        db.recordPrefixes(reading: "ないので", output: "ない")
+        let entries = db.fetchAllHistory().filter { $0.output == "ない" }
+        XCTAssertTrue(entries.isEmpty, "途中確定パターンは記録しない（行ができない）")
+    }
+
+    /// truncation 確定が既存の正当な短い行を吸収してはいけない。
+    /// バグ前: (ない, ない, 3) が (ないので, ない) に巻き取られ削除され count=4 に育つ。
+    /// 修正後: (ない, ない, 3) はそのまま残り、truncation 確定は無視される。
+    func testTruncationCommitDoesNotAbsorbShorterRow() {
+        db.record(input: "ない", output: "ない")
+        db.record(input: "ない", output: "ない")
+        db.record(input: "ない", output: "ない")
+        db.recordPrefixes(reading: "ないので", output: "ない")
+
+        let entries = db.fetchAllHistory().filter { $0.output == "ない" }
+        XCTAssertEqual(entries.count, 1, "短い行は無傷")
+        XCTAssertEqual(entries.first?.input, "ない")
+        XCTAssertEqual(entries.first?.count, 3, "count は 3 のまま（truncation 確定は加算しない）")
+    }
+
+    /// 既存に truncation row が残っていても、新たな短い reading の正当確定はそこへ吸われない。
+    /// バグ前: (ないので, ない, 5) があるとき reading="ない" 確定が `recordPrefixesOnQueue` の
+    /// (A) longer 統合に拾われ、(ないので, ない) の count が +1 に育つ。
+    /// 修正後: longer 統合の filter で truncation row が除外され、新行 (ない, ない, 1) が独立に作られる。
+    func testNormalCommitDoesNotFeedExistingTruncationRow() {
+        db.record(input: "ないので", output: "ない")
+        db.record(input: "ないので", output: "ない")
+        db.record(input: "ないので", output: "ない")
+        db.record(input: "ないので", output: "ない")
+        db.record(input: "ないので", output: "ない")
+        // この時点: (ないので, ない, count=5)（バグ行）が単独
+
+        db.recordPrefixes(reading: "ない", output: "ない")
+
+        let entries = db.fetchAllHistory().filter { $0.output == "ない" }
+            .sorted { $0.input < $1.input }
+        XCTAssertEqual(entries.count, 2, "バグ行と新行が独立に共存")
+
+        let bad = entries.first(where: { $0.input == "ないので" })
+        XCTAssertEqual(bad?.count, 5, "truncation row は count=5 のまま育たない")
+
+        let good = entries.first(where: { $0.input == "ない" })
+        XCTAssertEqual(good?.count, 1, "新行は独立に作られる")
+    }
+
+    /// pending romaji が残ったまま確定された行（reading 末尾にラテン文字残り）も
+    /// truncation として扱う。例: reading="やるしかないのd" / output="やるしかない"。
+    func testRecordPrefixesSkipsPendingRomajiResidue() {
+        db.recordPrefixes(reading: "やるしかないのd", output: "やるしかない")
+        let entries = db.fetchAllHistory().filter { $0.output == "やるしかない" }
+        XCTAssertTrue(entries.isEmpty, "pending romaji 残しの途中確定も記録しない")
+    }
+
+    /// 漢字変換などの「output が reading の prefix にならない」通常確定は影響を受けない。
+    func testRecordPrefixesNormalKanjiConfirmStillRecorded() {
+        db.recordPrefixes(reading: "とうきょう", output: "東京")
+        let entries = db.fetchAllHistory().filter { $0.output == "東京" }
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.first?.input, "とうきょう")
+    }
+
+    /// reading と output が等しい hiragana 確定（passthrough）は既存ロジックで弾かれる。
+    /// truncation ガードは strict prefix（reading が長い）のみが対象。
+    func testIsTruncationCommitEdgeCases() {
+        // strict prefix（reading が長い）→ true
+        XCTAssertTrue(DatabaseManager.isTruncationCommit(reading: "ないので", output: "ない"))
+        XCTAssertTrue(DatabaseManager.isTruncationCommit(reading: "ありがとうございます", output: "ありがとう"))
+        XCTAssertTrue(DatabaseManager.isTruncationCommit(reading: "やるしかないのd", output: "やるしかない"))
+        // 同一 → false
+        XCTAssertFalse(DatabaseManager.isTruncationCommit(reading: "ない", output: "ない"))
+        // prefix 関係なし（漢字）→ false
+        XCTAssertFalse(DatabaseManager.isTruncationCommit(reading: "とうきょう", output: "東京"))
+        XCTAssertFalse(DatabaseManager.isTruncationCommit(reading: "しゅ", output: "種類"))
+        // output が長い → false
+        XCTAssertFalse(DatabaseManager.isTruncationCommit(reading: "とう", output: "東京"))
+    }
+
     func testPenalizeResolvesCanonicalLongerReading() {
         db.recordPrefixes(reading: "しゅるい", output: "種類")
         db.recordPrefixes(reading: "しゅ", output: "種類")

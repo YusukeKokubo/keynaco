@@ -12,6 +12,9 @@ public struct InputSessionTracker {
     /// 2 char → 1 char に縮めた BS の回数。
     /// 旧挙動では `state.backspace().needsRefresh = false` で候補窓が dismiss されていた。
     public private(set) var bsShrunkToOneCount = 0
+    /// このセッションで観測した最大の候補 selectedRow。
+    /// 確定時の selectedRow がこの値より小さければ「巻き戻り」が起きている（async fetch の `.show` で row=0 に戻された等）。
+    public private(set) var maxObservedSelectedRow = 0
     private var startedAtMs: Int?
 
     public mutating func track(keyCode: UInt16) {
@@ -27,6 +30,11 @@ public struct InputSessionTracker {
     public mutating func trackBackspaceContext(wasExplicit: Bool, composedAfter: Int) {
         if wasExplicit { bsExplicitCount += 1 }
         if composedAfter == 1 { bsShrunkToOneCount += 1 }
+    }
+
+    /// `applyCandidateAction` 直後の `candidateSession.selectedRow` を引数に呼ぶ。最大値だけを保持する。
+    public mutating func trackSelectedRow(_ row: Int) {
+        if row > maxObservedSelectedRow { maxObservedSelectedRow = row }
     }
 
     public mutating func reset() {
@@ -53,12 +61,14 @@ public struct InputSessionRecord {
     public let anomaly: [String]
     public let bsExplicitCount: Int
     public let bsShrunkToOneCount: Int
+    public let maxObservedSelectedRow: Int
 
     public init(
         ts: Int, keyCount: Int, bsCount: Int, compositionMs: Int,
         reading: String, committed: String?, candidateDepth: Int?,
         wasExplicit: Bool, scrollCount: Int, anomaly: [String],
-        bsExplicitCount: Int = 0, bsShrunkToOneCount: Int = 0
+        bsExplicitCount: Int = 0, bsShrunkToOneCount: Int = 0,
+        maxObservedSelectedRow: Int = 0
     ) {
         self.ts = ts
         self.keyCount = keyCount
@@ -72,6 +82,7 @@ public struct InputSessionRecord {
         self.anomaly = anomaly
         self.bsExplicitCount = bsExplicitCount
         self.bsShrunkToOneCount = bsShrunkToOneCount
+        self.maxObservedSelectedRow = maxObservedSelectedRow
     }
 
     public func addingAnomaly(_ kind: String) -> InputSessionRecord {
@@ -80,7 +91,8 @@ public struct InputSessionRecord {
             compositionMs: compositionMs, reading: reading, committed: committed,
             candidateDepth: candidateDepth, wasExplicit: wasExplicit,
             scrollCount: scrollCount, anomaly: anomaly + [kind],
-            bsExplicitCount: bsExplicitCount, bsShrunkToOneCount: bsShrunkToOneCount
+            bsExplicitCount: bsExplicitCount, bsShrunkToOneCount: bsShrunkToOneCount,
+            maxObservedSelectedRow: maxObservedSelectedRow
         )
     }
 
@@ -110,6 +122,9 @@ public struct InputSessionRecord {
         }
         if bsShrunkToOneCount > 0 {
             dict["bs_shrunk_to_one"] = bsShrunkToOneCount
+        }
+        if maxObservedSelectedRow > 0 {
+            dict["max_observed_row"] = maxObservedSelectedRow
         }
         return dict
     }

@@ -3,10 +3,13 @@
 
 1. 同一 output で短い読みが長い読みの前方一致になっている行を削除（count / used_at は最長読みへ合算）
 2. --particles: input==output の助詞・機能語（HiraganaPreferredBuiltins 相当）を削除
+3. --truncations: output が input の真の prefix（途中確定の疑い）な行を削除
+   例: (input="ないので", output="ない") — reading の最後まで打たずに途中確定されたケース
 
 使い方:
   python3 scripts/cleanup_history_db.py              # ドライラン
   python3 scripts/cleanup_history_db.py --apply        # 実行（自動バックアップ）
+  python3 scripts/cleanup_history_db.py --truncations  # 途中確定行も検出（dry-run）
   python3 scripts/cleanup_history_db.py --db /path/to/history.db --apply
 """
 
@@ -97,6 +100,22 @@ def plan_particle_cleanup(rows: list[tuple[str, str, int, int]]) -> list[tuple[s
     ]
 
 
+def plan_truncation_cleanup(rows: list[tuple[str, str, int, int]]) -> list[tuple[str, str, int]]:
+    """output が input の真の prefix な行を返す（input != output, input が output で始まる）。
+
+    `recordPrefixesOnQueue` の (A) longer 統合ルールに巻き取られて成長する「途中確定行」。
+    reading="ないので" で output="ない" を確定 → (input="ないので", output="ない") が
+    作られ、以後の reading="ない" の確定までこの行に吸収されてスコアが青天井に育つ。
+    """
+    return [
+        (inp, out, cnt)
+        for inp, out, cnt, _ in rows
+        if inp != out
+        and len(inp) > len(out)
+        and inp.startswith(out)
+    ]
+
+
 def load_rows(conn: sqlite3.Connection) -> list[tuple[str, str, int, int]]:
     cur = conn.execute("SELECT input, output, count, used_at FROM history")
     return [(r[0], r[1], r[2], r[3]) for r in cur.fetchall()]
@@ -107,6 +126,7 @@ def main() -> int:
     parser.add_argument("--db", type=Path, default=DEFAULT_DB, help="history.db のパス")
     parser.add_argument("--apply", action="store_true", help="実際に変更する（省略時はドライラン）")
     parser.add_argument("--particles", action="store_true", help="助詞・機能語の input==output も削除")
+    parser.add_argument("--truncations", action="store_true", help="途中確定行（output が input の真の prefix）も削除")
     parser.add_argument("--no-backup", action="store_true", help="--apply 時にバックアップを作らない")
     args = parser.parse_args()
 
@@ -124,6 +144,10 @@ def main() -> int:
     particle_deletes = plan_particle_cleanup(rows) if args.particles else []
     for pair in particle_deletes:
         delete_set.add(pair)
+    truncation_rows = plan_truncation_cleanup(rows)
+    if args.truncations:
+        for inp, out, _ in truncation_rows:
+            delete_set.add((inp, out))
 
     # prefix 合算で keeper が削除対象に入らないよう調整
     update_keys = set(to_update)
@@ -134,12 +158,21 @@ def main() -> int:
     print(f"冗長プレフィックス削除: {len(to_delete)} 行（count 合算先: {len(to_update)} 行）")
     if args.particles:
         print(f"助詞パススルー削除: {len(particle_deletes)} 行")
+    truncation_total_count = sum(c for _, _, c in truncation_rows)
+    flag_note = "" if args.truncations else "（--truncations で削除対象に追加）"
+    print(f"途中確定行検出: {len(truncation_rows)} 行 / count 合計 {truncation_total_count}{flag_note}")
     print(f"削除合計: {len(delete_set)} 行 → 残り約 {total - len(delete_set)} 行")
+
+    if truncation_rows:
+        print("\n途中確定行（count 降順）:")
+        for inp, out, cnt in sorted(truncation_rows, key=lambda r: -r[2]):
+            mark = "→削除" if args.truncations else "→保持"
+            print(f"  ({inp!r}, {out!r}) count={cnt} {mark}")
 
     if not args.apply:
         print("\nドライランです。実行するには --apply を付けてください。")
         if to_delete[:5]:
-            print("\n削除例（先頭5件）:")
+            print("\n冗長プレフィックス削除例（先頭5件）:")
             for inp, out in to_delete[:5]:
                 print(f"  ({inp}, {out})")
         conn.close()

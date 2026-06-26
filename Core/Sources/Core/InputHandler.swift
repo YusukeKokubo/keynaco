@@ -271,6 +271,11 @@ public struct InputHandler {
         var anomaly: [String] = []
         if sessionTracker.scrollCount >= 4 { anomaly.append("deep_scroll") }
         if !inputKey.isEmpty, inputKey == prevReadingForReTyped { anomaly.append("re_typed") }
+        // ユーザーが ↓↑ / Space で row N に動かしたのに、確定時の selectedRow が N より小さいと
+        // 巻き戻り（async fetch の `.show` で row 0 にリセットされた等）が起きている。
+        if candidate.isVisible, candidate.selectedRow < sessionTracker.maxObservedSelectedRow {
+            anomaly.append("row_snapped_back")
+        }
         pendingSessionRecord = InputSessionRecord(
             ts: nowMs,
             keyCount: sessionTracker.keyCount,
@@ -283,7 +288,8 @@ public struct InputHandler {
             scrollCount: sessionTracker.scrollCount,
             anomaly: anomaly,
             bsExplicitCount: sessionTracker.bsExplicitCount,
-            bsShrunkToOneCount: sessionTracker.bsShrunkToOneCount
+            bsShrunkToOneCount: sessionTracker.bsShrunkToOneCount,
+            maxObservedSelectedRow: sessionTracker.maxObservedSelectedRow
         )
         recordCandidateDivergenceIfAny(
             reading: inputKey,
@@ -421,6 +427,7 @@ public struct InputHandler {
             db.deleteHistory(output: text)
         }
         candidateSession.apply(action)
+        sessionTracker.trackSelectedRow(candidateSession.selectedRow)
         syncMarkedText(client: client)
     }
 
@@ -504,7 +511,8 @@ public struct InputHandler {
             scrollCount: sessionTracker.scrollCount,
             anomaly: anomaly,
             bsExplicitCount: sessionTracker.bsExplicitCount,
-            bsShrunkToOneCount: sessionTracker.bsShrunkToOneCount
+            bsShrunkToOneCount: sessionTracker.bsShrunkToOneCount,
+            maxObservedSelectedRow: sessionTracker.maxObservedSelectedRow
         )
         sessionTracker.reset()
         return (true, .dismiss)
