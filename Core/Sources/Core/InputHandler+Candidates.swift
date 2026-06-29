@@ -231,7 +231,8 @@ extension InputHandler {
             azooKeyCandidates: sources.azooKeyCandidates,
             azooKeyApiOrder: apiOrder,
             numberCandidates: numberCandidates,
-            dateTimeCandidates: dateTimeCandidates
+            dateTimeCandidates: dateTimeCandidates,
+            trigger: trigger
         ))
         let scoredLayout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(
             scored: scored

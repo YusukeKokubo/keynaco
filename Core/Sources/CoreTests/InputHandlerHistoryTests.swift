@@ -435,7 +435,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         )
     }
 
-    func testExplicit_alsoFocusesScoreOrderPrefixHistory() {
+    func testExplicit_demotesPrefixHistoryBelowExactReading() {
         setUpWithConverter(SnapStub(["ダケンス", "打鍵末"]))
         handler.db.recordPrefixes(reading: "だけんすうげん", output: "打鍵数削減")
         handler.db.updatePOSClassification(output: "打鍵数削減", pos: "noun", lcid: 1285)
@@ -444,12 +444,23 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         guard let payload = handler.buildCandidateList(trigger: .explicit).showPayload else {
             XCTFail("候補を出すはず"); return
         }
-        // PLAN260624b: explicit/whileTyping どちらも score 順先頭。
-        // prefix 履歴の score が AzooKey rank 0 より高ければ履歴側にフォーカス。
+        // feedback-space-explicit-exact: `.explicit`（Space）では入力より長い読みの
+        // 候補（`historyPrefix:打鍵数削減` 読み「だけんすうげん」）は exact-reading
+        // 候補（azooKey の ダケンス・打鍵末。読み「だけんす」そのもの）より下位に
+        // 置く。「Space = 今の入力での変換を期待」という user の意思表示に合わせる。
         XCTAssertEqual(
             payload.candidates[0],
-            "打鍵数削減",
-            "Space（explicit）も score 順先頭: \(payload.candidates)"
+            "ダケンス",
+            ".explicit では exact-reading top（azooKey rank 0）が row 0: \(payload.candidates)"
+        )
+        guard let idxDaken = payload.candidates.firstIndex(of: "打鍵数削減"),
+              let idxKatakana = payload.candidates.firstIndex(of: "ダケンス") else {
+            XCTFail("両方とも候補に含まれるはず: \(payload.candidates)")
+            return
+        }
+        XCTAssertGreaterThan(
+            idxDaken, idxKatakana,
+            "打鍵数削減（historyPrefix）は ダケンス（azooKey, exact-reading）より下: \(payload.candidates)"
         )
     }
 }

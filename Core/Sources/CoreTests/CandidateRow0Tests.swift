@@ -24,7 +24,8 @@ final class CandidateRow0Tests: XCTestCase {
             azooKeyCandidates: azooKey,
             azooKeyApiOrder: [],
             numberCandidates: [],
-            dateTimeCandidates: []
+            dateTimeCandidates: [],
+            trigger: .whileTyping
         ))
         return CandidateScoredLayout.assemble(CandidateScoredLayout.Input(scored: scored))
             .candidates.first

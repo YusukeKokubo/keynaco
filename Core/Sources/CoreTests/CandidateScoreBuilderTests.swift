@@ -13,7 +13,8 @@ final class CandidateScoreBuilderTests: XCTestCase {
         userExact: [String] = [],
         userPrefix: [String] = [],
         azooKey: [String] = [],
-        azooOrder: [String] = []
+        azooOrder: [String] = [],
+        trigger: CandidateListTrigger = .whileTyping
     ) -> [ScoredCandidate] {
         var byOutput: [String: HistoryEntry] = [:]
         var order: [String] = []
@@ -41,7 +42,8 @@ final class CandidateScoreBuilderTests: XCTestCase {
             azooKeyCandidates: azooKey,
             azooKeyApiOrder: azooOrder,
             numberCandidates: [],
-            dateTimeCandidates: []
+            dateTimeCandidates: [],
+            trigger: trigger
         ))
     }
 
@@ -144,7 +146,8 @@ final class CandidateScoreBuilderTests: XCTestCase {
             historyEntries: [entry],
             userDictExact: [], userDictPrefix: [],
             azooKeyCandidates: [], azooKeyApiOrder: [],
-            numberCandidates: [], dateTimeCandidates: []
+            numberCandidates: [], dateTimeCandidates: [],
+            trigger: .whileTyping
         ))
         XCTAssertEqual(scored.filter { $0.text == "漢字" }.count, 1, "重複行は dedup されるはず")
         XCTAssertEqual(scored.first?.source, .historyExact, "同点なら sourceSortKey 小 = exact 側が勝つ")
@@ -206,6 +209,77 @@ final class CandidateScoreBuilderTests: XCTestCase {
         XCTAssertEqual(target?.score, CandidateScoreBuilder.hiraganaBuiltinBonus)
     }
 
+    /// **不変条件回帰テスト**: `.explicit` トリガー（Space 押下）では、入力より長い読みの
+    /// 候補（`historyPrefix`）が exact-reading 候補より上に出てはいけない。
+    /// 「Space = 今の入力での変換を期待」という user の意思表示に合わせる。
+    /// この demotion は `.whileTyping`（autoShow）には適用しない。
+    func testExplicitDemotesPrefixExtendedBelowExact() {
+        // 「どう」divergence_log の実ケース再現:
+        // historyPrefix:どう思う(99) が historyExact:どう(10) より上にあるのを直す
+        let explicit = build(
+            reading: "どう",
+            exact: ["どう", "同"],
+            exactScores: ["どう": 10, "同": 10],
+            prefix: ["どう思う", "動作確認", "どういう"],
+            prefixScores: ["どう思う": 99, "動作確認": 96, "どういう": 46],
+            trigger: .explicit
+        )
+        XCTAssertEqual(
+            explicit.prefix(2).map(\.source),
+            [.historyExact, .historyExact],
+            ".explicit では historyExact が上 2 行を占める（スコアが低くても）"
+        )
+        XCTAssertEqual(
+            explicit.suffix(3).map(\.source),
+            [.historyPrefix, .historyPrefix, .historyPrefix],
+            ".explicit では historyPrefix は下位に追いやられる"
+        )
+        // 同じ入力で whileTyping は従来通りスコア順
+        let whileTyping = build(
+            reading: "どう",
+            exact: ["どう", "同"],
+            exactScores: ["どう": 10, "同": 10],
+            prefix: ["どう思う", "動作確認", "どういう"],
+            prefixScores: ["どう思う": 99, "動作確認": 96, "どういう": 46],
+            trigger: .whileTyping
+        )
+        XCTAssertEqual(
+            whileTyping.first?.source, .historyPrefix,
+            ".whileTyping は demotion を適用しない（autoShow は単語補完 UX）"
+        )
+    }
+
+    /// **不変条件回帰テスト**: userDict prefix も `.explicit` で demote される。
+    /// 「入力より長い読みのユーザー辞書候補」も exact-reading 候補より下に置く。
+    func testExplicitDemotesUserDictPrefix() {
+        let scored = build(
+            reading: "じ",
+            exact: ["字"],
+            exactScores: ["字": 5],
+            userPrefix: ["時間"],  // userDictPrefixScore = 30 で本来は上に出る
+            trigger: .explicit
+        )
+        XCTAssertEqual(
+            scored.first?.text, "字",
+            ".explicit では userDict(isExact: false) は exact-reading 候補より下"
+        )
+        XCTAssertEqual(scored.last?.text, "時間")
+    }
+
+    /// **不変条件回帰テスト**: `.explicit` で exact 内 / prefix 内のソート順は従来通り score 降順。
+    /// demotion はあくまで「exact-reading group」と「prefix-extended group」の境界のみ。
+    func testExplicitPreservesScoreOrderWithinGroups() {
+        let scored = build(
+            reading: "どう",
+            exact: ["どう", "同"],
+            exactScores: ["どう": 5, "同": 12],  // 同 のほうがスコア上
+            prefix: ["どう思う", "どういう"],
+            prefixScores: ["どう思う": 99, "どういう": 46],
+            trigger: .explicit
+        )
+        XCTAssertEqual(scored.map(\.text), ["同", "どう", "どう思う", "どういう"])
+    }
+
     func testHiraganaUserBonusWinsOnExactTieWithHistory() {
         let scored = build(
             reading: "の",
@@ -235,7 +309,8 @@ final class CandidateScoredLayoutTests: XCTestCase {
             azooKeyCandidates: ["情"],
             azooKeyApiOrder: [],
             numberCandidates: [],
-            dateTimeCandidates: []
+            dateTimeCandidates: [],
+            trigger: .whileTyping
         ))
         let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(scored: scored))
         XCTAssertEqual(Array(layout.candidates.prefix(3)), ["情報共有", "上", "情"])
@@ -253,7 +328,8 @@ final class CandidateScoredLayoutTests: XCTestCase {
             azooKeyCandidates: ["ノ", "之"],
             azooKeyApiOrder: [],
             numberCandidates: [],
-            dateTimeCandidates: []
+            dateTimeCandidates: [],
+            trigger: .whileTyping
         ))
         let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(scored: scored))
         XCTAssertEqual(Array(layout.candidates.prefix(3)), ["の", "ノックアウト", "ノ"])
@@ -271,7 +347,8 @@ final class CandidateScoredLayoutTests: XCTestCase {
             azooKeyCandidates: [],
             azooKeyApiOrder: [],
             numberCandidates: ["1234", "１２３４"],
-            dateTimeCandidates: []
+            dateTimeCandidates: [],
+            trigger: .whileTyping
         ))
         let layout = CandidateScoredLayout.assemble(CandidateScoredLayout.Input(scored: scored))
         XCTAssertEqual(layout.candidates, ["1234", "１２３４"])

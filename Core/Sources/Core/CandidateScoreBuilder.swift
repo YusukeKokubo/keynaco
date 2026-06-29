@@ -33,6 +33,11 @@ enum CandidateScoreBuilder {
         let azooKeyApiOrder: [String]
         let numberCandidates: [String]
         let dateTimeCandidates: [String]
+        /// `.explicit`（Space 押下）では入力より長い読みの候補（`historyPrefix` /
+        /// `userDict(isExact: false)`）を exact-reading 候補の下位に置く。
+        /// 「Space = 今の入力での変換を期待」という user の意思表示に合わせる。
+        /// `.whileTyping`（autoShow）は単語補完 UX のため現状維持。
+        let trigger: CandidateListTrigger
     }
 
     static func azooKeyScore(rank: Int) -> Double {
@@ -135,8 +140,13 @@ enum CandidateScoreBuilder {
                 input.azooKeyApiOrder.enumerated().map { ($0.element, $0.offset) },
                 uniquingKeysWith: { first, _ in first }
             )
+        let demotePrefixExtended = input.trigger == .explicit
         let sorted = insertionOrder.compactMap { byText[$0] }.sorted { lhs, rhs in
-            compare(lhs, rhs, azooKeyRankByText: azooKeyRankByText)
+            compare(
+                lhs, rhs,
+                azooKeyRankByText: azooKeyRankByText,
+                demotePrefixExtended: demotePrefixExtended
+            )
         }
         return sorted
     }
@@ -151,6 +161,16 @@ enum CandidateScoreBuilder {
     static func isHiraganaPreferredSource(_ source: ScoredCandidate.Source) -> Bool {
         switch source {
         case .hiraganaPreferred, .hiraganaBuiltin: return true
+        default: return false
+        }
+    }
+
+    /// 入力より長い読みの候補（`historyPrefix` / `userDict(isExact: false)`）。
+    /// `.explicit` トリガーで exact-reading 候補より絶対下位に置くために使う。
+    static func isPrefixExtendedSource(_ source: ScoredCandidate.Source) -> Bool {
+        switch source {
+        case .historyPrefix: return true
+        case .userDict(let isExact): return !isExact
         default: return false
         }
     }
@@ -171,8 +191,14 @@ enum CandidateScoreBuilder {
     private static func compare(
         _ lhs: ScoredCandidate,
         _ rhs: ScoredCandidate,
-        azooKeyRankByText: [String: Int]?
+        azooKeyRankByText: [String: Int]?,
+        demotePrefixExtended: Bool
     ) -> Bool {
+        if demotePrefixExtended {
+            let lExt = isPrefixExtendedSource(lhs.source)
+            let rExt = isPrefixExtendedSource(rhs.source)
+            if lExt != rExt { return !lExt }
+        }
         if lhs.score != rhs.score { return lhs.score > rhs.score }
         let lp = sourceSortKey(lhs.source)
         let rp = sourceSortKey(rhs.source)
