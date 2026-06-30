@@ -71,8 +71,13 @@ public extension InputHandler {
             return (true, .selectNext)
 
         default:
-            // 選択中の括弧を確定して、このキーは通常処理へ
-            bracketCandidates = nil
+            // 選択中の括弧を確定して、このキーは通常処理へ。
+            // `bracketCandidates` だけ nil にすると候補列・isVisible が残り、後段の
+            // `handleNormalInput` が `(false, .none)` を返すケース（矢印キー・Cmd+key 等）で
+            // session の `isVisible=true` && `!isBracketMode` という不整合状態が固定化し、
+            // `commitComposition` のガードが弾いて候補ウィンドウが取り残される。session 全体を
+            // 落としてから委譲する。
+            candidateSession.reset()
             client.insertText(selectedText)
             return handleNormalInput(keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
                                       modifiers: modifiers, wasExplicitlySelected: false,

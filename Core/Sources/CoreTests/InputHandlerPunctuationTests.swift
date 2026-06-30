@@ -318,6 +318,33 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
         }
     }
 
+    /// 括弧モード中に左右矢印（あるいは Cmd+key 等）を押すと default 分岐に落ちる。
+    /// 旧実装は `bracketCandidates = nil` のみ書き換えていたため、`candidateSession.isVisible`
+    /// が true のまま `isBracketMode = false` になる不整合状態が固定化し、`commitComposition` の
+    /// ガード（`isVisible && !isComposing && !isBracketMode`）が早期 return して候補ウィンドウが
+    /// 取り残されていた。default 分岐で session 全体をリセットすることで再発を防ぐ。
+    func testBracketModeLeftArrowResetsSession() {
+        type(chars: "[", base: "[")
+        XCTAssertTrue(handler.candidateSession.isVisible)
+        XCTAssertTrue(handler.isBracketMode)
+        let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: "「")
+        _ = handleAndApply(keyCode: KeyCode.leftArrow, candidate: ctx)
+        XCTAssertFalse(handler.isBracketMode, "矢印キー後は括弧モードが解除されるはず")
+        XCTAssertFalse(handler.candidateSession.isVisible,
+                       "default 分岐は session を完全に閉じるはず（古い bracket 候補を残さない）")
+        XCTAssertTrue(handler.candidateSession.candidates.isEmpty)
+        XCTAssertEqual(client.inserted.last, "「")
+    }
+
+    func testBracketModeRightArrowResetsSession() {
+        type(chars: "[", base: "[")
+        XCTAssertTrue(handler.candidateSession.isVisible)
+        let ctx = CandidateContext(isVisible: true, selectedRow: 0, selectedText: "「")
+        _ = handleAndApply(keyCode: KeyCode.rightArrow, candidate: ctx)
+        XCTAssertFalse(handler.isBracketMode)
+        XCTAssertFalse(handler.candidateSession.isVisible)
+    }
+
     // MARK: - Shift+/ → ？候補ウィンドウ、Shift+1 → ！候補ウィンドウ
 
     func testShiftSlashShowsCandidateWindow() {

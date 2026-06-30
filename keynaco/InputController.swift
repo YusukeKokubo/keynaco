@@ -230,6 +230,11 @@ class InputController: IMKInputController, @unchecked Sendable {
         if consumed {
             applyCandidateWindowEffects(action: action, adapter: adapter)
         }
+        // 候補ウィンドウは session の可視性に追随する。consumed=false 経路（矢印キー・Cmd+key 等）で
+        // session が hidden になってもウィンドウだけ残るケースを潰す（ISSUE: 括弧モード+矢印キー）。
+        if !handler.candidateSession.isVisible && candidateWindow.isVisible {
+            candidateWindow.dismiss()
+        }
         KeydownLatencySignpost.endPeekUpdate(
             generation: keydownGeneration,
             stats: handler.azooKeyConverter.latencyStats
