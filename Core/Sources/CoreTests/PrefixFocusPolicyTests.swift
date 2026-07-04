@@ -13,6 +13,11 @@ final class PrefixFocusPolicyTests: XCTestCase {
         XCTAssertNil(PrefixFocusPolicy.minimumMorae(for: .auxiliary))
     }
 
+    func testRank_dbOnly_fallsBackToUnknownWithoutAzooKeyLookup() {
+        let db = DatabaseManager(inMemory: true)
+        XCTAssertEqual(PrefixFocusPolicy.rank(output: "未分類語", db: db), .unknown)
+    }
+
     func testRank_fromPos() {
         XCTAssertEqual(PrefixFocusPolicy.rank(fromPos: "noun"), .noun)
         XCTAssertEqual(PrefixFocusPolicy.rank(fromPos: "proper_noun/place"), .properNoun)

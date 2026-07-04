@@ -21,26 +21,13 @@ enum PrefixFocusPolicy {
         static let other = 5
     }
 
-    /// 品詞ランク解決: `lcid` → `pos`（DB）→ 履歴最長読み辞書 lookup → 組成読み lookup。
-    static func rank(
-        output: String,
-        db: DatabaseManager,
-        azooKey: AzooKeyConverting,
-        readingHint: String = ""
-    ) -> POSRank {
+    /// 品詞ランク解決: DB の `lcid` → `pos` のみ（peek 中の同期辞書 lookup は行わない。PLAN260704b A1）。
+    static func rank(output: String, db: DatabaseManager) -> POSRank {
         if let lcid = db.lcidForOutput(output) {
             return rank(fromLcid: lcid)
         }
         if let pos = db.posForOutput(output) {
             return rank(fromPos: pos)
-        }
-        if let input = db.longestInputForOutput(output),
-           let lcid = azooKey.lcidForCommitted(reading: input, output: output) {
-            return rank(fromLcid: lcid)
-        }
-        if !readingHint.isEmpty,
-           let lcid = azooKey.lcidForCommitted(reading: readingHint, output: output) {
-            return rank(fromLcid: lcid)
         }
         return .unknown
     }
@@ -49,12 +36,11 @@ enum PrefixFocusPolicy {
     static func acceptsPrefixFocus(
         reading: String,
         output: String,
-        db: DatabaseManager,
-        azooKey: AzooKeyConverting
+        db: DatabaseManager
     ) -> Bool {
         let moraCount = KanaUtils.moraCount(in: reading)
         guard moraCount >= MoraThreshold.noun else { return false }
-        let posRank = rank(output: output, db: db, azooKey: azooKey, readingHint: reading)
+        let posRank = rank(output: output, db: db)
         guard let minimum = minimumMorae(for: posRank) else { return false }
         return moraCount >= minimum
     }
