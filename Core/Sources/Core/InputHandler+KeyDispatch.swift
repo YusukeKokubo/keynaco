@@ -23,6 +23,11 @@ extension InputHandler {
             sessionTracker.track(keyCode: keyCode)
         }
 
+        // activateServer 直後の英数/かな echo 抑制は 1 キー分だけ有効。ルーティング前に take して
+        // `handle()` 内の分岐ごとの clear を不要にする。
+        let suppressModeSwitchEcho = ignoreNextModeSwitch
+        ignoreNextModeSwitch = false
+
         let route = KeyDispatch.route(KeyDispatchInput(
             keyCode: keyCode,
             isBackspace: isBackspace,
@@ -30,7 +35,7 @@ extension InputHandler {
             isBracketMode: isBracketMode,
             candidateVisible: candidate.isVisible,
             isComposing: state.isComposing,
-            ignoreNextModeSwitch: ignoreNextModeSwitch
+            ignoreNextModeSwitch: suppressModeSwitchEcho
         ))
 
         let wasExplicitlySelected = candidate.panelInteraction == .explicit
@@ -48,12 +53,10 @@ extension InputHandler {
             return handleModeSwitchKey(keyCode: keyCode, suppressEcho: suppressEcho, client: client)
 
         case .asciiMode:
-            ignoreNextModeSwitch = false
             return handleAsciiModeKey(
                 keyCode: keyCode, characters: characters, modifiers: modifiers, client: client)
 
         case .candidateVisible:
-            ignoreNextModeSwitch = false
             if let r = handleCandidateVisible(
                 keyCode: keyCode, characters: characters,
                 modifiers: modifiers, candidate: candidate, client: client) { return r }
@@ -63,11 +66,9 @@ extension InputHandler {
                 candidate: candidate, client: client)
 
         case .composeOnly(let key):
-            ignoreNextModeSwitch = false
             return handleComposeOnlyKey(key, client: client)
 
         case .normalInput:
-            ignoreNextModeSwitch = false
             return handleNormalInput(
                 keyCode: keyCode, characters: characters, baseCharacters: baseCharacters,
                 modifiers: modifiers, wasExplicitlySelected: wasExplicitlySelected,
@@ -97,10 +98,7 @@ extension InputHandler {
         suppressEcho: Bool,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        if suppressEcho {
-            ignoreNextModeSwitch = false
-            return (true, .none)
-        }
+        if suppressEcho { return (true, .none) }
         if keyCode == KeyCode.eisu {
             if state.isComposing { commitComposition(client: client, trigger: .modeSwitch) }
             Self.isAsciiMode = true

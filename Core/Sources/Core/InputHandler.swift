@@ -150,7 +150,7 @@ public struct InputHandler {
     /// | 操作 | 値 |
     /// |------|-----|
     /// | **set `true`** | `InputController.activateServer` のみ |
-    /// | **clear `false`** | 英数/かなキーで echo 抑制消費時（`handleModeSwitchKey`）、それ以外の任意キー（`handle()` 本流） |
+    /// | **clear `false`** | 次の `handle()` 入口で take 消費（英数/かな echo 抑制の有無に関わらず） |
     public var ignoreNextModeSwitch = false
     /// 本番 `InputController` のみ `true`。`.whileTyping` で AzooKey を同期呼ばず `pendingAzooKeyReading` を返す。
     public var deferAzooKeyWhileTyping = false

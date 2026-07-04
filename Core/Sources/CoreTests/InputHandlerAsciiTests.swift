@@ -74,6 +74,16 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
         XCTAssertTrue(InputHandler.isAsciiMode, "2 回目の英数は通常どおり ASCII モードへ")
     }
 
+    /// 英数/かな以外のキーでも take で消費される（echo 待ちのまま残さない）。
+    func testNonModeKeyConsumesIgnoreNextModeSwitch() {
+        InputHandler.isAsciiMode = false
+        handler.ignoreNextModeSwitch = true
+        _ = type(chars: "a", base: "a")
+        XCTAssertFalse(handler.ignoreNextModeSwitch)
+        press(keyCode: 102)
+        XCTAssertTrue(InputHandler.isAsciiMode, "フラグ消費後の英数は通常どおり ASCII モードへ")
+    }
+
     // MARK: - Shift + 文字 → 組成バッファに英字として貯める
     // See: docs/domain/scenarios.md#s-04-shift文字日本語モードで英字組成
 
