@@ -2,13 +2,10 @@ import Foundation
 
 public extension InputHandler {
 
-    /// sandbox: 候補 `applyCandidateAction` を consumed 不問で適用。IMK キャッシュは更新しない。
+    /// sandbox: 候補 `applyCandidateAction` を適用。IMK キャッシュは更新しない。
     mutating func applyPostKeyDownCandidateAndIMK(
-        consumed: Bool,
         action: CandidateAction,
-        client: TextInputClient,
-        composedHiraganaWasEmpty: Bool,
-        didInsertText: Bool
+        client: TextInputClient
     ) {
         applyCandidateAction(action, client: client)
     }

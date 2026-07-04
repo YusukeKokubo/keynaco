@@ -80,6 +80,7 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
 private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {
     var isZenzaiEnabled: Bool { false }
     let latencyStats = TypingLatencyStats()
+    var fetchLogger: FetchLogger { FetchLogger.sharedNoOp }
     private(set) var lastRichCandidates: Bool?
     private(set) var requestCount = 0
 
@@ -96,4 +97,6 @@ private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {
     func commit(reading: String, text: String) { _ = (reading, text) }
 
     func lcidForCommitted(reading: String, output: String) -> Int? { nil }
+
+    func canonicalReading(for reading: String, text: String) -> String? { nil }
 }

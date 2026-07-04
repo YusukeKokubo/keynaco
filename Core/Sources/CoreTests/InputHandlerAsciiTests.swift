@@ -141,11 +141,11 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
         press(keyCode: 36)  // Enter
 
         // input キーが小文字 "api" で記録されること
-        let results = handler.db.fetchHistoryExact(reading: "api")
+        let results = handler.db.exactOutputs(reading: "api")
         XCTAssertEqual(results, ["API"], "ASCII 入力は小文字キーで記録される")
 
         // 大文字で引いても COLLATE NOCASE により取得できること
-        let upperResults = handler.db.fetchHistoryExact(reading: "API")
+        let upperResults = handler.db.exactOutputs(reading: "API")
         XCTAssertEqual(upperResults, ["API"])
     }
 
@@ -157,11 +157,11 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
         press(keyCode: 36)  // Enter
 
         // GITHUB は g-i-t-h-u-b: prefix "gi" で絞り込める
-        let results = handler.db.fetchHistoryPrefix(reading: "gi")
+        let results = handler.db.mergedOutputs(reading: "gi")
         XCTAssertTrue(results.contains("GITHUB"), "prefix 'gi' で GITHUB が候補に出る: \(results)")
 
         // さらに短い prefix "g" でも引ける（Shift+G 1打で GITHUB が候補に出ること）
-        let resultsG = handler.db.fetchHistoryPrefix(reading: "g")
+        let resultsG = handler.db.mergedOutputs(reading: "g")
         XCTAssertTrue(resultsG.contains("GITHUB"), "prefix 'g' で GITHUB が候補に出る: \(resultsG)")
     }
 
@@ -205,7 +205,7 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
         press(keyCode: 36)  // Enter
 
         // historyKey は小文字正規化されるので "github" で検索
-        let exact = handler.db.fetchHistoryExact(reading: "github")
+        let exact = handler.db.exactOutputs(reading: "github")
         XCTAssertTrue(exact.contains("GitHub"), "exact 'github' → GitHub: \(exact)")
     }
 
@@ -225,7 +225,7 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
         press(keyCode: 36)  // Enter → input:"あAPI", output:"あAPI"
 
         // 元のキーで取得できる
-        let original = handler.db.fetchHistoryExact(reading: "あAPI")
+        let original = handler.db.exactOutputs(reading: "あAPI")
         XCTAssertEqual(original, ["あAPI"])
     }
 }

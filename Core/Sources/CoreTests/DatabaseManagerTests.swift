@@ -1,6 +1,16 @@
 import XCTest
 @testable import KeynacoCore
 
+private extension DatabaseManager {
+    func historyExactOutputs(reading: String) -> [String] {
+        fetchHistoryExactScored(reading: reading).map(\.output)
+    }
+
+    func historyMergedOutputs(reading: String) -> [String] {
+        fetchHistoryScoredMerged(reading: reading).map(\.output)
+    }
+}
+
 final class DatabaseManagerTests: XCTestCase {
 
     private var db: DatabaseManager!
@@ -20,14 +30,14 @@ final class DatabaseManagerTests: XCTestCase {
 
     func testRecordAndFetch() {
         db.record(input: "かいぎ", output: "会議")
-        let results = db.fetchHistoryExact(reading: "かいぎ")
+        let results = db.historyExactOutputs(reading: "かいぎ")
         XCTAssertTrue(results.contains("会議"))
     }
 
     func testFetchHistoryExactDoesNotMatchPrefix() {
         db.record(input: "かいぎ", output: "会議")
         db.record(input: "かいしゃ", output: "会社")
-        let results = db.fetchHistoryExact(reading: "かい")
+        let results = db.historyExactOutputs(reading: "かい")
         XCTAssertFalse(results.contains("会議"), "前方一致は返さない（完全一致のみ）")
         XCTAssertFalse(results.contains("会社"))
     }
@@ -36,7 +46,7 @@ final class DatabaseManagerTests: XCTestCase {
         db.record(input: "かいぎ", output: "会議")
         db.record(input: "かいぎ", output: "会議")
         db.record(input: "かいぎ", output: "懐疑")
-        let results = db.fetchHistoryExact(reading: "かいぎ")
+        let results = db.historyExactOutputs(reading: "かいぎ")
         // 会議 (count=2) が 懐疑 (count=1) より前
         let idxKaigi  = results.firstIndex(of: "会議")!
         let idxKaigi2 = results.firstIndex(of: "懐疑")!
@@ -46,7 +56,7 @@ final class DatabaseManagerTests: XCTestCase {
     func testDeleteHistory() {
         db.record(input: "かいぎ", output: "会議")
         db.deleteHistory(output: "会議")
-        let results = db.fetchHistoryExact(reading: "かいぎ")
+        let results = db.historyExactOutputs(reading: "かいぎ")
         XCTAssertFalse(results.contains("会議"))
     }
 
@@ -54,7 +64,7 @@ final class DatabaseManagerTests: XCTestCase {
         db.record(input: "あい", output: "愛")
         db.record(input: "あい", output: "愛")
         db.record(input: "あい", output: "相")
-        let results = db.fetchHistoryExact(reading: "あい")
+        let results = db.historyExactOutputs(reading: "あい")
         let idxAi  = results.firstIndex(of: "愛")!
         let idxSou = results.firstIndex(of: "相")!
         XCTAssertLessThan(idxAi, idxSou, "使用頻度の高い候補が先頭")
@@ -62,32 +72,32 @@ final class DatabaseManagerTests: XCTestCase {
 
     // MARK: - fetchHistoryPrefix / recordPrefixes
 
-    func testFetchHistoryPrefixReturnsPartialMatch() {
+    func testFetchHistoryScoredMergedReturnsPartialMatch() {
         db.record(input: "かいぎ", output: "会議")
-        let results = db.fetchHistoryPrefix(reading: "か")
+        let results = db.historyMergedOutputs(reading: "か")
         XCTAssertTrue(results.contains("会議"), "前方一致する候補を返す")
     }
 
-    func testFetchHistoryPrefixExcludesExactMatch() {
+    func testFetchHistoryExactScoredVsMerged() {
         db.record(input: "かい", output: "会")
         db.record(input: "かいぎ", output: "会議")
-        let exact = db.fetchHistoryPrefix(reading: "かい")
-        XCTAssertFalse(exact.contains("会"), "完全一致は除外される")
-        XCTAssertTrue(exact.contains("会議"))
+        XCTAssertTrue(db.historyExactOutputs(reading: "かい").contains("会"))
+        XCTAssertTrue(db.historyMergedOutputs(reading: "かい").contains("会議"))
+        XCTAssertFalse(db.historyExactOutputs(reading: "か").contains("会議"), "exact は input 完全一致のみ")
     }
 
-    func testFetchHistoryPrefixNoDuplicatesWhenMultiplePrefixRowsExist() {
+    func testFetchHistoryScoredMergedNoDuplicatesWhenMultiplePrefixRowsExist() {
         // 1 回の確定で最長読みのみ記録。LIKE 前方一致で短い読みからもヒットする。
         db.recordPrefixes(reading: "えくすぽーと", output: "エクスポート")
-        let results = db.fetchHistoryPrefix(reading: "え")
+        let results = db.historyMergedOutputs(reading: "え")
         let count = results.filter { $0 == "エクスポート" }.count
         XCTAssertEqual(count, 1, "複数のプレフィックス行があっても重複なく1件")
     }
 
-    func testFetchHistoryPrefixDeduplicatesMultipleOutputs() {
+    func testFetchHistoryScoredMergedDeduplicatesMultipleOutputs() {
         db.recordPrefixes(reading: "えくすぽーと", output: "エクスポート")
         db.recordPrefixes(reading: "えーす", output: "エース")
-        let results = db.fetchHistoryPrefix(reading: "え")
+        let results = db.historyMergedOutputs(reading: "え")
         let exportCount = results.filter { $0 == "エクスポート" }.count
         let aceCount    = results.filter { $0 == "エース" }.count
         XCTAssertEqual(exportCount, 1)
@@ -97,10 +107,10 @@ final class DatabaseManagerTests: XCTestCase {
     func testRecordPrefixesStoresPrefixReading() {
         db.recordPrefixes(reading: "かいぎ", output: "会議")
         // prefix "か" / "かい" でも前方一致して返るか
-        XCTAssertTrue(db.fetchHistoryPrefix(reading: "か").contains("会議"))
-        XCTAssertTrue(db.fetchHistoryPrefix(reading: "かい").contains("会議"))
+        XCTAssertTrue(db.historyMergedOutputs(reading: "か").contains("会議"))
+        XCTAssertTrue(db.historyMergedOutputs(reading: "かい").contains("会議"))
         // フル読みは exact で返る
-        XCTAssertTrue(db.fetchHistoryExact(reading: "かいぎ").contains("会議"))
+        XCTAssertTrue(db.historyExactOutputs(reading: "かいぎ").contains("会議"))
     }
 
     func testRecordPrefixesConsolidatesToLongestReading() {
@@ -263,7 +273,7 @@ final class DatabaseManagerTests: XCTestCase {
         db.record(input: "あい", output: "相")
         // どちらも count=1、"相" の方が直近
         db.clock = { base + 20 }
-        let results = db.fetchHistoryExact(reading: "あい")
+        let results = db.historyExactOutputs(reading: "あい")
         XCTAssertEqual(results.first, "相", "同 count なら直近の方が上位")
     }
 
@@ -280,18 +290,18 @@ final class DatabaseManagerTests: XCTestCase {
         db.clock = { base + tau }  // 30日後に直近を記録
         for _ in 0..<3 { db.record(input: "あ", output: "低頻度新しい") }
         db.clock = { base + tau + 10 }
-        let results = db.fetchHistoryExact(reading: "あ")
+        let results = db.historyExactOutputs(reading: "あ")
         let idxOld = results.firstIndex(of: "高頻度古い")!
         let idxNew = results.firstIndex(of: "低頻度新しい")!
         XCTAssertLessThan(idxNew, idxOld, "直近 count=3 + short bonus が 30 日前 count=10 を上回る")
     }
 
-    func testHistoryEntryScoreTwoStageDecay() {
-        // PLAN260621b: HistoryEntry.score の 2 段 decay 数値検証。
+    func testStoredHistoryRowScoreTwoStageDecay() {
+        // PLAN260621b: StoredHistoryRow.score の 2 段 decay 数値検証。
         // 直近 0 秒: ~3.0 / 1日前: ~2.0 / 7日前: ~1.06 / 30日前: ~0.56
         let now: Int64 = 1_700_000_000
-        func entry(ageDays: Double) -> DatabaseManager.HistoryEntry {
-            DatabaseManager.HistoryEntry(
+        func entry(ageDays: Double) -> DatabaseManager.StoredHistoryRow {
+            DatabaseManager.StoredHistoryRow(
                 input: "x", output: "y", count: 1, pos: nil, lcid: nil,
                 usedAt: now - Int64(ageDays * 86400)
             )
@@ -313,7 +323,7 @@ final class DatabaseManagerTests: XCTestCase {
         db.clock = { base + oneDay - oneHour }  // 23h 後に新規記録
         db.record(input: "あ", output: "より直近")
         db.clock = { base + oneDay }
-        let results = db.fetchHistoryExact(reading: "あ")
+        let results = db.historyExactOutputs(reading: "あ")
         let idxRecent = results.firstIndex(of: "より直近")!
         let idxOlder = results.firstIndex(of: "古い直近")!
         XCTAssertLessThan(idxRecent, idxOlder, "1 日以内では直近側が上位（short bonus が支配）")
@@ -328,7 +338,7 @@ final class DatabaseManagerTests: XCTestCase {
         db.clock = { base + 2 * tau }  // 60日後
         for _ in 0..<4 { db.record(input: "あ", output: "低頻度新しい") }
         db.clock = { base + 2 * tau + 10 }
-        let results = db.fetchHistoryExact(reading: "あ")
+        let results = db.historyExactOutputs(reading: "あ")
         let idxOld = results.firstIndex(of: "高頻度古い")!
         let idxNew = results.firstIndex(of: "低頻度新しい")!
         XCTAssertLessThan(idxNew, idxOld, "count=4 / score=4.0 が count=10 / score≈3.33 より上位")
@@ -343,7 +353,7 @@ final class DatabaseManagerTests: XCTestCase {
         // performGC は recency スコア < 0.1 を削除（count=1 だと約 9 ヶ月超相当）
         db.clock = { base + 280 * 86400 }
         db.performGCIfNeeded()
-        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").isEmpty, "count=1 かつ低スコアは GC で削除")
+        XCTAssertTrue(db.historyExactOutputs(reading: "あ").isEmpty, "count=1 かつ低スコアは GC で削除")
     }
 
     func testGCKeepsHighCountEntries() {
@@ -353,7 +363,7 @@ final class DatabaseManagerTests: XCTestCase {
         db.record(input: "あ", output: "高頻度")  // count=2
         db.clock = { base + 181 * 86400 }
         db.performGCIfNeeded()
-        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("高頻度"), "count=2 は残る")
+        XCTAssertTrue(db.historyExactOutputs(reading: "あ").contains("高頻度"), "count=2 は残る")
     }
 
     func testGCKeepsRecentSingleCountEntries() {
@@ -362,7 +372,7 @@ final class DatabaseManagerTests: XCTestCase {
         db.record(input: "あ", output: "新しい")  // count=1 だが直近
         db.clock = { base + 90 * 86400 }
         db.performGCIfNeeded()
-        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("新しい"), "count=1 でも 90日前は残る")
+        XCTAssertTrue(db.historyExactOutputs(reading: "あ").contains("新しい"), "count=1 でも 90日前は残る")
     }
 
     func testGCSkipsIfRunRecently() {
@@ -373,14 +383,14 @@ final class DatabaseManagerTests: XCTestCase {
         UserDefaults.standard.set(base - 3 * 86400, forKey: "lastGCDate")
         db.clock = { base }
         db.performGCIfNeeded()
-        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").contains("古い"), "7日以内は GC を実行しない")
+        XCTAssertTrue(db.historyExactOutputs(reading: "あ").contains("古い"), "7日以内は GC を実行しない")
     }
 
     // MARK: - ユーザー辞書
 
     func testUserDictAddAndFetch() {
         XCTAssertTrue(db.addUserDict(input: "けいなこ", output: "keynaco"))
-        let results = db.fetchUserDict(reading: "けいなこ")
+        let results = db.fetchUserDictCombined(reading: "けいなこ").exact
         XCTAssertEqual(results, ["keynaco"])
     }
 
@@ -391,7 +401,7 @@ final class DatabaseManagerTests: XCTestCase {
 
     func testUserDictExactMatchOnly() {
         db.addUserDict(input: "けいなこ", output: "keynaco")
-        XCTAssertTrue(db.fetchUserDict(reading: "けいな").isEmpty, "前方一致は返さない")
+        XCTAssertTrue(db.fetchUserDictCombined(reading: "けいな").exact.isEmpty, "前方一致は返さない")
     }
 
     func testUserDictDelete() {
@@ -399,7 +409,7 @@ final class DatabaseManagerTests: XCTestCase {
         let all = db.fetchAllUserDict()
         guard let entry = all.first else { XCTFail("エントリが存在するはず"); return }
         db.deleteUserDict(id: entry.id)
-        XCTAssertTrue(db.fetchUserDict(reading: "けいなこ").isEmpty)
+        XCTAssertTrue(db.fetchUserDictCombined(reading: "けいなこ").exact.isEmpty)
     }
 
     func testUserDictFetchAllOrdered() {
@@ -412,27 +422,27 @@ final class DatabaseManagerTests: XCTestCase {
     func testUserDictMultipleEntriesSameReading() {
         db.addUserDict(input: "りーなー", output: "Leaner")
         db.addUserDict(input: "りーなー", output: "リーナー株式会社")
-        let results = db.fetchUserDict(reading: "りーなー")
+        let results = db.fetchUserDictCombined(reading: "りーなー").exact
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results[0], "Leaner", "登録順が先")
     }
 
     func testUserDictPrefixMatch() {
         db.addUserDict(input: "とうきょう", output: "東京")
-        let results = db.fetchUserDictPrefix(reading: "とうきょうと")
+        let results = db.fetchUserDictCombined(reading: "とうきょうと").prefix
         XCTAssertEqual(results, ["東京"])
     }
 
     func testUserDictPrefixExcludesExactMatch() {
         db.addUserDict(input: "とうきょう", output: "東京")
-        let results = db.fetchUserDictPrefix(reading: "とうきょう")
-        XCTAssertTrue(results.isEmpty, "完全一致は除外する")
+        let results = db.fetchUserDictCombined(reading: "とうきょう").prefix
+        XCTAssertTrue(results.isEmpty, "完全一致は prefix に含めない")
     }
 
     func testUserDictPrefixOrderedByRegistration() {
         db.addUserDict(input: "とうきょう", output: "東京")
         db.addUserDict(input: "とうきょうと", output: "東京都")
-        let results = db.fetchUserDictPrefix(reading: "とうきょうとちょう")
+        let results = db.fetchUserDictCombined(reading: "とうきょうとちょう").prefix
         XCTAssertEqual(results, ["東京", "東京都"], "登録順で返る")
     }
 
@@ -451,7 +461,7 @@ final class DatabaseManagerTests: XCTestCase {
         let second = DatabaseManager(snapshotPath: path)
         XCTAssertEqual(second.schemaUserVersion, DatabaseManager.schemaVersionLatest)
         second.record(input: "てすと", output: "テスト")
-        XCTAssertTrue(second.fetchHistoryExact(reading: "てすと").contains("テスト"))
+        XCTAssertTrue(second.historyExactOutputs(reading: "てすと").contains("テスト"))
     }
 
     // MARK: - penalizeAll（訂正シグナル）
@@ -459,6 +469,6 @@ final class DatabaseManagerTests: XCTestCase {
     func testPenalizeAllDeletesHistoryWhenCountReachesZero() {
         db.record(input: "あ", output: "阿")
         db.penalizeAll(input: "あ", output: "阿", fullReading: nil)
-        XCTAssertTrue(db.fetchHistoryExact(reading: "あ").isEmpty)
+        XCTAssertTrue(db.historyExactOutputs(reading: "あ").isEmpty)
     }
 }

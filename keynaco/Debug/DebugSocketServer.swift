@@ -1138,12 +1138,16 @@ final class DebugSocketServer: @unchecked Sendable {
     }
 
     private func updateMockMarkedText() {
-        let text: String
-        if handler.candidateSession.isVisible, let selected = handler.candidateSession.selectedText {
-            text = selected + handler.state.pendingRomaji
-        } else {
-            text = handler.state.composingText
-        }
+        let session = handler.candidateSession
+        let text = MarkedTextSync.resolve(
+            isBracketMode: handler.isBracketMode,
+            candidateVisible: session.isVisible,
+            isExplicitlySelected: session.isExplicitlySelected,
+            composedHiragana: handler.state.composedHiragana,
+            pendingRomaji: handler.state.pendingRomaji,
+            composingText: handler.state.composingText,
+            selectedCandidate: session.selectedText
+        )
         mockClient.setMarkedText(text, selectionRange: NSRange(location: text.count, length: 0))
     }
 }

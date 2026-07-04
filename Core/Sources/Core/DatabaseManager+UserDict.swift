@@ -4,31 +4,6 @@ import SQLite3
 extension DatabaseManager {
     // MARK: - ユーザー辞書
 
-    func fetchUserDict(reading: String) -> [String] {
-        dbQueue.sync {
-            self.queryStringsOnQueue("""
-            SELECT output FROM user_dict
-            WHERE input = ?
-            ORDER BY id ASC
-            """) {
-                self.bindText($0, 1, reading)
-            }
-        }
-    }
-
-    func fetchUserDictPrefix(reading: String) -> [String] {
-        dbQueue.sync {
-            self.queryStringsOnQueue("""
-            SELECT output FROM user_dict
-            WHERE ? LIKE (input || '%') AND input != ?
-            ORDER BY id ASC
-            """) {
-                self.bindText($0, 1, reading)
-                self.bindText($0, 2, reading)
-            }
-        }
-    }
-
     /// 完全一致・前方一致のユーザー辞書候補を 1 クエリで返す（buildCandidateList ホットパス用）。
     func fetchUserDictCombined(reading: String) -> (exact: [String], prefix: [String]) {
         let pairs = dbQueue.sync {

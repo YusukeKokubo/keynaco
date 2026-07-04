@@ -14,7 +14,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         type(chars: "a", base: "a")
         type(chars: "i", base: "i")
         press(keyCode: 36)  // Enter → 確定
-        let hist = handler.db.fetchHistoryExact(reading: "あい")
+        let hist = handler.db.exactOutputs(reading: "あい")
         XCTAssertTrue(hist.contains("あい"), "HiraganaPreferred 外のひらがな確定は履歴に記録する")
     }
 
@@ -22,13 +22,13 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
 
     func testHiraganaPassthroughNotRecorded() {
         handler.db.recordPrefixes(reading: "は", output: "は")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "は").isEmpty, "助詞パススルーは記録しない")
+        XCTAssertTrue(handler.db.exactOutputs(reading: "は").isEmpty, "助詞パススルーは記録しない")
     }
 
     func testNonParticleHiraganaPassthroughIsRecorded() {
         // HiraganaPreferredBuiltins に含まれないひらがな語は記録する（「さん」「して」等）
         handler.db.recordPrefixes(reading: "して", output: "して")
-        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "して").isEmpty, "助詞以外のひらがなは記録する")
+        XCTAssertFalse(handler.db.exactOutputs(reading: "して").isEmpty, "助詞以外のひらがなは記録する")
     }
 
     // MARK: - 格助詞トリム記録
@@ -36,9 +36,9 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
     func testTrailingParticleTrimmedOnRecord() {
         // 格助詞「が」は trim される。reading も対応部分を除去
         handler.db.recordPrefixes(reading: "とうきょうが", output: "東京が")
-        let exact = handler.db.fetchHistoryExact(reading: "とうきょう")
+        let exact = handler.db.exactOutputs(reading: "とうきょう")
         XCTAssertTrue(exact.contains("東京"), "「とうきょう」→「東京」で記録されるはず")
-        let withGa = handler.db.fetchHistoryExact(reading: "とうきょうが")
+        let withGa = handler.db.exactOutputs(reading: "とうきょうが")
         XCTAssertTrue(withGa.isEmpty, "「とうきょうが」は記録されない")
     }
 
@@ -46,8 +46,8 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         // 活用語尾「る」「て」は格助詞でないので trim しない
         handler.db.recordPrefixes(reading: "でる", output: "出る")
         handler.db.recordPrefixes(reading: "おしえて", output: "教えて")
-        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "でる").isEmpty, "「出る」はそのまま記録")
-        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "おしえて").isEmpty, "「教えて」はそのまま記録")
+        XCTAssertFalse(handler.db.exactOutputs(reading: "でる").isEmpty, "「出る」はそのまま記録")
+        XCTAssertFalse(handler.db.exactOutputs(reading: "おしえて").isEmpty, "「教えて」はそのまま記録")
     }
 
     func testTrimTrailingParticleHelper() {
@@ -68,24 +68,24 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
     func testNonParticleEndingPreserved() {
         // 非格助詞末尾の output はそのまま記録
         handler.db.recordPrefixes(reading: "わたしたち", output: "私たち")
-        let r = handler.db.fetchHistoryExact(reading: "わたしたち")
+        let r = handler.db.exactOutputs(reading: "わたしたち")
         XCTAssertTrue(r.contains("私たち"), "格助詞以外の末尾はそのまま記録")
     }
 
     func testHiraganaToKanjiIsRecorded() {
         handler.db.recordPrefixes(reading: "は", output: "葉")
-        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "は").isEmpty, "「は」→「葉」は変換なので記録する")
+        XCTAssertFalse(handler.db.exactOutputs(reading: "は").isEmpty, "「は」→「葉」は変換なので記録する")
     }
 
     func testKatakanaOutputIsRecorded() {
         handler.db.recordPrefixes(reading: "ひらがな", output: "ヒラガナ")
-        XCTAssertFalse(handler.db.fetchHistoryExact(reading: "ひらがな").isEmpty, "カタカナ変換は記録する")
+        XCTAssertFalse(handler.db.exactOutputs(reading: "ひらがな").isEmpty, "カタカナ変換は記録する")
     }
 
     func testHistoryRecordedAfterCandidateSelectionAndEnter() {
         type(chars: "a", base: "a")
         press(keyCode: 36, candidateVisible: true, selectedRow: 1, selectedText: "阿")
-        let hist = handler.db.fetchHistoryExact(reading: "あ")
+        let hist = handler.db.exactOutputs(reading: "あ")
         XCTAssertTrue(hist.contains("阿"), "候補選択→Enter 確定後に変換結果が履歴として記録されるはず")
     }
 
@@ -135,8 +135,8 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
     func testPrefixRecord() {
         handler.db.recordPrefixes(reading: "とうきょう", output: "東京")
 
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "とうきょう"), ["東京"], "フル読みで exact ヒット")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "とうきょ").isEmpty, "フル読み以外は exact ヒットしない")
+        XCTAssertEqual(handler.db.exactOutputs(reading: "とうきょう"), ["東京"], "フル読みで exact ヒット")
+        XCTAssertTrue(handler.db.exactOutputs(reading: "とうきょ").isEmpty, "フル読み以外は exact ヒットしない")
 
         // LIKE 前方一致では候補が出る
         let merged = handler.db.fetchHistoryScoredMerged(reading: "とうきょ").map(\.output)
@@ -146,8 +146,8 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
     func testPrefixRecordSkipsASCII() {
         handler.db.recordPrefixes(reading: "github", output: "GitHub")
 
-        XCTAssertEqual(handler.db.fetchHistoryExact(reading: "github"), ["GitHub"], "フル読みは記録される")
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "githu").isEmpty, "プレフィックスはexactヒットしない")
+        XCTAssertEqual(handler.db.exactOutputs(reading: "github"), ["GitHub"], "フル読みは記録される")
+        XCTAssertTrue(handler.db.exactOutputs(reading: "githu").isEmpty, "プレフィックスはexactヒットしない")
     }
 
     func testPrefixRecordViaCommit() {
@@ -156,7 +156,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         press(keyCode: 36, candidateVisible: true, selectedRow: 0, selectedText: "東京")
 
         // exact ではヒットしない
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "とうきょ").isEmpty, "prefix の exact ヒットは記録しない")
+        XCTAssertTrue(handler.db.exactOutputs(reading: "とうきょ").isEmpty, "prefix の exact ヒットは記録しない")
         // scoredMerged の LIKE パスでヒットする
         let merged = handler.db.fetchHistoryScoredMerged(reading: "とうきょ").map(\.output)
         XCTAssertTrue(merged.contains("東京"), "確定後、LIKE 前方一致で履歴ヒットするはず")
@@ -218,7 +218,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         // 確定直後 Backspace → penalizeAll → count=0 → DELETE
         press(keyCode: 51)
 
-        let hist = handler.db.fetchHistoryExact(reading: "あ")
+        let hist = handler.db.exactOutputs(reading: "あ")
         XCTAssertFalse(hist.contains("阿"), "count <= 0 でエントリが削除されるはず")
     }
 
@@ -233,7 +233,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
         // Backspace → penalize されない
         press(keyCode: 51)
 
-        let hist = handler.db.fetchHistoryExact(reading: "あ")
+        let hist = handler.db.exactOutputs(reading: "あ")
         XCTAssertTrue(hist.contains("阿"), "別キー後の Backspace では penalize されないはず")
     }
 
@@ -244,7 +244,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
             fullReading: nil
         )
         _ = press(keyCode: 51)
-        XCTAssertTrue(handler.db.fetchHistoryExact(reading: "あ").isEmpty)
+        XCTAssertTrue(handler.db.exactOutputs(reading: "あ").isEmpty)
         // 1 回目で lastConfirmedContext は消えている
         _ = press(keyCode: 51)
         // 二重にエラーにならなければよい（空のペナルティ呼び出しはしない）

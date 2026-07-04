@@ -462,15 +462,17 @@ extension DebugSocketServer {
     warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
     let generation = azooKeyScheduler.onKeyDown()
     let before = makeResponse(inserted: [])
-    let (consumed, action) = handler.handle(
-    keyCode: keyCode,
-    characters: chars,
-    baseCharacters: base,
-    modifiers: mods,
-    candidate: handler.candidateSession.makeContext(),
-    client: mockClient
+    let pre = KeyEventPipeline.preSnapshot(handler: handler)
+    let keyResult = KeyEventPipeline.runHandle(
+        handler: &handler,
+        keyCode: keyCode,
+        characters: chars,
+        baseCharacters: base,
+        modifiers: mods,
+        pre: pre,
+        client: mockClient
     )
-    if keyCode == KeyCode.backspace, !consumed {
+    if keyCode == KeyCode.backspace, !keyResult.consumed {
         if let output = backspacePenalizeOutput {
             mockClient.removeDocumentSuffix(output)
         } else {
@@ -478,13 +480,10 @@ extension DebugSocketServer {
         }
     }
     handler.applyPostKeyDownCandidateAndIMK(
-        consumed: consumed,
-        action: action,
-        client: mockClient,
-        composedHiraganaWasEmpty: composedHiraganaWasEmpty,
-        didInsertText: mockClient.hasPendingInsertions
+        action: keyResult.candidateAction,
+        client: mockClient
     )
-    scheduleSandboxAzooKeyIfNeeded(generation: generation, consumed: consumed)
+    scheduleSandboxAzooKeyIfNeeded(generation: generation, consumed: keyResult.consumed)
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
         let reading = handler.lastConfirmedContext?.input ?? handler.lastCommittedReading ?? ""
@@ -645,23 +644,21 @@ extension DebugSocketServer {
         let base = baseCharacters ?? characters
         syncLeftSideContext()
         let generation = azooKeyScheduler.onKeyDown()
-        let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
-        let (consumed, action) = handler.handle(
+        let pre = KeyEventPipeline.preSnapshot(handler: handler)
+        let keyResult = KeyEventPipeline.runHandle(
+            handler: &handler,
             keyCode: keyCode,
             characters: characters,
             baseCharacters: base,
             modifiers: [],
-            candidate: handler.candidateSession.makeContext(),
+            pre: pre,
             client: mockClient
         )
         handler.applyPostKeyDownCandidateAndIMK(
-            consumed: consumed,
-            action: action,
-            client: mockClient,
-            composedHiraganaWasEmpty: composedHiraganaWasEmpty,
-            didInsertText: mockClient.hasPendingInsertions
+            action: keyResult.candidateAction,
+            client: mockClient
         )
-        scheduleSandboxAzooKeyIfNeeded(generation: generation, consumed: consumed)
+        scheduleSandboxAzooKeyIfNeeded(generation: generation, consumed: keyResult.consumed)
         _ = mockClient.consume()
     }
 

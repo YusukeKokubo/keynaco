@@ -4,12 +4,6 @@ import SQLite3
 extension DatabaseManager {
     // MARK: - daily_log テーブル操作
 
-    struct DailyLogEntry: Sendable {
-        let text: String
-        let appBundleID: String?
-        let createdAt: Int64
-    }
-
     /// 確定テキストを daily_log に追記する。punctuation 除外は呼び出し側で行う。
     func recordDailyLog(output: String, appBundleID: String? = nil) {
         let date = Self.todayDateString()
@@ -27,42 +21,6 @@ extension DatabaseManager {
                 }
                 sqlite3_bind_int64($0, 4, now)
             }
-        }
-    }
-
-    /// 指定日の確定テキストを時系列順（初出順）で返す。同一テキストは重複排除。
-    func fetchDailyLog(for date: String) -> [DailyLogEntry] {
-        dbQueue.sync {
-            let sql = """
-            SELECT committed_text, app_bundle_id, MIN(created_at) AS first_seen
-            FROM daily_log WHERE date = ?
-            GROUP BY committed_text
-            ORDER BY first_seen
-            """
-            guard let stmt = self.prepareUncachedStmt(sql) else { return [] }
-            defer { sqlite3_finalize(stmt) }
-            self.bindText(stmt, 1, date)
-            var results: [DailyLogEntry] = []
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                guard let p = sqlite3_column_text(stmt, 0) else { continue }
-                let text = String(cString: p)
-                let appBundleID = sqlite3_column_text(stmt, 1).map { String(cString: $0) }
-                let createdAt = sqlite3_column_int64(stmt, 2)
-                results.append(DailyLogEntry(text: text, appBundleID: appBundleID, createdAt: createdAt))
-            }
-            return results
-        }
-    }
-
-    /// 指定日の daily_log エントリ数を返す。
-    func countDailyLog(for date: String) -> Int {
-        dbQueue.sync {
-            let sql = "SELECT COUNT(*) FROM daily_log WHERE date = ?"
-            guard let stmt = self.prepareUncachedStmt(sql) else { return 0 }
-            defer { sqlite3_finalize(stmt) }
-            self.bindText(stmt, 1, date)
-            guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
-            return Int(sqlite3_column_int(stmt, 0))
         }
     }
 

@@ -30,11 +30,11 @@ extension InputController {
         KeydownLatencySignpost.beginFetchComplete(generation: generation)
         let leftContext = handler.leftContext.azooKeyValue
         let converter = handler.azooKeyConverter
-        let debounceNs = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
+        let debounceNs = AzooKeyDebouncePolicy.nanoseconds(
             interKeyIntervalMs: azooKeyScheduler.lastInterKeyIntervalMs,
-            hasPendingRomaji: !handler.state.pendingRomaji.isEmpty,
-            readingLength: reading.count
-        ))
+            pendingRomaji: handler.state.pendingRomaji,
+            reading: reading
+        )
         converter.latencyStats.recordDebounce(ms: Double(debounceNs) / 1_000_000)
         if let interKeyMs = azooKeyScheduler.lastInterKeyIntervalMs {
             converter.latencyStats.recordInterKey(ms: interKeyMs)
@@ -62,10 +62,15 @@ extension InputController {
         candidates: [AzooKeyCandidate],
         adapter: IMKTextInputAdapter
     ) {
-        guard azooKeyScheduler.candidateGeneration == generation else { return }
-        guard handler.state.composedHiragana == reading else { return }
-        guard !handler.candidateSession.isExplicitlySelected else { return }
-        guard handler.state.isComposing else { return }
+        let context = AsyncCandidateArrival.ApplyContext(
+            candidateGeneration: azooKeyScheduler.candidateGeneration,
+            arrivalGeneration: generation,
+            reading: reading,
+            composedHiragana: handler.state.composedHiragana,
+            isExplicitlySelected: handler.candidateSession.isExplicitlySelected,
+            isComposing: handler.state.isComposing
+        )
+        guard AsyncCandidateArrival.shouldApply(context) else { return }
 
         let action = handler.rebuildCandidateList(
             reading: reading,
@@ -88,18 +93,12 @@ extension InputController {
         generation: Int
     ) {
         let wasVisible = handler.candidateSession.isVisible
-        let previousSelectedRow = handler.candidateSession.selectedRow
-        let previousSelectedText = handler.candidateSession.selectedText
-
-        handler.candidateSession.apply(action)
-
-        if wasVisible,
-           !handler.candidateSession.isExplicitlySelected,
-           let text = previousSelectedText,
-           previousSelectedRow < handler.candidateSession.candidates.count,
-           handler.candidateSession.candidates[previousSelectedRow] == text {
-            handler.candidateSession.selectedRow = previousSelectedRow
-        }
+        let preservation = AsyncCandidateArrival.rowPreservationSnapshot(from: handler.candidateSession)
+        AsyncCandidateArrival.applyCandidateAction(
+            session: &handler.candidateSession,
+            action: action,
+            preservation: preservation
+        )
 
         applyCandidateWindowEffects(
             action: action,

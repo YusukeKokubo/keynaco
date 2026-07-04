@@ -45,10 +45,36 @@ public struct InputSessionTracker {
         guard let start = startedAtMs else { return 0 }
         return endMs - start
     }
+
+    /// `commitComposition` / `doEscape` 共通の `InputSessionRecord` 組み立て。
+    func makeSessionRecord(
+        ts: Int,
+        reading: String,
+        committed: String?,
+        candidateDepth: Int?,
+        wasExplicit: Bool,
+        anomaly: [String]
+    ) -> InputSessionRecord {
+        InputSessionRecord(
+            ts: ts,
+            keyCount: keyCount,
+            bsCount: bsCount,
+            compositionMs: compositionMs(endMs: ts),
+            reading: reading,
+            committed: committed,
+            candidateDepth: candidateDepth,
+            wasExplicit: wasExplicit,
+            scrollCount: scrollCount,
+            anomaly: anomaly,
+            bsExplicitCount: bsExplicitCount,
+            bsShrunkToOneCount: bsShrunkToOneCount,
+            maxObservedSelectedRow: maxObservedSelectedRow
+        )
+    }
 }
 
 /// 1変換セッションのログエントリ。`InputQualityLogger` が JSONL に書き出す。
-public struct InputSessionRecord {
+public struct InputSessionRecord: Sendable {
     public let ts: Int
     public let keyCount: Int
     public let bsCount: Int

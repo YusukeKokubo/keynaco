@@ -352,7 +352,7 @@ extension InputHandler {
             azooKeyApiOrder: Array(sources.azooKeyApiOrder.prefix(8)),
             initialText: initialText,
             fixedEnd: scoredLayout?.fixedEnd ?? 0,
-            scoredSources: scored.prefix(8).map { CandidateBuildDiagnosticsSupport.scoredSourceLabel($0) },
+            scoredSources: scored.prefix(8).map { CandidateRowMetadata.scoredCandidateDiagnosticLabel($0) },
             deferAzooKeyWhileTyping: deferAzooKeyWhileTyping
         )
     }

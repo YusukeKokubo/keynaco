@@ -45,19 +45,26 @@ public struct CandidateContext: Sendable {
     public private(set) var isExplicitlySelected: Bool
     /// 行ごとの source。Shift+Delete とセクション描画の正本。
     public private(set) var candidateSources: [ScoredCandidate.Source] = []
+    /// `CandidateSession.panelInteraction` をスナップショット時に写した値。
+    public private(set) var panelInteraction: CandidatePanelInteraction
 
     public init(
         isVisible: Bool,
         selectedRow: Int,
         selectedText: String?,
         isExplicitlySelected: Bool = false,
-        candidateSources: [ScoredCandidate.Source] = []
+        candidateSources: [ScoredCandidate.Source] = [],
+        panelInteraction: CandidatePanelInteraction? = nil
     ) {
         self.isVisible = isVisible
         self.selectedRow = selectedRow
         self.selectedText = selectedText
         self.isExplicitlySelected = isExplicitlySelected
         self.candidateSources = candidateSources
+        self.panelInteraction = panelInteraction ?? {
+            guard isVisible else { return .hidden }
+            return isExplicitlySelected ? .explicit : .passive
+        }()
     }
 
     public func isHistoryDeletable(at row: Int) -> Bool {
@@ -67,14 +74,9 @@ public struct CandidateContext: Sendable {
 
     public static let hidden = CandidateContext(
         isVisible: false, selectedRow: 0, selectedText: nil,
-        isExplicitlySelected: false, candidateSources: []
+        isExplicitlySelected: false, candidateSources: [],
+        panelInteraction: .hidden
     )
-
-    /// `CandidateSession.panelInteraction` と同じ導出（`handle()` へのスナップショット用）。
-    public var panelInteraction: CandidatePanelInteraction {
-        guard isVisible else { return .hidden }
-        return isExplicitlySelected ? .explicit : .passive
-    }
 }
 
 /// `buildCandidateList` の呼び出し元。候補列の組み立てロジックは共通、UI 抑制だけ分岐する。
@@ -276,20 +278,13 @@ public struct InputHandler {
         if candidate.isVisible, candidate.selectedRow < sessionTracker.maxObservedSelectedRow {
             anomaly.append("row_snapped_back")
         }
-        pendingSessionRecord = InputSessionRecord(
+        pendingSessionRecord = sessionTracker.makeSessionRecord(
             ts: nowMs,
-            keyCount: sessionTracker.keyCount,
-            bsCount: sessionTracker.bsCount,
-            compositionMs: sessionTracker.compositionMs(endMs: nowMs),
             reading: inputKey,
             committed: committedText,
             candidateDepth: candidate.isVisible ? candidate.selectedRow : nil,
             wasExplicit: candidate.isExplicitlySelected,
-            scrollCount: sessionTracker.scrollCount,
-            anomaly: anomaly,
-            bsExplicitCount: sessionTracker.bsExplicitCount,
-            bsShrunkToOneCount: sessionTracker.bsShrunkToOneCount,
-            maxObservedSelectedRow: sessionTracker.maxObservedSelectedRow
+            anomaly: anomaly
         )
         recordCandidateDivergenceIfAny(
             reading: inputKey,
@@ -317,11 +312,9 @@ public struct InputHandler {
         let row = candidateSession.selectedRow
         let confirmedSource: String
         if candidateSession.candidateSources.indices.contains(row) {
-            switch CandidateRowMetadata.section(for: candidateSession.candidateSources[row]) {
-            case .fixed: confirmedSource = "fixed"
-            case .history: confirmedSource = "history"
-            case .dictionary: confirmedSource = "dict"
-            }
+            confirmedSource = CandidateRowMetadata.divergenceConfirmedSource(
+                for: candidateSession.candidateSources[row]
+            )
         } else {
             confirmedSource = "dict"
         }
@@ -499,20 +492,13 @@ public struct InputHandler {
         let nowMs = Int(Date().timeIntervalSince1970 * 1000)
         var anomaly: [String] = []
         if reading.count >= 3 { anomaly.append("escaped_long") }
-        pendingSessionRecord = InputSessionRecord(
+        pendingSessionRecord = sessionTracker.makeSessionRecord(
             ts: nowMs,
-            keyCount: sessionTracker.keyCount,
-            bsCount: sessionTracker.bsCount,
-            compositionMs: sessionTracker.compositionMs(endMs: nowMs),
             reading: reading,
             committed: nil,
             candidateDepth: nil,
             wasExplicit: wasExplicit,
-            scrollCount: sessionTracker.scrollCount,
-            anomaly: anomaly,
-            bsExplicitCount: sessionTracker.bsExplicitCount,
-            bsShrunkToOneCount: sessionTracker.bsShrunkToOneCount,
-            maxObservedSelectedRow: sessionTracker.maxObservedSelectedRow
+            anomaly: anomaly
         )
         sessionTracker.reset()
         return (true, .dismiss)

@@ -40,7 +40,7 @@ public extension InputHandler {
         let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
 
         if let r = handleZSequence(base: base, client: client) { return r }
-        if let r = handleBracketChar(chars: chars, base: base, modifiers: modifiers, client: client) { return r }
+        if let r = handleBracketChar(chars: chars, base: base, client: client) { return r }
         if let r = handleShiftChar(chars: chars, isNonAscii: isNonAscii, modifiers: modifiers,
                                     wasExplicitlySelected: wasExplicitlySelected,
                                     candidate: candidate, client: client) { return r }
@@ -73,7 +73,7 @@ public extension InputHandler {
     }
 
     private mutating func handleBracketChar(
-        chars: String, base: String, modifiers: NSEvent.ModifierFlags, client: TextInputClient
+        chars: String, base: String, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if !state.isComposing {

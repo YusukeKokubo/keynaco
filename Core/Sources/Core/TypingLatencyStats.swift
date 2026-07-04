@@ -295,7 +295,7 @@ public final class TypingLatencyStats: @unchecked Sendable {
 
     private func writePrepared(_ prepared: (dict: [String: Any], flushTime: Date)?, to fileURL: URL) -> Bool {
         guard let prepared else { return false }
-        guard writeJSONLine(prepared.dict, to: fileURL) else { return false }
+        guard JSONLWriter.appendLine(prepared.dict, to: fileURL, logLabel: "latency log") else { return false }
         lock.withLock {
             resetLocked()
             lastFlushedAt = prepared.flushTime
@@ -403,34 +403,6 @@ public final class TypingLatencyStats: @unchecked Sendable {
             rates[readingLenBucketKey(bucket)] = rate
         }
         return rates
-    }
-
-    private func writeJSONLine(_ dict: [String: Any], to fileURL: URL) -> Bool {
-        guard JSONSerialization.isValidJSONObject(dict),
-              let jsonData = try? JSONSerialization.data(withJSONObject: dict),
-              var line = String(data: jsonData, encoding: .utf8) else {
-            NSLog("keynaco: latency log JSON serialization failed")
-            return false
-        }
-        line += "\n"
-        guard let lineData = line.data(using: .utf8) else { return false }
-
-        let dir = fileURL.deletingLastPathComponent()
-        do {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                let handle = try FileHandle(forWritingTo: fileURL)
-                defer { try? handle.close() }
-                try handle.seekToEnd()
-                try handle.write(contentsOf: lineData)
-            } else {
-                try lineData.write(to: fileURL)
-            }
-            return true
-        } catch {
-            NSLog("keynaco: latency log append failed: \(error)")
-            return false
-        }
     }
 
     private static func percentile(_ sorted: [Double], p: Int) -> Double? {

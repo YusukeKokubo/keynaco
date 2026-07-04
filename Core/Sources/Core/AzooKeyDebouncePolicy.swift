@@ -51,4 +51,17 @@ public enum AzooKeyDebouncePolicy {
         let clamped = min(max(ms, 40), 120)
         return UInt64(clamped * 1_000_000)
     }
+
+    /// 本番 / sandbox 共通の debounce 入力組み立て。
+    public static func nanoseconds(
+        interKeyIntervalMs: Double?,
+        pendingRomaji: String,
+        reading: String
+    ) -> UInt64 {
+        nanoseconds(for: AzooKeyDebounceInput(
+            interKeyIntervalMs: interKeyIntervalMs,
+            hasPendingRomaji: !pendingRomaji.isEmpty,
+            readingLength: reading.count
+        ))
+    }
 }

@@ -20,16 +20,14 @@ public final class DatabaseManager: @unchecked Sendable {
     static let recencyTauSeconds: Double = 30 * 86400
     static let recencyShortTauSeconds: Double = 86400
     static let recencyShortBonus: Double = 2.0
-    // 時間減衰スコア式: 各クエリの ORDER BY / SUM で使用する。
-    // bind は (now, now) を連続 2 箇所に bindRecency で埋める。tau / bonus は SQL リテラルとして
-    // 埋め込み、bind index を増やさず既存 5 箇所の SQL の `?` カウントを保つ。
+    // 時間減衰スコア式（正本）。各クエリの ORDER BY / SUM で使用する。
+    // Swift 側の同等式は `StoredHistoryRow.score`（Settings 表示用）。
     static var recencyExpr: String {
         "(count * 1.0 / (1.0 + (? - used_at) * 1.0 / \(recencyTauSeconds))"
             + " + count * \(recencyShortBonus) / (1.0 + (? - used_at) * 1.0 / \(recencyShortTauSeconds)))"
     }
 
-    // GC 用 long-only 式。GC は「累積で価値が薄いものを削除」する役割で、直近 short bonus は
-    // 表示ランクの目的なので関与させない（短期的なノイズで削除判定が揺れんようにする）。
+    // GC 用 long-only 式。正本は SQL `recencyExprLongOnly`（Swift 側に long-only 変種は持たない）。
     static var recencyExprLongOnly: String {
         "count * 1.0 / (1.0 + (? - used_at) * 1.0 / \(recencyTauSeconds))"
     }
@@ -37,7 +35,7 @@ public final class DatabaseManager: @unchecked Sendable {
     func nowEpoch() -> Int64 { clock() }
 
     private static let hiraganaPreferredSeededKey = "hiragana_preferred_seeded_v1"
-    static let schemaVersionLatest = 5
+    static let schemaVersionLatest = 6
 
     private enum SchemaMigration: Int, CaseIterable {
         case dropDeprecatedNgramTables = 1
@@ -45,6 +43,7 @@ public final class DatabaseManager: @unchecked Sendable {
         case dropDeprecatedHistoryColumns = 3
         case ensureDailyLogAppColumn = 4
         case ensureHistoryLcidColumn = 5
+        case dropDiaryTable = 6
     }
 
     private init() {
@@ -140,11 +139,6 @@ public final class DatabaseManager: @unchecked Sendable {
             created_at   INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_daily_log_date ON daily_log(date);
-        CREATE TABLE IF NOT EXISTS diary (
-            date         TEXT NOT NULL PRIMARY KEY,
-            content      TEXT NOT NULL,
-            generated_at INTEGER NOT NULL
-        );
         """
         sqlite3_exec(db, sql, nil, nil, nil)
     }
@@ -184,7 +178,12 @@ public final class DatabaseManager: @unchecked Sendable {
         case .dropDeprecatedHistoryColumns: dropDeprecatedHistoryColumns()
         case .ensureDailyLogAppColumn: ensureDailyLogAppColumn()
         case .ensureHistoryLcidColumn: ensureHistoryLcidColumn()
+        case .dropDiaryTable: dropDiaryTable()
         }
+    }
+
+    private func dropDiaryTable() {
+        sqlite3_exec(db, "DROP TABLE IF EXISTS diary", nil, nil, nil)
     }
 
     /// 廃止した bigram / trigram / skip_bigram テーブルを既存 DB から削除する。
@@ -333,7 +332,8 @@ public final class DatabaseManager: @unchecked Sendable {
 
     // MARK: - 設定画面用（型定義）
 
-    public struct HistoryEntry: Sendable {
+    /// Settings 履歴一覧用の DB 行。スコアラー用 `HistoryEntry`（HistoryEntry.swift）とは別型。
+    public struct StoredHistoryRow: Sendable {
         public let input: String
         public let output: String
         public let count: Int
@@ -341,8 +341,8 @@ public final class DatabaseManager: @unchecked Sendable {
         public let lcid: Int?
         public let usedAt: Int64
 
+        /// Swift 側の 2 段 decay 評価。正本は SQL の `recencyExpr` / `recencyExprLongOnly`。
         public func score(now: Int64 = Int64(Date().timeIntervalSince1970)) -> Double {
-            // recencyExpr の Swift 表現。SQL と同じ 2 段 decay。
             let dt = Double(now - usedAt)
             let long = Double(count) / (1.0 + dt / DatabaseManager.recencyTauSeconds)
             let short = Double(count) * DatabaseManager.recencyShortBonus

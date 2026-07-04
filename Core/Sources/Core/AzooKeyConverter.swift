@@ -60,7 +60,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
     private static func displayCandidates(from candidates: [Candidate], inputLength: Int) -> [AzooKeyCandidate] {
         let filtered = filterCandidatesForDisplay(candidates, inputLength: inputLength)
         let source = filtered.isEmpty ? candidates : filtered
-        return source.map { AzooKeyCandidate(text: $0.text, segmentCount: $0.data.count) }
+        return source.map { AzooKeyCandidate(text: $0.text) }
     }
 
     /// XCTest 並列実行時に学習メモリのファイル競合を避けるため、テスト中はインスタンスごとに隔離する。

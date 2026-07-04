@@ -25,11 +25,11 @@ extension DebugSocketServer {
         guard consumed, let reading = handler.pendingAzooKeyReading else { return }
         let leftContext = handler.leftContext.azooKeyValue
         let converter = handler.azooKeyConverter
-        let debounceNs = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
+        let debounceNs = AzooKeyDebouncePolicy.nanoseconds(
             interKeyIntervalMs: azooKeyScheduler.lastInterKeyIntervalMs,
-            hasPendingRomaji: !handler.state.pendingRomaji.isEmpty,
-            readingLength: reading.count
-        ))
+            pendingRomaji: handler.state.pendingRomaji,
+            reading: reading
+        )
         azooKeyScheduler.schedule(
             generation: generation,
             reading: reading,
@@ -50,10 +50,15 @@ extension DebugSocketServer {
         reading: String,
         candidates: [AzooKeyCandidate]
     ) {
-        guard azooKeyScheduler.candidateGeneration == generation else { return }
-        guard handler.state.composedHiragana == reading else { return }
-        guard !handler.candidateSession.isExplicitlySelected else { return }
-        guard handler.state.isComposing else { return }
+        let context = AsyncCandidateArrival.ApplyContext(
+            candidateGeneration: azooKeyScheduler.candidateGeneration,
+            arrivalGeneration: generation,
+            reading: reading,
+            composedHiragana: handler.state.composedHiragana,
+            isExplicitlySelected: handler.candidateSession.isExplicitlySelected,
+            isComposing: handler.state.isComposing
+        )
+        guard AsyncCandidateArrival.shouldApply(context) else { return }
 
         let action = handler.rebuildCandidateList(
             reading: reading,

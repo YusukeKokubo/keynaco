@@ -62,4 +62,33 @@ public enum CandidateRowMetadata {
         }
         return fixedEnd
     }
+
+    /// デバッグ診断用 source ラベル（`historyExact` 等）。
+    public static func diagnosticSourceLabel(for source: ScoredCandidate.Source) -> String {
+        switch source {
+        case .historyExact: return "historyExact"
+        case .historyPrefix: return "historyPrefix"
+        case .userDict(let exact): return exact ? "userDictExact" : "userDictPrefix"
+        case .azooKey(let rank): return "azooKey(\(rank))"
+        case .hiraganaPreferred: return "hiraganaPreferred"
+        case .hiraganaBuiltin: return "hiraganaBuiltin"
+        case .number: return "number"
+        case .dateTime: return "dateTime"
+        }
+    }
+
+    /// `"historyPrefix:情報共有(93.00)"` 形式のスコア付き source 要約。
+    public static func scoredCandidateDiagnosticLabel(_ candidate: ScoredCandidate) -> String {
+        let source = diagnosticSourceLabel(for: candidate.source)
+        return "\(source):\(candidate.text)(\(String(format: "%.2f", candidate.score)))"
+    }
+
+    /// `CandidateDivergenceRecord.confirmedSource` 用（`dict` / `fixed` / `history`）。
+    public static func divergenceConfirmedSource(for source: ScoredCandidate.Source) -> String {
+        switch section(for: source) {
+        case .fixed: return "fixed"
+        case .history: return "history"
+        case .dictionary: return "dict"
+        }
+    }
 }

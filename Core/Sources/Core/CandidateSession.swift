@@ -59,7 +59,8 @@ public struct CandidateSession: Sendable, Equatable {
             selectedRow: selectedRow,
             selectedText: selectedText,
             isExplicitlySelected: isExplicitlySelected,
-            candidateSources: candidateSources
+            candidateSources: candidateSources,
+            panelInteraction: panelInteraction
         )
     }
 
@@ -79,6 +80,10 @@ public struct CandidateSession: Sendable, Equatable {
     /// 候補ウィンドウの削除ボタン用。行除去のみ。DB 削除と marked 同期は `InputController.onDelete` が行う。
     /// キーボードの Shift+Delete は `.deleteSelected` → `InputHandler.applyCandidateAction`（別経路）。
     public mutating func removeCandidate(at row: Int) {
+        removeRows(at: row)
+    }
+
+    private mutating func removeRows(at row: Int) {
         guard candidates.indices.contains(row) else { return }
         candidates.remove(at: row)
         if candidateSources.indices.contains(row) { candidateSources.remove(at: row) }
@@ -113,15 +118,8 @@ public struct CandidateSession: Sendable, Equatable {
             selectedRow = (selectedRow - 1 + candidates.count) % candidates.count
             isExplicitlySelected = true
         case .deleteSelected: // Shift+Delete。DB 削除は `applyCandidateAction` が apply 前に行う。
-            guard isVisible, candidates.indices.contains(selectedRow) else { break }
-            let row = selectedRow
-            candidates.remove(at: row)
-            if candidateSources.indices.contains(row) { candidateSources.remove(at: row) }
-            if candidates.isEmpty {
-                reset()
-            } else {
-                selectedRow = min(selectedRow, candidates.count - 1)
-            }
+            guard isVisible else { break }
+            removeRows(at: selectedRow)
         }
     }
 }

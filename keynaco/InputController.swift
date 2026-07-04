@@ -266,32 +266,32 @@ class InputController: IMKInputController, @unchecked Sendable {
         warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
         let generation = azooKeyScheduler.onKeyDown()
         KeydownLatencySignpost.onKeyDown(generation: generation)
-        let composedHiraganaWasEmpty = handler.state.composedHiragana.isEmpty
-        let ctx = handler.candidateSession.makeContext()
-        let (consumed, action) = handler.handle(
+        let pre = KeyEventPipeline.preSnapshot(handler: handler)
+        let keyResult = KeyEventPipeline.runHandle(
+            handler: &handler,
             keyCode: keyCode,
             characters: characters,
             baseCharacters: baseCharacters,
             modifiers: modifiers,
-            candidate: ctx,
+            pre: pre,
             client: adapter
         )
         flushPendingInputRecord(penalized: handler.lastKeyDownDidPenalize)
-        checkAndStorePendingSessionRecord()
+        absorbPendingLogsFromHandler()
         applyPostKeyDownEffects(
-            consumed: consumed,
-            action: action,
+            consumed: keyResult.consumed,
+            action: keyResult.candidateAction,
             adapter: adapter,
-            composedHiraganaWasEmpty: composedHiraganaWasEmpty,
+            composedHiraganaWasEmpty: keyResult.composedHiraganaWasEmpty,
             imkSenderForSurrounding: imkSenderForSurrounding,
             keydownGeneration: generation
         )
         scheduleAzooKeyReplacementIfNeeded(
             generation: generation,
-            consumed: consumed,
+            consumed: keyResult.consumed,
             adapter: adapter
         )
-        return consumed
+        return keyResult.consumed
     }
 
     // MARK: - イベントハンドリング
@@ -358,7 +358,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             ) else { return }
             ic.handler.commitComposition(client: adapter, candidate: session.makeContext(), trigger: .deactivate)
             ic.flushPendingInputRecord()
-            ic.checkAndStorePendingSessionRecord()
+            ic.absorbPendingLogsFromHandler()
             ic.flushPendingInputRecord()
             ic.handler.candidateSession.reset()
             LeftContextSource.resetCache(&ic.handler.leftContextIMKCache)
@@ -385,14 +385,13 @@ class InputController: IMKInputController, @unchecked Sendable {
         )
     }
 
-    private func checkAndStorePendingSessionRecord() {
-        if let record = handler.pendingSessionRecord {
+    private func absorbPendingLogsFromHandler() {
+        let logs = KeyEventPipeline.drainPendingLogs(from: &handler)
+        if let record = logs.sessionRecord {
             pendingInputRecord = record
-            handler.pendingSessionRecord = nil
         }
-        if let divergence = handler.pendingDivergenceRecord {
+        if let divergence = logs.divergenceRecord {
             divergenceLogger.append(record: divergence, appVersion: AppVersion.logLabel)
-            handler.pendingDivergenceRecord = nil
         }
     }
 

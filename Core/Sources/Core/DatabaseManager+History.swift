@@ -11,22 +11,6 @@ extension DatabaseManager {
 
     // MARK: - 検索
 
-    /// 読みに完全一致する履歴候補を使用頻度順で返す。
-    func fetchHistoryExact(reading: String) -> [String] {
-        dbQueue.sync {
-            let now = self.nowEpoch()
-            return self.queryStringsOnQueue("""
-            SELECT output FROM history
-            WHERE input = ? COLLATE NOCASE
-            ORDER BY (\(Self.recencyExpr)) DESC, used_at DESC
-            LIMIT 10
-            """) {
-                self.bindText($0, 1, reading)
-                self.bindRecency($0, at: 2, now: now)
-            }
-        }
-    }
-
     /// 読みに完全一致する履歴候補をスコア付きで返す。
     /// `fetchHistoryScoredMerged`（prefix SUM 集計）と異なり、`input = reading` のスコアのみを返す。
     /// `HistoryEntry.exactScore` の判定に使う。
@@ -41,23 +25,6 @@ extension DatabaseManager {
             """) {
                 self.bindRecency($0, at: 1, now: now)
                 self.bindText($0, 3, reading)
-            }
-        }
-    }
-
-    /// 読みが前方一致する履歴候補を使用頻度順で返す（完全一致は除外）。
-    func fetchHistoryPrefix(reading: String) -> [String] {
-        dbQueue.sync {
-            let now = self.nowEpoch()
-            return self.queryStringsOnQueue("""
-            SELECT output FROM history
-            WHERE input LIKE ? AND input != ?
-            GROUP BY output
-            ORDER BY (SUM(\(Self.recencyExpr))) DESC, MAX(used_at) DESC
-            LIMIT 10
-            """) {
-                self.bindText($0, 1, reading + "%"); self.bindText($0, 2, reading)
-                self.bindRecency($0, at: 3, now: now)
             }
         }
     }
@@ -162,24 +129,6 @@ extension DatabaseManager {
         }
     }
 
-    /// 未分類・`lcid` 欠落の出力語を最大 `limit` 件返す（重複排除）。
-    func fetchUnclassifiedHistory(limit: Int) -> [String] {
-        dbQueue.sync {
-            var results: [String] = []
-            let sql = """
-            SELECT DISTINCT output FROM history
-            WHERE \(Self.posBackfillOutputFilter)
-            LIMIT ?
-            """
-            guard let stmt = self.cachedStmt(for: sql) else { return results }
-            sqlite3_bind_int(stmt, 1, Int32(limit))
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                if let p = sqlite3_column_text(stmt, 0) { results.append(String(cString: p)) }
-            }
-            return results
-        }
-    }
-
     /// backfill 対象 output 件数（output 単位）。
     public func countUnclassifiedHistoryOutputs() -> Int {
         dbQueue.sync {
@@ -230,7 +179,7 @@ extension DatabaseManager {
         return stmt
     }
 
-    public func fetchAllHistory() -> [HistoryEntry] {
+    public func fetchAllHistory() -> [StoredHistoryRow] {
         dbQueue.sync {
             let sql = """
             SELECT input, output, count, pos, lcid, used_at FROM history
@@ -239,7 +188,7 @@ extension DatabaseManager {
             var stmt: OpaquePointer?
             defer { sqlite3_finalize(stmt) }
             guard sqlite3_prepare_v2(self.db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
-            var results: [HistoryEntry] = []
+            var results: [StoredHistoryRow] = []
             while sqlite3_step(stmt) == SQLITE_ROW {
                 guard let i = sqlite3_column_text(stmt, 0),
                       let o = sqlite3_column_text(stmt, 1) else { continue }
@@ -247,7 +196,7 @@ extension DatabaseManager {
                 let lcid = sqlite3_column_type(stmt, 4) == SQLITE_NULL
                     ? nil : Int(sqlite3_column_int(stmt, 4))
                 let usedAt = sqlite3_column_int64(stmt, 5)
-                results.append(HistoryEntry(
+                results.append(StoredHistoryRow(
                     input: String(cString: i), output: String(cString: o),
                     count: Int(sqlite3_column_int(stmt, 2)), pos: pos, lcid: lcid, usedAt: usedAt
                 ))

@@ -27,13 +27,7 @@ final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
         handler.candidateSession.apply(
             .show(candidates: ["a", "b"], fixedEnd: 0)
         )
-        handler.applyPostKeyDownCandidateAndIMK(
-            consumed: false,
-            action: .selectNext,
-            client: client,
-            composedHiraganaWasEmpty: true,
-            didInsertText: false
-        )
+        handler.applyPostKeyDownCandidateAndIMK(action: .selectNext, client: client)
         XCTAssertEqual(handler.candidateSession.selectedRow, 1)
         XCTAssertTrue(handler.candidateSession.isExplicitlySelected)
     }
@@ -57,13 +51,7 @@ final class InputHandlerPostKeyDownTests: InputHandlerTestCase {
 
     func testSandboxOverloadSkipsIMKMaintenance() {
         handler.leftContextIMKCache = .invalidated
-        handler.applyPostKeyDownCandidateAndIMK(
-            consumed: false,
-            action: .none,
-            client: client,
-            composedHiraganaWasEmpty: true,
-            didInsertText: false
-        )
+        handler.applyPostKeyDownCandidateAndIMK(action: .none, client: client)
         XCTAssertTrue(handler.leftContextIMKCache.isInvalidated)
     }
 }

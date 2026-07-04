@@ -5,7 +5,7 @@ final class HistoryViewController: NSViewController {
     private let tableView = DeletableTableView()
     private let deleteButton = NSButton(title: "選択を削除", target: nil, action: nil)
     private let cleanupButton = NSButton(title: "低頻度を削除", target: nil, action: nil)
-    private var data: [DatabaseManager.HistoryEntry] = []
+    private var data: [DatabaseManager.StoredHistoryRow] = []
 
     private struct ColumnDef {
         let id: String
