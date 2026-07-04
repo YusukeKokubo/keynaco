@@ -28,7 +28,7 @@ extension InputHandler {
         let suppressModeSwitchEcho = ignoreNextModeSwitch
         ignoreNextModeSwitch = false
 
-        let route = KeyDispatch.route(KeyDispatchInput(
+        let route = KeyDispatch.route(KeyDispatchInput.make(
             keyCode: keyCode,
             isBackspace: isBackspace,
             isAsciiMode: isAsciiMode,

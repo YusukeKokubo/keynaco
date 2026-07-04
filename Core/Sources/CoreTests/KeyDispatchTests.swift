@@ -12,7 +12,7 @@ final class KeyDispatchTests: XCTestCase {
         isComposing: Bool = false,
         ignoreNextModeSwitch: Bool = false
     ) -> KeyDispatchInput {
-        KeyDispatchInput(
+        KeyDispatchInput.make(
             keyCode: keyCode,
             isBackspace: isBackspace,
             isAsciiMode: isAsciiMode,
@@ -21,6 +21,23 @@ final class KeyDispatchTests: XCTestCase {
             isComposing: isComposing,
             ignoreNextModeSwitch: ignoreNextModeSwitch
         )
+    }
+
+    func testModeDerivationPriority() {
+        XCTAssertEqual(
+            input(isAsciiMode: true, isBracketMode: true, candidateVisible: true, isComposing: true).mode,
+            .bracket
+        )
+        XCTAssertEqual(
+            input(isAsciiMode: true, candidateVisible: true, isComposing: true).mode,
+            .ascii
+        )
+        XCTAssertEqual(
+            input(candidateVisible: true, isComposing: true).mode,
+            .candidatePanel
+        )
+        XCTAssertEqual(input(isComposing: true).mode, .composing)
+        XCTAssertEqual(input().mode, .idle)
     }
 
     func testBracketModeTakesPriority() {

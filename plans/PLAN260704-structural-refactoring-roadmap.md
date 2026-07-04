@@ -1,6 +1,7 @@
 ---
-status: in-progress
+status: implemented
 created: 2026-07-04
+related_commit: c6e2914
 ---
 
 # PLAN260704: 構造リファクタリング・ロードマップ
@@ -16,7 +17,7 @@ created: 2026-07-04
 | 2 JSONLWriter 統合 | 完了 | `c070900` |
 | 3 候補状態の単一正本化 | 完了（軽微な残差あり） | `c070900` |
 | 4 keyDown パイプライン一本化 | 完了（軽微な残差あり） | `c070900` |
-| 5 モード明示化 | **未着手** | — |
+| 5 モード明示化 | **完了** | `7c13b8e`–`c6e2914` |
 | 6 保留 | — | — |
 
 **検証ゲート（2026-07-04）**: `./scripts/test_core_all.sh` 緑。sandbox 3 本・`xcodebuild test` は未再実行（keynaco 未起動 / バイナリ stale）。
@@ -157,7 +158,7 @@ Phase 3-4 で状態の読み書き経路が絞れた後にやる。ここが一�
 - [x] `ignoreNextModeSwitch` の 5 箇所リセットを、`handle()` 冒頭の 1 箇所（消費型 take パターン）に集約
 - [x] `InputHandler.isAsciiMode` の process-global static を注入可能な状態ホルダーに移す（テストの `setUp` リセット必須という罠も一緒に消える）— インスタンス `var isAsciiMode`（`InputController.handler` / sandbox `handler` が正本）
 - [x] 候補構築の入口 4 つを「トリガー enum を受ける単一入口」に統合し、約 120 行の `assembleCandidateList` を（dismiss 判定 / ソース収集 / スコア構築 / 診断）に分割 — `buildCandidateList(for:azooKey:)` + `CandidateListAzooKeySupply` / `whileTypingPreScoreDismissReason`・`buildScoredLayout`
-- [ ] `KeyDispatchInput` の 6 bool を、可能なら状態 enum（待機 / ASCII / 組成中 / passive / explicit / bracket — docs/domain/states.md と同型）由来に置き換える。**ただし enum 化が差分を膨らませすぎる場合は「不変条件の構造化」までで止める判断もあり**（このチェックボックスだけ独立コミット系列にする）
+- [x] `KeyDispatchInput` の 6 bool を、可能なら状態 enum（待機 / ASCII / 組成中 / passive / explicit / bracket — docs/domain/states.md と同型）由来に置き換える — `KeyDispatchMode`（passive/explicit は `.candidatePanel` に統合。ルート分岐に不要なため）
 
 **効果**: docs/domain/states.md の状態遷移図とコードが同型になり、状態依存バグ（実績のあるクラス）の発生源を塞ぐ。
 
