@@ -5,7 +5,7 @@ public protocol AzooKeyConverting: AnyObject, Sendable {
     var latencyStats: TypingLatencyStats { get }
     /// fetch ごとの詳細ログ（`AzooKeyConverter` のみ実書き込み。スタブは no-op）。
     var fetchLogger: FetchLogger { get }
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate]
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool, options: AzooKeyFetchOptions) -> [AzooKeyCandidate]
     /// `candidateCache` の同期参照。ヒット時は非同期取得を待たず候補に使える。
     func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek?
     func commit(reading: String, text: String)
@@ -22,11 +22,15 @@ extension AzooKeyConverting {
     var fetchLogger: FetchLogger { FetchLogger.sharedNoOp }
 
     func requestCandidates(hiragana: String) -> [AzooKeyCandidate] {
-        requestCandidates(hiragana: hiragana, leftSideContext: nil, richCandidates: false)
+        requestCandidates(hiragana: hiragana, leftSideContext: nil, richCandidates: false, options: .default)
     }
 
     func requestCandidates(hiragana: String, leftSideContext: String?) -> [AzooKeyCandidate] {
-        requestCandidates(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: false)
+        requestCandidates(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: false, options: .default)
+    }
+
+    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
+        requestCandidates(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates, options: .default)
     }
 
     func peekCachedCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> AzooKeyCachePeek? {

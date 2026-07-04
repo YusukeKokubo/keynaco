@@ -9,8 +9,13 @@ import Foundation
 // MARK: - S-01 用モック（候補に「漢字」のみ返す）
 
 private final class ScenarioS01KanjiMockConverter: BaseAzooKeyStub {
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
-        _ = (leftSideContext, richCandidates)
+    override func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
+        _ = (leftSideContext, richCandidates, options)
         return hiragana == "かんじ" ? [.text("漢字")] : [.text("□")]
     }
 }
@@ -18,8 +23,13 @@ private final class ScenarioS01KanjiMockConverter: BaseAzooKeyStub {
 // MARK: - なので dismiss 用モック（AzooKey がカタカナのみ返すケース）
 
 private final class NanodeFunctionalWordStub: BaseAzooKeyStub {
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
-        _ = (leftSideContext, richCandidates)
+    override func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
+        _ = (leftSideContext, richCandidates, options)
         return hiragana == "なので" ? [.text("ナノデ")] : []
     }
 }

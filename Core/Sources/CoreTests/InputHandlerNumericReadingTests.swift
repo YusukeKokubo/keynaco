@@ -10,7 +10,8 @@ final class InputHandlerNumericReadingTests: XCTestCase {
         override func requestCandidates(
             hiragana: String,
             leftSideContext: String?,
-            richCandidates: Bool
+            richCandidates: Bool,
+            options: AzooKeyFetchOptions
         ) -> [AzooKeyCandidate] {
             lastHiragana = hiragana
             return []

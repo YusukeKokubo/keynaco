@@ -67,7 +67,8 @@ final class AzooKeyAsyncScheduler {
         _ = converter.requestCandidates(
             hiragana: engineReading,
             leftSideContext: leftSideContext,
-            richCandidates: true
+            richCandidates: true,
+            options: .default
         )
     }
 
@@ -79,6 +80,8 @@ final class AzooKeyAsyncScheduler {
         debounceNanoseconds: UInt64 = AzooKeyDebouncePolicy.defaultNanoseconds,
         onComplete: @escaping @MainActor ([AzooKeyCandidate]) -> Void
     ) {
+        let isPaused = (lastInterKeyIntervalMs ?? 0) >= 160
+        let inferenceLimit: Int? = isPaused ? nil : AzooKeyConverter.whileTypingInferenceLimit
         pendingTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: debounceNanoseconds)
             guard !Task.isCancelled else { return }
@@ -89,13 +92,18 @@ final class AzooKeyAsyncScheduler {
             let conv = converter
             let genSnapshot = generation
             let liveGen = liveGeneration
+            let fetchOptions = AzooKeyFetchOptions(
+                zenzaiInferenceLimit: inferenceLimit,
+                abortBeforeFetch: { liveGen.get() != genSnapshot }
+            )
 
             let candidates = await Task.detached {
                 guard liveGen.get() == genSnapshot else { return [AzooKeyCandidate]() }
                 return conv.requestCandidates(
                     hiragana: capturedReading,
                     leftSideContext: capturedContext,
-                    richCandidates: true
+                    richCandidates: true,
+                    options: fetchOptions
                 )
             }.value
 

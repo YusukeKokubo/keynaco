@@ -198,7 +198,8 @@ extension InputHandler {
         let raw = azooKeyConverter.requestCandidates(
             hiragana: engineReading,
             leftSideContext: leftContext.azooKeyValue,
-            richCandidates: richCandidates
+            richCandidates: richCandidates,
+            options: .default
         )
         return raw.texts
     }
@@ -429,8 +430,7 @@ extension InputHandler {
             PrefixFocusPolicy.acceptsPrefixFocus(
                 reading: reading,
                 output: output,
-                db: db,
-                azooKey: azooKeyConverter
+                db: db
             )
         }
         let filteredHistory = historyEntries.compactMap {

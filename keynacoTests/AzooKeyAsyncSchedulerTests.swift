@@ -84,7 +84,12 @@ private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {
     private(set) var lastRichCandidates: Bool?
     private(set) var requestCount = 0
 
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
+    func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
         requestCount += 1
         lastRichCandidates = richCandidates
         return [.text("漢字")]

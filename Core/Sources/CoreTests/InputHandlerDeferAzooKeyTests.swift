@@ -165,7 +165,12 @@ private final class CachePeekStub: BaseAzooKeyStub, @unchecked Sendable {
         return richCandidates ? "\(hiragana)|\(ctx)|rich" : "\(hiragana)|\(ctx)"
     }
 
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
+    override func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
         let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         if let hit = cache[key] { return hit }
         let result: [AzooKeyCandidate] = switch hiragana {
@@ -210,7 +215,12 @@ private final class RichCapturingStub: BaseAzooKeyStub, @unchecked Sendable {
         super.init()
     }
 
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
+    override func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
         lastRichCandidates = richCandidates
         return lines.map { AzooKeyCandidate.text($0) }
     }
@@ -225,7 +235,12 @@ private final class CountingAzooKeyStub: BaseAzooKeyStub, @unchecked Sendable {
         super.init()
     }
 
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
+    override func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
         requestCount += 1
         return lines.map { AzooKeyCandidate.text($0) }
     }

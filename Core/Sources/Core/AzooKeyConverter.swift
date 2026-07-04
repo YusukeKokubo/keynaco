@@ -36,7 +36,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
     private let locked = LockedConverter()
     private var candidateCache: [String: [Candidate]] = [:]
     private var candidateCacheKeys: [String] = []
-    private let candidateCacheLimit = 50
+    private let candidateCacheLimit = 200
+    /// whileTyping 非 pause 時の Zenzai `inferenceLimit`（PLAN260704b A2）。pause / explicit は既定 5。
+    public static let whileTypingInferenceLimit = 2
     private let baseOptions: ConvertRequestOptions
     private let memoryURL: URL
     private let zenzaiEnabled: Bool
@@ -96,11 +98,19 @@ public final class AzooKeyConverter: @unchecked Sendable {
         if candidateCache[key] != nil {
             candidateCacheKeys.removeAll { $0 == key }
         } else if candidateCache.count >= candidateCacheLimit {
-            let evict = candidateCacheKeys.removeFirst()
-            candidateCache.removeValue(forKey: evict)
+            let evict = evictableCacheKey() ?? candidateCacheKeys.first
+            if let evict {
+                candidateCacheKeys.removeAll { $0 == evict }
+                candidateCache.removeValue(forKey: evict)
+            }
         }
         candidateCache[key] = value
         candidateCacheKeys.append(key)
+    }
+
+    /// 読み 2 文字以下のキャッシュキーは pinned 扱いで LRU から除外する（PLAN260704b A4）。
+    private func evictableCacheKey() -> String? {
+        candidateCacheKeys.first { Self.cacheSegment(fromCacheKey: $0).count > 2 }
     }
 
     public convenience init() {
@@ -197,6 +207,20 @@ public final class AzooKeyConverter: @unchecked Sendable {
     }
 
     public func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool = false) -> [AzooKeyCandidate] {
+        requestCandidates(
+            hiragana: hiragana,
+            leftSideContext: leftSideContext,
+            richCandidates: richCandidates,
+            options: .default
+        )
+    }
+
+    public func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
         let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         let inputLength = hiragana.count
         if let cached = candidateCache[key] {
@@ -205,13 +229,21 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
-        let options = makeOptions(leftSideContext: leftSideContext, richCandidates: richCandidates)
+        let convertOptions = makeOptions(
+            leftSideContext: leftSideContext,
+            richCandidates: richCandidates,
+            inferenceLimit: options.zenzaiInferenceLimit
+        )
         let lockRequestedAt = CFAbsoluteTimeGetCurrent()
+        let abortBeforeFetch = options.abortBeforeFetch
         return locked.withLock { c in
+            if abortBeforeFetch?() == true {
+                return [AzooKeyCandidate]()
+            }
             let lockWaitMs = (CFAbsoluteTimeGetCurrent() - lockRequestedAt) * 1000
             os_signpost(.begin, log: spLog, name: "requestCandidates", "%{public}s", hiragana)
             let t0 = CFAbsoluteTimeGetCurrent()
-            let result = c.requestCandidates(text, options: options)
+            let result = c.requestCandidates(text, options: convertOptions)
             let elapsedMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
             os_signpost(.end, log: spLog, name: "requestCandidates")
             os_log(.debug, log: spLog, "requestCandidates %.1fms (lockWait %.1fms) %{public}s zenzai=%d", elapsedMs, lockWaitMs, hiragana, zenzaiEnabled ? 1 : 0)
@@ -242,12 +274,17 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
     }
 
-    private func makeOptions(leftSideContext: String?, richCandidates: Bool = false) -> ConvertRequestOptions {
+    private func makeOptions(
+        leftSideContext: String?,
+        richCandidates: Bool = false,
+        inferenceLimit: Int? = nil
+    ) -> ConvertRequestOptions {
         var opts = baseOptions
         guard zenzaiEnabled, let modelURL = zenzaiModelURL else { return opts }
+        let limit = inferenceLimit ?? zenzaiInferenceLimit
         opts.zenzaiMode = .on(
             weight: modelURL,
-            inferenceLimit: zenzaiInferenceLimit,
+            inferenceLimit: limit,
             requestRichCandidates: richCandidates,
             personalizationMode: nil,
             versionDependentMode: .v3(

@@ -16,7 +16,12 @@ final class MockAzooKeyConverter: AzooKeyConverting, @unchecked Sendable {
         return richCandidates ? "\(hiragana)|\(ctx)|rich" : "\(hiragana)|\(ctx)"
     }
 
-    func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
+    func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
         lastLeftContext = leftSideContext
         let key = cacheKey(hiragana: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         if let hit = cache[key] { return hit }

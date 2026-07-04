@@ -9,7 +9,12 @@ final class SnapStub: BaseAzooKeyStub, @unchecked Sendable {
         super.init()
         isZenzaiEnabled = zenzai
     }
-    override func requestCandidates(hiragana: String, leftSideContext: String?, richCandidates: Bool) -> [AzooKeyCandidate] {
+    override func requestCandidates(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> [AzooKeyCandidate] {
         lines.map { AzooKeyCandidate.text($0) }
     }
 }
