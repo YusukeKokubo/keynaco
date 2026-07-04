@@ -44,6 +44,7 @@
 		B2ABABD46456BA4A8BC0BDA8 /* SurroundingIMKContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */; };
 		C3D4E5F60718293A4B5C6E01 /* AzooKeyAsyncSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F60718293A4B5C6E02 /* AzooKeyAsyncSchedulerTests.swift */; };
 		C3D4E5F60718293A4B5C6E03 /* AzooKeyRichEquivalenceHostedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F60718293A4B5C6E04 /* AzooKeyRichEquivalenceHostedTests.swift */; };
+		C3D4E5F60718293A4B5C6E05 /* AzooKeyRichCostHostedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F60718293A4B5C6E06 /* AzooKeyRichCostHostedTests.swift */; };
 		CC81B691B4422E5779491EE0 /* UserDictViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAF819A0C923DABBF533AF54 /* UserDictViewController.swift */; };
 		CF5D2357CC1B6C7209F9918F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC83CA0F9C13530D08702297 /* main.swift */; };
 		E6EBE8BA5804493A67AFE238 /* InputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A755C9097E561BF05FF3D11 /* InputController.swift */; };
@@ -94,6 +95,7 @@
 		A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurroundingIMKContextTests.swift; sourceTree = "<group>"; };
 		C3D4E5F60718293A4B5C6E02 /* AzooKeyAsyncSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyAsyncSchedulerTests.swift; sourceTree = "<group>"; };
 		C3D4E5F60718293A4B5C6E04 /* AzooKeyRichEquivalenceHostedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyRichEquivalenceHostedTests.swift; sourceTree = "<group>"; };
+		C3D4E5F60718293A4B5C6E06 /* AzooKeyRichCostHostedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AzooKeyRichCostHostedTests.swift; sourceTree = "<group>"; };
 		AC5B60092B9315A5731AEF44 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		AED425059C465687B7765B08 /* InputSource@2x.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = "InputSource@2x.tiff"; sourceTree = "<group>"; };
 		AF65EB09683AA03C603CADC8 /* CandidateWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindow.swift; sourceTree = "<group>"; };
@@ -198,6 +200,7 @@
 				D4E5F60718293A4B5C6D7E04 /* AzooKeyFooterStatusTests.swift */,
 				C3D4E5F60718293A4B5C6E02 /* AzooKeyAsyncSchedulerTests.swift */,
 				C3D4E5F60718293A4B5C6E04 /* AzooKeyRichEquivalenceHostedTests.swift */,
+				C3D4E5F60718293A4B5C6E06 /* AzooKeyRichCostHostedTests.swift */,
 				A52BBEA5145348E29A811CDF /* SurroundingIMKContextTests.swift */,
 			);
 			path = keynacoTests;
@@ -359,6 +362,7 @@
 				D4E5F60718293A4B5C6D7E03 /* AzooKeyFooterStatusTests.swift in Sources */,
 				C3D4E5F60718293A4B5C6E01 /* AzooKeyAsyncSchedulerTests.swift in Sources */,
 				C3D4E5F60718293A4B5C6E03 /* AzooKeyRichEquivalenceHostedTests.swift in Sources */,
+				C3D4E5F60718293A4B5C6E05 /* AzooKeyRichCostHostedTests.swift in Sources */,
 				B2ABABD46456BA4A8BC0BDA8 /* SurroundingIMKContextTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

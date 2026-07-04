@@ -17,7 +17,7 @@ created: 2026-07-04
 | A3 ロック取得後 generation 再チェック | 4 | 完了 | — |
 | A4 短読み pinned cache + LRU 拡大 | 5 | 完了 | — |
 | B2 dateTime source のカバレッジ拡大 | 6 | 完了 | — |
-| C1 whileTyping 常時 rich=true の見直し | POC | 未着手 | — |
+| C1 whileTyping 常時 rich=true の見直し | POC | 現状維持 | POC260704c（delta -11%） |
 | C2 Phase B/C lcid 取得の局所化 | A1 同時 | 不要 | PLAN260613 で B/C 削除済み |
 
 ## 背景：診断結果（2026-07-04 計測）
@@ -108,6 +108,15 @@ created: 2026-07-04
 
 **判断基準**: コスト差が fetch p50 の 20% 未満なら現状維持で close。
 
+**POC 結果（2026-07-04、`AzooKeyRichCostHostedTests`、Zenzai on・inferenceLimit=2）**:
+
+| 条件 | p50 | p95 | mean |
+|------|-----|-----|------|
+| rich=false | 42.3ms | 133.8ms | 50.0ms |
+| rich=true | 37.6ms | 101.7ms | 43.7ms |
+
+delta p50 = **-11.0%**（rich の方が速い）。20% 閾値未満 → **現状維持**。whileTyping の `richCandidates: true` は変更不要。
+
 ### C2. Phase B/C lcid 取得の局所化（A1 と同時実施）
 
 PLAN260613 Phase B/C の技術評価（メモリ project_lcid_phase_bc_eval）で「常時コスト付きのレアパス。残すならコスト局所化が筋」と確定済み。削る/残すの product 判断は保留のまま、「epsilon 帯の行だけ lcid を引く」局所化を A1 の作業と同時にやる。
@@ -123,3 +132,7 @@ PLAN260613 Phase B/C の技術評価（メモリ project_lcid_phase_bc_eval）�
 - 着手順の推奨: A1 → A2 → B1 → A3（体感インパクト ÷ 実装コスト順）。A1 と C2 は同一箇所のため同時。
 - 各施策は着手時に `/keynaco-perf-cycle` で個別 plan を切り、`objective_axis`・`baseline_at`・`sample_threshold` を契約として固定する（本ファイルのベースラインは計画時点のスナップショットであり、個別 plan は着手時点で取り直す）。
 - 個別 plan が implemented / abandoned になったら本ファイルの進捗表を更新。全行が終端になったら本ファイルを implemented にする。
+
+## 実装後の検証（未了）
+
+コード変更は 2026-07-04 にマージ済み（`deef0b9`–`1cba473`）。`/keynaco-perf-cycle` の検証ゲート（セッション ≥5・確定 ≥100）は実ログ再計測待ち。主要指標: `peek_update p95`・`lock_wait p95`・`fetch_complete p95`・数字読み pain 件数。
