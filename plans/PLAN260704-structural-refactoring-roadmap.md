@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in-progress
 created: 2026-07-04
 ---
 
@@ -7,6 +7,24 @@ created: 2026-07-04
 
 歴史的経緯の積み重ねで溜まった構造負債を、挙動を変えずに段階的に返済するロードマップ。
 2026-07-04 時点のコードベース全域調査（Core 状態機械 / アプリ層非同期 / 候補・DB パイプラインの 3 方向）に基づく。
+
+## 実装状況（2026-07-04 更新）
+
+| Phase | 状態 | コミット |
+|-------|------|----------|
+| 1 dead code 掃除 | 完了 | `c070900` |
+| 2 JSONLWriter 統合 | 完了 | `c070900` |
+| 3 候補状態の単一正本化 | 完了（軽微な残差あり） | `c070900` |
+| 4 keyDown パイプライン一本化 | 完了（軽微な残差あり） | `c070900` |
+| 5 モード明示化 | **未着手** | — |
+| 6 保留 | — | — |
+
+**検証ゲート（2026-07-04）**: `./scripts/test_core_all.sh` 緑。sandbox 3 本・`xcodebuild test` は未再実行（keynaco 未起動 / バイナリ stale）。
+
+**Phase 3–4 の残差**（意図的に Phase 5 まで温存）:
+
+- `CandidateContext.panelInteraction` は削除せず、`CandidateSession.makeContext()` がスナップショットを写す形に変更。init の nil 時フォールバック導出は後方互換のため残存
+- `pendingSessionRecord` / `pendingDivergenceRecord` は `InputHandler` 上のフィールドのまま。`KeyEventPipeline.drainPendingLogs` で回収経路を一本化（`commitComposition` / `doEscape` のタイミングで書く必要があるため、戻り値への完全移行は Phase 5 と合わせて再検討）
 
 ## 目的
 
@@ -84,48 +102,56 @@ grep で production 呼び出しゼロを確認済み:
 
 ### Phase 1: dead code・化石の掃除
 
-- [ ] `fetchHistoryExact` / `fetchHistoryPrefix` / `fetchUserDict` / `fetchUserDictPrefix` を削除し、依存テストは Scored/Combined 系 API でアサートし直す
-- [ ] `fetchUnclassifiedHistory` / `fetchDailyLog` / `countDailyLog` を削除
-- [ ] `diary` テーブルの CREATE を削除 + migration で `DROP TABLE IF EXISTS diary`（実行前に実 DB を SELECT して空を確認 — retrospectives「destructive な DB 操作」）
-- [ ] `AzooKeyCandidate.segmentCount` を削除（`fromConverted` の呼び出し側も同時整理）
-- [ ] `InputController+LLM.swift` → `InputController+POS.swift` にリネーム、`HiraganaPreferredBuiltins` の stale コメント修正
-- [ ] `DatabaseManager.HistoryEntry` を `StoredHistoryRow` 等にリネームして名前衝突を解消
-- [ ] `handleBracketChar` の未使用 `modifiers` 引数、`applyPostKeyDownCandidateAndIMK` sandbox オーバーロードの捨て引数 3 つを削除
-- [ ] recency 減衰式の Swift 側 2 実装に「SQL `recencyExpr` が正本」の `///` を付け、GC 変種を可能なら統合
+- [x] `fetchHistoryExact` / `fetchHistoryPrefix` / `fetchUserDict` / `fetchUserDictPrefix` を削除し、依存テストは Scored/Combined 系 API でアサートし直す
+- [x] `fetchUnclassifiedHistory` / `fetchDailyLog` / `countDailyLog` を削除
+- [x] `diary` テーブルの CREATE を削除 + migration で `DROP TABLE IF EXISTS diary`（実行前に実 DB を SELECT して空を確認 — retrospectives「destructive な DB 操作」）
+- [x] `AzooKeyCandidate.segmentCount` を削除（`fromConverted` の呼び出し側も同時整理）
+- [x] `InputController+LLM.swift` → `InputController+POS.swift` にリネーム、`HiraganaPreferredBuiltins` の stale コメント修正
+- [x] `DatabaseManager.HistoryEntry` を `StoredHistoryRow` 等にリネームして名前衝突を解消
+- [x] `handleBracketChar` の未使用 `modifiers` 引数、`applyPostKeyDownCandidateAndIMK` sandbox オーバーロードの捨て引数 3 つを削除
+- [x] recency 減衰式の Swift 側 2 実装に「SQL `recencyExpr` が正本」の `///` を付け、GC 変種を可能なら統合
 
 **効果**: 以降の Phase の grep ノイズが消える。リスクほぼゼロ。
 
 ### Phase 2: ログ基盤の統合（JSONLWriter）
 
-- [ ] `JSONLWriter`（open/seek/write/close + `LogTimestamp`）を新設し、4 つの `writeJSONLine` を置換
-- [ ] trim ポリシー（日数 + 最大行数 + UserDefaults による日次ゲート）をパラメタ化して 3+1 箇所を統合
-- [ ] buffer + 閾値 flush（50/10/10）を共通の `BufferedJSONLLogger` に寄せる（`TypingLatencyStats` の keep-N 変種は無理に寄せない。合わなければ writer 共有のみ）
+- [x] `JSONLWriter`（open/seek/write/close + `LogTimestamp`）を新設し、4 つの `writeJSONLine` を置換
+- [x] trim ポリシー（日数 + 最大行数 + UserDefaults による日次ゲート）をパラメタ化して 3+1 箇所を統合
+- [x] buffer + 閾値 flush（50/10/10）を共通の `BufferedJSONLLogger` に寄せる（`TypingLatencyStats` の keep-N 変種は無理に寄せない。合わなければ writer 共有のみ）
 
 **効果**: ログ 1 本追加するコストが激減。retrospectives「新ロジック導入と同時に計装する」の実行コストを下げる布石。
 
 ### Phase 3: 候補状態の単一正本化
 
-- [ ] `CandidateContext.panelInteraction` を削除し、`CandidateSession.panelInteraction` の値をスナップショット時に写す（導出ロジックを 1 箇所に）
-- [ ] `CandidateSession.removeCandidate` と `apply(.deleteSelected)` の重複 6 行を片方に集約。ついでに UI 削除ボタン経路（`InputController.onDelete`）とキーボード Shift+Delete 経路の二重実装を Core の単一メソッド経由に揃える
-- [ ] `InputSessionRecord` の組み立てを factory（`sessionTracker` 側）に集約し、`commitComposition` / `doEscape` の 12 フィールド重複を解消
-- [ ] `ScoredCandidate.Source` → 表示ラベル/セクション文字列の 3 箇所マッピング（CandidateBuildDiagnostics / CandidateScoreBuilder / InputHandler.swift:320-324）を `CandidateRowSection` 起点の 1 箇所に統合
+- [x] `CandidateContext.panelInteraction` を削除し、`CandidateSession.panelInteraction` の値をスナップショット時に写す（導出ロジックを 1 箇所に）— 実装は `makeContext()` スナップショット。フィールド自体は残し init フォールバックのみ温存
+- [x] `CandidateSession.removeCandidate` と `apply(.deleteSelected)` の重複 6 行を片方に集約。ついでに UI 削除ボタン経路（`InputController.onDelete`）とキーボード Shift+Delete 経路の二重実装を Core の単一メソッド経由に揃える — `removeRows(at:)` に集約。UI 経路の DB/marked 同期は Controller 側のまま
+- [x] `InputSessionRecord` の組み立てを factory（`sessionTracker` 側）に集約し、`commitComposition` / `doEscape` の 12 フィールド重複を解消
+- [x] `ScoredCandidate.Source` → 表示ラベル/セクション文字列の 3 箇所マッピング（CandidateBuildDiagnostics / CandidateScoreBuilder / InputHandler.swift:320-324）を `CandidateRowSection` 起点の 1 箇所に統合
 
 **効果**: 「候補リストの状態を触る変更」の変更箇所が常に 1 つになる。
 
 ### Phase 4: keyDown パイプラインの一本化
 
-- [ ] 非同期結果の適用可否判定（generation / reading / explicit / composing の 4 条件）と選択行保持ヒューリスティックを Core の純粋関数（例: `AsyncCandidateArrival.resolve(session:reading:generation:)`）に抽出し、ユニットテストを付ける
-- [ ] `applyAsyncAzooKeyResult`（本番）と `applySandboxAzooKeyResult`（sandbox）を上記関数の薄い呼び出しにする
-- [ ] debounce 入力の組み立て（inter-key interval + policy）を 1 箇所に
-- [ ] `runKeyDown` の手順（pre スナップショット → handle → post 適用 → 非同期スケジュール）を共有型（例: `KeyEventPipeline`）に抽出し、`InputController` / `DebugSocketServer.handleKeyEvent` / `benchmarkSimulateKey` の 3 実装を 1 つに。pre/post の読み分けはパイプライン内部に閉じ込め、呼び出し側から `handler` フィールドの生読み書きを消す
-- [ ] `DebugSocketServer.swift:1142-1145` の独自 marked text 再構成を `MarkedTextSync.resolve` 経由に置換
-- [ ] `pendingSessionRecord` / `pendingDivergenceRecord` の write-then-drain をパイプラインの戻り値に変える（out-parameter フィールドの削減）
+- [x] 非同期結果の適用可否判定（generation / reading / explicit / composing の 4 条件）と選択行保持ヒューリスティックを Core の純粋関数（例: `AsyncCandidateArrival.resolve(session:reading:generation:)`）に抽出し、ユニットテストを付ける — `AsyncCandidateArrival` + `AsyncCandidateArrivalTests`
+- [x] `applyAsyncAzooKeyResult`（本番）と `applySandboxAzooKeyResult`（sandbox）を上記関数の薄い呼び出しにする
+- [x] debounce 入力の組み立て（inter-key interval + policy）を 1 箇所に — `AzooKeyDebouncePolicy`
+- [x] `runKeyDown` の手順（pre スナップショット → handle → post 適用 → 非同期スケジュール）を共有型（例: `KeyEventPipeline`）に抽出し、`InputController` / `DebugSocketServer.handleKeyEvent` / `benchmarkSimulateKey` の 3 実装を 1 つに。pre/post の読み分けはパイプライン内部に閉じ込め、呼び出し側から `handler` フィールドの生読み書きを消す
+- [x] `DebugSocketServer.swift:1142-1145` の独自 marked text 再構成を `MarkedTextSync.resolve` 経由に置換
+- [x] `pendingSessionRecord` / `pendingDivergenceRecord` の write-then-drain をパイプラインの戻り値に変える（out-parameter フィールドの削減）— `KeyEventPipeline.drainPendingLogs` で回収経路を統一。フィールド自体は Phase 5 と合わせて再検討
 
 **効果**: CLAUDE.md の「pre/post 1 キー遅延バグ」注意書きが構造で保証される。sandbox と本番の挙動乖離（過去に何度も調査コストを払った）が原理的に消える。E2E は sandbox 回帰 3 本 + `/keynaco-ime-sandbox` 手動シナリオ（組成→候補→確定、ブラケット、英数切替、非同期到着タイミング）で確認。
 
 ### Phase 5: モードの明示化・不変条件の構造化
 
 Phase 3-4 で状態の読み書き経路が絞れた後にやる。ここが一番深い変更なので、着手前に本 plan を見直して分割を再検討する。
+
+**着手前メモ（2026-07-04）** — 独立コミット系列として推奨する順序:
+
+1. **5a** `ignoreNextModeSwitch` の take パターン集約（変更半径小・テスト容易）
+2. **5b** `CandidateSession` 不変条件の構造化（`apply` / setter 内。ブラケット防御 `reset()` 撤廃はここ）
+3. **5c** 候補構築入口の単一化 + `assembleCandidateList` 分割（非同期経路 `withoutAzooKey` / `rebuild` との整合が難所）
+4. **5d** `isAsciiMode` の注入可能ホルダー化（テスト全ファイルの `setUp` リセットが連鎖する）
+5. **5e** `KeyDispatchInput` enum 化 — **差分が膨らむならスキップ可**（不変条件の構造化までで止める判断を維持）
 
 - [ ] `CandidateSession` の不変条件（`isExplicitlySelected ⇒ isVisible`、bracket 時の候補整合）を setter/apply 内で構造的に保証し、`handleBracketModeKey` の防御的 `reset()` を不要にする
 - [ ] `ignoreNextModeSwitch` の 5 箇所リセットを、`handle()` 冒頭の 1 箇所（消費型 take パターン）に集約
@@ -161,4 +187,4 @@ Phase 3-4 で状態の読み書き経路が絞れた後にやる。ここが一�
 3. `./scripts/test_marked_text_sandbox.sh` / `./scripts/test_candidate_cleanup_sandbox.sh` / `./scripts/test_prefix_focus.py` 緑
 4. `/deploy` → 実機で日本語入力の主要動線（組成 → Space → 選択 → Enter、ブラケット、英数切替、Shift+Delete）を一巡
 
-全 Phase 完了時に `docs/domain/states.md` と CLAUDE.md の「キー入力の挙動」「`handler` フィールド書き換えのタイミング」節を実装に合わせて更新する（Phase 4 が入ると pre/post 注意書きは不要になるはず）。
+Phase 4 完了時点で CLAUDE.md の pre/post 注意書きを `KeyEventPipeline` 前提に更新済み。全 Phase 完了時に `docs/domain/states.md` を実装に合わせて更新する。

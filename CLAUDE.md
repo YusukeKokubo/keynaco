@@ -175,7 +175,7 @@ Instruments によるプロファイリングは IME では実用的でない（
 
 ## キー入力の挙動（特殊ケース）
 
-- **`InputController` での `handler` フィールド書き換えのタイミング**: `handle()` 内で同一ターン中に読む値は書き換え前の値（pre）を変数に退避してから使うこと。書き換え後の値が次キー以降のみ参照される場合は post 書きでよいが、混在するとサイレントに1キー遅延バグになる（実績あり）。
+- **keyDown の pre/post 読み分け**: 本番・sandbox・benchmark は `KeyEventPipeline.preSnapshot` → `runHandle(pre:)` で固定する。`handle()` に渡す `candidate` は pre 時点の `candidateSession.makeContext()`。新しい keyDown 経路を足すときはこのパイプラインを通すこと（手書きの pre 退避を増やさない）。
 - **Shift+英字（日本語モード、組成前）**: 英字単語モードを開始（`GitHub` 等の混在ケース用）。`InputHandlerAsciiTests.swift` 参照。
 - **英数キー（keyCode 102）**: 組成中なら確定してASCIIモードへ。`ignoreNextModeSwitch` は **`activateServer` 直後に IMK が echo する英数/かなを 1 回無視**（入力ソース切替キーの余韻。英数押下の二重送信ではない）
 - **`baseCharacters` vs `characters`**: Shift押下時、`characters`はシフト文字（`>`）、`baseCharacters`は素文字（`.`）。Shift+`,`/`.` は `characters` が `<`/`>` となり Bracket モード（`＜`/`＞` 候補）に入る
