@@ -115,9 +115,20 @@ public extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard !state.composedHiragana.isEmpty && state.pendingRomaji.isEmpty
               && state.composedHiragana.allSatisfy({ $0.isASCII }) else { return nil }
+        // `7gatu` → `7月` 等: 数字だけの ASCII 組成のあとローマ字を ASCII 語として連結しない。
+        if state.composedHiragana.allSatisfy(\.isNumber),
+           Self.isRomajiLetters(chars) {
+            return nil
+        }
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         state.composedHiragana += chars
         return (true, buildCandidateListForTrigger(.whileTyping))
+    }
+
+    private static func isRomajiLetters(_ text: String) -> Bool {
+        !text.isEmpty && text.unicodeScalars.allSatisfy {
+            ($0.value >= 0x61 && $0.value <= 0x7A) || $0.value == 0x2D
+        }
     }
 
     private static let vowelKeys: Set<Character> = ["a", "i", "u", "e", "o", "n"]

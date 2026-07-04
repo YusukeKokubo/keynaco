@@ -171,4 +171,24 @@ final class AzooKeyConverterTests: XCTestCase {
         XCTAssertLessThan(idxKanji, idxHiragana,
             "漢字混じり辞書候補が機械生成ひらがなより前に来るはず: \(texts.prefix(5))")
     }
+
+    // MARK: - NumericReadingExpander 経由の暦読み
+
+    func testShichigatsuYieldsJuly() {
+        let converter = AzooKeyConverter()
+        let texts = converter.requestCandidates(hiragana: "しちがつ").texts
+        XCTAssertTrue(
+            texts.contains(where: { $0.contains("7") && $0.contains("月") }),
+            "しちがつ → 7月 系候補が含まれる: \(texts.prefix(8))"
+        )
+    }
+
+    func testRokugatsuYieldsJune() {
+        let converter = AzooKeyConverter()
+        let texts = converter.requestCandidates(hiragana: "ろくがつ").texts
+        XCTAssertTrue(
+            texts.contains(where: { $0.contains("6") && $0.contains("月") }),
+            "ろくがつ → 6月 系候補が含まれる: \(texts.prefix(8))"
+        )
+    }
 }

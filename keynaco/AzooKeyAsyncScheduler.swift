@@ -63,8 +63,9 @@ final class AzooKeyAsyncScheduler {
     ) {
         cancelPendingWork()
         guard !reading.isEmpty, !reading.allSatisfy(\.isASCII) else { return }
+        let engineReading = InputHandler.azooKeyReading(for: reading)
         _ = converter.requestCandidates(
-            hiragana: reading,
+            hiragana: engineReading,
             leftSideContext: leftSideContext,
             richCandidates: true
         )
@@ -83,7 +84,7 @@ final class AzooKeyAsyncScheduler {
             guard !Task.isCancelled else { return }
             guard candidateGeneration == generation else { return }
 
-            let capturedReading = reading
+            let capturedReading = InputHandler.azooKeyReading(for: reading)
             let capturedContext = leftSideContext
             let conv = converter
             let genSnapshot = generation

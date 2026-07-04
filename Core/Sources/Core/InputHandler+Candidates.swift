@@ -32,9 +32,10 @@ extension InputHandler {
     ) -> (action: CandidateAction, pendingReading: String?) {
         let h = state.composedHiragana
         let needsAzooKey = !h.isEmpty && !h.allSatisfy(\.isASCII)
+        let engineReading = Self.azooKeyReading(for: h)
         let peek = needsAzooKey
             ? azooKeyConverter.peekCachedCandidates(
-                hiragana: h,
+                hiragana: engineReading,
                 leftSideContext: leftContext.azooKeyValue,
                 richCandidates: true
             )
@@ -159,13 +160,19 @@ extension InputHandler {
         trigger: CandidateListTrigger
     ) -> [String] {
         guard !reading.allSatisfy({ $0.isASCII }) else { return [] }
+        let engineReading = Self.azooKeyReading(for: reading)
         let richCandidates = trigger == .explicit
         let raw = azooKeyConverter.requestCandidates(
-            hiragana: reading,
+            hiragana: engineReading,
             leftSideContext: leftContext.azooKeyValue,
             richCandidates: richCandidates
         )
         return raw.texts
+    }
+
+    /// UserReading を AzooKey 向け EngineReading へ補完する。マッチしなければそのまま返す。
+    public static func azooKeyReading(for userReading: String) -> String {
+        NumericReadingExpander.engineReading(for: userReading) ?? userReading
     }
 
     private func hiraganaBonusKind(for reading: String) -> CandidateScoreBuilder.HiraganaBonusKind? {
