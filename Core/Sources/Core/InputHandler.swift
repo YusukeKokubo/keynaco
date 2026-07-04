@@ -173,7 +173,7 @@ public struct InputHandler {
     }
     public var bracketCandidates: [String]? {
         get { candidateSession.bracketCandidates }
-        set { candidateSession.bracketCandidates = newValue }
+        set { candidateSession.setBracketCandidates(newValue) }
     }
     public var isBracketMode: Bool { candidateSession.isBracketMode }
     /// 確定直後の Backspace を「誤変換の訂正」として扱うために保持する直前 1 件の学習キー。

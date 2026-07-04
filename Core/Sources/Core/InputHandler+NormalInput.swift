@@ -77,7 +77,7 @@ public extension InputHandler {
     ) -> (consumed: Bool, candidateAction: CandidateAction)? {
         guard let options = InputHandler.bracketOptions[chars] else { return nil }
         if !state.isComposing {
-            bracketCandidates = options
+            candidateSession.beginBracketMode(options: options)
             return (true, .show(candidates: options, fixedEnd: 0))
         }
         flushPendingRomaji()

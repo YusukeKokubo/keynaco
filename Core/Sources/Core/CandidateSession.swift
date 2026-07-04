@@ -66,6 +66,25 @@ public struct CandidateSession: Sendable, Equatable {
 
     public init() {}
 
+    /// 括弧候補モードへ入る。`apply(.show)` とセットで呼ぶ（`handleBracketChar` 経路）。
+    mutating func beginBracketMode(options: [String]) {
+        bracketCandidates = options
+    }
+
+    /// 括弧モードを終了し候補パネルを閉じる。`bracketCandidates = nil` の正本。
+    mutating func endBracketMode() {
+        reset()
+    }
+
+    /// `bracketCandidates` 直書きの代替。`nil` は常に `endBracketMode()` へ委譲する。
+    mutating func setBracketCandidates(_ value: [String]?) {
+        if let value = value {
+            bracketCandidates = value
+        } else {
+            endBracketMode()
+        }
+    }
+
     public mutating func reset() {
         candidates = []
         isVisible = false
@@ -75,6 +94,13 @@ public struct CandidateSession: Sendable, Equatable {
         candidateSources = []
         azooKeyApiOrder = []
         bracketCandidates = nil
+        enforceInvariants()
+    }
+
+    private mutating func enforceInvariants() {
+        if !isVisible {
+            isExplicitlySelected = false
+        }
     }
 
     /// 候補ウィンドウの削除ボタン用。行除去のみ。DB 削除と marked 同期は `InputController.onDelete` が行う。
@@ -92,6 +118,7 @@ public struct CandidateSession: Sendable, Equatable {
         } else {
             selectedRow = min(selectedRow, candidates.count - 1)
         }
+        enforceInvariants()
     }
 
     /// `InputHandler` / デバッグソケットが返した `CandidateAction` を反映する。
@@ -106,7 +133,7 @@ public struct CandidateSession: Sendable, Equatable {
             fixedEnd = fe
             candidateSources = rowSources
             azooKeyApiOrder = apiOrder
-            isExplicitlySelected = initialExplicit
+            isExplicitlySelected = initialExplicit && isVisible
         case .dismiss:
             reset()
         case .selectNext:
@@ -121,5 +148,6 @@ public struct CandidateSession: Sendable, Equatable {
             guard isVisible else { break }
             removeRows(at: selectedRow)
         }
+        enforceInvariants()
     }
 }

@@ -319,10 +319,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     }
 
     /// 括弧モード中に左右矢印（あるいは Cmd+key 等）を押すと default 分岐に落ちる。
-    /// 旧実装は `bracketCandidates = nil` のみ書き換えていたため、`candidateSession.isVisible`
-    /// が true のまま `isBracketMode = false` になる不整合状態が固定化し、`commitComposition` の
-    /// ガード（`isVisible && !isComposing && !isBracketMode`）が早期 return して候補ウィンドウが
-    /// 取り残されていた。default 分岐で session 全体をリセットすることで再発を防ぐ。
+    /// `CandidateSession.endBracketMode()` で panel を閉じてから通常入力へ委譲する。
     func testBracketModeLeftArrowResetsSession() {
         type(chars: "[", base: "[")
         XCTAssertTrue(handler.candidateSession.isVisible)

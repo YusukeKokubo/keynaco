@@ -153,7 +153,7 @@ Phase 3-4 で状態の読み書き経路が絞れた後にやる。ここが一�
 4. **5d** `isAsciiMode` の注入可能ホルダー化（テスト全ファイルの `setUp` リセットが連鎖する）
 5. **5e** `KeyDispatchInput` enum 化 — **差分が膨らむならスキップ可**（不変条件の構造化までで止める判断を維持）
 
-- [ ] `CandidateSession` の不変条件（`isExplicitlySelected ⇒ isVisible`、bracket 時の候補整合）を setter/apply 内で構造的に保証し、`handleBracketModeKey` の防御的 `reset()` を不要にする
+- [x] `CandidateSession` の不変条件（`isExplicitlySelected ⇒ isVisible`、bracket 時の候補整合）を setter/apply 内で構造的に保証し、`handleBracketModeKey` の防御的 `reset()` を不要にする — `enforceInvariants` / `setBracketCandidates(nil)`→`endBracketMode()` / escape・enter は `.dismiss` のみ
 - [x] `ignoreNextModeSwitch` の 5 箇所リセットを、`handle()` 冒頭の 1 箇所（消費型 take パターン）に集約
 - [ ] `InputHandler.isAsciiMode` の process-global static を注入可能な状態ホルダーに移す（テストの `setUp` リセット必須という罠も一緒に消える）
 - [ ] 候補構築の入口 4 つを「トリガー enum を受ける単一入口」に統合し、約 120 行の `assembleCandidateList` を（dismiss 判定 / ソース収集 / スコア構築 / 診断）に分割

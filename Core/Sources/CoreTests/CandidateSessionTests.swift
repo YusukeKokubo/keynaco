@@ -47,4 +47,31 @@ final class CandidateSessionTests: XCTestCase {
         XCTAssertEqual(s.candidates, ["fix"])
         XCTAssertEqual(s.candidateSources, [.hiraganaBuiltin])
     }
+
+    func testExplicitRequiresVisible() {
+        var s = CandidateSession()
+        s.apply(.show(candidates: [], fixedEnd: 0, initialIsExplicitlySelected: true))
+        XCTAssertFalse(s.isVisible)
+        XCTAssertFalse(s.isExplicitlySelected)
+    }
+
+    func testSetBracketCandidatesNilEndsBracketMode() {
+        var s = CandidateSession()
+        s.beginBracketMode(options: ["「", "【"])
+        s.apply(.show(candidates: ["「", "【"], fixedEnd: 0))
+        XCTAssertTrue(s.isBracketMode)
+        s.setBracketCandidates(nil)
+        XCTAssertFalse(s.isBracketMode)
+        XCTAssertFalse(s.isVisible)
+        XCTAssertTrue(s.candidates.isEmpty)
+    }
+
+    func testEndBracketModeClosesPanel() {
+        var s = CandidateSession()
+        s.beginBracketMode(options: ["("])
+        s.apply(.show(candidates: ["("], fixedEnd: 0))
+        s.endBracketMode()
+        XCTAssertFalse(s.isBracketMode)
+        XCTAssertFalse(s.isVisible)
+    }
 }
