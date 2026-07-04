@@ -5,7 +5,7 @@
 
   python3 scripts/test_prefix_focus.py
 
-閾値（InitialRowPolicyResolver.MoraThreshold）:
+閾値（PrefixFocusPolicy）:
   名詞・固有名詞: 2 モーラ以上
   動詞:          3 モーラ以上
   形容詞:        3 モーラ以上

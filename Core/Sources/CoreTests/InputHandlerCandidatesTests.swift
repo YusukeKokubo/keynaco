@@ -553,8 +553,8 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         )
     }
 
-    /// 高スコア前方一致履歴が低スコア exact より先頭に来る（打鍵中）。
-    func testHighScorePrefixHistoryPromotedOverExactMatchWhileTyping() {
+    /// 打鍵中: 2 モーラ時点では未分類 prefix 履歴（5 モーラ必要）は載らず exact が先頭。
+    func testPrefixFocusBlocksHighScorePrefixAtTwoMoraWhileTyping() {
         setUpWithConverter(BaseAzooKeyStub())
 
         for _ in 0..<30 {
@@ -570,13 +570,37 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         guard let payload = action.showPayload else {
             XCTFail("candidates should be shown: \(action)"); return
         }
-        guard let idxShared = payload.candidates.firstIndex(of: "情報共有"),
-              let idxUe = payload.candidates.firstIndex(of: "上") else {
-            XCTFail("both should appear: \(payload.candidates)"); return
+        XCTAssertEqual(
+            payload.candidates[0], "上",
+            "2m では unknown 扱いの prefix 履歴より exact が row 0: \(payload.candidates)"
+        )
+        XCTAssertFalse(
+            payload.candidates.contains("情報共有"),
+            "閾値未満の prefix 履歴は whileTyping リストから除外: \(payload.candidates)"
+        )
+    }
+
+    /// 高スコア前方一致履歴が低スコア exact より先頭に来る（打鍵中・閾値充足時）。
+    func testHighScorePrefixHistoryPromotedOverExactMatchWhileTyping() {
+        setUpWithConverter(BaseAzooKeyStub())
+
+        for _ in 0..<30 {
+            handler.db.record(input: "じょうほうきょうゆう", output: "情報共有")
         }
-        XCTAssertLessThan(idxShared, idxUe, "情報共有 should precede 上: \(payload.candidates)")
-        XCTAssertEqual(payload.candidates[0], "情報共有",
-                       "row 0 should be highest-score prefix history: \(payload.candidates)")
+        for _ in 0..<3 {
+            handler.db.record(input: "じょう", output: "上")
+        }
+
+        typeRomaji("jouhouki")
+        let action = handler.buildCandidateList(trigger: .whileTyping)
+
+        guard let payload = action.showPayload else {
+            XCTFail("candidates should be shown: \(action)"); return
+        }
+        XCTAssertEqual(
+            payload.candidates[0], "情報共有",
+            "5m 以上で unknown prefix 履歴が row 0: \(payload.candidates)"
+        )
     }
 
     // MARK: - 日時候補

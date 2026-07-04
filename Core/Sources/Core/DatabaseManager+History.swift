@@ -92,6 +92,24 @@ extension DatabaseManager {
         }
     }
 
+    /// `output` に対応する履歴行の最長 `input` を返す。prefix focus の辞書 lookup 用。
+    func longestInputForOutput(_ output: String) -> String? {
+        dbQueue.sync {
+            let sql = """
+            SELECT input FROM history
+            WHERE output = ? AND input IS NOT NULL AND input != ''
+            ORDER BY length(input) DESC, used_at DESC
+            LIMIT 1
+            """
+            guard let stmt = self.cachedStmt(for: sql) else { return nil }
+            self.bindText(stmt, 1, output)
+            defer { sqlite3_reset(stmt) }
+            guard sqlite3_step(stmt) == SQLITE_ROW,
+                  let cStr = sqlite3_column_text(stmt, 0) else { return nil }
+            return String(cString: cStr)
+        }
+    }
+
     /// `output` に対応する履歴行の代表 `lcid` を返す。未設定なら nil。
     public func lcidForOutput(_ output: String) -> Int? {
         dbQueue.sync {

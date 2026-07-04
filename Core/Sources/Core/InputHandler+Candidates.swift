@@ -229,12 +229,18 @@ extension InputHandler {
 
         let zenzaiActive = azooKeyConverter.isZenzaiEnabled && leftContext.azooKeyValue != nil
         let apiOrder = zenzaiActive ? sources.azooKeyApiOrder : []
+        let (historyEntries, userDictPrefix) = prefixFocusFilteredSources(
+            reading: h,
+            trigger: trigger,
+            historyEntries: sources.historyEntries,
+            userDictPrefix: sources.userDictPrefix
+        )
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
             reading: h,
             hiraganaBonus: hiraganaBonusKind(for: h),
-            historyEntries: sources.historyEntries,
+            historyEntries: historyEntries,
             userDictExact: sources.userDictExact,
-            userDictPrefix: sources.userDictPrefix,
+            userDictPrefix: userDictPrefix,
             azooKeyCandidates: sources.azooKeyCandidates,
             azooKeyApiOrder: apiOrder,
             numberCandidates: numberCandidates,
@@ -357,4 +363,29 @@ extension InputHandler {
         )
     }
     #endif
+
+    /// `.whileTyping` のみ prefix focus モーラ閾値を適用。`.explicit` はそのまま返す。
+    private func prefixFocusFilteredSources(
+        reading: String,
+        trigger: CandidateListTrigger,
+        historyEntries: [HistoryEntry],
+        userDictPrefix: [String]
+    ) -> (historyEntries: [HistoryEntry], userDictPrefix: [String]) {
+        guard trigger == .whileTyping else {
+            return (historyEntries, userDictPrefix)
+        }
+        let accepts: (String) -> Bool = { output in
+            PrefixFocusPolicy.acceptsPrefixFocus(
+                reading: reading,
+                output: output,
+                db: db,
+                azooKey: azooKeyConverter
+            )
+        }
+        let filteredHistory = historyEntries.compactMap {
+            $0.applyingPrefixFocusGate(acceptsPrefix: accepts)
+        }
+        let filteredUserDictPrefix = userDictPrefix.filter(accepts)
+        return (filteredHistory, filteredUserDictPrefix)
+    }
 }
