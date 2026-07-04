@@ -156,7 +156,7 @@ Phase 3-4 で状態の読み書き経路が絞れた後にやる。ここが一�
 - [x] `CandidateSession` の不変条件（`isExplicitlySelected ⇒ isVisible`、bracket 時の候補整合）を setter/apply 内で構造的に保証し、`handleBracketModeKey` の防御的 `reset()` を不要にする — `enforceInvariants` / `setBracketCandidates(nil)`→`endBracketMode()` / escape・enter は `.dismiss` のみ
 - [x] `ignoreNextModeSwitch` の 5 箇所リセットを、`handle()` 冒頭の 1 箇所（消費型 take パターン）に集約
 - [ ] `InputHandler.isAsciiMode` の process-global static を注入可能な状態ホルダーに移す（テストの `setUp` リセット必須という罠も一緒に消える）
-- [ ] 候補構築の入口 4 つを「トリガー enum を受ける単一入口」に統合し、約 120 行の `assembleCandidateList` を（dismiss 判定 / ソース収集 / スコア構築 / 診断）に分割
+- [x] 候補構築の入口 4 つを「トリガー enum を受ける単一入口」に統合し、約 120 行の `assembleCandidateList` を（dismiss 判定 / ソース収集 / スコア構築 / 診断）に分割 — `buildCandidateList(for:azooKey:)` + `CandidateListAzooKeySupply` / `whileTypingPreScoreDismissReason`・`buildScoredLayout`
 - [ ] `KeyDispatchInput` の 6 bool を、可能なら状態 enum（待機 / ASCII / 組成中 / passive / explicit / bracket — docs/domain/states.md と同型）由来に置き換える。**ただし enum 化が差分を膨らませすぎる場合は「不変条件の構造化」までで止める判断もあり**（このチェックボックスだけ独立コミット系列にする）
 
 **効果**: docs/domain/states.md の状態遷移図とコードが同型になり、状態依存バグ（実績のあるクラス）の発生源を塞ぐ。

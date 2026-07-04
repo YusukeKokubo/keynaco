@@ -87,6 +87,16 @@ public enum CandidateListTrigger: Sendable {
     case explicit
 }
 
+/// AzooKey 候補の供給経路。`buildCandidateList(trigger:azooKey:)` の単一入口で選択する。
+public enum CandidateListAzooKeySupply: Sendable {
+    /// 同期 fetch（Space・explicit、または defer 無効の whileTyping）。
+    case fetchSync
+    /// defer 有効時の whileTyping: キャッシュ peek のみ。未キャッシュなら `pendingAzooKeyReading` を返す。
+    case peekOrDefer
+    /// 非同期結果注入（`composedHiragana == reading` のときのみ有効）。
+    case inject(reading: String, candidates: [AzooKeyCandidate])
+}
+
 /// 確定直後 Backspace で `penalizeAll` するための、直前確定の学習コンテキスト。
 public struct LastConfirmedContext: Equatable {
     public let input: String
