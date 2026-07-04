@@ -176,6 +176,11 @@ final class UserDictViewController: NSViewController {
 
         let inserted = DatabaseManager.shared.addUserDict(input: reading, output: output)
         if inserted {
+            InputController.schedulePOSClassification(
+                output: output,
+                reading: reading,
+                converter: ZenzaiSettings.makeConverter()
+            )
             readingField.stringValue = ""
             outputField.stringValue  = ""
             reload()

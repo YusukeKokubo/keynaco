@@ -183,8 +183,8 @@ def print_fetch_efficiency(data):
     print(f"  ※ wasted = fetch が走ったが新キーで結果破棄。debounce が batch として効くと低い。")
 
     wasted_ratios = [
-        d["wasted_fetch_count"] / d["fetch_count"]
-        for d in sessions_with_fetch if d.get("wasted_fetch_count", 0) >= 0
+        d.get("wasted_fetch_count", 0) / d["fetch_count"]
+        for d in sessions_with_fetch if d.get("fetch_count", 0) > 0
     ]
     if wasted_ratios:
         print(f"\n  セッション別 wasted 率:")

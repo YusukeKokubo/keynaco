@@ -493,6 +493,39 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         }
     }
 
+    /// A1 後: pos/lcid 未設定のユーザー辞書 prefix は `.unknown`（5 モーラ必要）で弾かれる。
+    func testUserDictPrefixFocus_requiresPosClassification() {
+        let marker = "⌘UD東京未分類"
+        handler.db.addUserDict(input: "とうき", output: marker)
+        typeRomaji("toukyo")
+        let action = handler.buildCandidateList(trigger: .whileTyping)
+        guard let payload = action.showPayload else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        XCTAssertFalse(
+            payload.candidates.contains(marker),
+            "pos/lcid なしでは userDict prefix focus に載らない: \(payload.candidates)"
+        )
+    }
+
+    /// ユーザー辞書登録時の pos/lcid 書き込み後は prefix focus が効く（PLAN260617 根本対処）。
+    func testUserDictPrefixFocus_afterPosClassification() {
+        let marker = "⌘UD東京名詞"
+        handler.db.addUserDict(input: "とうき", output: marker)
+        handler.db.upsertPOSClassification(
+            output: marker, reading: "とうき", pos: "noun", lcid: 1293
+        )
+        typeRomaji("toukyo")
+        let action = handler.buildCandidateList(trigger: .whileTyping)
+        guard let payload = action.showPayload else {
+            XCTFail(".show を返すはず: \(action)"); return
+        }
+        XCTAssertTrue(
+            payload.candidates.contains(marker),
+            "名詞 lcid 設定後は userDict prefix focus に載る: \(payload.candidates)"
+        )
+    }
+
     // MARK: - 重複排除
 
     // MARK: - 低スコア履歴は候補に載せない

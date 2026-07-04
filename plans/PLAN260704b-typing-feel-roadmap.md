@@ -135,4 +135,15 @@ PLAN260613 Phase B/C の技術評価（メモリ project_lcid_phase_bc_eval）�
 
 ## 実装後の検証（未了）
 
-コード変更は 2026-07-04 にマージ済み（`deef0b9`–`1cba473`）。`/keynaco-perf-cycle` の検証ゲート（セッション ≥5・確定 ≥100）は実ログ再計測待ち。主要指標: `peek_update p95`・`lock_wait p95`・`fetch_complete p95`・数字読み pain 件数。
+コード変更は 2026-07-04 にマージ済み（`deef0b9`–`9d61d2d`）。`/keynaco-perf-cycle` の検証ゲート（セッション ≥5・確定 ≥100）は実ログ再計測待ち。
+
+**直近 1h スナップショット（2026-07-04 15:00、n=7 セッション・30 確定）** — サンプル不足のため断定不可:
+
+| 指標 | ベースライン | 直近 1h |
+|------|-------------|---------|
+| peek_update p95 | 49.2ms | 50.2ms |
+| lock_wait p95 | 24.2ms (max 858) | 9.5ms (max 66.8) |
+| pain 率 | 16.3% | 0% (0/30) |
+| wasted fetch | 17.4% | 24–28% |
+
+**A1 後続（2026-07-04）**: ユーザー辞書登録時に `schedulePOSClassification` + `upsertPOSClassification` で pos/lcid を書き込み（履歴未確定語の prefix focus 退行を解消）。

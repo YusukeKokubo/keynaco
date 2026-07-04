@@ -759,7 +759,9 @@ extension DebugSocketServer {
         guard let c = AzooKeyPOSClassifier.classify(
             output: output, reading: reading, converter: posLookupConverter
         ) else { return }
-        handler.db.updatePOSClassification(output: output, pos: c.pos, lcid: c.lcid)
+        handler.db.upsertPOSClassification(
+            output: output, reading: reading, pos: c.pos, lcid: c.lcid
+        )
     }
 
 }

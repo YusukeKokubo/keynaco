@@ -129,6 +129,51 @@ extension DatabaseManager {
         }
     }
 
+    /// 履歴行が無い output（ユーザー辞書のみ等）にも pos/lcid を書く。分類用スタブ行を 1 件挿入する。
+    public func upsertPOSClassification(output: String, reading: String, pos: String?, lcid: Int?) {
+        guard pos != nil || lcid != nil else { return }
+        dispatchWrite {
+            self.executeOnQueue("""
+            UPDATE history SET
+                pos = COALESCE(?, pos),
+                lcid = COALESCE(?, lcid)
+            WHERE output = ?
+            """) {
+                if let pos {
+                    self.bindText($0, 1, pos)
+                } else {
+                    sqlite3_bind_null($0, 1)
+                }
+                if let lcid {
+                    sqlite3_bind_int($0, 2, Int32(lcid))
+                } else {
+                    sqlite3_bind_null($0, 2)
+                }
+                self.bindText($0, 3, output)
+            }
+            guard sqlite3_changes(self.db) == 0 else { return }
+            let t = self.nowEpoch()
+            self.executeOnQueue("""
+            INSERT INTO history (input, output, count, used_at, pos, lcid)
+            VALUES (?, ?, 0, ?, ?, ?)
+            """) {
+                self.bindText($0, 1, reading)
+                self.bindText($0, 2, output)
+                sqlite3_bind_int64($0, 3, t)
+                if let pos {
+                    self.bindText($0, 4, pos)
+                } else {
+                    sqlite3_bind_null($0, 4)
+                }
+                if let lcid {
+                    sqlite3_bind_int($0, 5, Int32(lcid))
+                } else {
+                    sqlite3_bind_null($0, 5)
+                }
+            }
+        }
+    }
+
     /// backfill 対象 output 件数（output 単位）。
     public func countUnclassifiedHistoryOutputs() -> Int {
         dbQueue.sync {

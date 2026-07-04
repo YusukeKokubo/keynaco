@@ -394,6 +394,12 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(results, ["keynaco"])
     }
 
+    func testUpsertPOSClassification_insertsStubWhenNoHistoryRow() {
+        db.upsertPOSClassification(output: "keynaco", reading: "けいなこ", pos: "noun", lcid: 1285)
+        XCTAssertEqual(db.posForOutput("keynaco"), "noun")
+        XCTAssertEqual(db.lcidForOutput("keynaco"), 1285)
+    }
+
     func testUserDictDuplicateReturnsFalse() {
         db.addUserDict(input: "けいなこ", output: "keynaco")
         XCTAssertFalse(db.addUserDict(input: "けいなこ", output: "keynaco"))
