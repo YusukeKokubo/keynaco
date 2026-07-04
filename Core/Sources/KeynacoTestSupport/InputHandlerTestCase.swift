@@ -33,7 +33,6 @@ class InputHandlerTestCase: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        InputHandler.isAsciiMode = false
         let db = DatabaseManager(inMemory: true)
         db.seedHiraganaPreferredWords()
         handler = InputHandler(db: db)

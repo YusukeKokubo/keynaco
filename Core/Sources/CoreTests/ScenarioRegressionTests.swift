@@ -28,7 +28,6 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
 
     /// **S-01**: `k` `a` `n` `j` `i` Space Enter → 確定「漢字」。
     func testS01_kanji_space_enter_insertsKanji() {
-        InputHandler.isAsciiMode = false
         let mock = ScenarioS01KanjiMockConverter()
         var h = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: mock)
         let c = MockTextClient()
@@ -71,7 +70,6 @@ final class ScenarioRegressionTests: InputHandlerTestCase {
 
     /// **S-04**: `t` Shift+`O` Shift+`K` `y` `o` Enter → `tOKyo`（シナリオ記載の混在大文字トレース）
     func testS04_tShiftOShiftKyo_enter_insertsTokyoStyleWord() {
-        InputHandler.isAsciiMode = false
         type(chars: "t", base: "t")
         type(chars: "O", base: "o", modifiers: .shift)
         type(chars: "K", base: "k", modifiers: .shift)

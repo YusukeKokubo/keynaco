@@ -301,7 +301,7 @@ class InputController: IMKInputController, @unchecked Sendable {
 
         // Caps Lock でモード切替（LED ON = 英字モード、LED OFF = 日本語モード）
         if event.type == .flagsChanged && event.keyCode == KeyCode.capsLock {
-            InputHandler.isAsciiMode = event.modifierFlags.contains(.capsLock)
+            handler.isAsciiMode = event.modifierFlags.contains(.capsLock)
             return false
         }
 

@@ -11,7 +11,7 @@ public extension InputHandler {
             pendingRomaji: state.pendingRomaji,
             composingText: state.composingText,
             markedText: markedText,
-            isAsciiMode: Self.isAsciiMode,
+            isAsciiMode: isAsciiMode,
             isBracketMode: isBracketMode,
             isExplicitlySelected: session.isExplicitlySelected,
             candidateVisible: session.isVisible,

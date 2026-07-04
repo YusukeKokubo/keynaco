@@ -287,7 +287,7 @@ final class InputHandlerPunctuationTests: InputHandlerTestCase {
     }
 
     func testFunctionKeyIgnoredInAsciiMode() {
-        InputHandler.isAsciiMode = true
+        handler.isAsciiMode = true
         let (consumed, action) = press(keyCode: KeyCode.f7)
         XCTAssertFalse(consumed)
         guard case .none = action else {

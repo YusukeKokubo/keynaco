@@ -338,7 +338,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
 
         // 英数キー（keyCode 102）で ASCII モードへ
         press(keyCode: 102)
-        XCTAssertTrue(InputHandler.isAsciiMode)
+        XCTAssertTrue(handler.isAsciiMode)
 
         // ASCII モード中に Enter → committedHistory がクリアされるはず
         press(keyCode: 36)
@@ -406,7 +406,7 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
 
     func testSessionTextBufferClearedOnAsciiEnter() {
         handler.commitText(text: "word", client: client)
-        InputHandler.isAsciiMode = true
+        handler.isAsciiMode = true
         press(keyCode: 36)
         XCTAssertEqual(handler.sessionTextBuffer, "")
     }

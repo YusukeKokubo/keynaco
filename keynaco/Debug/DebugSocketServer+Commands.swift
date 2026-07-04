@@ -18,7 +18,7 @@ extension DebugSocketServer {
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: converter)
     }
     handler.deferAzooKeyWhileTyping = true
-    InputHandler.isAsciiMode = false
+    handler.isAsciiMode = false
     handler.candidateSession.reset()
     mockClient.reset()
     debugLeftContextOverride = nil
@@ -633,7 +633,7 @@ extension DebugSocketServer {
         handler.candidateSession.reset()
         _ = mockClient.consume()
         mockClient.reset()
-        InputHandler.isAsciiMode = false
+        handler.isAsciiMode = false
     }
 
     private func benchmarkSimulateKey(

@@ -43,7 +43,6 @@ final class AzooKeyCacheTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        InputHandler.isAsciiMode = false
         mock = MockAzooKeyConverter()
         handler = InputHandler(db: DatabaseManager(inMemory: true), azooKeyConverter: mock)
         client = MockTextClient()

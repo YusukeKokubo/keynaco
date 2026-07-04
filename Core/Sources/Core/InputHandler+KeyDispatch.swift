@@ -31,7 +31,7 @@ extension InputHandler {
         let route = KeyDispatch.route(KeyDispatchInput(
             keyCode: keyCode,
             isBackspace: isBackspace,
-            isAsciiMode: Self.isAsciiMode,
+            isAsciiMode: isAsciiMode,
             isBracketMode: isBracketMode,
             candidateVisible: candidate.isVisible,
             isComposing: state.isComposing,
@@ -101,9 +101,9 @@ extension InputHandler {
         if suppressEcho { return (true, .none) }
         if keyCode == KeyCode.eisu {
             if state.isComposing { commitComposition(client: client, trigger: .modeSwitch) }
-            Self.isAsciiMode = true
+            isAsciiMode = true
         } else {
-            Self.isAsciiMode = false
+            isAsciiMode = false
         }
         return (true, .none)
     }
@@ -114,7 +114,7 @@ extension InputHandler {
         modifiers: NSEvent.ModifierFlags,
         client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
-        if keyCode == KeyCode.escape { Self.isAsciiMode = false; return (true, .none) }
+        if keyCode == KeyCode.escape { isAsciiMode = false; return (true, .none) }
         if keyCode == KeyCode.enter {
             resetContextOnEnter()
             return (false, .none)

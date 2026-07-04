@@ -134,16 +134,12 @@ public enum KeyCode {
 /// - `InputHandler+BracketMode.swift`    ：括弧モード
 public struct InputHandler {
 
-    /// 英字直接入力モード。プロセス全体で 1 つの static（全 `InputController` / アプリ切替後も維持）。
+    /// 英字直接入力モード。`InputHandler` インスタンスごとに保持（`InputController.handler` が正本）。
     ///
     /// 不変条件:
     /// - 英数キー（`KeyCode.eisu`）・かなキー（`KeyCode.kana`）・Escape（ASCII 中）・Caps Lock（`InputController.flagsChanged`）で更新
     /// - `activateServer` 直後の `ignoreNextModeSwitch` とは独立（IMK のモードキー echo 抑制専用）
-    /// - ユニットテストは `setUp` で必ず `false` にリセットする
-    ///
-    /// `nonisolated(unsafe)`: IMK コールバックと `flagsChanged` が異なる isolation から触るため。
-    /// インスタンス状態へ移さない（意図的なグローバルモード）。
-    public nonisolated(unsafe) static var isAsciiMode = false
+    public var isAsciiMode = false
 
     /// 役割: この集合に含まれる読みには `CandidateScoreBuilder` の hiragana bonus（score 100）を付与する。
     public var hiraganaPreferredSet: Set<String> = []

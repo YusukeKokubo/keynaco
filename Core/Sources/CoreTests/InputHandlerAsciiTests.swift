@@ -38,9 +38,9 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
 
     func testKanaKeyExitsAsciiMode() {
         press(keyCode: 102)
-        XCTAssertTrue(InputHandler.isAsciiMode)
+        XCTAssertTrue(handler.isAsciiMode)
         press(keyCode: 104)
-        XCTAssertFalse(InputHandler.isAsciiMode)
+        XCTAssertFalse(handler.isAsciiMode)
         type(chars: "a", base: "a")
         XCTAssertEqual(client.markedText, "あ")
         XCTAssertTrue(client.inserted.isEmpty)
@@ -49,39 +49,39 @@ final class InputHandlerAsciiTests: InputHandlerTestCase {
     // MARK: - activateServer 直後のモードキー echo（ignoreNextModeSwitch）
 
     func testSpuriousEisuAfterActivationIgnored() {
-        InputHandler.isAsciiMode = false
+        handler.isAsciiMode = false
         handler.ignoreNextModeSwitch = true
         let result = press(keyCode: 102)
         XCTAssertTrue(result.consumed)
-        XCTAssertFalse(InputHandler.isAsciiMode, "echo された英数は ASCII モードにしてはいけない")
+        XCTAssertFalse(handler.isAsciiMode, "echo された英数は ASCII モードにしてはいけない")
         XCTAssertFalse(handler.ignoreNextModeSwitch)
     }
 
     func testSpuriousKanaAfterActivationIgnored() {
-        InputHandler.isAsciiMode = true
+        handler.isAsciiMode = true
         handler.ignoreNextModeSwitch = true
         let result = press(keyCode: 104)
         XCTAssertTrue(result.consumed)
-        XCTAssertTrue(InputHandler.isAsciiMode, "echo されたかなは日本語モードへ戻してはいけない")
+        XCTAssertTrue(handler.isAsciiMode, "echo されたかなは日本語モードへ戻してはいけない")
         XCTAssertFalse(handler.ignoreNextModeSwitch)
     }
 
     func testModeSwitchHonoredAfterIgnoredEcho() {
-        InputHandler.isAsciiMode = false
+        handler.isAsciiMode = false
         handler.ignoreNextModeSwitch = true
         press(keyCode: 102)
         press(keyCode: 102)
-        XCTAssertTrue(InputHandler.isAsciiMode, "2 回目の英数は通常どおり ASCII モードへ")
+        XCTAssertTrue(handler.isAsciiMode, "2 回目の英数は通常どおり ASCII モードへ")
     }
 
     /// 英数/かな以外のキーでも take で消費される（echo 待ちのまま残さない）。
     func testNonModeKeyConsumesIgnoreNextModeSwitch() {
-        InputHandler.isAsciiMode = false
+        handler.isAsciiMode = false
         handler.ignoreNextModeSwitch = true
         _ = type(chars: "a", base: "a")
         XCTAssertFalse(handler.ignoreNextModeSwitch)
         press(keyCode: 102)
-        XCTAssertTrue(InputHandler.isAsciiMode, "フラグ消費後の英数は通常どおり ASCII モードへ")
+        XCTAssertTrue(handler.isAsciiMode, "フラグ消費後の英数は通常どおり ASCII モードへ")
     }
 
     // MARK: - Shift + 文字 → 組成バッファに英字として貯める
