@@ -1,7 +1,7 @@
 ---
 status: implemented
 created: 2026-07-04
-related_commit: c6e2914
+related_commit: b422602
 ---
 
 # PLAN260704: 構造リファクタリング・ロードマップ
@@ -17,10 +17,10 @@ related_commit: c6e2914
 | 2 JSONLWriter 統合 | 完了 | `c070900` |
 | 3 候補状態の単一正本化 | 完了（軽微な残差あり） | `c070900` |
 | 4 keyDown パイプライン一本化 | 完了（軽微な残差あり） | `c070900` |
-| 5 モード明示化 | **完了** | `7c13b8e`–`c6e2914` |
+| 5 モード明示化 | **完了** | `7c13b8e`–`b422602` |
 | 6 保留 | — | — |
 
-**検証ゲート（2026-07-04）**: `./scripts/test_core_all.sh` 緑。sandbox 3 本・`xcodebuild test` は未再実行（keynaco 未起動 / バイナリ stale）。
+**検証ゲート（2026-07-04）**: `./scripts/test_core_all.sh` 緑。deploy 後 sandbox 3 本（marked text / candidate cleanup / prefix focus）すべて PASS（HEAD `b422602` 一致）。
 
 **Phase 3–4 の残差**（意図的に Phase 5 まで温存）:
 

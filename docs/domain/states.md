@@ -51,17 +51,33 @@ stateDiagram-v2
 
 ## キー処理パイプライン（候補・marked text）
 
+`KeyEventPipeline` が `InputController` / sandbox / benchmark で共通の keyDown 手順を担う。`preSnapshot` で pre 状態を固定してから `handle()` を呼び、確定後に `drainPendingLogs` でセッション・ divergence ログを回収する。
+
 `InputHandler` はキー → `CandidateAction` のみ返す。IMK への marked text 反映と候補ウィンドウ更新は `InputController` に集約する。
 
 ```mermaid
 flowchart LR
-    KD[keyDown] --> H[InputHandler.handle]
+    KD[keyDown] --> PS[KeyEventPipeline.preSnapshot]
+    PS --> H[InputHandler.handle]
     H --> CA[CandidateAction]
     CA --> ACA[applyCandidateAction]
     ACA --> MT[syncMarkedText]
     ACA --> CW[CandidateWindow]
     MT --> IMK[IMK client]
+    ACA --> DL[KeyEventPipeline.drainPendingLogs]
 ```
+
+## キー分岐モード（`KeyDispatchMode`）
+
+`KeyDispatch.route` が使う操作モードの簡略版。上記「状態一覧」の粗いグルーピングに対応するが、候補サジェスト中（`.passive`）と候補選択中（`.explicit`）はどちらも `.candidatePanel`。明示選択の有無は `CandidateContext` 側で扱う。
+
+| `KeyDispatchMode` | 導出条件（`KeyDispatchInput.make`） |
+|-------------------|-----------------------------------|
+| `.bracket` | `CandidateSession.bracketCandidates != nil` |
+| `.ascii` | `isAsciiMode` |
+| `.candidatePanel` | 候補窓表示中（`candidateVisible`） |
+| `.composing` | 組成中（読み or pending ローマ字が非空）かつ上記以外 |
+| `.idle` | 待機 |
 
 ## 主要な語彙と対応するコード概念
 
@@ -74,7 +90,8 @@ flowchart LR
 | 確定経路 | `CommitTrigger` | 確定の起因（`.enter`・`.rightArrow`・`.modeSwitch`・`.deactivate`）。`commitComposition` の呼び出し側が明示する |
 | 候補フェーズ | `CandidatePanelInteraction` | `isVisible × isExplicitlySelected` から導出される3状態（`.hidden` / `.passive` / `.explicit`）。パネルの表示有無と操作種別を一元化する |
 | 行セクション | `CandidateRowSection` | 候補行の UI 区分（`.fixed` / `.history` / `.dictionary`）。`ScoredCandidate.Source`（`candidateSources`）から導出。Shift+Delete 可否と区切り線描画の基準 |
-| 構築トリガー | `CandidateListTrigger` | `buildCandidateList` の呼び出し起因（`.whileTyping` / `.explicit`）。候補フェーズとは別概念 |
+| 構築トリガー | `CandidateListTrigger` | `buildCandidateList(for:azooKey:)` の呼び出し起因（`.whileTyping` / `.explicit`）。候補フェーズとは別概念 |
+| キー分岐モード | `KeyDispatchMode` | `KeyDispatch.route` の分岐用。`.passive` / `.explicit` はどちらも `.candidatePanel` |
 | 候補先行表示 | `AzooKeyCachePeek` | AzooKey の非同期変換結果が届く前に、直前のキャッシュ（完全一致 or 短い読みの prefix）を暫定候補として即時表示する仕組み。完全一致ヒット時は非同期リクエストを省略する |
 | 候補ランキング | `azooKeyApiOrder` | Zenzai（zenz-v3）が推論した候補の並び順。AzooKey が候補テキストを生成し、Zenzai がその順位を決める。keynaco 側では `CandidateScoreBuilder` が AzooKey rank スコアと exact 履歴の Zenzai tie-break に使う |
 
@@ -116,5 +133,5 @@ flowchart LR
 
 ## 注意点
 
-- **`isAsciiMode` は static**: アプリ切替後もモードを維持。テストの `setUp` でリセット必須
+- **`isAsciiMode` はインスタンス**: `InputHandler` ごとに保持。アプリ切替後も同一 `handler` インスタンスならモードを維持
 - **キー動作詳細**: 各状態の細かいキー動作（Backspace の挙動・候補選択中の `.` `,` での組成追加など）は `InputHandler+*.swift` および対応テストを参照。ここに書くと drift する
