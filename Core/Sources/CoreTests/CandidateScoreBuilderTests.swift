@@ -138,6 +138,41 @@ final class CandidateScoreBuilderTests: XCTestCase {
     /// upsert の dedup は「高スコア優先 → 同点なら sourceSortKey 小（= exact 側）」で解決する。
     /// production の `collectLocalCandidateSources` は exact 優先で抜くため `.both` は稀だが、
     /// builder 単体としての契約は維持する。
+    func testDigitReadingElevatesNumberAboveAzooKeyRank0() {
+        let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "7がつ",
+            hiraganaBonus: nil,
+            historyEntries: [],
+            userDictExact: [], userDictPrefix: [],
+            azooKeyCandidates: ["7ガツ", "7月"],
+            azooKeyApiOrder: ["7ガツ", "7月"],
+            numberCandidates: ["7月"],
+            dateTimeCandidates: [],
+            trigger: .whileTyping
+        ))
+        XCTAssertEqual(scored.first?.text, "7月")
+        XCTAssertGreaterThan(
+            scored.first?.score ?? 0,
+            CandidateScoreBuilder.azooKeyScore(rank: 0)
+        )
+    }
+
+    func testNanatsuReadingElevatesDateTimeAboveAzooKeyRank0() {
+        let dates = InputHandler.generateDateTimeCandidates(for: "なながつ")
+        let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(
+            reading: "なながつ",
+            hiraganaBonus: nil,
+            historyEntries: [],
+            userDictExact: [], userDictPrefix: [],
+            azooKeyCandidates: ["7ガツ", "7月"],
+            azooKeyApiOrder: ["7ガツ", "7月"],
+            numberCandidates: [],
+            dateTimeCandidates: dates,
+            trigger: .whileTyping
+        ))
+        XCTAssertEqual(scored.first?.text, dates.last)
+    }
+
     func testHistoryEntryWithBothScoresPrefersExactOnTie() {
         let entry = HistoryEntry(output: "漢字", score: .both(exact: 50, prefix: 50))
         let scored = CandidateScoreBuilder.build(CandidateScoreBuilder.BuildInput(

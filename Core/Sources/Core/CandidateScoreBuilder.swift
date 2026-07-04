@@ -15,6 +15,8 @@ enum CandidateScoreBuilder {
     static let hiraganaBuiltinBonus = 80.0
     /// 数値・日時特殊変換（POC 値。PLAN260624）。
     static let specialCandidateScore = 5.0
+    /// ASCII 数字を含む読みの数値・日時候補（Zenzai カタカナ rank 0=10.0 より上。PLAN260704b B1）。
+    static let digitReadingSpecialScore = 12.0
 
     enum HiraganaBonusKind: Sendable, Equatable {
         case userSetting
@@ -42,6 +44,19 @@ enum CandidateScoreBuilder {
 
     static func azooKeyScore(rank: Int) -> Double {
         10.0 / (1.0 + Double(rank))
+    }
+
+    private static func specialCandidateScore(for reading: String) -> Double {
+        if reading.contains(where: { $0.isASCII && $0.isNumber }) {
+            return digitReadingSpecialScore
+        }
+        if InputHandler.isNumericStyleDateTimeReading(reading) {
+            return digitReadingSpecialScore
+        }
+        if !InputHandler.generateNumberCandidates(for: reading).isEmpty {
+            return digitReadingSpecialScore
+        }
+        return specialCandidateScore
     }
 
     /// 載せた履歴は AzooKey rank 0 より前に並べる（flatten 後も辞書より優先）。
@@ -128,10 +143,18 @@ enum CandidateScoreBuilder {
         }
 
         for text in input.numberCandidates {
-            upsert(ScoredCandidate(text: text, score: specialCandidateScore, source: .number))
+            upsert(ScoredCandidate(
+                text: text,
+                score: specialCandidateScore(for: input.reading),
+                source: .number
+            ))
         }
         for text in input.dateTimeCandidates {
-            upsert(ScoredCandidate(text: text, score: specialCandidateScore, source: .dateTime))
+            upsert(ScoredCandidate(
+                text: text,
+                score: specialCandidateScore(for: input.reading),
+                source: .dateTime
+            ))
         }
 
         let azooKeyRankByText: [String: Int]? = input.azooKeyApiOrder.isEmpty

@@ -62,4 +62,17 @@ final class InputHandlerDateTimeTests: XCTestCase {
     func testUnknownReadingReturnsEmpty() {
         XCTAssertTrue(InputHandler.generateDateTimeCandidates(for: "あいう").isEmpty)
     }
+
+    func testNanatsuReturnsMonthCandidates() {
+        let result = InputHandler.generateDateTimeCandidates(for: "なながつ")
+        XCTAssertEqual(result.count, 2)
+        XCTAssertTrue(result[1].hasSuffix("月"), "7月形式: \(result[1])")
+        XCTAssertTrue(result[1].hasPrefix("7"), "月番号: \(result[1])")
+    }
+
+    func testTsuitachiReturnsDayCandidates() {
+        let result = InputHandler.generateDateTimeCandidates(for: "ついたち")
+        XCTAssertEqual(result.count, 4)
+        XCTAssertTrue(result[1].hasSuffix("日"), "1日形式: \(result[1])")
+    }
 }

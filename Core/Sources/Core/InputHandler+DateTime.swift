@@ -1,6 +1,11 @@
 import Foundation
 
 public extension InputHandler {
+    /// 和語の月日読み（`なながつ`・`ついたち` 等）。相対日付（`きょう`）は含まない。
+    static func isNumericStyleDateTimeReading(_ reading: String) -> Bool {
+        monthReadingTable[reading] != nil || dayReadingTable[reading] != nil
+    }
+
     static func generateDateTimeCandidates(for reading: String) -> [String] {
         let cal = Calendar.current
         let now = Date()
@@ -16,9 +21,62 @@ public extension InputHandler {
         case "こんげつ": return formatMonth(now, cal: cal)
         case "せんげつ": return formatMonth(cal.date(byAdding: .month, value: -1, to: now)!, cal: cal)
         case "らいげつ": return formatMonth(cal.date(byAdding: .month, value:  1, to: now)!, cal: cal)
-        default: return []
+        default:
+            if let month = monthNumber(forHiraganaReading: reading) {
+                var comps = cal.dateComponents([.year], from: now)
+                comps.month = month
+                comps.day = 1
+                guard let date = cal.date(from: comps) else { return [] }
+                return formatMonth(date, cal: cal)
+            }
+            if let day = dayNumber(forHiraganaReading: reading) {
+                var comps = cal.dateComponents([.year, .month], from: now)
+                comps.day = day
+                guard let date = cal.date(from: comps) else { return [] }
+                return formatDate(date, cal: cal)
+            }
+            return []
         }
     }
+
+    private static func monthNumber(forHiraganaReading reading: String) -> Int? {
+        monthReadingTable[reading]
+    }
+
+    private static func dayNumber(forHiraganaReading reading: String) -> Int? {
+        dayReadingTable[reading]
+    }
+
+    private static let monthReadingTable: [String: Int] = [
+        "いちがつ": 1, "ひとつき": 1,
+        "にがつ": 2, "ふたつき": 2,
+        "さんがつ": 3, "みつき": 3,
+        "しがつ": 4, "よつき": 4, "よんがつ": 4,
+        "ごがつ": 5, "いつつき": 5,
+        "ろくがつ": 6, "むつき": 6,
+        "しちがつ": 7, "なながつ": 7, "ななつき": 7,
+        "はちがつ": 8, "やつき": 8,
+        "くがつ": 9, "ここのつき": 9,
+        "じゅうがつ": 10,
+        "じゅういちがつ": 11,
+        "じゅうにがつ": 12,
+    ]
+
+    private static let dayReadingTable: [String: Int] = [
+        "ついたち": 1,
+        "ふつか": 2,
+        "みっか": 3,
+        "よっか": 4,
+        "いつか": 5,
+        "むいか": 6,
+        "なのか": 7,
+        "ようか": 8,
+        "ここのか": 9,
+        "とおか": 10,
+        "じゅうよっか": 14,
+        "はつか": 20,
+        "にじゅうよっか": 24,
+    ]
 
     private static func formatDate(_ date: Date, cal: Calendar) -> [String] {
         let y = cal.component(.year, from: date)
