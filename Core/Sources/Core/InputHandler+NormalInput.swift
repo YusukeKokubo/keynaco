@@ -131,24 +131,14 @@ public extension InputHandler {
         }
     }
 
-    private static let vowelKeys: Set<Character> = ["a", "i", "u", "e", "o", "n"]
-
     private mutating func handleRomaji(
         base: String, wasExplicitlySelected: Bool, candidate: CandidateContext, client: TextInputClient
     ) -> (consumed: Bool, candidateAction: CandidateAction) {
         if wasExplicitlySelected { _ = doConfirmSelection(candidate: candidate, client: client) }
         let needsRefresh = state.addRomaji(base)
-        let isVowelKey = base.count == 1 && Self.vowelKeys.contains(base.lowercased().first!)
-        let candidateAction: CandidateAction
-        if needsRefresh {
-            // 母音/`n` だけ whileTyping 再構築。子音は候補を閉じて marked に pending を出す
-            // （visible のまま `.none` だと MarkedTextSync がローマ字尾を隠し Enter で pending が消える）。
-            candidateAction = isVowelKey
-                ? buildCandidateListForTrigger(.whileTyping)
-                : .dismiss
-        } else {
-            candidateAction = .dismiss
-        }
+        let candidateAction: CandidateAction = needsRefresh
+            ? buildCandidateListForTrigger(.whileTyping)
+            : .dismiss
         return (true, candidateAction)
     }
 }

@@ -69,7 +69,10 @@ final class MarkedTextSyncTests: XCTestCase {
         ), "かんじ")
     }
 
-    func testPassiveCompose_hidesTrailingRomajiTail() {
+    /// passive 候補表示中も pending ローマ字尾を marked に出す。
+    /// commit（Enter）と marked を一致させる（`.hidden` フォールバックで finalizedText 確定される）。
+    /// 修正前は `かんj` の `j` を隠して `かん` を marked にしとったが、ri- + n 型の食い違い（marked "りー" / commit "りーん"）を招くため撤去。
+    func testPassiveCompose_showsTrailingRomajiTail() {
         XCTAssertEqual(MarkedTextSync.resolve(
             isBracketMode: false,
             candidateVisible: true,
@@ -78,7 +81,7 @@ final class MarkedTextSyncTests: XCTestCase {
             pendingRomaji: "j",
             composingText: "かんj",
             selectedCandidate: "漢字"
-        ), "かん")
+        ), "かんj")
     }
 
     func testHiddenCandidate_showsTrailingRomajiTail() {

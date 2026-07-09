@@ -303,6 +303,34 @@ Phase 3 後の残ギャップ:
 - `n` を母音キー扱いするルールは [PLAN260428](PLAN260428-successor-pending-romaji.md) 由来。本件とは独立だが説明コストは残る
 - Electron の Enter 経路は sandbox では再現しない（[PLAN260605](PLAN260605-workarounds-audit.md) C-1）。実機確認は別途
 
+## 追記: 母音限定 → 全キー rebuild への revert（2026-07-09）
+
+母音限定 whileTyping の副作用対策として上で入れた 3 点セット（子音 `.dismiss` / MarkedTextSync `composedHiragana` 分岐 / `.hidden` フォールバック）は、`ri-` + `n` + Enter の実運用ログで新たな WYSIWYG 崩れを生んだ:
+
+| 状態 | 修正前 |
+|------|-------|
+| marked | `りー` |
+| row 0 | `リーナー`（historyPrefix） |
+| Enter で commit | `りーん` |
+
+`n` は `vowelKeys` に含まれるため `handleRomaji` が `.whileTyping` rebuild → candidate visible 維持 → `MarkedTextSync` case 3 が `n` を隠す → Enter が `finalizedText`（`りー` + `ん`）を commit、の連鎖。marked も row 0 も commit と食い違う 3 重不整合。
+
+### 判断: 3 段 dance をやめて素直な IME 挙動に統一
+
+| 変更 | 理由 |
+|------|------|
+| `InputHandler+NormalInput.swift`: `vowelKeys` / `isVowelKey` 削除、`needsRefresh ? .whileTyping : .dismiss` に統一 | 子音でも rebuild する。composedHiragana が変わらない子音の rebuild はキャッシュヒットするだけで実害は無し |
+| `MarkedTextSync.swift`: case 3（passive + candidateVisible + ASCII pending で `composedHiragana` を返す分岐）削除 | pending 尾を隠す必然性が消えた。marked = composingText で marked と commit（`finalizedText`）が n → ん だけずれる標準 IME 挙動に |
+
+### 検証
+
+- `./scripts/test_core.sh` 540/540 pass。旧挙動を固めた 3 テストを新挙動に書き換え:
+  - `VowelKeyRegressionTests` → `WhileTypingPendingRomajiTests`（子音でも候補維持、`ri-` + `n` + Enter で `りーん`）
+  - `testConsonantAfterWhileTypingDismissesCandidatesAndShowsPending` → `KeepsCandidatesAndShowsPending`
+  - `testEnterAfterConsonantDismissCommitsFullComposition` → `testEnterAfterConsonantCommitsFullComposition`
+  - `MarkedTextSyncTests.testPassiveCompose_hidesTrailingRomajiTail` → `showsTrailingRomajiTail`
+- `kanzi` + `b` + Enter → `かんじb` は引き続き成立（`testEnterWithPassiveCandidateAndPendingCommitsFinalizedText` 継続 pass）
+
 ## Phase 4（別トラック・任意）: AzooKey 上流への貢献
 
 `SetAlgebra.init(arr...)` のホットスポットは AzooKeyKanaKanjiConverter（OSS）内部。Release 計測（Phase 0）でもこれが支配的なら、upstream の該当箇所（`kana2lattice` 系）をプロファイルして PR を出す選択肢がある。keynaco 側の構造改善とは独立に進められるが、効果の不確実性と往復コストを考えると Phase 2 完了後の余力次第。

@@ -34,15 +34,6 @@ public enum MarkedTextSync {
         if candidateVisible, isExplicitlySelected, let selected = selectedCandidate {
             return selected + pendingRomaji
         }
-        // 打鍵サジェスト表示中のみ未変換ローマ字尾を marked に出さない（候補非表示時は composingText を見せる）。
-        if candidateVisible,
-           !isExplicitlySelected,
-           !composedHiragana.isEmpty,
-           !composedHiragana.allSatisfy(\.isASCII),
-           !pendingRomaji.isEmpty,
-           pendingRomaji.allSatisfy(\.isASCII) {
-            return composedHiragana
-        }
         return composingText
     }
 }

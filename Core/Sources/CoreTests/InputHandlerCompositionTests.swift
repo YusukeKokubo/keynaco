@@ -54,10 +54,13 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         XCTAssertTrue(payload.candidates.contains("あい"))
     }
 
-    // MARK: - whileTyping 子音打鍵（母音限定候補の副作用対策）
+    // MARK: - whileTyping 子音打鍵（pending romaji 表示の副作用対策）
 
-    func testConsonantAfterWhileTypingDismissesCandidatesAndShowsPending() {
-        // 履歴があれば defer モードでも候補窓が即時表示される。子音打鍵で dismiss する挙動の検証。
+    /// 子音打鍵中も候補窓は維持し、marked に pending 尾を出す。
+    /// 修正前は子音で dismiss しとったが、母音（特に `n`）との整合が取れず
+    /// marked "りー" / commit "りーん" のような WYSIWYG 崩れを招いたため、
+    /// 「子音でも whileTyping rebuild、marked は composingText」に統一した。
+    func testConsonantAfterWhileTypingKeepsCandidatesAndShowsPending() {
         handler.db.record(input: "あい", output: "愛")
         handler.deferAzooKeyWhileTyping = true
         type(chars: "a", base: "a")
@@ -66,21 +69,17 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
             XCTFail("あい で whileTyping 候補が出るはず: \(showAction)"); return
         }
         XCTAssertTrue(handler.candidateSession.isVisible)
-        let (_, action) = type(chars: "k", base: "k")
-        guard case .dismiss = action else {
-            XCTFail("子音打鍵は .dismiss を返すはず: \(action)"); return
-        }
-        XCTAssertFalse(handler.candidateSession.isVisible)
-        XCTAssertEqual(client.markedText, "あいk")
+        _ = type(chars: "k", base: "k")
+        XCTAssertTrue(handler.candidateSession.isVisible, "子音でも候補窓は維持される")
+        XCTAssertEqual(client.markedText, "あいk", "pending 尾も marked に出る")
     }
 
-    func testEnterAfterConsonantDismissCommitsFullComposition() {
+    func testEnterAfterConsonantCommitsFullComposition() {
         handler.db.record(input: "かんじ", output: "漢字")
         handler.deferAzooKeyWhileTyping = true
         typeRomaji("kanzi")
         XCTAssertTrue(handler.candidateSession.isVisible)
         type(chars: "b", base: "b")
-        XCTAssertFalse(handler.candidateSession.isVisible)
         XCTAssertEqual(client.markedText, "かんじb")
         press(keyCode: KeyCode.enter)
         XCTAssertEqual(client.inserted.last, "かんじb")
