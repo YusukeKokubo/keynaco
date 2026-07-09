@@ -10,6 +10,16 @@
 
 ---
 
+## Enter の挙動を状況で分岐しない（WYSIWYG 一択）
+
+Enter は「今 visible な候補行を commit する」に振り切る。pending romaji が残っていても、passive candidate 表示中でも、この原則を曲げる特殊分岐は入れない。marked/candidate/commit の 3 者間の整合を保つ設計変更が必要になったら、**まず Enter を触らずに解ける道**（marked を修正する・candidate 生成条件を見直す・別キーに raw 経路を渡す）を探す。
+
+**なぜ**: 「pending 保護のために candidate を捨てる」「vowel だけ rebuild する」のような特殊分岐は、当初の症状は塞ぐが、隣接ケース（`n` pending + Enter → row 0 と finalizedText の乖離）で新しい WYSIWYG 崩れを生む。3 者の整合が取れんときは Enter の解釈を歪めるのが安く見えるが、実際は特殊 case が積み上がって管理コストが指数関数的に増える。Raw が欲しいユーザーには Escape・F6-F10・→ という**別キーの語彙**が既に用意されとる（[`concept.md`](concept.md) 指針 6）ので、Enter に多義性を持たせる必要はない。
+
+*由来: PLAN260612 で `kanzi + b + Enter → かんじb`（pending 保護）を守るために `doConfirmSelection` の `.hidden` フォールバック・`MarkedTextSync` case 3（pending 隠蔽）・`vowelKeys` 例外（子音時 dismiss）の 3 層を積み上げた。結果、`ri- + n + Enter` で marked "りー" / row 0 "リーナー" / commit "りーん" の 3 重不整合が発生し `penalized` ループを招いた。1 層目（`.hidden` フォールバック）を撤去した瞬間に残り 2 層も用済みになり、「Enter は candidate で確定」の 1 ルールに収束。特殊 case 3 個 → 一般ルール 1 個で、実装・テスト・ユーザー体感すべてがシンプル化した*
+
+---
+
 ## 「動線」を検証する時はユーザーの実操作シーケンスで見る
 
 sandbox で挙動を観察する時、`type_string → Space → state` のような **分析用の操作シーケンス** で見えた状態を「動線」と結論しない。`Space` が分析者の都合で挿入されとっても、実ユーザーが Space を押すとは限らない。

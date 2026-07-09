@@ -73,6 +73,13 @@ keynaco は **「打鍵を最小化するローカル完結 IME」** を目指�
 - 効果が測れなかった LLM 機能は容赦なく削る（LLMPOSClassifier・LLMSegmentConverter・Zenzai の `topic`/`style`/`preference` UI など）
 - 削除判断は [`rejected.md`](rejected.md) に記録、経過観察中は [`observation.md`](observation.md) で追跡
 
+### 6. Enter は必ず選択中の候補で確定する（WYSIWYG）
+
+- 候補窓が表示されとる状態での Enter は、passive でも explicit でも **選択中の行**を commit する
+- pending romaji が残っとっても candidate を捨てて finalizedText を出すような「pending 保護のための特殊分岐」は入れない
+- Raw を欲しい場合の escape hatch は別キーで用意済み: **Escape**（composition 破棄）・**F6-F10**（ひらがな/カタカナ/英字強制確定）・**→**（raw hiragana 確定）
+- 「Enter の意味を状況によって変える」設計は繰り返し出現するが、都度 marked/candidate/commit の 3 者間で不整合を生む（[`retrospectives.md`](retrospectives.md) の「Enter の挙動を状況で分岐しない」参照）
+
 ---
 
 ## このコンセプトに合致しない機能の例
