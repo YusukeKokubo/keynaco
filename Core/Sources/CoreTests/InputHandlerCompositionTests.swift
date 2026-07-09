@@ -85,7 +85,11 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         XCTAssertEqual(client.inserted.last, "かんじb")
     }
 
-    func testEnterWithPassiveCandidateAndPendingCommitsFinalizedText() {
+    /// 候補選択操作なし（矢印/Space 未押下）で Enter を押したときは row 0 を commit する（WYSIWYG）。
+    /// pending 尾はここで捨てられる — 保持したい場合は Escape → 再打鍵で対応する。
+    /// 修正前は `.hidden` フォールバックで `finalizedText` を確定しとった（PLAN260612）が、
+    /// pending が `n` のとき marked "りー" / row 0 "リーナー" / commit "りーん" の 3 重不整合を招いた。
+    func testEnterWithPassiveCandidateAndPendingCommitsRowZero() {
         handler.db.record(input: "あい", output: "愛")
         handler.deferAzooKeyWhileTyping = true
         type(chars: "a", base: "a")
@@ -95,7 +99,7 @@ final class InputHandlerCompositionTests: InputHandlerTestCase {
         XCTAssertTrue(ctx.isVisible)
         XCTAssertFalse(ctx.isExplicitlySelected)
         handleAndApply(keyCode: KeyCode.enter, candidate: ctx)
-        XCTAssertEqual(client.inserted.last, "あいk")
+        XCTAssertEqual(client.inserted.last, "愛", "row 0 の候補を commit（pending k は捨てる）")
     }
 
     func testEnterWithExplicitCandidateAndPendingStillCommitsSelection() {

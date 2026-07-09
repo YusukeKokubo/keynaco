@@ -303,6 +303,29 @@ Phase 3 後の残ギャップ:
 - `n` を母音キー扱いするルールは [PLAN260428](PLAN260428-successor-pending-romaji.md) 由来。本件とは独立だが説明コストは残る
 - Electron の Enter 経路は sandbox では再現しない（[PLAN260605](PLAN260605-workarounds-audit.md) C-1）。実機確認は別途
 
+## 追記: `.hidden` フォールバック撤去（2026-07-09、後段）
+
+上記の「全キー rebuild」修正だけでは足りず、実運用の `ri-` + `n` + Enter が **依然として `りーん` を commit していた**。ユーザーの UX 苦情は「row 0 = リーナー なのに Enter が りーん を返す」であり、marked と commit の整合（前段の修正で片付けたところ）だけでは解決しない。
+
+### 判断: 候補選択操作なしの Enter は row 0 で確定する（WYSIWYG）
+
+`doConfirmSelection` の `hasTrailingRomaji && !isExplicitlySelected → .hidden` フォールバックを撤去。候補が visible な状態での Enter は矢印/Space の選択有無に関わらず現在選択行（passive なら row 0、explicit なら選択行）を commit する。
+
+| 入力 | 修正前 | 修正後 |
+|------|--------|--------|
+| `ri-n` + Enter（passive candidate visible） | `りーん`（finalizedText） | **row 0**（例: `リーナー`） |
+| `kanzi` + `b` + Enter（passive candidate visible） | `かんじb`（finalizedText） | **row 0**（例: `漢字`） |
+| `↓` → Enter（explicit selection） | 選択行 | 選択行（不変） |
+
+**PLAN260612 の `かんじb` 保持は捨てる**。pending 尾を保持したい場合は Escape → 再打鍵で対応する。設計原理: 「Enter は今 visible な候補で確定する」を単一ルールにする。前段修正で marked に pending が見えるようになったので、ユーザーは "Escape すれば消える" ことも認知可能。
+
+### 検証
+
+- `./scripts/test_core.sh` 540/540 pass
+- `testEnterWithPassiveCandidateAndPendingCommitsFinalizedText` → `CommitsRowZero`（assertion "あいk" → "愛"）
+- `WhileTypingPendingRomajiTests.testPendingNEnterCommitsFinalizedReading` → `testPendingNEnterCommitsRow0`（assertion "りーん" → row 0 の "リー"）
+- `testEnterWithExplicitCandidateAndPendingStillCommitsSelection` 継続 pass（explicit selection 経路は不変）
+
 ## 追記: 母音限定 → 全キー rebuild への revert（2026-07-09）
 
 母音限定 whileTyping の副作用対策として上で入れた 3 点セット（子音 `.dismiss` / MarkedTextSync `composedHiragana` 分岐 / `.hidden` フォールバック）は、`ri-` + `n` + Enter の実運用ログで新たな WYSIWYG 崩れを生んだ:

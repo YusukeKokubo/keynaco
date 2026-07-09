@@ -21,23 +21,24 @@ final class WhileTypingPendingRomajiTests: InputHandlerTestCase {
         XCTAssertEqual(client.markedText, "あいs", "pending 尾も marked に出す")
     }
 
-    /// ri- + n: pending "n" 中の Enter は marked "りーn" と commit "りーん" が食い違わない
-    /// （n → ん の forceFinalize は標準 IME 挙動として理解可能）。
-    /// 修正前は passive candidate 表示中に marked が "りー" に潰れ、Enter で "りーん" が commit されて WYSIWYG が破綻しとった。
-    func testPendingNEnterCommitsFinalizedReading() {
-        let stub = SnapStub(["リー"])
-        setUpWithConverter(stub)
-        handler.deferAzooKeyWhileTyping = true
-        handler.db.record(input: "りーなー", output: "リーナー")
-
+    /// ri- + n + Enter: 候補選択操作なしの Enter は row 0 を commit する（WYSIWYG）。
+    /// pending "n" は捨てられる — 保持したい場合は Escape → 再打鍵で対応する。
+    /// 修正前は `.hidden` フォールバックで finalizedText="りーん" が commit され、
+    /// row 0 に見えていた候補（例: リーナー）と食い違って penalized ループが発生していた。
+    func testPendingNEnterCommitsRow0() {
+        setUpWithConverter(SnapStub(["リー"]))
         typeRomaji("ri-")
-        _ = type(chars: "n", base: "n")
+        XCTAssertTrue(handler.candidateSession.isVisible, "りー で whileTyping 候補が visible")
+        XCTAssertEqual(handler.candidateSession.selectedText, "リー", "row 0 は stub の 'リー'")
 
+        _ = type(chars: "n", base: "n")
         XCTAssertEqual(handler.state.composedHiragana, "りー")
         XCTAssertEqual(handler.state.pendingRomaji, "n")
         XCTAssertEqual(client.markedText, "りーn", "pending n は marked に見える")
+        XCTAssertTrue(handler.candidateSession.isVisible, "n 打鍵後も candidate visible 維持")
+        XCTAssertFalse(handler.candidateSession.isExplicitlySelected, "候補選択操作なし")
 
         _ = handler.doConfirmSelection(candidate: handler.candidateSession.makeContext(), client: client)
-        XCTAssertEqual(client.inserted.last, "りーん", "Enter は finalizedText を確定する（n → ん）")
+        XCTAssertEqual(client.inserted.last, "リー", "row 0 の候補を commit（pending n は捨てる）")
     }
 }

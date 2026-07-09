@@ -6,15 +6,13 @@ extension InputHandler {
 
     /// 候補ウィンドウ表示中の Enter 経路。確定本体は `commitComposition` に委ね、
     /// 候補状態マシンへ `.dismiss` を返す薄いラッパー。
-    /// 末尾に未吸収ローマ字が残っていて explicit 選択でないとき（whileTyping 候補で Enter を押した場合）は、
-    /// 視覚的選択を捨てて入力読みそのものを確定する。
+    /// 候補が visible な状態で Enter を押したときは、候補選択操作（矢印/Space）の有無に
+    /// 関わらず row 0（またはユーザーが選んだ行）を commit する（WYSIWYG）。
+    /// pending romaji はここでは捨てられる — 保持したい場合は Escape → 再打鍵で対応する。
     @discardableResult
     mutating func doConfirmSelection(candidate: CandidateContext, client: TextInputClient) -> CandidateAction {
         guard state.isComposing else { return .none }
-        let hasTrailingRomaji = !state.pendingRomaji.isEmpty
-        let effectiveCandidate: CandidateContext =
-            (!candidate.isExplicitlySelected && hasTrailingRomaji) ? .hidden : candidate
-        commitComposition(client: client, candidate: effectiveCandidate, trigger: .enter)
+        commitComposition(client: client, candidate: candidate, trigger: .enter)
         return .dismiss
     }
 
