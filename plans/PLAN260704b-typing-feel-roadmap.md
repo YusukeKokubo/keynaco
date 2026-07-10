@@ -7,6 +7,8 @@ created: 2026-07-04
 
 実測ログ（latency 229 セッション・input 1308 確定・divergence 149 件）とパイプライン実装調査を突き合わせて出した、打鍵体感改善の施策候補一覧。**このファイルはロードマップ（親 plan）**。各施策に着手するときは `/keynaco-perf-cycle` で `objective_axis` を 1 つに絞った個別 plan（`PLAN2607xx-<slug>.md`）を切り、このファイルの進捗表を更新する。
 
+第 2 弾（2026-07-10 再計測に基づく履歴学習系の施策）: [PLAN260710-typing-feel-learning-gaps.md](PLAN260710-typing-feel-learning-gaps.md)
+
 ## 実装状況
 
 | 施策 | 優先 | 状態 | 個別 plan |
