@@ -96,12 +96,12 @@ pain 率は下がった一方、fetch 系のテールはやや悪化しとる。
 - 帰結として **trim が走るのは azooKey 候補確定のみ**。素の reading 確定・F6–F10（`InputHandler.swift:408`）・history / userDict ソース確定は flag 無し → trim=false 固定。真の助詞ケースでも完成形行が育ち始める＝実質 D2 案 1（二重記録）の部分先行（行数増の観察は D2 の POC 観点へ）
 - 文字列版 `trimTrailingParticle` は **廃止**（fallback にも使わない）
 
-- [ ] **POC ゲート**: 実辞書で `特に` / `主に` / `一緒に` / `今は` / `東京まで` の `candidate.data` セグメント構成を確認する slow テスト。「特に」が `特+に`（末尾 joshi）の多セグメントで返るなら lcid 判定でも誤トリムが再発するため、判定条件を再設計してから先へ進む
+- [x] **POC ゲート**: 実辞書で `特に` / `主に` / `一緒に` / `今は` / `東京まで` のセグメント構成を確認（`ParticleTrimSegmentPOCTests`、2026-07-10 通過）。特に型は単一セグメント、東京までは多セグメント末尾 joshi。「今は」も単一見出しのため trim せず完成形が育つ
 - [ ] `AzooKeyCandidate` に末尾セグメント joshi flag を追加し、`displayCandidates` で設定、CandidateContext 経由で `commitComposition` まで運ぶ
 - [ ] `recordPrefixes` を「trim してよいか」を呼び出し側から受け取る形にし、`data.count >= 2` かつ末尾 joshi のときだけトリム。flag 無しはトリムしない
 - [ ] `trimTrailingParticle` の文字列サフィックス判定を廃止
-- [ ] 回帰テスト: 「特に」「主に」「さらに」等の副詞（`さらに` は現行だと raw 確定でも `さら→さら` の壊れ行が生える例）・「東京まで」「今は」等の真の助詞ケースを両方固定
-- [ ] テストの置き場を決める: lcid 判定は実辞書が要るため、slow テストに置くか、fast テストはスタブ（`AzooKeyConverting`）に joshi flag を足して供給するか
+- [ ] 回帰テスト: 「特に」「主に」「さらに」等の副詞・「東京まで」等の真の助詞ケースを両方固定
+- [ ] テストの置き場: slow=POC 固定、fast=スタブに joshi flag を足して供給
 
 **期待効果**: 「とくに」型（副詞末尾がたまたま助詞文字）の pain が確定 2〜3 回後に row 0 直行へ変わる。`とく→特` は `LIKE 'とくに%'` にヒットせんので、完成形行が生えれば cleanup なしでも exact 到達は可能。
 **検証指標**: 対象 reading の pain 件数・scroll_count、履歴 DB の完成形行の成長。objective_axis: UX-pain。

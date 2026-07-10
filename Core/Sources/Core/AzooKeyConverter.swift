@@ -384,6 +384,34 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
     }
 
+    /// キャッシュ上の候補の `data` セグメント構成（PLAN260710a POC ゲート用）。
+    /// `requestCandidates` 済みでキャッシュに残っていることが前提。ミスなら nil。
+    public func segmentSnapshots(for reading: String, text: String) -> [AzooKeySegmentSnapshot]? {
+        locked.withLock { _ in
+            for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
+                if let candidate = candidates.first(where: { $0.text == text }) {
+                    return candidate.data.map { element in
+                        AzooKeySegmentSnapshot(
+                            word: element.word,
+                            ruby: element.ruby,
+                            lcid: element.lcid,
+                            rcid: element.rcid,
+                            isJoshiLcid: CIDData.isJoshi(cid: element.lcid),
+                            isJoshiRcid: CIDData.isJoshi(cid: element.rcid)
+                        )
+                    }
+                }
+            }
+            return nil
+        }
+    }
+
+    /// PLAN260710a の trim 条件: セグメント 2 以上かつ末尾 lcid が joshi。
+    public static func shouldTrimTrailingJoshi(segments: [AzooKeySegmentSnapshot]) -> Bool {
+        guard segments.count >= 2, let last = segments.last else { return false }
+        return last.isJoshiLcid
+    }
+
     /// `cacheKey` の先頭セグメント（`|` より前）を読みとして取り出す。
     private static func cacheSegment(fromCacheKey key: String) -> String {
         guard let idx = key.firstIndex(of: "|") else { return key }

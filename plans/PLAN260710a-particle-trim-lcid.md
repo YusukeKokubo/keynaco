@@ -57,23 +57,35 @@ related_plan: PLAN260710-typing-feel-learning-gaps.md
 
 ## 5. 実装方針
 
-### 5.0 POC ゲート（実装前必須）
+### 5.0 POC ゲート（実装前必須） — **通過（2026-07-10）**
 
-実辞書 slow テストで次の語の `candidate.data` セグメント構成を確認する:
+実辞書 slow テスト `ParticleTrimSegmentPOCTests` の結果:
 
-`特に` / `主に` / `一緒に` / `今は` / `東京まで`
+| reading | text | segments | wouldTrim (count≥2 ∧ last joshi) |
+|---------|------|----------|----------------------------------|
+| とくに | 特に | 1: 特に lcid=1281 | false |
+| おもに | 主に | 1: 主に lcid=1287（rcid のみ joshi） | false |
+| いっしょに | 一緒に | 1: 一緒に lcid=1288 | false |
+| いまは | 今は | 1: 今は lcid=1314（rcid のみ joshi） | false |
+| とうきょうまで | 東京まで | 2: 東京 + まで(joshi) | true |
 
-- 「特に」が **単一セグメント**（または末尾非 joshi）→ 本線どおり進む
-- 「特に」が **`特`+`に`（末尾 joshi）の多セグメント** → lcid 判定でも誤トリム再発。判定条件を再設計してから本体へ（例: 内容語+助詞でも reading 全体が辞書見出しなら trim しない、等）
+結論: **本線の判定条件で進んでよい。** 「特に」型は単一セグメントなので誤トリムしない。真の多セグメント助詞（東京まで）だけ trim する。「今は」も辞書 1 見出しのため trim せず、azooKey 確定では完成形が育つ（D2 部分先行が POC でも裏付け）。
+
+注意: `rcid` が joshi でも `lcid` が非 joshi・単一セグメントの語がある（主に・今は）。**判定は lcid + count≥2 に固定**（rcid 単体では副詞を壊す）。
+
+- [x] POC ゲート: セグメント構成確認（上記）
+- [ ] `AzooKeyCandidate` に末尾セグメント joshi flag を追加し、`displayCandidates` で設定、CandidateContext 経由で `commitComposition` まで運ぶ
+- [ ] `recordPrefixes` を「trim してよいか」を呼び出し側から受け取る形にし、flag 無しはトリムしない
+- [ ] `trimTrailingParticle` の文字列サフィックス自動判定を廃止
+- [ ] 回帰テスト（fast: stub flag / slow: POC 固定）
 
 ### 5.1 本体
 
-1. `displayCandidates` で `candidate.data` から `endsWithJoshiSegment`（仮名）を計算: `data.count >= 2 && CIDData.isJoshi(cid: data.last!.lcid)`
-2. `AzooKeyCandidate` にその Bool を載せる
-3. `ScoredCandidate` / 候補構築経路 / `CandidateSession` / `CandidateContext` で選択行の flag を確定まで運ぶ（**追加の LockedConverter ロックなし**）
-4. `recordPrefixes(reading:output:trimTrailingParticle:)` のように呼び出し側から trim 可否を受け取る。`true` のときだけ末尾助詞文字列を trim（現行の particle 文字列リストで reading/output を削る）。`false`/省略は trim しない
-5. 文字列版の自動判定 `trimTrailingParticle(_:)` は廃止。`trailingParticles` リストは「trim 実行時の削る文字列」用に残すか、joshi 表層から導出するかに整理
-6. 回帰: fast は stub flag で「特には trim しない / 東京がは trim する」。slow は POC ゲートのセグメント固定
+1. `displayCandidates` で `data.count >= 2 && CIDData.isJoshi(cid: data.last!.lcid)` を `AzooKeyCandidate` に載せる（`shouldTrimTrailingJoshi` と同条件）
+2. `ScoredCandidate` / `CandidateSession` / `CandidateContext` で選択行の flag を確定まで運ぶ（追加ロックなし）
+3. `recordPrefixes(reading:output:trimTrailingParticle:)` — `true` のときだけ末尾助詞文字列を trim。省略/`false` は trim しない
+4. 文字列版の自動判定 `trimTrailingParticle(_:)` は廃止。`trailingParticles` は trim 実行時の削り文字列用に残す
+5. 回帰: fast は stub flag、slow は POC 固定（既存 `ParticleTrimSegmentPOCTests`）
 
 ## 6. 検証ゲート
 
