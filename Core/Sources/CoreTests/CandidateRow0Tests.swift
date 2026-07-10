@@ -21,7 +21,7 @@ final class CandidateRow0Tests: XCTestCase {
             historyEntries: entries,
             userDictExact: userExact,
             userDictPrefix: [],
-            azooKeyCandidates: azooKey,
+            azooKeyCandidates: azooKey.map { AzooKeyCandidate.text($0) },
             azooKeyApiOrder: [],
             numberCandidates: [],
             dateTimeCandidates: [],

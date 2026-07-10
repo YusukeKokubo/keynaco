@@ -33,6 +33,8 @@ public struct CandidateSession: Sendable, Equatable {
     public var isExplicitlySelected = false
     public var fixedEnd = 0
     public var candidateSources: [ScoredCandidate.Source] = []
+    /// PLAN260710a: 行ごとの助詞トリム可否。`candidates` と同長。
+    public var candidateTrimFlags: [Bool] = []
     /// AzooKey API が返した順序（LCID ソート前）。Zenzai 有効 + 左文脈ありの `.show` でのみ非空。
     /// 候補ウィンドウで「Zenzai のソート順位」を小さく表示するための情報。
     public var azooKeyApiOrder: [String] = []
@@ -60,6 +62,7 @@ public struct CandidateSession: Sendable, Equatable {
             selectedText: selectedText,
             isExplicitlySelected: isExplicitlySelected,
             candidateSources: candidateSources,
+            candidateTrimFlags: candidateTrimFlags,
             panelInteraction: panelInteraction
         )
     }
@@ -92,6 +95,7 @@ public struct CandidateSession: Sendable, Equatable {
         isExplicitlySelected = false
         fixedEnd = 0
         candidateSources = []
+        candidateTrimFlags = []
         azooKeyApiOrder = []
         bracketCandidates = nil
         enforceInvariants()
@@ -113,6 +117,7 @@ public struct CandidateSession: Sendable, Equatable {
         guard candidates.indices.contains(row) else { return }
         candidates.remove(at: row)
         if candidateSources.indices.contains(row) { candidateSources.remove(at: row) }
+        if candidateTrimFlags.indices.contains(row) { candidateTrimFlags.remove(at: row) }
         if candidates.isEmpty {
             reset()
         } else {
@@ -126,12 +131,13 @@ public struct CandidateSession: Sendable, Equatable {
         switch action {
         case .none:
             break
-        case .show(let cands, let fe, let apiOrder, let initialExplicit, let rowSources):
+        case .show(let cands, let fe, let apiOrder, let initialExplicit, let rowSources, let trimFlags):
             candidates = cands
             isVisible = !cands.isEmpty
             selectedRow = 0
             fixedEnd = fe
             candidateSources = rowSources
+            candidateTrimFlags = trimFlags
             azooKeyApiOrder = apiOrder
             isExplicitlySelected = initialExplicit && isVisible
         case .dismiss:

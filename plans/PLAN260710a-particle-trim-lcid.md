@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in-progress
 created: 2026-07-10
 objective_axis: UX-pain
 baseline_at: 2026-07-10T20:14:30+0900
@@ -74,18 +74,18 @@ related_plan: PLAN260710-typing-feel-learning-gaps.md
 注意: `rcid` が joshi でも `lcid` が非 joshi・単一セグメントの語がある（主に・今は）。**判定は lcid + count≥2 に固定**（rcid 単体では副詞を壊す）。
 
 - [x] POC ゲート: セグメント構成確認（上記）
-- [ ] `AzooKeyCandidate` に末尾セグメント joshi flag を追加し、`displayCandidates` で設定、CandidateContext 経由で `commitComposition` まで運ぶ
-- [ ] `recordPrefixes` を「trim してよいか」を呼び出し側から受け取る形にし、flag 無しはトリムしない
-- [ ] `trimTrailingParticle` の文字列サフィックス自動判定を廃止
-- [ ] 回帰テスト（fast: stub flag / slow: POC 固定）
+- [x] `AzooKeyCandidate` に末尾セグメント joshi flag を追加し、`displayCandidates` で設定、CandidateContext 経由で `commitComposition` まで運ぶ
+- [x] `recordPrefixes` を「trim してよいか」を呼び出し側から受け取る形にし、flag 無しはトリムしない
+- [x] `trimTrailingParticle` の文字列サフィックス自動判定を廃止（実行用は `applyTrailingParticleTrim`）
+- [x] 回帰テスト（fast: stub flag / slow: POC 固定）
 
-### 5.1 本体
+### 5.1 本体 — **実装済み（検証 window 待ち）**
 
-1. `displayCandidates` で `data.count >= 2 && CIDData.isJoshi(cid: data.last!.lcid)` を `AzooKeyCandidate` に載せる（`shouldTrimTrailingJoshi` と同条件）
-2. `ScoredCandidate` / `CandidateSession` / `CandidateContext` で選択行の flag を確定まで運ぶ（追加ロックなし）
-3. `recordPrefixes(reading:output:trimTrailingParticle:)` — `true` のときだけ末尾助詞文字列を trim。省略/`false` は trim しない
-4. 文字列版の自動判定 `trimTrailingParticle(_:)` は廃止。`trailingParticles` は trim 実行時の削り文字列用に残す
-5. 回帰: fast は stub flag、slow は POC 固定（既存 `ParticleTrimSegmentPOCTests`）
+実装の要点:
+1. `displayCandidates` で `shouldTrimTrailingJoshi(segments:)` を `AzooKeyCandidate` に載せる
+2. `ScoredCandidate` → `CandidateScoredLayout.trimFlags` → `CandidateAction.show` → `CandidateSession` → `CandidateContext.selectedShouldTrimTrailingJoshi`
+3. `recordPrefixes(reading:output:trimTrailingParticle:)` — 既定 false。true のときだけ `applyTrailingParticleTrim`
+4. 候補なし確定・F6–F10 は trim=false のまま
 
 ## 6. 検証ゲート
 

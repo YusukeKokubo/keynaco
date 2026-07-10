@@ -3,9 +3,14 @@ import Foundation
 
 /// 候補リストスナップショット・inject 等価性テスト用 AzooKey スタブ。
 final class SnapStub: BaseAzooKeyStub, @unchecked Sendable {
-    let lines: [String]
+    let candidates: [AzooKeyCandidate]
     init(_ lines: [String], zenzai: Bool = false) {
-        self.lines = lines
+        self.candidates = lines.map { AzooKeyCandidate.text($0) }
+        super.init()
+        isZenzaiEnabled = zenzai
+    }
+    init(candidates: [AzooKeyCandidate], zenzai: Bool = false) {
+        self.candidates = candidates
         super.init()
         isZenzaiEnabled = zenzai
     }
@@ -15,6 +20,6 @@ final class SnapStub: BaseAzooKeyStub, @unchecked Sendable {
         richCandidates: Bool,
         options: AzooKeyFetchOptions
     ) -> [AzooKeyCandidate] {
-        lines.map { AzooKeyCandidate.text($0) }
+        candidates
     }
 }

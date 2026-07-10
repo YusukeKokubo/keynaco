@@ -34,8 +34,8 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
     // MARK: - 格助詞トリム記録
 
     func testTrailingParticleTrimmedOnRecord() {
-        // 格助詞「が」は trim される。reading も対応部分を除去
-        handler.db.recordPrefixes(reading: "とうきょうが", output: "東京が")
+        // 格助詞「が」は trim される。reading も対応部分を除去（呼び出し側が trim=true）
+        handler.db.recordPrefixes(reading: "とうきょうが", output: "東京が", trimTrailingParticle: true)
         let exact = handler.db.exactOutputs(reading: "とうきょう")
         XCTAssertTrue(exact.contains("東京"), "「とうきょう」→「東京」で記録されるはず")
         let withGa = handler.db.exactOutputs(reading: "とうきょうが")
@@ -51,18 +51,53 @@ final class InputHandlerHistoryTests: InputHandlerTestCase {
     }
 
     func testTrimTrailingParticleHelper() {
-        XCTAssertEqual(DatabaseManager.trimTrailingParticle("東京が"), "東京")
-        XCTAssertEqual(DatabaseManager.trimTrailingParticle("何時に"), "何時")
-        XCTAssertEqual(DatabaseManager.trimTrailingParticle("東京より"), "東京")
-        XCTAssertNil(DatabaseManager.trimTrailingParticle("出る"))
-        XCTAssertNil(DatabaseManager.trimTrailingParticle("教えて"))
-        XCTAssertNil(DatabaseManager.trimTrailingParticle("東京"))
+        XCTAssertEqual(DatabaseManager.applyTrailingParticleTrim("東京が"), "東京")
+        XCTAssertEqual(DatabaseManager.applyTrailingParticleTrim("何時に"), "何時")
+        XCTAssertEqual(DatabaseManager.applyTrailingParticleTrim("東京より"), "東京")
+        XCTAssertNil(DatabaseManager.applyTrailingParticleTrim("出る"))
+        XCTAssertNil(DatabaseManager.applyTrailingParticleTrim("教えて"))
+        XCTAssertNil(DatabaseManager.applyTrailingParticleTrim("東京"))
     }
 
     func testPrefixSearchHitsAfterParticleTrim() {
-        handler.db.recordPrefixes(reading: "とうきょうが", output: "東京が")
+        handler.db.recordPrefixes(reading: "とうきょうが", output: "東京が", trimTrailingParticle: true)
         let results = handler.db.fetchHistoryScoredMerged(reading: "とうきょう")
         XCTAssertTrue(results.map(\.output).contains("東京"), "前方一致で「東京」がヒットするはず")
+    }
+
+    /// PLAN260710a: flag 無し（既定 false）では文字列が助詞末尾でも trim しない。
+    func testAdverbLikeOutputNotTrimmedWithoutFlag() {
+        handler.db.recordPrefixes(reading: "とくに", output: "特に")
+        XCTAssertTrue(handler.db.exactOutputs(reading: "とくに").contains("特に"))
+        XCTAssertTrue(handler.db.exactOutputs(reading: "とく").isEmpty,
+                      "flag 無しでは「とく→特」に壊さない")
+    }
+
+    /// PLAN260710a: azooKey 候補の trim flag が commit まで運ばれ、履歴に反映される。
+    func testCommitUsesAzooKeyTrimFlag() {
+        // 特に（trim=false）
+        setUpWithConverter(SnapStub(candidates: [
+            AzooKeyCandidate.text("特に", shouldTrimTrailingJoshi: false),
+        ]))
+        typeRomaji("tokuni")
+        applyCandidateAction(handler.buildCandidateList(trigger: .explicit))
+        let ctxTokuni = handler.candidateSession.makeContext()
+        XCTAssertFalse(ctxTokuni.selectedShouldTrimTrailingJoshi)
+        handler.commitComposition(client: client, candidate: ctxTokuni)
+        XCTAssertTrue(handler.db.exactOutputs(reading: "とくに").contains("特に"))
+        XCTAssertTrue(handler.db.exactOutputs(reading: "とく").isEmpty)
+
+        // 東京まで（trim=true）
+        setUpWithConverter(SnapStub(candidates: [
+            AzooKeyCandidate.text("東京まで", shouldTrimTrailingJoshi: true),
+        ]))
+        typeRomaji("toukyoumade")
+        applyCandidateAction(handler.buildCandidateList(trigger: .explicit))
+        let ctxMade = handler.candidateSession.makeContext()
+        XCTAssertTrue(ctxMade.selectedShouldTrimTrailingJoshi)
+        handler.commitComposition(client: client, candidate: ctxMade)
+        XCTAssertTrue(handler.db.exactOutputs(reading: "とうきょう").contains("東京"))
+        XCTAssertTrue(handler.db.exactOutputs(reading: "とうきょうまで").isEmpty)
     }
 
     func testNonParticleEndingPreserved() {

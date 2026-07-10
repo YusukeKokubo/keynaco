@@ -9,7 +9,9 @@ public enum CandidateAction: Sendable {
         /// AzooKey API が返した順序（LCID ソート前）。Zenzai 有効 + 左文脈ありのときのみ非空。
         azooKeyApiOrder: [String] = [],
         initialIsExplicitlySelected: Bool = false,
-        candidateSources: [ScoredCandidate.Source] = []
+        candidateSources: [ScoredCandidate.Source] = [],
+        /// PLAN260710a: 行ごとの助詞トリム可否。`candidates` と同長。
+        candidateTrimFlags: [Bool] = []
     )
     case dismiss
     case selectNext
@@ -24,10 +26,13 @@ extension CandidateAction {
         fixedEnd: Int,
         azooKeyApiOrder: [String],
         initialIsExplicitlySelected: Bool,
-        candidateSources: [ScoredCandidate.Source]
+        candidateSources: [ScoredCandidate.Source],
+        candidateTrimFlags: [Bool]
     )? {
-        if case .show(let candidates, let fixedEnd, let apiOrder, let initialExplicit, let sources) = self {
-            return (candidates, fixedEnd, apiOrder, initialExplicit, sources)
+        if case .show(
+            let candidates, let fixedEnd, let apiOrder, let initialExplicit, let sources, let trimFlags
+        ) = self {
+            return (candidates, fixedEnd, apiOrder, initialExplicit, sources, trimFlags)
         }
         return nil
     }
@@ -45,6 +50,8 @@ public struct CandidateContext: Sendable {
     public private(set) var isExplicitlySelected: Bool
     /// 行ごとの source。Shift+Delete とセクション描画の正本。
     public private(set) var candidateSources: [ScoredCandidate.Source] = []
+    /// PLAN260710a: 行ごとの助詞トリム可否。
+    public private(set) var candidateTrimFlags: [Bool] = []
     /// `CandidateSession.panelInteraction` をスナップショット時に写した値。
     public private(set) var panelInteraction: CandidatePanelInteraction
 
@@ -54,6 +61,7 @@ public struct CandidateContext: Sendable {
         selectedText: String?,
         isExplicitlySelected: Bool = false,
         candidateSources: [ScoredCandidate.Source] = [],
+        candidateTrimFlags: [Bool] = [],
         panelInteraction: CandidatePanelInteraction? = nil
     ) {
         self.isVisible = isVisible
@@ -61,10 +69,17 @@ public struct CandidateContext: Sendable {
         self.selectedText = selectedText
         self.isExplicitlySelected = isExplicitlySelected
         self.candidateSources = candidateSources
+        self.candidateTrimFlags = candidateTrimFlags
         self.panelInteraction = panelInteraction ?? {
             guard isVisible else { return .hidden }
             return isExplicitlySelected ? .explicit : .passive
         }()
+    }
+
+    /// 選択行の助詞トリム可否。flag 配列が無い・範囲外なら false。
+    public var selectedShouldTrimTrailingJoshi: Bool {
+        guard candidateTrimFlags.indices.contains(selectedRow) else { return false }
+        return candidateTrimFlags[selectedRow]
     }
 
     public func isHistoryDeletable(at row: Int) -> Bool {
@@ -74,7 +89,7 @@ public struct CandidateContext: Sendable {
 
     public static let hidden = CandidateContext(
         isVisible: false, selectedRow: 0, selectedText: nil,
-        isExplicitlySelected: false, candidateSources: [],
+        isExplicitlySelected: false, candidateSources: [], candidateTrimFlags: [],
         panelInteraction: .hidden
     )
 }
@@ -263,7 +278,11 @@ public struct InputHandler {
             let isPunct = Self.readingPunctuations.contains(selected) || Self.sentenceTerminators.contains(selected)
             if !isDateTime && !isNumber && !isPunct {
                 let reading = resolvedHistoryReading(userReading: normalizedInput, inputKey: inputKey, output: selected)
-                db.recordPrefixes(reading: reading, output: selected)
+                db.recordPrefixes(
+                    reading: reading,
+                    output: selected,
+                    trimTrailingParticle: candidate.selectedShouldTrimTrailingJoshi
+                )
             }
             let conv = azooKeyConverter; let r = inputKey; let t = selected
             Task.detached(priority: .utility) { conv.commit(reading: r, text: t) }

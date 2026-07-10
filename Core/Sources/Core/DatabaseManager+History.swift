@@ -352,23 +352,15 @@ extension DatabaseManager {
         "より", "の", "を", "が", "は", "に", "で", "と", "も", "へ",
     ].sorted { $0.count > $1.count }
 
-    /// output 末尾が格助詞・係助詞で終わっている場合、助詞を除いた文字列を返す。
-    /// 「東京が」→「東京」、「何時に」→「何時」。対象助詞でなければ nil。
-    static func trimTrailingParticle(_ s: String) -> String? {
-        for p in trailingParticles where s.hasSuffix(p) {
-            let trimmed = String(s.dropLast(p.count))
-            return trimmed.isEmpty ? nil : trimmed
-        }
-        return nil
-    }
-
     /// 確定時の読みを1行だけ記録する。同一 output で読みが前方一致関係のときは最長読みに統合し、
     /// 短い読みの行は作らない。前方一致検索は `fetchHistoryScoredMerged` の LIKE が担う。
-    /// output 末尾が格助詞・係助詞の場合（例: 「東京が」）、助詞を除いた文節単位（「東京」）で記録する。
-    /// reading も同じ助詞文字列分だけ末尾を除去する（全ひらがな reading の場合は維持）。
-    func recordPrefixes(reading: String, output: String) {
+    ///
+    /// `trimTrailingParticle == true` のときだけ、output 末尾の格助詞・係助詞を除いた文節単位で記録する
+    ///（例: 「東京が」→「東京」）。判定は呼び出し側（azooKey 候補のセグメント joshi flag）が行い、
+    /// 文字列サフィックスだけでは決めない（PLAN260710a）。flag 無し・false は完成形のまま記録。
+    func recordPrefixes(reading: String, output: String, trimTrailingParticle: Bool = false) {
         let (r, o): (String, String)
-        if let trimmedOutput = Self.trimTrailingParticle(output) {
+        if trimTrailingParticle, let trimmedOutput = Self.applyTrailingParticleTrim(output) {
             let particle = String(output.dropFirst(trimmedOutput.count))
             let trimmedReading = reading.hasSuffix(particle) ? String(reading.dropLast(particle.count)) : ""
             r = trimmedReading.isEmpty ? reading : trimmedReading
@@ -381,6 +373,23 @@ extension DatabaseManager {
         dispatchWrite {
             self.recordPrefixesOnQueue(reading: r, output: o, now: self.nowEpoch())
         }
+    }
+
+    /// output 末尾が格助詞・係助詞で終わっている場合、助詞を除いた文字列を返す。
+    /// 「東京が」→「東京」、「何時に」→「何時」。対象助詞でなければ nil。
+    /// `recordPrefixes(trimTrailingParticle: true)` の実行時にだけ使う（自動判定の入口ではない）。
+    static func applyTrailingParticleTrim(_ s: String) -> String? {
+        for p in trailingParticles where s.hasSuffix(p) {
+            let trimmed = String(s.dropLast(p.count))
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return nil
+    }
+
+    /// - Warning: PLAN260710a で自動判定入口は廃止。trim 実行用は `applyTrailingParticleTrim`。
+    ///   既存テスト互換のため残す。
+    static func trimTrailingParticle(_ s: String) -> String? {
+        applyTrailingParticleTrim(s)
     }
 
     /// `output` が `reading` の真の prefix（reading が output で始まり長い）のとき true。

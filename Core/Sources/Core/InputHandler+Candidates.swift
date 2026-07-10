@@ -36,7 +36,7 @@ extension InputHandler {
             let pendingReading: String? = needsAzooKey && peek?.needsAsyncFetch != false ? h : nil
             let action = assembleFromSources(
                 reading: h,
-                azooKeyCandidates: peekRaw.texts,
+                azooKeyCandidates: peekRaw,
                 azooKeyApiOrder: peekRaw.texts,
                 trigger: trigger
             )
@@ -46,7 +46,7 @@ extension InputHandler {
             guard state.composedHiragana == reading else { return (.none, nil) }
             let action = assembleFromSources(
                 reading: reading,
-                azooKeyCandidates: candidates.texts,
+                azooKeyCandidates: candidates,
                 azooKeyApiOrder: candidates.texts,
                 trigger: trigger
             )
@@ -95,7 +95,7 @@ extension InputHandler {
 
     private mutating func assembleFromSources(
         reading: String,
-        azooKeyCandidates: [String],
+        azooKeyCandidates: [AzooKeyCandidate],
         azooKeyApiOrder: [String],
         trigger: CandidateListTrigger
     ) -> CandidateAction {
@@ -106,7 +106,7 @@ extension InputHandler {
 
     private struct CandidateListSources {
         let h: String
-        let azooKeyCandidates: [String]
+        let azooKeyCandidates: [AzooKeyCandidate]
         /// AzooKey API の返却順（Zenzai 込み）。Zenzai 順位ラベル表示等に使う。
         let azooKeyApiOrder: [String]
         let userDictRaw: [String]
@@ -115,7 +115,7 @@ extension InputHandler {
         /// 履歴 1 件は exact / prefix どちらか or 両方の score を持つ（PLAN260624d）。
         let historyEntries: [HistoryEntry]
 
-        func withAzooKey(candidates: [String], apiOrder: [String]) -> CandidateListSources {
+        func withAzooKey(candidates: [AzooKeyCandidate], apiOrder: [String]) -> CandidateListSources {
             CandidateListSources(
                 h: h,
                 azooKeyCandidates: candidates,
@@ -145,7 +145,7 @@ extension InputHandler {
         let h = state.composedHiragana
         let azooKeyCandidates = fetchAzooKeyCandidates(reading: h, trigger: trigger)
         return collectLocalCandidateSources(reading: h)
-            .withAzooKey(candidates: azooKeyCandidates, apiOrder: azooKeyCandidates)
+            .withAzooKey(candidates: azooKeyCandidates, apiOrder: azooKeyCandidates.texts)
     }
 
     private mutating func collectLocalCandidateSources(reading: String) -> CandidateListSources {
@@ -191,17 +191,16 @@ extension InputHandler {
     private mutating func fetchAzooKeyCandidates(
         reading: String,
         trigger: CandidateListTrigger
-    ) -> [String] {
+    ) -> [AzooKeyCandidate] {
         guard !reading.allSatisfy({ $0.isASCII }) else { return [] }
         let engineReading = Self.azooKeyReading(for: reading)
         let richCandidates = trigger == .explicit
-        let raw = azooKeyConverter.requestCandidates(
+        return azooKeyConverter.requestCandidates(
             hiragana: engineReading,
             leftSideContext: leftContext.azooKeyValue,
             richCandidates: richCandidates,
             options: .default
         )
-        return raw.texts
     }
 
     /// UserReading を AzooKey 向け EngineReading へ補完する。マッチしなければそのまま返す。
@@ -297,7 +296,8 @@ extension InputHandler {
             fixedEnd: built.layout.fixedEnd,
             azooKeyApiOrder: built.apiOrder,
             initialIsExplicitlySelected: trigger == .explicit,
-            candidateSources: built.layout.sources
+            candidateSources: built.layout.sources,
+            candidateTrimFlags: built.layout.trimFlags
         )
     }
 
@@ -406,7 +406,7 @@ extension InputHandler {
             hiraganaBuiltin: Self.isBuiltinFunctionalWord(reading),
             historyEntries: sources.historyEntries,
             userDictExact: sources.userDictExact,
-            azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8)),
+            azooKeyCandidates: Array(sources.azooKeyCandidates.prefix(8).map(\.text)),
             azooKeyApiOrder: Array(sources.azooKeyApiOrder.prefix(8)),
             initialText: initialText,
             fixedEnd: scoredLayout?.fixedEnd ?? 0,

@@ -14,7 +14,7 @@ PLAN260704b（第 1 弾）の A/B 系施策が完了した後の再計測（2026
 
 | 施策 | 優先 | 状態 | 個別 plan |
 |------|------|------|-----------|
-| D1 助詞トリムの lcid 判定化 | 1 | draft | [PLAN260710a](PLAN260710a-particle-trim-lcid.md) |
+| D1 助詞トリムの lcid 判定化 | 1 | in-progress | [PLAN260710a](PLAN260710a-particle-trim-lcid.md) |
 | E1 prefix 習慣学習（whileTyping 限定） | 2 | 未着手 | — |
 | D2 文節完成形（内容語+助詞）の row 0 到達 | 3 | 未着手 | — |
 | F1 起動キャッシュウォームアップ | 4 | 未着手 | — |
@@ -97,11 +97,11 @@ pain 率は下がった一方、fetch 系のテールはやや悪化しとる。
 - 文字列版 `trimTrailingParticle` は **廃止**（fallback にも使わない）
 
 - [x] **POC ゲート**: 実辞書で `特に` / `主に` / `一緒に` / `今は` / `東京まで` のセグメント構成を確認（`ParticleTrimSegmentPOCTests`、2026-07-10 通過）。特に型は単一セグメント、東京までは多セグメント末尾 joshi。「今は」も単一見出しのため trim せず完成形が育つ
-- [ ] `AzooKeyCandidate` に末尾セグメント joshi flag を追加し、`displayCandidates` で設定、CandidateContext 経由で `commitComposition` まで運ぶ
-- [ ] `recordPrefixes` を「trim してよいか」を呼び出し側から受け取る形にし、`data.count >= 2` かつ末尾 joshi のときだけトリム。flag 無しはトリムしない
-- [ ] `trimTrailingParticle` の文字列サフィックス判定を廃止
-- [ ] 回帰テスト: 「特に」「主に」「さらに」等の副詞・「東京まで」等の真の助詞ケースを両方固定
-- [ ] テストの置き場: slow=POC 固定、fast=スタブに joshi flag を足して供給
+- [x] `AzooKeyCandidate` に末尾セグメント joshi flag を追加し、`displayCandidates` で設定、CandidateContext 経由で `commitComposition` まで運ぶ
+- [x] `recordPrefixes` を「trim してよいか」を呼び出し側から受け取る形にし、`data.count >= 2` かつ末尾 joshi のときだけトリム。flag 無しはトリムしない
+- [x] `trimTrailingParticle` の文字列サフィックス判定を廃止（実行用 `applyTrailingParticleTrim`）
+- [x] 回帰テスト: fast stub flag + slow POC 固定
+- [ ] **検証 window（14d）**: `とくに` pain / history `とくに→特に` 成長を baseline と比較（ゲート通過後に implemented）
 
 **期待効果**: 「とくに」型（副詞末尾がたまたま助詞文字）の pain が確定 2〜3 回後に row 0 直行へ変わる。`とく→特` は `LIKE 'とくに%'` にヒットせんので、完成形行が生えれば cleanup なしでも exact 到達は可能。
 **検証指標**: 対象 reading の pain 件数・scroll_count、履歴 DB の完成形行の成長。objective_axis: UX-pain。

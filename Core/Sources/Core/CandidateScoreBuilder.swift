@@ -30,7 +30,7 @@ enum CandidateScoreBuilder {
         let historyEntries: [HistoryEntry]
         let userDictExact: [String]
         let userDictPrefix: [String]
-        let azooKeyCandidates: [String]
+        let azooKeyCandidates: [AzooKeyCandidate]
         /// Zenzai 込み API 順。空なら rank ボーナスなし。
         let azooKeyApiOrder: [String]
         let numberCandidates: [String]
@@ -133,12 +133,13 @@ enum CandidateScoreBuilder {
         }
 
         let historyTexts = Set(byText.keys)
-        for (rank, text) in input.azooKeyCandidates.enumerated() {
-            guard !historyTexts.contains(text) else { continue }
+        for (rank, candidate) in input.azooKeyCandidates.enumerated() {
+            guard !historyTexts.contains(candidate.text) else { continue }
             upsert(ScoredCandidate(
-                text: text,
+                text: candidate.text,
                 score: azooKeyScore(rank: rank),
-                source: .azooKey(rank: rank)
+                source: .azooKey(rank: rank),
+                shouldTrimTrailingJoshi: candidate.shouldTrimTrailingJoshi
             ))
         }
 
