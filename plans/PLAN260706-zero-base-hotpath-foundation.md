@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in-progress
 created: 2026-07-06
 ---
 
@@ -76,6 +76,8 @@ created: 2026-07-06
 ## Phase 分割
 
 ### Phase 1: 打鍵同期パスから DB・IPC を退避（挙動ほぼ不変・効果即時）
+
+個別 plan: [PLAN260718](PLAN260718-sync-path-db-eviction.md)（2026-07-18 着手。baseline 7d 固定済み）
 
 - [ ] `output → (pos, lcid)` のプロセス内メモ化で prefix focus の per-candidate クエリ（最大 2N 本）を撲滅する
 - [ ] peek ビルドで取得したローカルソース（履歴・辞書）を async inject ビルドへ引き渡し、DB 3 クエリ × 2 回を × 1 回にする
