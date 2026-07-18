@@ -15,17 +15,19 @@ extension DatabaseManager {
     /// `fetchHistoryScoredMerged`（prefix SUM 集計）と異なり、`input = reading` のスコアのみを返す。
     /// `HistoryEntry.exactScore` の判定に使う。
     func fetchHistoryExactScored(reading: String) -> [(output: String, score: Double)] {
-        dbQueue.sync {
-            let now = self.nowEpoch()
-            return self.queryOutputScorePairsOnQueue("""
-            SELECT output, (\(Self.recencyExpr)) AS s FROM history
-            WHERE input = ? COLLATE NOCASE
-            ORDER BY s DESC
-            LIMIT 10
-            """) {
-                self.bindRecency($0, at: 1, now: now)
-                self.bindText($0, 3, reading)
-            }
+        dbQueue.sync { self.fetchHistoryExactScoredOnQueue(reading: reading) }
+    }
+
+    func fetchHistoryExactScoredOnQueue(reading: String) -> [(output: String, score: Double)] {
+        let now = nowEpoch()
+        return queryOutputScorePairsOnQueue("""
+        SELECT output, (\(Self.recencyExpr)) AS s FROM history
+        WHERE input = ? COLLATE NOCASE
+        ORDER BY s DESC
+        LIMIT 10
+        """) {
+            self.bindRecency($0, at: 1, now: now)
+            self.bindText($0, 3, reading)
         }
     }
 
@@ -36,19 +38,39 @@ extension DatabaseManager {
     /// `SUM` で集計する。exact / prefix を別クエリに分割し `MAX` で合計する設計に書き換えると、
     /// 異なる読み長で確定した回数が合算されなくなり履歴ランキングが壊れる。
     func fetchHistoryScoredMerged(reading: String) -> [(output: String, score: Double)] {
-        return dbQueue.sync {
-            let now = self.nowEpoch()
-            return self.queryOutputScorePairsOnQueue("""
-            SELECT output, SUM((\(Self.recencyExpr))) AS s FROM history
-            WHERE input LIKE ?
-              AND (pos IS NULL OR pos NOT IN ('other/conjunction', 'other/interjection'))
-            GROUP BY output
-            ORDER BY s DESC, MAX(used_at) DESC
-            LIMIT 20
-            """) {
-                self.bindRecency($0, at: 1, now: now)
-                self.bindText($0, 3, reading + "%")
-            }
+        dbQueue.sync { self.fetchHistoryScoredMergedOnQueue(reading: reading) }
+    }
+
+    func fetchHistoryScoredMergedOnQueue(reading: String) -> [(output: String, score: Double)] {
+        let now = nowEpoch()
+        return queryOutputScorePairsOnQueue("""
+        SELECT output, SUM((\(Self.recencyExpr))) AS s FROM history
+        WHERE input LIKE ?
+          AND (pos IS NULL OR pos NOT IN ('other/conjunction', 'other/interjection'))
+        GROUP BY output
+        ORDER BY s DESC, MAX(used_at) DESC
+        LIMIT 20
+        """) {
+            self.bindRecency($0, at: 1, now: now)
+            self.bindText($0, 3, reading + "%")
+        }
+    }
+
+    /// 候補ビルド用ローカルソース（user_dict + history exact/merged）を 1 `dbQueue.sync` で返す（PLAN260718）。
+    func fetchLocalCandidateQuery(reading: String) -> (
+        userDictExact: [String],
+        userDictPrefix: [String],
+        historyExact: [(output: String, score: Double)],
+        historyMerged: [(output: String, score: Double)]
+    ) {
+        dbQueue.sync {
+            let userDict = self.fetchUserDictCombinedOnQueue(reading: reading)
+            return (
+                userDictExact: userDict.exact,
+                userDictPrefix: userDict.prefix,
+                historyExact: self.fetchHistoryExactScoredOnQueue(reading: reading),
+                historyMerged: self.fetchHistoryScoredMergedOnQueue(reading: reading)
+            )
         }
     }
 
@@ -80,28 +102,49 @@ extension DatabaseManager {
         }
     }
 
+    /// `output` の pos / lcid を 1 クエリ + プロセス内メモで返す（PLAN260718）。
+    /// 打鍵中は不変のためメモ化し、分類書き込み時に当該 output を invalidate する。
+    public func classificationForOutput(_ output: String) -> (pos: String?, lcid: Int?) {
+        dbQueue.sync {
+            if let cached = self.outputClassificationCache[output] {
+                return cached
+            }
+            let sql = """
+            SELECT
+              (SELECT pos FROM history WHERE output = ? AND pos IS NOT NULL LIMIT 1),
+              (SELECT lcid FROM history WHERE output = ? AND lcid IS NOT NULL LIMIT 1)
+            """
+            guard let stmt = self.cachedStmt(for: sql) else {
+                let empty: (String?, Int?) = (nil, nil)
+                self.outputClassificationCache[output] = empty
+                return empty
+            }
+            self.bindText(stmt, 1, output)
+            self.bindText(stmt, 2, output)
+            defer { sqlite3_reset(stmt) }
+            guard sqlite3_step(stmt) == SQLITE_ROW else {
+                let empty: (String?, Int?) = (nil, nil)
+                self.outputClassificationCache[output] = empty
+                return empty
+            }
+            let pos = sqlite3_column_text(stmt, 0).map { String(cString: $0) }
+            let lcid: Int? = sqlite3_column_type(stmt, 1) == SQLITE_NULL
+                ? nil
+                : Int(sqlite3_column_int(stmt, 1))
+            let value = (pos, lcid)
+            self.outputClassificationCache[output] = value
+            return value
+        }
+    }
+
     /// `output` がすでに分類済みなら pos を返す。未分類または未登録なら nil。
     public func posForOutput(_ output: String) -> String? {
-        dbQueue.sync {
-            let sql = "SELECT pos FROM history WHERE output = ? AND pos IS NOT NULL LIMIT 1"
-            guard let stmt = self.cachedStmt(for: sql) else { return nil }
-            self.bindText(stmt, 1, output)
-            defer { sqlite3_reset(stmt) }
-            guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
-            return sqlite3_column_text(stmt, 0).map { String(cString: $0) }
-        }
+        classificationForOutput(output).pos
     }
 
     /// `output` に対応する履歴行の代表 `lcid` を返す。未設定なら nil。
     public func lcidForOutput(_ output: String) -> Int? {
-        dbQueue.sync {
-            let sql = "SELECT lcid FROM history WHERE output = ? AND lcid IS NOT NULL LIMIT 1"
-            guard let stmt = self.cachedStmt(for: sql) else { return nil }
-            self.bindText(stmt, 1, output)
-            defer { sqlite3_reset(stmt) }
-            guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
-            return Int(sqlite3_column_int(stmt, 0))
-        }
+        classificationForOutput(output).lcid
     }
 
     /// `output` に対応する全履歴行の pos / lcid を更新する。`nil` のフィールドは既存値を維持。
@@ -126,6 +169,7 @@ extension DatabaseManager {
                 }
                 self.bindText($0, 3, output)
             }
+            self.outputClassificationCache.removeValue(forKey: output)
         }
     }
 
@@ -151,26 +195,28 @@ extension DatabaseManager {
                 }
                 self.bindText($0, 3, output)
             }
-            guard sqlite3_changes(self.db) == 0 else { return }
-            let t = self.nowEpoch()
-            self.executeOnQueue("""
-            INSERT INTO history (input, output, count, used_at, pos, lcid)
-            VALUES (?, ?, 0, ?, ?, ?)
-            """) {
-                self.bindText($0, 1, reading)
-                self.bindText($0, 2, output)
-                sqlite3_bind_int64($0, 3, t)
-                if let pos {
-                    self.bindText($0, 4, pos)
-                } else {
-                    sqlite3_bind_null($0, 4)
-                }
-                if let lcid {
-                    sqlite3_bind_int($0, 5, Int32(lcid))
-                } else {
-                    sqlite3_bind_null($0, 5)
+            if sqlite3_changes(self.db) == 0 {
+                let t = self.nowEpoch()
+                self.executeOnQueue("""
+                INSERT INTO history (input, output, count, used_at, pos, lcid)
+                VALUES (?, ?, 0, ?, ?, ?)
+                """) {
+                    self.bindText($0, 1, reading)
+                    self.bindText($0, 2, output)
+                    sqlite3_bind_int64($0, 3, t)
+                    if let pos {
+                        self.bindText($0, 4, pos)
+                    } else {
+                        sqlite3_bind_null($0, 4)
+                    }
+                    if let lcid {
+                        sqlite3_bind_int($0, 5, Int32(lcid))
+                    } else {
+                        sqlite3_bind_null($0, 5)
+                    }
                 }
             }
+            self.outputClassificationCache.removeValue(forKey: output)
         }
     }
 
@@ -255,6 +301,7 @@ extension DatabaseManager {
             self.executeOnQueue("DELETE FROM history WHERE input = ? AND output = ?") {
                 self.bindText($0, 1, input); self.bindText($0, 2, output)
             }
+            self.outputClassificationCache.removeValue(forKey: output)
         }
     }
 
@@ -262,6 +309,7 @@ extension DatabaseManager {
     public func deleteHistory(output: String) {
         dispatchWrite {
             self.executeOnQueue("DELETE FROM history WHERE output = ?") { self.bindText($0, 1, output) }
+            self.outputClassificationCache.removeValue(forKey: output)
         }
     }
 

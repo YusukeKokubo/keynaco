@@ -22,11 +22,13 @@ enum PrefixFocusPolicy {
     }
 
     /// 品詞ランク解決: DB の `lcid` → `pos` のみ（peek 中の同期辞書 lookup は行わない。PLAN260704b A1）。
+    /// `classificationForOutput` で 1 hop + メモ化（PLAN260718）。
     static func rank(output: String, db: DatabaseManager) -> POSRank {
-        if let lcid = db.lcidForOutput(output) {
+        let classification = db.classificationForOutput(output)
+        if let lcid = classification.lcid {
             return rank(fromLcid: lcid)
         }
-        if let pos = db.posForOutput(output) {
+        if let pos = classification.pos {
             return rank(fromPos: pos)
         }
         return .unknown

@@ -17,13 +17,13 @@ enum CandidateScoredLayout {
     }
 
     /// スコア降順リストをそのまま flatten。
+    /// テキスト一意性は `CandidateScoreBuilder.build` が保証する（PLAN260718 で二重 dedup を廃止）。
     static func assemble(_ input: Input) -> Result {
         var candidates: [String] = []
         var sources: [ScoredCandidate.Source] = []
         var trimFlags: [Bool] = []
-        var seen = Set<String>()
 
-        for item in input.scored where seen.insert(item.text).inserted {
+        for item in input.scored {
             candidates.append(item.text)
             sources.append(item.source)
             trimFlags.append(item.shouldTrimTrailingJoshi)

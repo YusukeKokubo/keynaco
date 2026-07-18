@@ -398,6 +398,23 @@ final class DatabaseManagerTests: XCTestCase {
         db.upsertPOSClassification(output: "keynaco", reading: "けいなこ", pos: "noun", lcid: 1285)
         XCTAssertEqual(db.posForOutput("keynaco"), "noun")
         XCTAssertEqual(db.lcidForOutput("keynaco"), 1285)
+        let classification = db.classificationForOutput("keynaco")
+        XCTAssertEqual(classification.pos, "noun")
+        XCTAssertEqual(classification.lcid, 1285)
+        // メモ化: 再取得も同じ。分類更新後は invalidate されて新値が見える。
+        XCTAssertEqual(db.classificationForOutput("keynaco").lcid, 1285)
+        db.updatePOSClassification(output: "keynaco", pos: "verb", lcid: 42)
+        XCTAssertEqual(db.classificationForOutput("keynaco").pos, "verb")
+        XCTAssertEqual(db.classificationForOutput("keynaco").lcid, 42)
+    }
+
+    func testFetchLocalCandidateQuery_oneHopMatchesSeparateFetches() {
+        db.record(input: "とうきょう", output: "東京")
+        db.addUserDict(input: "とうきょう", output: "Ｔｏｋｙｏ")
+        let combined = db.fetchLocalCandidateQuery(reading: "とうきょう")
+        XCTAssertEqual(combined.userDictExact, db.fetchUserDictCombined(reading: "とうきょう").exact)
+        XCTAssertEqual(combined.historyExact.map(\.output), db.fetchHistoryExactScored(reading: "とうきょう").map(\.output))
+        XCTAssertEqual(combined.historyMerged.map(\.output), db.fetchHistoryScoredMerged(reading: "とうきょう").map(\.output))
     }
 
     func testUserDictDuplicateReturnsFalse() {

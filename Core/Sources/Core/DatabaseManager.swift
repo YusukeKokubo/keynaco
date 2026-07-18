@@ -7,6 +7,8 @@ public final class DatabaseManager: @unchecked Sendable {
     var db: OpaquePointer?
     var stmtCache: [String: OpaquePointer] = [:]
     let dbQueue = DispatchQueue(label: "keynaco.db", qos: .utility)
+    /// `classificationForOutput` のプロセス内メモ（dbQueue 上のみ触る。PLAN260718）。
+    var outputClassificationCache: [String: (pos: String?, lcid: Int?)] = [:]
     // inMemory=true のテストでは書き込みを同期実行して即座に読み取れるようにする
     let writeAsync: Bool
 

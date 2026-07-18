@@ -6,19 +6,21 @@ extension DatabaseManager {
 
     /// 完全一致・前方一致のユーザー辞書候補を 1 クエリで返す（buildCandidateList ホットパス用）。
     func fetchUserDictCombined(reading: String) -> (exact: [String], prefix: [String]) {
-        let pairs = dbQueue.sync {
-            self.queryStringKindPairsOnQueue("""
-            SELECT output, kind FROM (
-              SELECT output, 0 AS kind, id AS ord FROM user_dict WHERE input = ?
-              UNION ALL
-              SELECT output, 1 AS kind, id AS ord FROM user_dict
-              WHERE ? LIKE (input || '%') AND input != ?
-            ) ORDER BY kind ASC, ord ASC
-            """) {
-                self.bindText($0, 1, reading)
-                self.bindText($0, 2, reading)
-                self.bindText($0, 3, reading)
-            }
+        dbQueue.sync { self.fetchUserDictCombinedOnQueue(reading: reading) }
+    }
+
+    func fetchUserDictCombinedOnQueue(reading: String) -> (exact: [String], prefix: [String]) {
+        let pairs = queryStringKindPairsOnQueue("""
+        SELECT output, kind FROM (
+          SELECT output, 0 AS kind, id AS ord FROM user_dict WHERE input = ?
+          UNION ALL
+          SELECT output, 1 AS kind, id AS ord FROM user_dict
+          WHERE ? LIKE (input || '%') AND input != ?
+        ) ORDER BY kind ASC, ord ASC
+        """) {
+            self.bindText($0, 1, reading)
+            self.bindText($0, 2, reading)
+            self.bindText($0, 3, reading)
         }
         var exact: [String] = []
         var pfx: [String] = []

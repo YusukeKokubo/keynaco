@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in-progress
 created: 2026-07-18
 objective_axis: latency
 baseline_at: 2026-07-18T22:10:19+0900
@@ -61,14 +61,18 @@ related_plan: PLAN260706-zero-base-hotpath-foundation.md
 
 ## 5. 実装方針
 
-PLAN260706 Phase 1 のチェックリストをそのまま実行する（正本は親 plan、進捗チェックも親側を更新）:
+PLAN260706 Phase 1 のチェックリストをそのまま実行する（正本は親 plan、進捗チェックも親側を更新）。
+
+**コミット優先順位**（p95 寄与の大きい順。失敗時の切り分け用）:
 
 1. `output → (pos, lcid)` のプロセス内メモ化で prefix focus の per-candidate クエリ（最大 2N 本）を撲滅
 2. peek ビルドで取得したローカルソース（履歴・辞書）を async inject ビルドへ引き渡し、DB 3 クエリ × 2 回 → × 1 回
-3. 残る 3 クエリの 1 hop 統合、または read 専用コネクション分離（WAL 並行 read）。書き込みの後ろで打鍵 read が待つ構造を解消
+3. 残る 3 クエリの **1 hop 統合を先に**（`dbQueue.sync` 1 回で 3 クエリ）。書き込みの後ろで打鍵 read が待つ構造を緩和。それでも p95 が残るなら read 専用コネクション分離を次手にする
 4. `generateDateTimeCandidates` に早期ガード（`Calendar.current`/`Date()` は日時読みマッチ時のみ）
 5. `NSWorkspace.frontmostApplication` 問い合わせを毎打鍵 → activate 時・確定時へ
 6. dedup 二重（ScoreBuilder / ScoredLayout）を 1 パスに統合
+
+成功目安 **peek_update p95 ≤ 15ms** は第一ゲート（明確減）。親契約 1 の「p50 と同桁（数 ms）」は最終到達点であり、本 plan の `implemented` 判定とは別。
 
 挙動差が許されるのは「async 到着時のソース鮮度」境界のみ。確定時にメモを invalidate する設計にし、確定 → 即再組成で古い履歴が見えんことを sandbox で確認する（親 plan のリスク表参照）。
 
@@ -89,3 +93,5 @@ PLAN260706 Phase 1 のチェックリストをそのまま実行する（正本�
 - スコアリング・dismiss の変更（Phase 3。候補の並び順は一切変えない）
 - D1/E1 の学習系施策との混線（D1 は検証 window 消化待ち、E1 はその後。指標が直交しとることが並走の条件）
 - F2（長読み Zenzai テール）への直接対策（Phase 2 で解消見込み。残ったら個別 plan）
+- **親調査 A-7（peek prefix 線形走査・最大 200）**: 本 Phase の DB/IPC 退避とは別レイヤ。残テールなら個別に切る
+- **毎打鍵 `selectedRange()`**: 左文脈解決に必要。本 plan では触らない（`frontmostApplication` のみ退避）

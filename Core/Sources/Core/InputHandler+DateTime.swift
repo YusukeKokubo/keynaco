@@ -7,6 +7,8 @@ public extension InputHandler {
     }
 
     static func generateDateTimeCandidates(for reading: String) -> [String] {
+        // Calendar.current / Date() は日時読みのときだけ（PLAN260718）。
+        guard isDateTimeCandidateReading(reading) else { return [] }
         let cal = Calendar.current
         let now = Date()
         switch reading {
@@ -36,6 +38,18 @@ public extension InputHandler {
                 return formatDate(date, cal: cal)
             }
             return []
+        }
+    }
+
+    /// `generateDateTimeCandidates` が非空になり得る読みか（Calendar 生成前の早期判定）。
+    private static func isDateTimeCandidateReading(_ reading: String) -> Bool {
+        switch reading {
+        case "きょう", "きのう", "あした", "あす", "いま",
+             "ことし", "きょねん", "らいねん",
+             "こんげつ", "せんげつ", "らいげつ":
+            return true
+        default:
+            return isNumericStyleDateTimeReading(reading)
         }
     }
 

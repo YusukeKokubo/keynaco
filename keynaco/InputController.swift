@@ -125,6 +125,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             ic.handler.ignoreNextModeSwitch = true
             ic.handler.deferAzooKeyWhileTyping = true
             ic.handler.candidateSession.reset()
+            ic.handler.currentAppBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             ic.candidateWindow.dismiss()
         }
     }
@@ -257,7 +258,6 @@ class InputController: IMKInputController, @unchecked Sendable {
         adapter: IMKTextInputAdapter,
         imkSenderForSurrounding: Any?
     ) -> Bool {
-        handler.currentAppBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         handler.leftContext = LeftContextSource.resolveProduction(
             sessionBuffer: handler.sessionTextBuffer,
             cache: &handler.leftContextIMKCache,

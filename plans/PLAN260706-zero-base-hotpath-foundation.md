@@ -79,14 +79,14 @@ created: 2026-07-06
 
 個別 plan: [PLAN260718](PLAN260718-sync-path-db-eviction.md)（2026-07-18 着手。baseline 7d 固定済み）
 
-- [ ] `output → (pos, lcid)` のプロセス内メモ化で prefix focus の per-candidate クエリ（最大 2N 本）を撲滅する
-- [ ] peek ビルドで取得したローカルソース（履歴・辞書）を async inject ビルドへ引き渡し、DB 3 クエリ × 2 回を × 1 回にする
-- [ ] 残る 3 クエリを 1 回の `dbQueue.sync` に統合するか、read 専用コネクションを分離する（WAL は並行 read 可）。書き込みキューの後ろで打鍵 read が待つ構造を解消する
-- [ ] `generateDateTimeCandidates` に早期ガードを入れ、`Calendar.current` / `Date()` 生成を日時読みマッチ時だけにする
-- [ ] `NSWorkspace.frontmostApplication` の問い合わせを毎打鍵から activate 時・確定時へ移す
-- [ ] dedup の二重（ScoreBuilder / ScoredLayout）を 1 パスに統合する
+- [x] `output → (pos, lcid)` のプロセス内メモ化で prefix focus の per-candidate クエリ（最大 2N 本）を撲滅する
+- [x] peek ビルドで取得したローカルソース（履歴・辞書）を async inject ビルドへ引き渡し、DB 3 クエリ × 2 回を × 1 回にする
+- [x] 残る 3 クエリを 1 回の `dbQueue.sync` に統合する（1 hop）。read 専用コネクション分離は p95 残存時の次手
+- [x] `generateDateTimeCandidates` に早期ガードを入れ、`Calendar.current` / `Date()` 生成を日時読みマッチ時だけにする
+- [x] `NSWorkspace.frontmostApplication` の問い合わせを毎打鍵から activate 時・確定時へ移す
+- [x] dedup の二重（ScoreBuilder / ScoredLayout）を 1 パスに統合する
 
-**検証**: peek_update p95・fetch_complete p50 の再計測、`test_core_all.sh` + sandbox 回帰 3 本。挙動差は「async 到着時のソース鮮度」境界のみ（確定直後の再組成で古い履歴が見える窓が生じんか sandbox で確認）。
+**検証**: peek_update p95・fetch_complete p50 の再計測、`test_core_all.sh` + sandbox 回帰 3 本。挙動差は「async 到着時のソース鮮度」境界のみ（確定直後の再組成で古い履歴が見える窓が生じんか sandbox で確認）。ゲート通過まで PLAN260718 は `in-progress`。
 
 ### Phase 2: 変換パイプラインの actor 化（複雑さの返済 + 次の一手の解禁）
 

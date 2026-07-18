@@ -99,12 +99,13 @@ extension InputHandler {
         azooKeyApiOrder: [String],
         trigger: CandidateListTrigger
     ) -> CandidateAction {
-        let sources = collectLocalCandidateSources(reading: reading)
+        let sources = localCandidateSources(for: reading)
             .withAzooKey(candidates: azooKeyCandidates, apiOrder: azooKeyApiOrder)
         return assembleCandidateList(from: sources, trigger: trigger)
     }
 
-    private struct CandidateListSources {
+    /// peek→inject で引き回すローカルソース束（PLAN260718）。
+    struct CandidateListSources {
         let h: String
         let azooKeyCandidates: [AzooKeyCandidate]
         /// AzooKey API の返却順（Zenzai 込み）。Zenzai 順位ラベル表示等に使う。
@@ -144,17 +145,29 @@ extension InputHandler {
     ) -> CandidateListSources {
         let h = state.composedHiragana
         let azooKeyCandidates = fetchAzooKeyCandidates(reading: h, trigger: trigger)
-        return collectLocalCandidateSources(reading: h)
+        return localCandidateSources(for: h)
             .withAzooKey(candidates: azooKeyCandidates, apiOrder: azooKeyCandidates.texts)
+    }
+
+    /// peek / inject で同一読みのローカルソースを再利用する（PLAN260718）。
+    private mutating func localCandidateSources(for reading: String) -> CandidateListSources {
+        if let cached = localSourcesCache, cached.reading == reading {
+            return cached.sources
+        }
+        let sources = collectLocalCandidateSources(reading: reading)
+        localSourcesCache = (reading: reading, sources: sources)
+        return sources
     }
 
     private mutating func collectLocalCandidateSources(reading: String) -> CandidateListSources {
         let isAscii = reading.allSatisfy({ $0.isASCII })
         let historyKey = (!reading.isEmpty && isAscii) ? reading.lowercased() : reading
-        let (userDictExact, userDictPrefix) = db.fetchUserDictCombined(reading: historyKey)
+        let query = db.fetchLocalCandidateQuery(reading: historyKey)
+        let userDictExact = query.userDictExact
+        let userDictPrefix = query.userDictPrefix
         let userDictRaw = Self.merged(userDictExact, userDictPrefix)
-        let historyScored = db.fetchHistoryScoredMerged(reading: historyKey)
-        let exactMatchScored = db.fetchHistoryExactScored(reading: historyKey)
+        let historyScored = query.historyMerged
+        let exactMatchScored = query.historyExact
         let exactMatchHistoryOutputs = Set(exactMatchScored.map { $0.output })
 
         // 1 output に exact / prefix 両方の score を集約（PLAN260624d）。

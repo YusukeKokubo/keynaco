@@ -253,6 +253,8 @@ public struct InputHandler {
 
     public let db: DatabaseManager
     public var azooKeyConverter: any AzooKeyConverting
+    /// peek で集めたローカルソースを同読みの inject まで再利用する（PLAN260718）。確定で消す。
+    var localSourcesCache: (reading: String, sources: CandidateListSources)?
 
     public init(db: DatabaseManager = .shared, azooKeyConverter: (any AzooKeyConverting)? = nil) {
         self.db = db
@@ -266,6 +268,8 @@ public struct InputHandler {
     /// - Parameter trigger: 呼び出し元の確定経路（`CommitTrigger`）
     public mutating func commitComposition(client: TextInputClient, candidate: CandidateContext = .hidden, trigger: CommitTrigger = .enter) {
         guard state.isComposing else { return }
+        // diary_log 用。activate 時に取った値を確定直前に更新（PLAN260718）。
+        currentAppBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         azooKeyConverter.latencyStats.recordConfirmation(selectionDepth: candidate.isVisible ? candidate.selectedRow : nil)
         let inputKey = state.finalizedText
         let normalizedInput = inputKey.allSatisfy({ $0.isASCII }) ? inputKey.lowercased() : inputKey
@@ -318,6 +322,7 @@ public struct InputHandler {
             nowMs: nowMs
         )
         sessionTracker.reset()
+        localSourcesCache = nil
     }
 
     /// Zenzai が推した Z1（`candidateSession.azooKeyApiOrder.first`）と実確定が違うときだけ 1 件残す。
@@ -408,6 +413,7 @@ public struct InputHandler {
         invalidateMarkedTextSyncCache()
         client.insertText(text)
         state = CompositionState()
+        localSourcesCache = nil
     }
 
     /// F6–F10 の変換確定。composingText が空なら false を返す。
@@ -526,6 +532,7 @@ public struct InputHandler {
             anomaly: anomaly
         )
         sessionTracker.reset()
+        localSourcesCache = nil
         return (true, .dismiss)
     }
 }
