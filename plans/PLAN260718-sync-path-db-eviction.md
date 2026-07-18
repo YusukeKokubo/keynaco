@@ -76,6 +76,25 @@ PLAN260706 Phase 1 のチェックリストをそのまま実行する（正本�
 
 挙動差が許されるのは「async 到着時のソース鮮度」境界のみ。確定時にメモを invalidate する設計にし、確定 → 即再組成で古い履歴が見えんことを sandbox で確認する（親 plan のリスク表参照）。
 
+## 経過: 実装と機能回帰（2026-07-18 通過）
+
+実装は `4a10ec7`（6 項目すべて。親 plan のチェックリスト更新済み）。レビューと回帰で以下を追加:
+
+- **`4683cfe`**: 実装レビューで復活バグを検出・修正。`localSourcesCache` は確定 3 経路で破棄しとったが、**組成中の履歴削除 2 経路**（Shift+Delete / 候補 UI 削除）で invalidate 漏れがあり、同読み explicit リビルドで削除済み候補が復活しとった。`invalidateLocalSourcesCache()` を両経路から呼び、fix なしで赤になる回帰テストで固定。**教訓: 組成中に DB を変更する経路を増やすときは invalidate とセットにする**（Phase 2 以降も同様）。あわせて A4 の LRU 上限 50→200 に追従しとらんかった slow キャッシュテスト 2 件を修正
+- **`b48e294`**: sandbox スイート 2 本が実データ依存で腐っとったのを修正（どちらも本 plan の退行ではない）。marked text は row 0 テキストのハードコードが AzooKey エンジン学習の並び変化で崩壊 → capture + 不変条件アサートへ。prefix focus は A1（`deef0b9`、07-04）の同期辞書 lookup 廃止以降 noun 2m ケースが構造的に落ちとった → probe に `pos_backfill`（本番の起動時バックフィル相当）を追加
+
+機能回帰の通過状況（2026-07-18）:
+
+| 項目 | 結果 |
+|------|------|
+| `./scripts/test_core_all.sh` | 586 件・失敗 0 |
+| `xcodebuild test`（Manual 署名フラグ必要） | 26 件・失敗 0 |
+| sandbox 回帰 3 本 | marked text 8/8 + integrity / cleanup 5/5 / prefix focus 10/10 |
+| 鮮度境界: 確定 → 即・同読み再組成 | PASS（直前確定が historyExact で即見える） |
+| 鮮度境界: Shift+Delete → 同読み explicit リビルド | PASS（復活せず） |
+
+deploy 済み（2026-07-18 23:43）。**残りは 7d 計測 window（〜2026-07-25）と after 再計測のみ。**
+
 ## 6. 検証ゲート
 
 - サンプル閾値: セッション数 ≥ 100 AND 確定数 ≥ 500（p95 比較のため既定の 5/100 より厳しめに設定。直近実績 1041 セッション/7d なので 7d 待てば自然に満たす）
