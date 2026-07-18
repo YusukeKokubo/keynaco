@@ -102,9 +102,15 @@ def run_focus_checks(sock: socket.socket, buf: bytearray) -> int:
     """品詞別モーラ閾値の境界を全パターン検証する。"""
 
     def probe(output: str, seed_reading: str, romaji: str, times: int = 3) -> dict:
-        """history をシードして romaji を打鍵し、AzooKey 完了後の状態を返す。"""
+        """history をシードして romaji を打鍵し、AzooKey 完了後の状態を返す。
+
+        seed_history は pos/lcid を書かないため、本番の起動時バックフィル相当の
+        pos_backfill を挟んで分類してから打鍵する（A1 以降、打鍵中の同期辞書
+        lookup は無いので、分類なしだと品詞ランクが unknown（閾値 5）になる）。
+        """
         send(sock, buf, {"reset": True})
         send(sock, buf, {"seed_history": {"input": seed_reading, "output": output, "times": times}})
+        send(sock, buf, {"pos_backfill": True})
         send(sock, buf, {"type_string": romaji})
         send(sock, buf, {"wait_azoo_key": {"timeoutMs": 3000}})
         return send(sock, buf, {"state": True, "fields": ["selectedText", "candidateVisible", "composedHiragana"]})

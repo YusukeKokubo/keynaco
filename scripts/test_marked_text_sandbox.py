@@ -41,14 +41,24 @@ MARKED_TEXT_SUITE: dict = {
             "cmds": [{"type_string": "kanzi"}],
             "assert": {"composedHiragana": "かんじ", "markedText": "かんじ"},
         },
+        # 以下 3 本は row 0 のテキストをハードコードしない（実 DB + AzooKey エンジン学習で
+        # 並びが正当に変わるため）。意図は「marked が選択行に追従する」等の不変条件で固定する。
         {
             "name": "space-marked-follows-selection",
             "cmds": [
                 {"type_string": "kanzi"},
                 {"wait_azoo_key": True},
-                {"key": "space"},
+                {"key": "space", "capture": {"picked": "selectedText"}},
+                {
+                    "state": True,
+                    "assert": {
+                        "candidateVisible": True,
+                        "selectedRow": 0,
+                        "markedText": "{{picked}}",
+                        "selectedText": "{{picked}}",
+                    },
+                },
             ],
-            "assert": {"candidateVisible": True, "markedText": "漢字", "selectedText": "漢字"},
         },
         {
             "name": "down-syncs-selected-while-composing",
@@ -56,19 +66,27 @@ MARKED_TEXT_SUITE: dict = {
                 {"type_string": "kanzi"},
                 {"wait_azoo_key": True},
                 {"key": "space"},
-                {"key": "down"},
+                {"key": "down", "capture": {"row1": "selectedText"}},
+                {
+                    "state": True,
+                    "assert": {
+                        "isExplicitlySelected": True,
+                        "selectedRow": 1,
+                        "markedText": "{{row1}}",
+                        "selectedText": "{{row1}}",
+                    },
+                },
             ],
-            "assert": {"markedText": "幹事", "selectedText": "幹事", "isExplicitlySelected": True},
         },
         {
-            "name": "kanzi-space-enter-kanji",
+            "name": "space-enter-commits-selected-candidate",
             "cmds": [
                 {"type_string": "kanzi"},
                 {"wait_azoo_key": True},
-                {"key": "space"},
-                {"key": "enter"},
+                {"key": "space", "capture": {"picked": "selectedText"}},
+                {"key": "enter", "assert_contains": {"inserted": "{{picked}}"}},
             ],
-            "assert_contains": {"inserted": "漢字"},
+            "assert": {"candidateVisible": False},
         },
         {
             "name": "shift-delete-removes-history-candidate",
@@ -78,15 +96,6 @@ MARKED_TEXT_SUITE: dict = {
                 {"key": "backspace", "mods": SHIFT},
             ],
             "assert_not": {"assert_contains": {"candidates": "実装"}},
-        },
-        {
-            "name": "enter-matches-selected-candidate",
-            "cmds": [
-                {"type_string": "kanzi"},
-                {"wait_azoo_key": True},
-                {"key": "space", "capture": {"picked": "selectedText"}},
-                {"key": "enter", "assert_contains": {"inserted": "{{picked}}"}},
-            ],
         },
     ],
 }
