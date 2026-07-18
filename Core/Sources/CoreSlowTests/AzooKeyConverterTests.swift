@@ -7,21 +7,27 @@ final class AzooKeyConverterTests: XCTestCase {
 
     func testCandidateCacheDoesNotExceedLimit() {
         let converter = AzooKeyConverter()
-        for i in 0..<60 {
+        let limit = converter.candidateCacheLimit
+        for i in 0..<(limit + 10) {
             _ = converter.requestCandidates(hiragana: "あ\(i)")
         }
         XCTAssertLessThanOrEqual(
-            converter.candidateCacheCount, 50,
-            "キャッシュが上限 50 を超えないはず: \(converter.candidateCacheCount)"
+            converter.candidateCacheCount, limit,
+            "キャッシュが上限 \(limit) を超えないはず: \(converter.candidateCacheCount)"
         )
     }
 
     func testCandidateCacheKeepsRecentEntry() {
         let converter = AzooKeyConverter()
-        for i in 0..<55 {
+        let limit = converter.candidateCacheLimit
+        for i in 0..<(limit + 5) {
             _ = converter.requestCandidates(hiragana: "い\(i)")
         }
-        XCTAssertLessThanOrEqual(converter.candidateCacheCount, 50)
+        XCTAssertLessThanOrEqual(converter.candidateCacheCount, limit)
+        // 直近エントリは evict されず、再要求はキャッシュヒット（エントリ数が増えない）
+        let count = converter.candidateCacheCount
+        _ = converter.requestCandidates(hiragana: "い\(limit + 4)")
+        XCTAssertEqual(converter.candidateCacheCount, count, "直近キーの再要求はキャッシュヒットするはず")
     }
 
     func testRequestCandidatesCacheHitForSameKey() {

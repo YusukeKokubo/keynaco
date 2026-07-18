@@ -36,7 +36,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
     private let locked = LockedConverter()
     private var candidateCache: [String: [Candidate]] = [:]
     private var candidateCacheKeys: [String] = []
-    private let candidateCacheLimit = 200
+    let candidateCacheLimit = 200
     /// whileTyping 非 pause 時の Zenzai `inferenceLimit`（PLAN260704b A2）。pause / explicit は既定 5。
     public static let whileTypingInferenceLimit = 2
     private let baseOptions: ConvertRequestOptions

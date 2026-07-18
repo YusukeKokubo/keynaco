@@ -448,6 +448,34 @@ final class InputHandlerCandidatesTests: InputHandlerTestCase {
         XCTAssertTrue(client.inserted.isEmpty, "削除不可なので確定テキストは挿入されないはず")
     }
 
+    /// **不変条件回帰テスト（PLAN260718）**: 組成中の Shift+Delete で履歴を消した後、
+    /// 同じ読みのリビルドが `localSourcesCache` の古いソースを再利用して
+    /// 削除済み候補が復活しないこと（`invalidateLocalSourcesCache` の呼び忘れ検知）。
+    func testShiftDeleteDoesNotResurrectHistoryOnSameReadingRebuild() {
+        setUpWithConverter(BaseAzooKeyStub())  // AzooKey 候補ゼロで履歴を確実に候補へ出す
+        for _ in 0..<3 { handler.db.record(input: "かい", output: "下位") }
+        typeRomaji("kai")
+
+        // explicit ビルドで localSourcesCache に履歴込みソースが載る
+        let first = applyCandidateAction(handler.buildCandidateList(trigger: .explicit))
+        XCTAssertTrue(first.showPayload?.candidates.contains("下位") ?? false, "前提: 履歴候補が出とるはず")
+
+        // 「下位」の行まで選択を移してから Shift+Delete 経路（.deleteSelected）を通す
+        var moves = 0
+        while handler.candidateSession.selectedText != "下位", moves < 10 {
+            handleAndApply(keyCode: KeyCode.downArrow)
+            moves += 1
+        }
+        XCTAssertEqual(handler.candidateSession.selectedText, "下位", "前提: 削除対象行を選択できるはず")
+        applyCandidateAction(.deleteSelected)
+
+        let rebuilt = handler.buildCandidateList(trigger: .explicit)
+        XCTAssertFalse(
+            rebuilt.showPayload?.candidates.contains("下位") ?? false,
+            "削除した履歴が同読みリビルドで復活しないはず: \(rebuilt.showPayload?.candidates ?? [])"
+        )
+    }
+
     // MARK: - ユーザー辞書候補
 
     func testUserDictAppearsInCandidates() {

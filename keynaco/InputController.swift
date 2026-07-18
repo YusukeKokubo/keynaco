@@ -41,6 +41,7 @@ class InputController: IMKInputController, @unchecked Sendable {
                 MainActor.assumeIsolated {
                     guard let ic else { return }
                     ic.handler.db.deleteHistory(output: text)
+                    ic.handler.invalidateLocalSourcesCache()
                     ic.handler.candidateSession.removeCandidate(at: row)
                     ic.candidateWindow.apply(
                         ic.makeCandidatePanelModel(),

@@ -449,10 +449,18 @@ public struct InputHandler {
         if case .deleteSelected = action,
            let text = candidateSession.selectedText {
             db.deleteHistory(output: text)
+            invalidateLocalSourcesCache()
         }
         candidateSession.apply(action)
         sessionTracker.trackSelectedRow(candidateSession.selectedRow)
         syncMarkedText(client: client)
+    }
+
+    /// 組成中に履歴・辞書を書き換えた直後（Shift+Delete / 候補 UI 削除等）に呼ぶ。
+    /// 同読みのリビルドが `localSourcesCache` の古いローカルソースを再利用して、
+    /// 削除済み候補が復活するのを防ぐ（確定時は `commitComposition` 等が破棄する）。
+    public mutating func invalidateLocalSourcesCache() {
+        localSourcesCache = nil
     }
 
     /// `commitText` 後など、次の `syncMarkedText` で dedup しないようキャッシュを破棄する。
