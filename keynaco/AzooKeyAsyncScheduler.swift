@@ -75,8 +75,14 @@ final class AzooKeyAsyncScheduler {
         let inferenceLimit: Int? = isPaused ? nil : AzooKeyConverter.whileTypingInferenceLimit
         pendingTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: debounceNanoseconds)
-            guard !Task.isCancelled else { return }
-            guard candidateGeneration == generation else { return }
+            guard !Task.isCancelled else {
+                pendingTask = nil
+                return
+            }
+            guard candidateGeneration == generation else {
+                pendingTask = nil
+                return
+            }
 
             let capturedReading = InputHandler.azooKeyReading(for: reading)
             let capturedContext = leftSideContext
@@ -93,6 +99,7 @@ final class AzooKeyAsyncScheduler {
                     converter.latencyStats.recordWastedFetch()
                     converter.fetchLogger.markLastFetchWasted(matchingReading: capturedReading)
                 }
+                pendingTask = nil
                 return
             }
             guard candidateGeneration == generation else {
@@ -100,14 +107,17 @@ final class AzooKeyAsyncScheduler {
                     converter.latencyStats.recordWastedFetch()
                     converter.fetchLogger.markLastFetchWasted(matchingReading: capturedReading)
                 }
+                pendingTask = nil
                 return
             }
             switch outcome {
             case .abortedBeforeFetch:
+                pendingTask = nil
                 return
             case .wastedAfterFetch:
                 converter.latencyStats.recordWastedFetch()
                 converter.fetchLogger.markLastFetchWasted(matchingReading: capturedReading)
+                pendingTask = nil
                 return
             case .success(let candidates):
                 pendingTask = nil

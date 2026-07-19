@@ -112,42 +112,64 @@ def run_focus_checks(sock: socket.socket, buf: bytearray) -> int:
         send(sock, buf, {"seed_history": {"input": seed_reading, "output": output, "times": times}})
         send(sock, buf, {"pos_backfill": True})
         send(sock, buf, {"type_string": romaji})
-        send(sock, buf, {"wait_azoo_key": {"timeoutMs": 3000}})
-        return send(sock, buf, {"state": True, "fields": ["selectedText", "candidateVisible", "composedHiragana"]})
+        wait = send(sock, buf, {"wait_azoo_key": {"timeoutMs": 3000}})
+        if not wait.get("ok"):
+            return {
+                "selectedText": None,
+                "candidateVisible": False,
+                "composedHiragana": None,
+                "waitOk": False,
+            }
+        state = send(sock, buf, {"state": True, "fields": ["selectedText", "candidateVisible", "composedHiragana"]})
+        state["waitOk"] = True
+        return state
 
-    # (label, output, seed_reading, romaji, expect_focus)
-    cases: list[tuple[str, str, str, str, bool]] = [
+    # (label, output, seed_reading, romaji, expected_composed, expect_focus)
+    cases: list[tuple[str, str, str, str, str, bool]] = [
         # ── 形容詞（閾値 3） ────────────────────────────────────
         # おいしい (4m): 2m で弾かれ、3m でフォーカス
-        ("adj  おいしい   2m  no-focus", "おいしい", "おいしい", "oi",     False),
-        ("adj  おいしい   3m  focus",    "おいしい", "おいしい", "oishi",  True),
+        ("adj  おいしい   2m  no-focus", "おいしい", "おいしい", "oi",     "おい",     False),
+        ("adj  おいしい   3m  focus",    "おいしい", "おいしい", "oishi",  "おいしい", True),
         # 面白い (5m): 2m で弾かれ、3m でフォーカス
-        ("adj  面白い     2m  no-focus", "面白い",   "おもしろい", "omo",    False),
-        ("adj  面白い     3m  focus",    "面白い",   "おもしろい", "omoshi", True),
+        ("adj  面白い     2m  no-focus", "面白い",   "おもしろい", "omo",    "おも",     False),
+        ("adj  面白い     3m  focus",    "面白い",   "おもしろい", "omoshi", "おもし",   True),
 
         # ── 動詞（閾値 3・回帰） ───────────────────────────────
         # 食べる (3m): 2m で弾かれ、3m でフォーカス
-        ("verb 食べる     2m  no-focus", "食べる",   "たべる",   "tabe",   False),
-        ("verb 食べる     3m  focus",    "食べる",   "たべる",   "taberu", True),
+        ("verb 食べる     2m  no-focus", "食べる",   "たべる",   "tabe",   "たべ",     False),
+        ("verb 食べる     3m  focus",    "食べる",   "たべる",   "taberu", "たべる",   True),
 
         # ── 名詞・固有名詞（閾値 2・回帰） ─────────────────────
         # 東京 (4m): 1m で弾かれ、2m でフォーカス
-        ("noun 東京       1m  no-focus", "東京",     "とうきょう", "to",    False),
-        ("noun 東京       2m  focus",    "東京",     "とうきょう", "tou",   True),
+        ("noun 東京       1m  no-focus", "東京",     "とうきょう", "to",    "と",       False),
+        ("noun 東京       2m  focus",    "東京",     "とうきょう", "tou",   "とう",     True),
 
         # ── 拗音含む語で mora_count の境界を確認 ────────────────
         # 習慣 (しゅうかん, 4m: しゅ=1, う=1, か=1, ん=1)
         # shu → しゅ (1m), shuu → しゅう (2m)
-        ("noun 習慣(拗音) 1m  no-focus", "習慣",     "しゅうかん", "shu",   False),
-        ("noun 習慣(拗音) 2m  focus",    "習慣",     "しゅうかん", "shuu",  True),
+        ("noun 習慣(拗音) 1m  no-focus", "習慣",     "しゅうかん", "shu",   "しゅ",     False),
+        ("noun 習慣(拗音) 2m  focus",    "習慣",     "しゅうかん", "shuu",  "しゅう",   True),
     ]
 
     failures: list[str] = []
-    for label, output, seed_reading, romaji, expect_focus in cases:
+    for label, output, seed_reading, romaji, expected_composed, expect_focus in cases:
         r = probe(output, seed_reading, romaji)
         sel = r.get("selectedText", "")
         composed = r.get("composedHiragana", "")
         mc = mora_count(composed) if composed else 0
+
+        if not r.get("waitOk", True):
+            print(f"[FAIL] {label}: wait_azoo_key timed out")
+            failures.append(label)
+            continue
+
+        if composed != expected_composed:
+            print(
+                f"[FAIL] {label}: composed mismatch expected={expected_composed!r} "
+                f"actual={composed!r} (wait/prefetch race?)"
+            )
+            failures.append(label)
+            continue
 
         ok = (sel == output) if expect_focus else (sel != output)
         mark = "PASS" if ok else "FAIL"

@@ -16,6 +16,7 @@ import sys
 SOCKET_PATH = os.path.join(os.environ.get("TMPDIR", "/tmp"), "keynaco-debug.sock")
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHIFT = 131072
+WAIT_AZOO_KEY = {"wait_azoo_key": {"timeoutMs": 3000}}
 
 MARKED_TEXT_SUITE: dict = {
     "before_each": [{"reset": True}],
@@ -47,7 +48,7 @@ MARKED_TEXT_SUITE: dict = {
             "name": "space-marked-follows-selection",
             "cmds": [
                 {"type_string": "kanzi"},
-                {"wait_azoo_key": True},
+                {"wait_azoo_key": {"timeoutMs": 3000}},
                 {"key": "space", "capture": {"picked": "selectedText"}},
                 {
                     "state": True,
@@ -64,7 +65,7 @@ MARKED_TEXT_SUITE: dict = {
             "name": "down-syncs-selected-while-composing",
             "cmds": [
                 {"type_string": "kanzi"},
-                {"wait_azoo_key": True},
+                {"wait_azoo_key": {"timeoutMs": 3000}},
                 {"key": "space"},
                 {"key": "down", "capture": {"row1": "selectedText"}},
                 {
@@ -82,7 +83,7 @@ MARKED_TEXT_SUITE: dict = {
             "name": "space-enter-commits-selected-candidate",
             "cmds": [
                 {"type_string": "kanzi"},
-                {"wait_azoo_key": True},
+                {"wait_azoo_key": {"timeoutMs": 3000}},
                 {"key": "space", "capture": {"picked": "selectedText"}},
                 {"key": "enter", "assert_contains": {"inserted": "{{picked}}"}},
             ],
@@ -164,7 +165,12 @@ def run_integrity_checks(sock: socket.socket, buf: bytearray) -> int:
     send(sock, buf, {"reset": True})
 
     send(sock, buf, {"type_string": "kanzi"})
-    send(sock, buf, {"wait_azoo_key": True})
+    wait = send(sock, buf, WAIT_AZOO_KEY)
+    if not wait.get("ok"):
+        failures.append(
+            f"wait_azoo_key(kanzi): ok=false pending={wait.get('pendingAzooKey')} "
+            f"reading={wait.get('pendingAzooKeyReading')!r}"
+        )
     r_passive = send(sock, buf, {"state": True})
     r_space = send(sock, buf, {"key": "space"})
     cands_before = list(r_passive.get("candidates", []))
@@ -184,7 +190,14 @@ def run_integrity_checks(sock: socket.socket, buf: bytearray) -> int:
 
     send(sock, buf, {"reset": True})
     send(sock, buf, {"seed_history": {"input": "じっそう", "output": "実装", "times": 5}})
-    r_j = send(sock, buf, {"type_string": "jissou", "then": "space"})
+    send(sock, buf, {"type_string": "jissou"})
+    wait = send(sock, buf, WAIT_AZOO_KEY)
+    if not wait.get("ok"):
+        failures.append(
+            f"wait_azoo_key(jissou): ok=false pending={wait.get('pendingAzooKey')} "
+            f"reading={wait.get('pendingAzooKeyReading')!r}"
+        )
+    r_j = send(sock, buf, {"key": "space"})
     cands = r_j.get("candidates", [])
     if "実装" not in cands:
         failures.append(f"shift-delete-setup: 実装 not in candidates: {cands[:6]}")

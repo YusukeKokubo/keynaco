@@ -38,7 +38,7 @@ CANDIDATE_CLEANUP_SUITE: dict = {
             "name": "passive-space-rebuilds-explicit",
             "cmds": [
                 {"type_string": "ai"},
-                {"wait_azoo_key": True},
+                {"wait_azoo_key": {"timeoutMs": 3000}},
                 {"key": "space"},
             ],
             "assert": {"isExplicitlySelected": True, "selectedRow": 0},
