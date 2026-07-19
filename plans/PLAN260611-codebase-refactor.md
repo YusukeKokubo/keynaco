@@ -1,11 +1,12 @@
 ---
-status: in-progress
+status: implemented
 created: 2026-06-11
+related_commit: 14a9a6a
 ---
 
 # PLAN260611: コードベース全体リファクタリング計画
 
-<!-- Phase 0–5 + post-key 追補完了。残タスク: Phase 6（plans/docs 棚卸し） -->
+**クローズ（2026-07-19、PLAN260719 triage）**: Phase 0–5 + post-key 追補完了。残っとった Phase 6（plans/docs 棚卸し）は [PLAN260719](PLAN260719-headroom-roadmap.md) の triage が実質の後継として実施。
 
 ## 背景と目的
 

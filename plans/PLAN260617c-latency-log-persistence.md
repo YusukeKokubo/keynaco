@@ -1,9 +1,12 @@
 ---
-status: draft
+status: implemented
 created: 2026-06-17
+related_commit: 336efdf
 ---
 
 # PLAN260617c: 打鍵レイテンシログの永続化
+
+**クローズ（2026-07-19、PLAN260719 triage）**: `latency_log.jsonl` として実装・稼働済み（`336efdf` 以降 `42a7a73`・`ed25fec`・`46f4d12`・`360a5d0` で拡張）。`/keynaco-latency-profiler` と perf-cycle 全 plan の計測基盤になっとる。draft のまま status 更新が漏れとっただけ。
 
 ## 目的
 

@@ -1,11 +1,14 @@
 ---
-status: draft
+status: superseded
 created: 2026-05-28
+superseded_by: PLAN260710-typing-feel-learning-gaps.md
 references:
   - plans/PLAN260528b-history-phrase-recording.md
 ---
 
 # PLAN260528: 履歴候補を文節単位で記録し、助詞付きフレーズのノイズを除去
+
+**superseded（2026-07-19、PLAN260719 triage）**: 問題意識（助詞付きフレーズの履歴ノイズ）は [PLAN260710](PLAN260710-typing-feel-learning-gaps.md) に引き継がれた。助詞トリムの判定は D1（[PLAN260710a](PLAN260710a-particle-trim-lcid.md)、lcid 判定化・実装済み）、文節完成形の記録方針は D2 で検討中。本 plan の文字列ベースの設計はそちらで置き換え。
 
 ## 問題
 

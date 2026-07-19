@@ -1,6 +1,7 @@
 ---
-status: in-progress
+status: implemented
 created: 2026-06-12
+related_commit: d8b79ca
 ---
 
 # PLAN260612: 候補生成の非同期二段階化 — 打鍵エコーを AzooKey から切り離す
@@ -377,3 +378,7 @@ Phase 3 後の残ギャップ:
 - Phase 0 で Release の p95 が閾値未満 → status: abandoned、計測結果を IDEA260612 へ追記
 - Phase 2 完了でこの plan の主目的は達成。Phase 3 / 4 は計測結果を見て個別判断
 - **実機 smoke**: 子音 dismiss 修正は sandbox 13/13（2026-06-14）。Electron Enter・連打チラつきは未記録
+
+## クローズ（2026-07-19、PLAN260719 triage）
+
+Phase 1–3.5 完了・主目的（打鍵エコーの非ブロッキング化 + Space 即時化）達成につき implemented。Phase 4（AzooKey upstream 貢献）は見送り。本 plan が持ち込んだ非同期パイプラインの複雑さ（世代管理 4 変数・二重 NSLock・キャッシュのロック外 read）の返済は [PLAN260706](PLAN260706-zero-base-hotpath-foundation.md) Phase 2 が後継。

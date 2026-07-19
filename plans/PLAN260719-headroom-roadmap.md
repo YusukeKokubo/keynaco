@@ -71,13 +71,13 @@ D1 の 14d 観察 → H5 D2 の要否確定
 
 | plan | 実態 | 処置 |
 |------|------|------|
-| PLAN260612（非同期二段階化） | Phase 3.5 まで ✅、主目的達成 | **implemented に更新**。複雑さ返済は PLAN260706 Phase 2 が後継、と一行追記 |
-| PLAN260617c（レイテンシログ永続化） | `latency_log.jsonl` として稼働中 = 本 plan 群の計測基盤そのもの | **implemented に更新** |
-| PLAN260528（履歴セグメントノイズ） | D1（lcid 判定トリム）+ D2 検討に実質吸収 | **superseded に更新**（後継: PLAN260710） |
+| PLAN260612（非同期二段階化） | Phase 3.5 まで ✅、主目的達成 | **implemented に更新**。複雑さ返済は PLAN260706 Phase 2 が後継、と一行追記 — ✅ 済（2026-07-19） |
+| PLAN260617c（レイテンシログ永続化） | `latency_log.jsonl` として稼働中 = 本 plan 群の計測基盤そのもの | **implemented に更新** — ✅ 済（2026-07-19） |
+| PLAN260528（履歴セグメントノイズ） | D1（lcid 判定トリム）+ D2 検討に実質吸収 | **superseded に更新**（後継: PLAN260710） — ✅ 済（2026-07-19） |
 | PLAN260621b（recency 重み強化） | E1 と同じ pain を別レバー（recency）で狙う draft | E1 着手時に**統合 or abandon を判断**（二重レバーは効果測定を壊す） |
 | POC260529（personalization n-gram） | 機構有効・データ律速で保持 | 観察継続。`docs/observation.md` への移管を検討 |
 | PLAN260523d（IME 簡素化） | Step 4（bracketOptions 間引き）のみ未着手 | Step 4 の要否を判断して**閉じる**（1 セッション仕事） |
-| PLAN260611（コードベースリファクタ） | 残タスクは Phase 6（plans/docs 棚卸し）のみ | 本 plan の triage が実質の後継 → **implemented に更新** |
+| PLAN260611（コードベースリファクタ） | 残タスクは Phase 6（plans/docs 棚卸し）のみ | 本 plan の triage が実質の後継 → **implemented に更新** — ✅ 済（2026-07-19） |
 
 ## 完了条件
 
