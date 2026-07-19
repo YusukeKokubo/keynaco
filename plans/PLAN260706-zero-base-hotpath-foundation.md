@@ -90,11 +90,12 @@ created: 2026-07-06
 
 ### Phase 2: 変換パイプラインの actor 化（複雑さの返済 + 次の一手の解禁）
 
-- [ ] `AzooKeyConverter` の変換・キャッシュを単一 actor（または単一直列 executor）に封じ、`LockedConverter` の NSLock・`liveGeneration` の第 2 NSLock・`abortBeforeFetch` クロージャ・手動 `Task.detached` 移送を廃止する
-- [ ] 世代管理を「投入時比較 1 回」に集約し、4 変数・判定 4 回を解消する。wasted 判定の「空配列 = abort」という暗黙契約も明示的な結果型にする
-- [ ] キャッシュ辞書のロック外 read（MainActor peek × detached write）を actor 隔離で構造的に消す
-- [ ] 同期 fetch 経路の rich キーを統一し、`lcidForCommitted` / `canonicalReading` をキャッシュ経由にする（Phase 1 のメモ化と重なる部分は統合）
-- [ ] 確定学習後にキャッシュを無効化（または該当読みだけ purge）する
+- [x] 世代管理を converter 側 `setLiveGeneration` に集約。scheduler の `LockedGeneration`・`abortBeforeFetch`・`Task.detached` を廃止（[PLAN260719a](PLAN260719a-converter-pipeline-phase2.md)）
+- [x] `FetchRequestOutcome` で aborted / wasted / success を明示
+- [x] キャッシュ read/write を `cacheLock` で直列化（peek は inference を待たない）
+- [x] 確定学習後に該当読みのキャッシュエントリを purge
+- [x] `lcidForCommitted` をキャッシュヒット優先に（ミス時のみ engine 問い合わせ）
+- [ ] `LockedConverter` の NSLock を actor / 単一直列 executor へ（本 PR は世代・キャッシュ。converter ロックは残存）
 
 **検証**: 挙動不変が原則。sandbox 回帰 3 本 + `/keynaco-ime-sandbox` で非同期到着タイミングの手動シナリオ。lock_wait・wasted fetch の再計測。Thread Sanitizer が回せるなら peek/fetch 並走の race 検査。
 

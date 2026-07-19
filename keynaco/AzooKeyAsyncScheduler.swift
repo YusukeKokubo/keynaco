@@ -10,16 +10,7 @@ final class AzooKeyAsyncScheduler {
     /// 後方互換・テスト用の固定 debounce（ポリシー未指定時のフォールバック）。
     static let debounceNanoseconds: UInt64 = AzooKeyDebouncePolicy.defaultNanoseconds
 
-    /// `Task.detached` から generation を読むためのスレッドセーフミラー。
-    private final class LockedGeneration: @unchecked Sendable {
-        private var value = 0
-        private let lock = NSLock()
-        func set(_ v: Int) { lock.withLock { value = v } }
-        func get() -> Int { lock.withLock { value } }
-    }
-
     private(set) var candidateGeneration = 0
-    private let liveGeneration = LockedGeneration()
     private var pendingTask: Task<Void, Never>?
     private var lastKeyDownInstant: ContinuousClock.Instant?
     private(set) var lastInterKeyIntervalMs: Double?
@@ -31,7 +22,7 @@ final class AzooKeyAsyncScheduler {
 
     /// keyDown ごとに呼ぶ。直前タスクをキャンセルし、新しい generation を返す。
     @discardableResult
-    func onKeyDown() -> Int {
+    func onKeyDown(converter: any AzooKeyConverting) -> Int {
         let now = ContinuousClock.now
         if let previous = lastKeyDownInstant {
             let delta = now - previous
@@ -44,7 +35,7 @@ final class AzooKeyAsyncScheduler {
         lastKeyDownInstant = now
 
         candidateGeneration += 1
-        liveGeneration.set(candidateGeneration)
+        converter.setLiveGeneration(candidateGeneration)
         cancelPendingWork()
         return candidateGeneration
     }
@@ -89,43 +80,39 @@ final class AzooKeyAsyncScheduler {
 
             let capturedReading = InputHandler.azooKeyReading(for: reading)
             let capturedContext = leftSideContext
-            let conv = converter
-            let genSnapshot = generation
-            let liveGen = liveGeneration
-            let fetchOptions = AzooKeyFetchOptions(
-                zenzaiInferenceLimit: inferenceLimit,
-                abortBeforeFetch: { liveGen.get() != genSnapshot }
+            let fetchOptions = AzooKeyFetchOptions(zenzaiInferenceLimit: inferenceLimit)
+            let outcome = await converter.requestCandidatesWhileTyping(
+                generation: generation,
+                hiragana: capturedReading,
+                leftSideContext: capturedContext,
+                options: fetchOptions
             )
 
-            let candidates = await Task.detached {
-                guard liveGen.get() == genSnapshot else { return [AzooKeyCandidate]() }
-                return conv.requestCandidates(
-                    hiragana: capturedReading,
-                    leftSideContext: capturedContext,
-                    richCandidates: true,
-                    options: fetchOptions
-                )
-            }.value
-
-            // detached が早期 bail（liveGen ≠ genSnapshot）すると空配列が返り fetch 自体走らんため wasted 扱いしない。
-            // 非空 = fetch が走った → ここで cancel/世代不一致なら結果破棄 = wasted。
-            let didRunFetch = !candidates.isEmpty
             guard !Task.isCancelled else {
-                if didRunFetch {
+                if outcome.didRunFetch {
                     converter.latencyStats.recordWastedFetch()
                     converter.fetchLogger.markLastFetchWasted(matchingReading: capturedReading)
                 }
                 return
             }
             guard candidateGeneration == generation else {
-                if didRunFetch {
+                if outcome.didRunFetch {
                     converter.latencyStats.recordWastedFetch()
                     converter.fetchLogger.markLastFetchWasted(matchingReading: capturedReading)
                 }
                 return
             }
-            pendingTask = nil
-            onComplete(candidates)
+            switch outcome {
+            case .abortedBeforeFetch:
+                return
+            case .wastedAfterFetch:
+                converter.latencyStats.recordWastedFetch()
+                converter.fetchLogger.markLastFetchWasted(matchingReading: capturedReading)
+                return
+            case .success(let candidates):
+                pendingTask = nil
+                onComplete(candidates)
+            }
         }
     }
 

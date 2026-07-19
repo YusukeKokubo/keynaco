@@ -8,7 +8,7 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
     func testScheduleUsesRichCandidates() async {
         let scheduler = AzooKeyAsyncScheduler()
         let stub = RichFlagStub()
-        let gen = scheduler.onKeyDown()
+        let gen = scheduler.onKeyDown(converter: stub)
 
         scheduler.schedule(
             generation: gen,
@@ -35,23 +35,24 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
 
     func testOnKeyDownRecordsInterKeyInterval() {
         let scheduler = AzooKeyAsyncScheduler()
-        _ = scheduler.onKeyDown()
+        let stub = RichFlagStub()
+        _ = scheduler.onKeyDown(converter: stub)
         XCTAssertNil(scheduler.lastInterKeyIntervalMs)
-        _ = scheduler.onKeyDown()
+        _ = scheduler.onKeyDown(converter: stub)
         XCTAssertNotNil(scheduler.lastInterKeyIntervalMs)
     }
 
     func testStaleGenerationSkipsDetachedWork() async {
         let scheduler = AzooKeyAsyncScheduler()
         let stub = RichFlagStub()
-        let gen = scheduler.onKeyDown()
+        let gen = scheduler.onKeyDown(converter: stub)
         scheduler.schedule(
             generation: gen,
             reading: "かんじ",
             leftSideContext: nil,
             converter: stub
         ) { _ in }
-        _ = scheduler.onKeyDown()
+        _ = scheduler.onKeyDown(converter: stub)
         try? await Task.sleep(nanoseconds: AzooKeyAsyncScheduler.debounceNanoseconds + 50_000_000)
         XCTAssertNil(stub.lastRichCandidates, "stale generation should skip requestCandidates")
     }
@@ -60,7 +61,7 @@ final class AzooKeyAsyncSchedulerTests: XCTestCase {
     func testOnCompleteRunsAfterPendingTaskCleared() async {
         let scheduler = AzooKeyAsyncScheduler()
         let stub = RichFlagStub()
-        let gen = scheduler.onKeyDown()
+        let gen = scheduler.onKeyDown(converter: stub)
         var pendingDuringCallback: Bool?
         scheduler.schedule(
             generation: gen,
@@ -83,6 +84,23 @@ private final class RichFlagStub: AzooKeyConverting, @unchecked Sendable {
     var fetchLogger: FetchLogger { FetchLogger.sharedNoOp }
     private(set) var lastRichCandidates: Bool?
     private(set) var requestCount = 0
+    private var liveGeneration = 0
+
+    func setLiveGeneration(_ generation: Int) {
+        liveGeneration = generation
+    }
+
+    func requestCandidatesWhileTyping(
+        generation: Int,
+        hiragana: String,
+        leftSideContext: String?,
+        options: AzooKeyFetchOptions
+    ) async -> FetchRequestOutcome {
+        guard generation == liveGeneration else { return .abortedBeforeFetch }
+        requestCount += 1
+        lastRichCandidates = true
+        return .success([.text("漢字")])
+    }
 
     func requestCandidates(
         hiragana: String,

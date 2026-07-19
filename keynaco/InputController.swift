@@ -265,7 +265,7 @@ class InputController: IMKInputController, @unchecked Sendable {
             cursorLocation: adapter.selectedRange().location
         )
         warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
-        let generation = azooKeyScheduler.onKeyDown()
+        let generation = azooKeyScheduler.onKeyDown(converter: handler.azooKeyConverter)
         KeydownLatencySignpost.onKeyDown(generation: generation)
         let pre = KeyEventPipeline.preSnapshot(handler: handler)
         let keyResult = KeyEventPipeline.runHandle(

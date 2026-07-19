@@ -460,7 +460,7 @@ extension DebugSocketServer {
     ) ? handler.lastConfirmedContext?.output : nil
     syncLeftSideContext()
     warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
-    let generation = azooKeyScheduler.onKeyDown()
+    let generation = azooKeyScheduler.onKeyDown(converter: handler.azooKeyConverter)
     let before = makeResponse(inserted: [])
     let pre = KeyEventPipeline.preSnapshot(handler: handler)
     let keyResult = KeyEventPipeline.runHandle(
@@ -643,7 +643,7 @@ extension DebugSocketServer {
     ) {
         let base = baseCharacters ?? characters
         syncLeftSideContext()
-        let generation = azooKeyScheduler.onKeyDown()
+        let generation = azooKeyScheduler.onKeyDown(converter: handler.azooKeyConverter)
         let pre = KeyEventPipeline.preSnapshot(handler: handler)
         let keyResult = KeyEventPipeline.runHandle(
             handler: &handler,

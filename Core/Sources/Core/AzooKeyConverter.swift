@@ -34,6 +34,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
 
     // llama_context (Zenzai) は非スレッドセーフ。LockedConverter が全 converter.* 呼び出しを直列化する。
     private let locked = LockedConverter()
+    private let cacheLock = NSLock()
+    private let generationLock = NSLock()
+    private var liveGeneration = 0
     private var candidateCache: [String: [Candidate]] = [:]
     private var candidateCacheKeys: [String] = []
     let candidateCacheLimit = 200
@@ -50,8 +53,6 @@ public final class AzooKeyConverter: @unchecked Sendable {
     private let zenzaiProfile: String
     private let zenzaiInferenceLimit: Int
     private var commitLockURL: URL { memoryURL.appendingPathComponent(".commit_lock") }
-
-    var candidateCacheCount: Int { candidateCache.count }
 
     private static func cacheKey(segment: String, leftSideContext: String?, richCandidates: Bool) -> String {
         // 読み2文字以下はZenzaiの文脈効果がほぼなく、文脈をキーに含めるとミス率が急増するため除外する
@@ -108,8 +109,20 @@ public final class AzooKeyConverter: @unchecked Sendable {
         return u
     }
 
-    // LockedConverter.withLock のクロージャ内（ロック保持中）から呼ぶこと
-    private func insertCache(key: String, value: [Candidate]) {
+    var candidateCacheCount: Int {
+        cacheLock.withLock { candidateCache.count }
+    }
+
+    public func setLiveGeneration(_ generation: Int) {
+        generationLock.withLock { liveGeneration = generation }
+    }
+
+    private func currentLiveGeneration() -> Int {
+        generationLock.withLock { liveGeneration }
+    }
+
+    // LockedConverter.withLock のクロージャ内から呼ぶこと
+    private func insertCacheUnderLock(key: String, value: [Candidate]) {
         if candidateCache[key] != nil {
             candidateCacheKeys.removeAll { $0 == key }
         } else if candidateCache.count >= candidateCacheLimit {
@@ -121,6 +134,39 @@ public final class AzooKeyConverter: @unchecked Sendable {
         }
         candidateCache[key] = value
         candidateCacheKeys.append(key)
+    }
+
+    private func insertCache(key: String, value: [Candidate]) {
+        cacheLock.withLock { insertCacheUnderLock(key: key, value: value) }
+    }
+
+    private func purgeCache(forReading reading: String) {
+        cacheLock.withLock {
+            let keysToRemove = candidateCacheKeys.filter { Self.cacheSegment(fromCacheKey: $0) == reading }
+            for key in keysToRemove {
+                candidateCache.removeValue(forKey: key)
+                candidateCacheKeys.removeAll { $0 == key }
+            }
+        }
+    }
+
+    private func cachedCandidates(for key: String) -> [Candidate]? {
+        cacheLock.withLock {
+            guard let cached = candidateCache[key] else { return nil }
+            insertCacheUnderLock(key: key, value: cached)
+            return cached
+        }
+    }
+
+    private func cachedCandidate(reading: String, text: String) -> Candidate? {
+        cacheLock.withLock {
+            for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
+                if let candidate = candidates.first(where: { $0.text == text }) {
+                    return candidate
+                }
+            }
+            return nil
+        }
     }
 
     /// 読み 2 文字以下のキャッシュキーは pinned 扱いで LRU から除外する（PLAN260704b A4）。
@@ -173,32 +219,31 @@ public final class AzooKeyConverter: @unchecked Sendable {
             leftSideContext: leftSideContext,
             richCandidates: richCandidates
         )
-        if let cached = candidateCache[exactKey] {
-            let items = Self.displayCandidates(from: cached, inputLength: hiragana.count)
-            guard !items.isEmpty else { return nil }
-            let peek = AzooKeyCachePeek(candidates: items, match: .exact)
-            recordCachePeek(hiragana: hiragana, peek: peek)
-            return peek
+        let peek = cacheLock.withLock { () -> AzooKeyCachePeek? in
+            if let cached = candidateCache[exactKey] {
+                let items = Self.displayCandidates(from: cached, inputLength: hiragana.count)
+                guard !items.isEmpty else { return nil }
+                return AzooKeyCachePeek(candidates: items, match: .exact)
+            }
+            var bestPrefix: String?
+            var bestCandidates: [Candidate]?
+            for key in candidateCacheKeys.reversed() {
+                let segment = Self.cacheSegment(fromCacheKey: key)
+                guard segment.count < hiragana.count, hiragana.hasPrefix(segment) else { continue }
+                guard key == Self.cacheKey(segment: segment, leftSideContext: leftSideContext, richCandidates: richCandidates) else { continue }
+                if let current = bestPrefix, segment.count <= current.count { continue }
+                bestPrefix = segment
+                bestCandidates = candidateCache[key]
+            }
+            if let segment = bestPrefix, let cached = bestCandidates {
+                let items = Self.displayCandidates(from: cached, inputLength: segment.count)
+                guard !items.isEmpty else { return nil }
+                return AzooKeyCachePeek(candidates: items, match: .prefix(sourceReading: segment))
+            }
+            return nil
         }
-        var bestPrefix: String?
-        var bestCandidates: [Candidate]?
-        for key in candidateCacheKeys.reversed() {
-            let segment = Self.cacheSegment(fromCacheKey: key)
-            guard segment.count < hiragana.count, hiragana.hasPrefix(segment) else { continue }
-            guard key == Self.cacheKey(segment: segment, leftSideContext: leftSideContext, richCandidates: richCandidates) else { continue }
-            if let current = bestPrefix, segment.count <= current.count { continue }
-            bestPrefix = segment
-            bestCandidates = candidateCache[key]
-        }
-        if let segment = bestPrefix, let cached = bestCandidates {
-            let items = Self.displayCandidates(from: cached, inputLength: segment.count)
-            guard !items.isEmpty else { return nil }
-            let peek = AzooKeyCachePeek(candidates: items, match: .prefix(sourceReading: segment))
-            recordCachePeek(hiragana: hiragana, peek: peek)
-            return peek
-        }
-        recordCachePeek(hiragana: hiragana, peek: nil)
-        return nil
+        recordCachePeek(hiragana: hiragana, peek: peek)
+        return peek
     }
 
     private func recordCachePeek(hiragana: String, peek: AzooKeyCachePeek?) {
@@ -230,6 +275,25 @@ public final class AzooKeyConverter: @unchecked Sendable {
         )
     }
 
+    public func requestCandidatesWhileTyping(
+        generation: Int,
+        hiragana: String,
+        leftSideContext: String?,
+        options: AzooKeyFetchOptions
+    ) async -> FetchRequestOutcome {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
+                continuation.resume(returning: self.fetchCandidatesCheckingGeneration(
+                    generation: generation,
+                    hiragana: hiragana,
+                    leftSideContext: leftSideContext,
+                    richCandidates: true,
+                    options: options
+                ))
+            }
+        }
+    }
+
     public func requestCandidates(
         hiragana: String,
         leftSideContext: String?,
@@ -238,10 +302,54 @@ public final class AzooKeyConverter: @unchecked Sendable {
     ) -> [AzooKeyCandidate] {
         let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
         let inputLength = hiragana.count
-        if let cached = candidateCache[key] {
-            insertCache(key: key, value: cached)
+        if let cached = cachedCandidates(for: key) {
             return Self.displayCandidates(from: cached, inputLength: inputLength)
         }
+        return performFetch(
+            hiragana: hiragana,
+            leftSideContext: leftSideContext,
+            richCandidates: richCandidates,
+            options: options,
+            cacheKey: key,
+            inputLength: inputLength
+        )
+    }
+
+    private func fetchCandidatesCheckingGeneration(
+        generation: Int,
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions
+    ) -> FetchRequestOutcome {
+        guard generation == currentLiveGeneration() else { return .abortedBeforeFetch }
+        let key = Self.cacheKey(segment: hiragana, leftSideContext: leftSideContext, richCandidates: richCandidates)
+        let inputLength = hiragana.count
+        if let cached = cachedCandidates(for: key) {
+            guard generation == currentLiveGeneration() else { return .wastedAfterFetch }
+            return .success(Self.displayCandidates(from: cached, inputLength: inputLength))
+        }
+        guard generation == currentLiveGeneration() else { return .abortedBeforeFetch }
+        let candidates = performFetch(
+            hiragana: hiragana,
+            leftSideContext: leftSideContext,
+            richCandidates: richCandidates,
+            options: options,
+            cacheKey: key,
+            inputLength: inputLength
+        )
+        guard generation == currentLiveGeneration() else { return .wastedAfterFetch }
+        return .success(candidates)
+    }
+
+    private func performFetch(
+        hiragana: String,
+        leftSideContext: String?,
+        richCandidates: Bool,
+        options: AzooKeyFetchOptions,
+        cacheKey key: String,
+        inputLength: Int
+    ) -> [AzooKeyCandidate] {
         var text = ComposingText()
         text.insertAtCursorPosition(hiragana, inputStyle: .direct)
         let convertOptions = makeOptions(
@@ -250,11 +358,7 @@ public final class AzooKeyConverter: @unchecked Sendable {
             inferenceLimit: options.zenzaiInferenceLimit
         )
         let lockRequestedAt = CFAbsoluteTimeGetCurrent()
-        let abortBeforeFetch = options.abortBeforeFetch
         return locked.withLock { c in
-            if abortBeforeFetch?() == true {
-                return [AzooKeyCandidate]()
-            }
             let lockWaitMs = (CFAbsoluteTimeGetCurrent() - lockRequestedAt) * 1000
             os_signpost(.begin, log: spLog, name: "requestCandidates", "%{public}s", hiragana)
             let t0 = CFAbsoluteTimeGetCurrent()
@@ -371,53 +475,38 @@ public final class AzooKeyConverter: @unchecked Sendable {
     }
 
     public func commit(reading: String, text: String) {
+        guard let candidate = cachedCandidate(reading: reading, text: text) else { return }
         locked.withLock { c in
-            for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
-                if let candidate = candidates.first(where: { $0.text == text }) {
-                    FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
-                    c.updateLearningData(candidate)
-                    c.commitUpdateLearningData()
-                    try? FileManager.default.removeItem(at: commitLockURL)
-                    return
-                }
-            }
+            FileManager.default.createFile(atPath: commitLockURL.path, contents: nil)
+            c.updateLearningData(candidate)
+            c.commitUpdateLearningData()
+            try? FileManager.default.removeItem(at: commitLockURL)
         }
+        purgeCache(forReading: reading)
     }
 
     /// キャッシュから候補の canonical reading（各 data 要素の ruby を連結）を返す。
     /// prefix-focus で短い読みで確定した場合に、本来の読みで履歴を保存するために使う。
     /// キャッシュミス（未変換 or キャッシュ evict 済み）の場合は nil。
     public func canonicalReading(for reading: String, text: String) -> String? {
-        locked.withLock { _ in
-            for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
-                if let candidate = candidates.first(where: { $0.text == text }) {
-                    let ruby = candidate.data.map(\.ruby).joined()
-                    return ruby.isEmpty ? nil : ruby
-                }
-            }
-            return nil
-        }
+        guard let candidate = cachedCandidate(reading: reading, text: text) else { return nil }
+        let ruby = candidate.data.map(\.ruby).joined()
+        return ruby.isEmpty ? nil : ruby
     }
 
     /// キャッシュ上の候補の `data` セグメント構成（PLAN260710a POC ゲート用）。
     /// `requestCandidates` 済みでキャッシュに残っていることが前提。ミスなら nil。
     public func segmentSnapshots(for reading: String, text: String) -> [AzooKeySegmentSnapshot]? {
-        locked.withLock { _ in
-            for (key, candidates) in candidateCache where Self.cacheSegment(fromCacheKey: key) == reading {
-                if let candidate = candidates.first(where: { $0.text == text }) {
-                    return candidate.data.map { element in
-                        AzooKeySegmentSnapshot(
-                            word: element.word,
-                            ruby: element.ruby,
-                            lcid: element.lcid,
-                            rcid: element.rcid,
-                            isJoshiLcid: CIDData.isJoshi(cid: element.lcid),
-                            isJoshiRcid: CIDData.isJoshi(cid: element.rcid)
-                        )
-                    }
-                }
-            }
-            return nil
+        guard let candidate = cachedCandidate(reading: reading, text: text) else { return nil }
+        return candidate.data.map { element in
+            AzooKeySegmentSnapshot(
+                word: element.word,
+                ruby: element.ruby,
+                lcid: element.lcid,
+                rcid: element.rcid,
+                isJoshiLcid: CIDData.isJoshi(cid: element.lcid),
+                isJoshiRcid: CIDData.isJoshi(cid: element.rcid)
+            )
         }
     }
 
@@ -436,6 +525,9 @@ public final class AzooKeyConverter: @unchecked Sendable {
     /// 確定済み `(reading, output)` に対応する候補の代表 `lcid` を辞書ルックアップで返す（Zenzai 不使用）。
     public func lcidForCommitted(reading: String, output: String) -> Int? {
         guard !reading.isEmpty else { return nil }
+        if let candidate = cachedCandidate(reading: reading, text: output) {
+            return Self.primaryLcid(from: candidate.data)
+        }
         var text = ComposingText()
         text.insertAtCursorPosition(reading, inputStyle: .direct)
         return locked.withLock { c in

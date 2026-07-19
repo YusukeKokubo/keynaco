@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in-progress
 created: 2026-07-19
 ---
 
@@ -27,7 +27,7 @@ created: 2026-07-19
 
 | ID | 施策 | 層 | 期待効果（根拠） | 正本 plan | 状態 |
 |----|------|-----|-----------------|-----------|------|
-| H1 | Phase 2: converter actor 化 + 世代管理集約 + 学習後キャッシュ無効化 | 非同期パイプライン | debounce 短縮・投機 prefetch の**解禁**。wasted fetch 37.8% の実行前破棄 | PLAN260706 Phase 2 | 未着手（着手可） |
+| H1 | Phase 2: converter actor 化 + 世代管理集約 + 学習後キャッシュ無効化 | 非同期パイプライン | debounce 短縮・投機 prefetch の**解禁**。wasted fetch 37.8% の実行前破棄 | [PLAN260719a](PLAN260719a-converter-pipeline-phase2.md) | **着手済**（2026-07-19） |
 | H2 | debounce 再チューニング | 同上（H1 後） | 待ち median 110ms → 50〜60ms 級。fetch_complete p50 の最大単一成分 | PLAN260706 Phase 4 枠 → 個別 plan | H1 待ち |
 | H3 | E1 prefix 習慣学習（whileTyping 限定） | 履歴 DB + スコア | とりひ/れびゅ/してき型 66+ pain/14d。**pain 側の最大単一レバー** | PLAN260710 E1 | D1 window（〜07-24）待ち |
 | H4 | F1 起動キャッシュウォームアップ | キャッシュ | 2 文字 miss 4613 件/7d のセッション頭分 | PLAN260710 F1 | H1 後（キャッシュ構造の安定後） |
