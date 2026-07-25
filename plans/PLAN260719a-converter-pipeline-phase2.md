@@ -54,6 +54,14 @@ parent_roadmap: PLAN260719-headroom-roadmap.md
 
 **Phase 2 では触らない**: debounce 数値変更（H2）、増分 lattice（H6）、スコアリング単純化（Phase 3）。
 
+### 同梱した H2 前提検証スイッチ（デフォルト無効）
+
+`AzooKeyDebouncePolicy.overrideMs`（`defaults write com.yusuke.inputmethod.keynaco debugDebounceOverrideMs -int 70` → 再起動）を追加した。**未設定なら通常ポリシーのままなので Phase 2 の指標には影響せん**。
+
+狙いは残タスク（`LockedConverter` → 直列 executor）の投資判断の前提を 1 定数で確かめること。最新ビルド（845）の実測は `lock_wait p95 = 0ms / max 55ms` で、**ロック待ちがそもそも起きとらん**。この状態が「debounce 90–120ms で発火を絞った結果」なのか「直列化がもう壁になっとらん」のかで残タスクの価値が変わる。override で 70ms に詰めて lock_wait が復活するなら前者＝残タスクに意味あり、復活せんなら後者＝残タスクは保守性目的に格下げし、無駄先読みの主因（推論時間そのもの、H6）へ寄せる。
+
+**実験順序**: Phase 2 前半の 7d 計測を先に取り切る → その後 override を立てて別セッション群として測る（同時に動かすと wasted fetch がどちらの効果か分からんくなる）。
+
 ## 5. 検証ゲート
 
 | # | 条件 |

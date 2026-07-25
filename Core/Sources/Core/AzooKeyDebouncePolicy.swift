@@ -28,6 +28,22 @@ public enum AzooKeyDebouncePolicy {
     public static let maxNanoseconds: UInt64 = 120_000_000
     public static let defaultNanoseconds: UInt64 = 70_000_000
 
+    /// 実験用の debounce 固定上書き（ms）。未設定 / 0 以下なら通常ポリシー。
+    ///
+    /// 狙いは「debounce を詰めるとロック待ちが復活するか」の因果確認。実測では最新ビルドの
+    /// `lock_wait p95 = 0ms` だが、これは debounce 90–120ms で発火を絞った結果である可能性があり、
+    /// 「直列化が debounce 短縮の壁」という仮説を 1 定数で直接確かめるために置く（PLAN260719 H2 の前提）。
+    ///
+    /// **プロセス起動時に一度だけ読む**。実験はセッション単位で分離したいので、途中で切り替わらん方が
+    /// `latency_log.jsonl` の `debounce_policy_p50_ms` とセッション行の対応が取れる。
+    ///
+    /// 使い方: `defaults write com.yusuke.inputmethod.keynaco debugDebounceOverrideMs -int 70` → keynaco 再起動。
+    /// 戻すときは `defaults delete`（or `-int 0`）→ 再起動。
+    public static let overrideMs: Double? = {
+        let value = UserDefaults.standard.double(forKey: "debugDebounceOverrideMs")
+        return value > 0 ? min(value, 500) : nil
+    }()
+
     public static func nanoseconds(for input: AzooKeyDebounceInput) -> UInt64 {
         var ms: Double = 70
         let isPaused = (input.interKeyIntervalMs ?? 0) >= 160
@@ -52,16 +68,28 @@ public enum AzooKeyDebouncePolicy {
         return UInt64(clamped * 1_000_000)
     }
 
-    /// 本番 / sandbox 共通の debounce 入力組み立て。
+    /// 本番 / sandbox 共通の debounce 入力組み立て。`overrideMs` が立っとればそれを優先する。
     public static func nanoseconds(
         interKeyIntervalMs: Double?,
         pendingRomaji: String,
         reading: String
     ) -> UInt64 {
-        nanoseconds(for: AzooKeyDebounceInput(
-            interKeyIntervalMs: interKeyIntervalMs,
-            hasPendingRomaji: !pendingRomaji.isEmpty,
-            readingLength: reading.count
-        ))
+        resolveNanoseconds(
+            overrideMs: overrideMs,
+            input: AzooKeyDebounceInput(
+                interKeyIntervalMs: interKeyIntervalMs,
+                hasPendingRomaji: !pendingRomaji.isEmpty,
+                readingLength: reading.count
+            )
+        )
+    }
+
+    /// `overrideMs` の適用を純粋関数として切り出したもの（`overrideMs` は起動時固定でテストから差せんため）。
+    /// 上書き値は clamp を通さない——実験で 40ms 未満も試せるようにするのが目的。
+    public static func resolveNanoseconds(overrideMs: Double?, input: AzooKeyDebounceInput) -> UInt64 {
+        if let overrideMs, overrideMs > 0 {
+            return UInt64(overrideMs * 1_000_000)
+        }
+        return nanoseconds(for: input)
     }
 }

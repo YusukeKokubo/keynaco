@@ -87,4 +87,37 @@ final class AzooKeyDebouncePolicyTests: XCTestCase {
         ))
         XCTAssertEqual(ns, 90_000_000)
     }
+
+    // MARK: - 実験用 override
+
+    /// override が立っとる間は、通常なら 120ms 床が効く条件（短読み・pause なし）でも上書き値が勝つ。
+    /// これが効かんと「debounce を詰めたらロック待ちが復活するか」の実験そのものが成立せん。
+    func testOverrideWinsOverPolicyIncludingShortReadingFloor() {
+        let ns = AzooKeyDebouncePolicy.resolveNanoseconds(
+            overrideMs: 70,
+            input: AzooKeyDebounceInput(
+                interKeyIntervalMs: 60,
+                hasPendingRomaji: false,
+                readingLength: 2
+            )
+        )
+        XCTAssertEqual(ns, 70_000_000)
+    }
+
+    /// override は clamp を通さない（40ms 未満も実験できることが要件）。
+    func testOverrideBypassesLowerClamp() {
+        let ns = AzooKeyDebouncePolicy.resolveNanoseconds(
+            overrideMs: 20,
+            input: AzooKeyDebounceInput(interKeyIntervalMs: 60, hasPendingRomaji: false, readingLength: 4)
+        )
+        XCTAssertEqual(ns, 20_000_000)
+    }
+
+    /// 未設定・0 以下は通常ポリシーに落ちる（実験を戻し忘れても本番挙動が変わらんこと）。
+    func testNilOrNonPositiveOverrideFallsBackToPolicy() {
+        let input = AzooKeyDebounceInput(interKeyIntervalMs: 120, hasPendingRomaji: false, readingLength: 3)
+        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: nil, input: input), 90_000_000)
+        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: 0, input: input), 90_000_000)
+        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: -5, input: input), 90_000_000)
+    }
 }
