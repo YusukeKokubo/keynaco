@@ -12,32 +12,21 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | [`docs/retrospectives.md`](docs/retrospectives.md) | 個別失敗から抽出した開発判断・運用のメタルール |
 | [`docs/apple-intelligence.md`](docs/apple-intelligence.md) | FoundationModels の制約・実験結果・使いどころ |
 | [`docs/observation.md`](docs/observation.md) | 経過観察中の機能（実装済みだが価値未確定。卒業/廃止を判断するためのリスト） |
+| [`docs/zenzai-params.md`](docs/zenzai-params.md) | Zenzai 制御パラメータ（zenz-v3 の条件付き変換）の効き方と UI 露出の判断 |
 
 **ドキュメント方針**: docs/ にはコードから引き出せない情報（理由・哲学・経験的失敗・俯瞰図）のみ置く。用語定義・behavior spec・入力シナリオは該当変数/関数の `///` ドキュメントコメントとテストが正本。**コード = 真実、ドキュメント = 真実から引き出せないもの限定**。
 
 ## ディレクトリ構成
 
-| パス | 内容 |
-|------|------|
-| `keynaco/` | アプリターゲット（Swift ソース + Info.plist + entitlements + リソース） |
-| `keynaco/Settings/` | 設定画面（`SettingsWindowController` 等 6 ファイル。ユーザー辞書・ひらがな優先・変換履歴・Zenzai の 4 タブ） |
-| `keynaco/Resources/` | バンドルリソース（`zenz-v3.2-small-gguf/` = Zenzai モデル git submodule） |
-| `keynaco/Debug/` | デバッグ用ツール（`DebugSocketServer`・`IMESandboxWindow`・`SocketMockClient` 等、本番動作には影響しない） |
-| `Core/` | Swift Package `KeynacoCore`（入力ロジック・DB・LLM 補助。`Core/Package.swift`） |
-| `Core/Sources/Core/` | `KeynacoCore` の実装（`InputHandler` 等） |
-| `Core/Sources/CoreTests/` | fast ユニットテスト（`InputHandler*` スタブ中心） |
-| `Core/Sources/CoreSlowTests/` | slow テスト（AzooKey 実辞書・POS 分類） |
-| `Core/Sources/KeynacoTestSupport/` | テストヘルパー（`MockTextClient` 等） |
-| `keynacoTests/` | アプリ専用テスト（`SurroundingIMKContext` 等） |
-| `keynaco.xcodeproj` | Xcode プロジェクト（リポジトリ管理。ローカル SPM で `Core/` を参照） |
-| `docs/` | `concept.md`（差別化軸）・`retrospectives.md`（メタルール）・`rejected.md`（不採用機能）・`domain/`（用語・状態遷移・シナリオ） |
+レイアウトそのものは `ls` で分かる。ここに書くのは命名規約と、見ただけでは分からんディレクトリの性格だけ。
+
+| パス | 規約・注意 |
+|------|-----------|
 | `plans/` | 設計・調査メモ（`PLAN<YYMMDD>[-letter]-<slug>.md` / `POC<…>.md`。規約は `plans-audit/references/plan-frontmatter.md`） |
-| `scripts/` | 開発用スクリプト（下記参照） |
 | `ideas/` | アイデアメモ（`IDEA<YYMMDD>.md` 形式） |
-| `make_icons.swift` | アイコン素材を各サイズに切り出すスクリプト |
 | `issues/` | バグ・課題メモ（`ISSUE<YYMMDD>.md` 形式） |
+| `keynaco/Debug/` | デバッグ用ツール。本番動作には影響しない |
 | `LocalPackages/` | Xcode が生成するローカル SPM キャッシュ（ソースなし。`.build/` と `.swiftpm/` のみ） |
-| `CHANGELOG.md` | リリースノート |
 
 ### スクリプト一覧（`scripts/`）
 
@@ -51,11 +40,6 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `test_candidate_cleanup_sandbox.sh` | passive/explicit Space・機能語 dismiss のソケット回帰（候補整理後の主要動線） |
 | `cleanup_history_db.py` | history.db の重複読み統合・助詞行削除（ドライランあり。`--apply` で実行・自動バックアップ） |
 | `test_prefix_focus.py` | 打鍵中 prefix focus の品詞別モーラ閾値回帰（形容詞 3 / 動詞 3 / 名詞 2 / 拗音 mora_count） |
-
-### 起動チェーン（IMK ブートストラップ）
-
-`main.swift` → `NSManualApplication`（`NSApplication` サブクラス）→ `AppDelegate` →
-`IMKServer` を生成し `InputController`（`IMKInputController` サブクラス）を登録。
 
 ## ビルド・インストール
 
@@ -79,54 +63,14 @@ xcodebuild build -scheme keynaco -destination "platform=macOS" \
   モデルがなくても Zenzai 機能がオフにフォールバックするだけでビルド自体は通る
 - POS 分類（`AzooKeyPOSClassifier`）は AzooKey 辞書の `lcid` + 接続詞/感動詞辞書によるルールベース実装。Apple Intelligence 不要。起動時に `AzooKeyPOSBackfill` で未分類エントリを一括再分類する。以前の `LLMPOSClassifier`（FoundationModels）は精度壊滅（77% が `other`）のため削除済み。`LLMSegmentConverter`（セグメントモード LLM 補助）は Zenzai ON 環境での効果がなく削除済み。
 
-### Zenzai 制御パラメータ（zenz-v3 の条件付き変換）
-
-zenz-v3 は制御トークンを使って変換確率分布をバイアスする「条件付き変換モデル」。各パラメータは最大 25 文字で、キーワードを `,` 区切りで書くのが効率的。
-
-| パラメータ | 制御トークン | 役割 | 効果的な入力例 |
-|-----------|------------|------|--------------|
-| `profile` | `\u{EE03}` | 執筆者の属性 | `ITエンジニア,技術文書` |
-| `topic`   | `\u{EE04}` | 執筆内容・話題 | `料理,レシピ` |
-| `style`   | `\u{EE05}` | 文体・トーン | `ですます,箇条書き` |
-| `preference` | `\u{EE06}` | ユーザー固有の癖 | `旧字体優先` |
-
-- **効果が出やすい**: 専門職（`医師`・`弁護士`）、特定分野（`競馬`・`アニメ`）、文体（`SNS`・`2ch`）。同音異義語の選択が変わる
-- **効果が出にくい**: 個人名（`田中太郎`）、挨拶文、汎用的すぎる語（`普通の人`）
-- keynaco は現在 `profile` のみ UI に露出。`topic`/`style`/`preference` は zenz-v3.1-small では測定可能な効果がないため UI から削除済み（`plans/POC260524-zenzai-topic-inference.md` 参照）。AzooKey API 自体は引き続きサポートしているが、keynaco では使用しない。
-
 ## テスト実行
 
-アプリ＋ IMK 関連テスト:
+コマンドは上のスクリプト一覧を参照（普段は fast の `./scripts/test_core.sh` のみ）。アプリ＋ IMK 関連は `xcodebuild test -scheme keynaco -destination "platform=macOS"`。
 
-```bash
-xcodebuild test -scheme keynaco -destination "platform=macOS"
-```
-
-コアロジック（`KeynacoCore` / SPM）— **普段は fast のみ**（`InputHandler*` スタブ中心、約 10 秒台）:
-
-```bash
-./scripts/test_core.sh
-```
-
-AzooKey 実辞書・POS 分類（`KeynacoCoreSlowTests`、約 8 秒台）:
-
-```bash
-./scripts/test_core_slow.sh
-```
-
-fast + slow 両方（CI・リリース前）:
-
-```bash
-./scripts/test_core_all.sh
-```
-
-`cd Core && swift test` も slow 含めて全部走る。slow のみ除外するなら `swift test --filter KeynacoCoreTests`。
-
-末尾に `✔ Test run with 0 tests in 0 suites passed` が出るが正常（Swift Testing framework のノイズ）。XCTest の結果は `Executed N tests` として別途出力される。
+- `cd Core && swift test` は slow 含めて全部走る。slow のみ除外するなら `swift test --filter KeynacoCoreTests`
+- 末尾に `✔ Test run with 0 tests in 0 suites passed` が出るが正常（Swift Testing framework のノイズ）。XCTest の結果は `Executed N tests` として別途出力される
 
 ## コンポーネント構成
-
-アプリ層（`keynaco/`）が `InputMethodKit` を通じてキーイベントを受け取り、`KeynacoCore`（`Core/`）の `InputHandler` struct（Swift 6 strict concurrency）でロジックを処理。変換は AzooKey API（`AzooKeyConverter`）+ Zenzai 経由、履歴は SQLite（`DatabaseManager`）、候補ウィンドウは自作 `NSWindow`（`CandidateWindow.swift`）。
 
 各クラス・関数・主要変数の振る舞いと不変条件は `///` ドキュメントコメントが正本（`fetchHistoryScoredMerged` の SUM 集計禁止、`recordPrefixes` の同一 output 最長読み統合、`isExplicitlySelected` の意味、`RomajiConverter` の `nn` 両方消費など）。
 
@@ -149,13 +93,7 @@ fast + slow 両方（CI・リリース前）:
 
 ## パフォーマンス計測
 
-Instruments によるプロファイリングは IME では実用的でない（UI にフォーカスが奪われ自然な打鍵ができない）。in-process 記録が唯一の実用手段。Claude Code からそのまま読んで分析できる。
-
-| ログ | パス | 内容 |
-|------|------|------|
-| `latency_log.jsonl` | `~/Library/Application Support/keynaco/latency_log.jsonl` | 変換レイテンシ・キャッシュヒット率（セッション単位）。`/keynaco-latency-profiler` スキルで分析 |
-| `input_log.jsonl` | `~/Library/Application Support/keynaco/input_log.jsonl` | 確定ごとの入力品質（`key_count`・`bs_count`・`composition_ms`・`was_explicit`）。バッファ 10 件 or `deactivateServer` でフラッシュ |
-| `divergence_log.jsonl` | `~/Library/Application Support/keynaco/divergence_log.jsonl` | Zenzai が推した Z1 と実確定が食い違ったケースだけ 1 行記録。`was_explicit=false` なら自動表示中の素通り事故、`true` なら Z1 精度の改善余地（カタカナ偏向など）。バッファ 10 件 or `deactivateServer` でフラッシュ |
+Instruments は IME では実用的でない（UI にフォーカスが奪われ自然な打鍵ができない）。in-process 記録が唯一の実用手段で、`~/Library/Application Support/keynaco/` 配下の 3 種の JSONL に落ちる。ログの内訳とフラッシュ条件は `/keynaco-latency-profiler` スキルの `references/log-files.md` を参照。
 
 ## テスト方針
 
