@@ -40,6 +40,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 | `test_candidate_cleanup_sandbox.sh` | passive/explicit Space・機能語 dismiss のソケット回帰（候補整理後の主要動線） |
 | `cleanup_history_db.py` | history.db の重複読み統合・助詞行削除（ドライランあり。`--apply` で実行・自動バックアップ） |
 | `test_prefix_focus.py` | 打鍵中 prefix focus の品詞別モーラ閾値回帰（形容詞 3 / 動詞 3 / 名詞 2 / 拗音 mora_count） |
+| `analyze_input.py` | `input_log.jsonl` の入力品質分析（`--ts-start` / `--ts-end` / `--tail` で期間・件数を絞れる） |
 
 ## ビルド・インストール
 
@@ -65,7 +66,7 @@ xcodebuild build -scheme keynaco -destination "platform=macOS" \
 
 ## テスト実行
 
-コマンドは上のスクリプト一覧を参照（普段は fast の `./scripts/test_core.sh` のみ）。アプリ＋ IMK 関連は `xcodebuild test -scheme keynaco -destination "platform=macOS"`。
+普段は fast のみ: `./scripts/test_core.sh`。slow 込み・アプリ＋ IMK 関連は上のスクリプト一覧と `xcodebuild test -scheme keynaco -destination "platform=macOS"`。
 
 - `cd Core && swift test` は slow 含めて全部走る。slow のみ除外するなら `swift test --filter KeynacoCoreTests`
 - 末尾に `✔ Test run with 0 tests in 0 suites passed` が出るが正常（Swift Testing framework のノイズ）。XCTest の結果は `Executed N tests` として別途出力される
@@ -147,9 +148,9 @@ InputMethodKit は ObjC ランタイムでクラスを探す。Swift の `IMKInp
 
 `setMarkedText("")`（空文字）のまま候補を表示すると、Electron は「IME が非アクティブ」と判断し Enter をアプリ側で処理する。候補選択中は実テキストを marked text に設定すること。
 
-### flagsChanged で Caps Lock を検知する
+### Caps Lock は flagsChanged で受ける（実装済み）
 
-Caps Lock トグルは未実装。実装時は `handle(event:client:)` で `.flagsChanged` イベントを受け取り、`NSEvent.ModifierFlags.capsLock` で ON/OFF を判定する。`inputText` では flagsChanged を受け取れない。
+`inputText` では `.flagsChanged` を受け取れないため、`handle(event:client:)` で処理する。実装は `LED ON = 英字モード / LED OFF = 日本語モード` の対応で、`handler.isAsciiMode` を設定した後 `false` を返してイベントを消費しない（`InputController.handle` の冒頭）。
 
 ## 不採用の機能
 
