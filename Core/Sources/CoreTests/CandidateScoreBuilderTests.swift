@@ -327,6 +327,48 @@ final class CandidateScoreBuilderTests: XCTestCase {
         XCTAssertEqual(target?.source, .hiraganaPreferred)
         XCTAssertEqual(target?.score, CandidateScoreBuilder.hiraganaUserBonus)
     }
+
+    // MARK: - 外来語シグナル読みのカタカナ昇格（PLAN260929）
+
+    func testLoanwordReadingPromotesKatakanaOverRawHiragana() {
+        let scored = build(reading: "わーくふぉるだ", azooKey: ["わーくふぉるだ", "ワークフォルダ"])
+        XCTAssertEqual(scored.map(\.text), ["ワークフォルダ", "わーくふぉるだ"])
+        XCTAssertEqual(scored[0].source, .azooKey(rank: 0))
+    }
+
+    func testLongVowelOnlyReadingAlsoPromotesKatakana() {
+        let scored = build(reading: "すげー", azooKey: ["すげー", "スゲー"])
+        XCTAssertEqual(scored.map(\.text), ["スゲー", "すげー"])
+    }
+
+    func testLoanwordPromotionOnlySwapsTheRawPair() {
+        let scored = build(
+            reading: "ほーむさーばー",
+            azooKey: ["ほーむさーばー", "Homeサーバー", "ホームサーバー"]
+        )
+        XCTAssertEqual(scored.map(\.text), ["ホームサーバー", "Homeサーバー", "ほーむさーばー"])
+    }
+
+    func testLoanwordPromotionSkipsHiraganaInHistory() {
+        let scored = build(
+            reading: "わーっと",
+            exact: ["わーっと"],
+            exactScores: ["わーっと": 10],
+            azooKey: ["わーっと", "ワーット"]
+        )
+        XCTAssertEqual(scored.map(\.text), ["わーっと", "ワーット"])
+        XCTAssertEqual(scored[0].source, .historyExact)
+    }
+
+    func testLoanwordPromotionKeepsOrderWhenKatakanaAlreadyAbove() {
+        let scored = build(reading: "りありてぃー", azooKey: ["リアリティー", "りありてぃー"])
+        XCTAssertEqual(scored.map(\.text), ["リアリティー", "りありてぃー"])
+    }
+
+    func testNoLoanwordSignalKeepsAzooKeyOrder() {
+        let scored = build(reading: "かっこいい", azooKey: ["かっこいい", "カッコイイ"])
+        XCTAssertEqual(scored.map(\.text), ["かっこいい", "カッコイイ"])
+    }
 }
 
 final class CandidateScoredLayoutTests: XCTestCase {

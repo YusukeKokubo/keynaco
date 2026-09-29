@@ -133,7 +133,10 @@ enum CandidateScoreBuilder {
         }
 
         let historyTexts = Set(byText.keys)
-        for (rank, candidate) in input.azooKeyCandidates.enumerated() {
+        let azooKeyCandidates = promoteKatakanaOverRawHiragana(
+            input.azooKeyCandidates, reading: input.reading, excluding: historyTexts
+        )
+        for (rank, candidate) in azooKeyCandidates.enumerated() {
             guard !historyTexts.contains(candidate.text) else { continue }
             upsert(ScoredCandidate(
                 text: candidate.text,
@@ -173,6 +176,29 @@ enum CandidateScoreBuilder {
             )
         }
         return sorted
+    }
+
+    /// 外来語シグナルのある読みで、AzooKey がひらがな生表記（テキスト = 読み）を
+    /// 全カタカナ表記より上位に返したとき、その 2 つの位置だけを入れ替える（PLAN260929）。
+    /// 辞書にない外来語（`わーくふぉるだ`）で AzooKey/Zenzai がひらがなを rank 0 に置くが、
+    /// 実際の確定は 9 割以上がカタカナだったため。候補の追加・削除はしない（rejected.md P-4）。
+    /// 履歴・ユーザー辞書・ひらがな優先に載った表記は `excluding` で除外され、入れ替え対象にならない。
+    static func promoteKatakanaOverRawHiragana(
+        _ candidates: [AzooKeyCandidate],
+        reading: String,
+        excluding: Set<String>
+    ) -> [AzooKeyCandidate] {
+        guard KanaUtils.hasLoanwordSignal(reading) else { return candidates }
+        let katakana = KanaUtils.hiraganaToKatakana(reading)
+        guard katakana != reading,
+              !excluding.contains(reading), !excluding.contains(katakana),
+              let hiraganaIndex = candidates.firstIndex(where: { $0.text == reading }),
+              let katakanaIndex = candidates.firstIndex(where: { $0.text == katakana }),
+              hiraganaIndex < katakanaIndex
+        else { return candidates }
+        var result = candidates
+        result.swapAt(hiraganaIndex, katakanaIndex)
+        return result
     }
 
     static func isHistorySource(_ source: ScoredCandidate.Source) -> Bool {

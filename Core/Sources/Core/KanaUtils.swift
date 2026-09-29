@@ -35,6 +35,19 @@ enum KanaUtils {
         }
     }
 
+    /// 外来語にしか現れない拗音（和語・漢語の読みには出ない組み合わせ）。
+    private static let loanwordOnlyMorae: [String] = [
+        "ふぁ", "ふぃ", "ふぇ", "ふぉ", "ふゅ", "てぃ", "でぃ", "とぅ", "どぅ", "てゅ", "でゅ",
+        "うぃ", "うぇ", "うぉ", "ゔ", "ちぇ", "しぇ", "じぇ",
+        "つぁ", "つぃ", "つぇ", "つぉ", "くぁ", "ぐぁ",
+    ]
+
+    /// 読みが外来語らしいか（長音 `ー` か外来語専用の拗音を含む）。
+    /// `すげー` / `わーっと` のような長音入りの和語も該当する（PLAN260929 で許容した誤判定）。
+    static func hasLoanwordSignal(_ reading: String) -> Bool {
+        reading.contains("ー") || loanwordOnlyMorae.contains { reading.contains($0) }
+    }
+
     /// ひらがな → 全角カタカナ。U+3041〜U+3096 を +0x60 シフト。
     static func hiraganaToKatakana(_ text: String) -> String {
         String(text.unicodeScalars.map { scalar in
