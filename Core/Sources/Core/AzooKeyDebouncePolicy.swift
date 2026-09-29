@@ -6,7 +6,7 @@ public struct AzooKeyDebounceInput: Equatable, Sendable {
     public let interKeyIntervalMs: Double?
     /// ローマ字子音待ち（`n` / `sh` 等）中なら `true` — まだ読みが伸びる見込みが高い。
     public let hasPendingRomaji: Bool
-    /// 現在の確定済みかな読み長。短い（≤2）うちは追加打鍵がほぼ確実に来るため、wasted fetch を防ぐ目的で debounce を伸ばす。
+    /// 現在の確定済みかな読み長。短い（≤2）うちは追加打鍵がほぼ確実に来るため、wasted fetch を防ぐ目的で debounce を伸ばす（下限 90ms）。
     public let readingLength: Int
 
     public init(interKeyIntervalMs: Double?, hasPendingRomaji: Bool, readingLength: Int) {
@@ -18,11 +18,12 @@ public struct AzooKeyDebounceInput: Equatable, Sendable {
 
 /// 打鍵速度・読み完成度に応じて debounce を 40–120ms の範囲で調整する。
 ///
-/// 通常バケット（80–160ms）の値は実測 `inter_key_p50 ≈ 117ms` ・ `fetch_p50 ≈ 84ms` を踏まえ
-/// 「fetch コストを下回らない」「打鍵間隔を超えない」両条件を満たす 90ms に設定。
-/// 70ms だと `LockedConverter` で直列化された fetch がキュー詰まりして `fetch_complete_p95` を悪化させとった。
-/// 読み長 ≤2 の打鍵中（pause 未検知）は max=120ms にして wasted fetch を構造的に削る
-/// （ログ実測: 2 文字読みミス率 90% / wasted fetch 35% の主要因。pause 検知時は通常通り 45ms で即発火）。
+/// 読みが変わらんキー（子音キー等）では予約中の fetch を捨てない（`WhileTypingFetchRetention`、PLAN260929a）。
+/// 次に読みが変わるのは通常 2 打鍵先なので、debounce は 1 打鍵間隔（実測 `inter_key_p50 ≈ 128ms`）を
+/// 守る必要がなく、fetch_complete の半分を占めとった待ちを詰めてある（通常 60ms / 高速打鍵 80ms）。
+/// 70ms 以下で `LockedConverter` のキュー詰まりが出た過去（子音キーで毎回 fetch を捨てとった頃）があるので、
+/// `lock_wait p95` をガード指標として見ること。
+/// 読み長 ≤2 の打鍵中（pause 未検知）は 90ms を下限にして wasted fetch を抑える（PLAN260621。pause 検知時は 45ms で即発火）。
 public enum AzooKeyDebouncePolicy {
     public static let minNanoseconds: UInt64 = 40_000_000
     public static let maxNanoseconds: UInt64 = 120_000_000
@@ -49,19 +50,19 @@ public enum AzooKeyDebouncePolicy {
         let isPaused = (input.interKeyIntervalMs ?? 0) >= 160
 
         if input.hasPendingRomaji {
-            ms = 105
+            ms = 80
         } else if let interval = input.interKeyIntervalMs {
             if interval < 80 {
-                ms = 110
+                ms = 80
             } else if interval < 160 {
-                ms = 90
+                ms = 60
             } else {
                 ms = 45
             }
         }
 
         if input.readingLength > 0 && input.readingLength <= 2 && !isPaused {
-            ms = max(ms, 120)
+            ms = max(ms, 90)
         }
 
         let clamped = min(max(ms, 40), 120)

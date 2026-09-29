@@ -15,8 +15,10 @@ enum KeydownLatencySignpost {
     private static var peekStartTimes: [Int: ContinuousClock.Instant] = [:]
     private static var fetchStartTimes: [Int: ContinuousClock.Instant] = [:]
 
-    static func onKeyDown(generation: Int) {
-        closeOrphanedSignposts()
+    /// `keyDownID` は keyDown 連番（`AzooKeyAsyncScheduler.keyDownSequence`）。
+    /// 開いとる fetchComplete は閉じない — 子音キーで fetch が生き残るため（PLAN260929a）。
+    static func onKeyDown(keyDownID generation: Int) {
+        closeOrphanedPeek()
         let id = OSSignpostID(log: log)
         openPeek = (generation, id)
         peekStartTimes[generation] = ContinuousClock.now
@@ -43,6 +45,7 @@ enum KeydownLatencySignpost {
     }
 
     static func beginFetchComplete(generation: Int) {
+        discardOpenFetch()
         let id = OSSignpostID(log: log)
         openFetch = (generation, id)
         fetchStartTimes[generation] = ContinuousClock.now
@@ -75,7 +78,7 @@ enum KeydownLatencySignpost {
         return (seconds + attoseconds) * 1_000
     }
 
-    private static func closeOrphanedSignposts() {
+    private static func closeOrphanedPeek() {
         if let open = openPeek {
             openPeek = nil
             peekStartTimes.removeValue(forKey: open.generation)
@@ -86,6 +89,10 @@ enum KeydownLatencySignpost {
                 signpostID: open.id
             )
         }
+    }
+
+    /// 世代が進んで結果が捨てられる fetch の計測を記録せずに閉じる。
+    static func discardOpenFetch() {
         if let open = openFetch {
             openFetch = nil
             fetchStartTimes.removeValue(forKey: open.generation)

@@ -265,8 +265,9 @@ class InputController: IMKInputController, @unchecked Sendable {
             cursorLocation: adapter.selectedRange().location
         )
         warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
-        let generation = azooKeyScheduler.onKeyDown(converter: handler.azooKeyConverter)
-        KeydownLatencySignpost.onKeyDown(generation: generation)
+        let keyDownID = azooKeyScheduler.recordKeyDown()
+        KeydownLatencySignpost.onKeyDown(keyDownID: keyDownID)
+        let composedHiraganaBefore = handler.state.composedHiragana
         let pre = KeyEventPipeline.preSnapshot(handler: handler)
         let keyResult = KeyEventPipeline.runHandle(
             handler: &handler,
@@ -277,6 +278,15 @@ class InputController: IMKInputController, @unchecked Sendable {
             pre: pre,
             client: adapter
         )
+        let settled = azooKeyScheduler.settleKeyDown(
+            composedHiraganaBefore: composedHiraganaBefore,
+            composedHiraganaAfter: handler.state.composedHiragana,
+            leftContextAfter: handler.leftContext.azooKeyValue,
+            requestedReading: handler.pendingAzooKeyReading,
+            consumed: keyResult.consumed,
+            converter: handler.azooKeyConverter
+        )
+        if !settled.keptPending { KeydownLatencySignpost.discardOpenFetch() }
         flushPendingInputRecord(penalized: handler.lastKeyDownDidPenalize)
         absorbPendingLogsFromHandler()
         applyPostKeyDownEffects(
@@ -285,11 +295,11 @@ class InputController: IMKInputController, @unchecked Sendable {
             adapter: adapter,
             composedHiraganaWasEmpty: keyResult.composedHiraganaWasEmpty,
             imkSenderForSurrounding: imkSenderForSurrounding,
-            keydownGeneration: generation
+            keydownGeneration: keyDownID
         )
         scheduleAzooKeyReplacementIfNeeded(
-            generation: generation,
-            consumed: keyResult.consumed,
+            generation: settled.generation,
+            consumed: keyResult.consumed && !settled.keptPending,
             adapter: adapter
         )
         return keyResult.consumed

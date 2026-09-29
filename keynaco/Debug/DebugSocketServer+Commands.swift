@@ -460,7 +460,8 @@ extension DebugSocketServer {
     ) ? handler.lastConfirmedContext?.output : nil
     syncLeftSideContext()
     warmRichCacheBeforeExplicitIfNeeded(keyCode: keyCode)
-    let generation = azooKeyScheduler.onKeyDown(converter: handler.azooKeyConverter)
+    azooKeyScheduler.recordKeyDown()
+    let composedHiraganaBefore = handler.state.composedHiragana
     let before = makeResponse(inserted: [])
     let pre = KeyEventPipeline.preSnapshot(handler: handler)
     let keyResult = KeyEventPipeline.runHandle(
@@ -483,7 +484,18 @@ extension DebugSocketServer {
         action: keyResult.candidateAction,
         client: mockClient
     )
-    scheduleSandboxAzooKeyIfNeeded(generation: generation, consumed: keyResult.consumed)
+    let settled = azooKeyScheduler.settleKeyDown(
+        composedHiraganaBefore: composedHiraganaBefore,
+        composedHiraganaAfter: handler.state.composedHiragana,
+        leftContextAfter: handler.leftContext.azooKeyValue,
+        requestedReading: handler.pendingAzooKeyReading,
+        consumed: keyResult.consumed,
+        converter: handler.azooKeyConverter
+    )
+    scheduleSandboxAzooKeyIfNeeded(
+        generation: settled.generation,
+        consumed: keyResult.consumed && !settled.keptPending
+    )
     let insertedTexts = mockClient.consume()
     for text in insertedTexts {
         let reading = handler.lastConfirmedContext?.input ?? handler.lastCommittedReading ?? ""

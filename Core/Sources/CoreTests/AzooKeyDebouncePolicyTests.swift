@@ -9,17 +9,17 @@ final class AzooKeyDebouncePolicyTests: XCTestCase {
             hasPendingRomaji: false,
             readingLength: 4
         ))
-        XCTAssertEqual(ns, 110_000_000)
+        XCTAssertEqual(ns, 80_000_000)
     }
 
     func testNormalTypingUsesBalancedDebounce() {
-        // 通常打鍵速度（実測 inter_key_p50 ≈ 117ms）。fetch コスト 80ms 程度を上回る 90ms に設定。
+        // 通常打鍵速度（実測 inter_key_p50 ≈ 128ms）。子音キーで fetch を捨てなくなったので 60ms まで詰める（PLAN260929a）。
         let ns = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
             interKeyIntervalMs: 120,
             hasPendingRomaji: false,
             readingLength: 4
         ))
-        XCTAssertEqual(ns, 90_000_000)
+        XCTAssertEqual(ns, 60_000_000)
     }
 
     func testPauseUsesShorterDebounce() {
@@ -37,7 +37,7 @@ final class AzooKeyDebouncePolicyTests: XCTestCase {
             hasPendingRomaji: true,
             readingLength: 4
         ))
-        XCTAssertEqual(ns, 105_000_000)
+        XCTAssertEqual(ns, 80_000_000)
     }
 
     func testFirstKeyUsesDefault() {
@@ -49,24 +49,24 @@ final class AzooKeyDebouncePolicyTests: XCTestCase {
         XCTAssertEqual(ns, AzooKeyDebouncePolicy.defaultNanoseconds)
     }
 
-    // 読み長 ≤2 で打鍵中（pause 未検知）は wasted fetch 削減のため max=120ms に伸ばす。
+    // 読み長 ≤2 で打鍵中（pause 未検知）は wasted fetch 削減のため 90ms を下限にする。
     func testShortReadingDuringTypingBumpsToMax() {
         let ns = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
             interKeyIntervalMs: 120,
             hasPendingRomaji: false,
             readingLength: 2
         ))
-        XCTAssertEqual(ns, 120_000_000)
+        XCTAssertEqual(ns, 90_000_000)
     }
 
     func testShortReadingFastTypingStillBumps() {
-        // 既に 110ms（fast bucket）でも 120ms まで伸ばす。
+        // fast bucket（80ms）でも 90ms まで伸ばす。
         let ns = AzooKeyDebouncePolicy.nanoseconds(for: AzooKeyDebounceInput(
             interKeyIntervalMs: 50,
             hasPendingRomaji: false,
             readingLength: 1
         ))
-        XCTAssertEqual(ns, 120_000_000)
+        XCTAssertEqual(ns, 90_000_000)
     }
 
     func testShortReadingWithPauseKeepsShortDebounce() {
@@ -85,7 +85,7 @@ final class AzooKeyDebouncePolicyTests: XCTestCase {
             hasPendingRomaji: false,
             readingLength: 3
         ))
-        XCTAssertEqual(ns, 90_000_000)
+        XCTAssertEqual(ns, 60_000_000)
     }
 
     // MARK: - 実験用 override
