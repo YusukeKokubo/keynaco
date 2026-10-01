@@ -180,6 +180,11 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
     private let showAllLogButton = NSButton()
 
     private var lines: [SandboxLine] = [SandboxLine(index: 0, committedSegments: [], events: [])]
+    /// 1 行に保持するイベントの上限。observer は他アプリでの打鍵も拾い、ソケット操作がない限り行が進まんため、
+    /// 上限なしだと起動しっぱなしで現在行が際限なく伸び、keyDown ごとの表再構築が詰まる（数日で 150ms/key 超）。
+    private static let maxEventsPerLine = 500
+    /// `filteredEntries` のキャッシュ。セルごとに全イベントを flatMap し直さんため、`reloadEventTable` で破棄する。
+    private var filteredEntriesCache: [(lineIndex: Int, entry: LogEntry)]?
     var currentLineIndex: Int = 0
     var pendingLineAdvance = false
     private var showAllLog = false
@@ -330,8 +335,10 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
     private func push(_ entry: LogEntry) {
         guard lines.indices.contains(currentLineIndex) else { return }
         lines[currentLineIndex].events.append(entry)
+        let overflow = lines[currentLineIndex].events.count - Self.maxEventsPerLine
+        if overflow > 0 { lines[currentLineIndex].events.removeFirst(overflow) }
         reloadEventTable()
-        if shouldAutoScrollEvents(for: entry.lineIndex) {
+        if isVisible, shouldAutoScrollEvents(for: entry.lineIndex) {
             scrollEventTableToLast()
             showEventDetail(at: filteredEntries.count - 1)
         }
@@ -348,13 +355,19 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
     }
 
     private var filteredEntries: [(lineIndex: Int, entry: LogEntry)] {
+        if let filteredEntriesCache { return filteredEntriesCache }
+        let entries: [(lineIndex: Int, entry: LogEntry)]
         if showAllLog {
-            return lines.flatMap { line in
+            entries = lines.flatMap { line in
                 line.events.map { (line.index, $0) }
             }
+        } else if lines.indices.contains(selectedLineIndex) {
+            entries = lines[selectedLineIndex].events.map { (selectedLineIndex, $0) }
+        } else {
+            entries = []
         }
-        guard lines.indices.contains(selectedLineIndex) else { return [] }
-        return lines[selectedLineIndex].events.map { (selectedLineIndex, $0) }
+        filteredEntriesCache = entries
+        return entries
     }
 
     private func clearLog() { clearSandbox() }
@@ -385,7 +398,10 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         makeFirstResponder(focusView.inputField)
     }
 
+    /// 非表示中は表を作り直さない（`show()` で再読込する）。
     private func reloadEventTable() {
+        filteredEntriesCache = nil
+        guard isVisible else { return }
         eventTableView.reloadData()
     }
 
@@ -687,6 +703,7 @@ final class IMESandboxWindow: NSWindow, NSSplitViewDelegate,
         level = .floating
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        reloadEventTable()
         selectLine(currentLineIndex)
         restoreInputFocus()
         if !didSetInitialDivider {
