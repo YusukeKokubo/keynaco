@@ -12,7 +12,9 @@ keynaco は macOS の IME（Input Method Editor）。通常のアプリと異な
 ビルド後の post-action が `/Library/Input Methods/` にインストール・プロセス再起動まで行う。
 動作確認は `scripts/debug_ime.py` またはこのスキルの `smoke.py` でデバッグソケット経由で行う。
 
-## ビルド＆インストール（`/deploy` スキルと同等）
+## ビルド＆インストール（`/deploy debug` と同等）
+
+デバッグソケットでの動作確認には Debug ビルドが必要。普段使いは Release（`/deploy`）なので、確認が終わったら `/deploy` で戻す。
 
 ```bash
 xcodebuild build -scheme keynaco -configuration Debug \

@@ -44,7 +44,7 @@ macOS 向け IME（Input Method Editor）。InputMethodKit + SQLite。
 
 ## ビルド・インストール
 
-`/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。Post-action でプロセス再起動しても `pgrep -x keynaco` が空のことがある。未起動なら `open "/Library/Input Methods/keynaco.app"` または日本語入力ソースへ切替。手動でビルドのみ行う場合:
+`/deploy` スキル（Claude Code 内）でビルドからインストールまで一括実行する。普段使いは Release（引数なし）、デバッグソケットを使う検証時だけ `/deploy debug`。Post-action でプロセス再起動しても `pgrep -x keynaco` が空のことがある。未起動なら `open "/Library/Input Methods/keynaco.app"` または日本語入力ソースへ切替。手動でビルドのみ行う場合:
 
 ```bash
 xcodebuild build -scheme keynaco -destination "platform=macOS" \

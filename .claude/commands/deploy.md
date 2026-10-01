@@ -1,5 +1,12 @@
 keynaco をビルドしてインストールする。
 
+引数: $ARGUMENTS
+
+- 引数なし → **Release**（普段使い。最適化あり・デバッグソケットなし）
+- `debug` → **Debug**（`/keynaco-ime-sandbox`・`scripts/test_*_sandbox.sh`・`debug_ime.py` を使うとき。検証が終わったら引数なしで Release に戻す）
+
+Debug ビルドはデバッグソケット・IME Sandbox・毎キーのスナップショット通知が常駐し、普段使いで起動しっぱなしにすると劣化しうる（`IMESandboxWindow` のイベント蓄積で 150ms/key 超になった実績あり）。latency/input/fetch/divergence ログは Release でも記録される。
+
 ## 初回のみ：ACL 設定（sudo は一度だけ）
 
 `/Library/Input Methods/` への書き込み権限を自分のアカウントに付与する。
@@ -14,14 +21,22 @@ sudo chmod +a "$(whoami) allow list,add_file,search,add_subdirectory,delete_chil
 ACL 設定済みであれば、ビルドだけで自動インストールまで完結する
 （Post-action が再署名・コピー・プロセス再起動を行う）。
 
+`CONFIG` は引数なしなら `Release`、`debug` なら `Debug`。
+
 ```bash
-xcodebuild build -scheme keynaco -configuration Debug \
+xcodebuild build -scheme keynaco -configuration "$CONFIG" \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_REQUIRED=NO
 ```
 
 ビルドエラーがあれば修正して再ビルド。
+
+インストール前に ACL が付いとるか確認する（無いと Post-action の `rm -rf` が中身だけ消して外枠が残り、`keynaco.app/keynaco.app` の二重構造になって keynaco が起動不能になる）:
+
+```bash
+ls -le -d "/Library/Input Methods" | grep -q "$(whoami) allow" || echo "ACL なし — 上の sudo chmod をユーザーに別ターミナルで実行してもらう"
+```
 
 ## 注意
 

@@ -16,13 +16,13 @@ description: |
 
 ## 前提
 
-- keynaco（Debug ビルド）が起動していること
+- keynaco（Debug ビルド）が起動していること。普段使いは Release（デバッグソケットなし）なので、ソケットが無ければ `/deploy debug` で入れる。検証後は `/deploy` で Release に戻すようユーザーに伝える
 - `$TMPDIR/keynaco-debug.sock` にソケットが存在すること
 - Python 3 が使えること
 
 起動確認（**必ず最初に実行**。ファイルの有無だけでなくプロセスの生死を確認すること）:
 ```bash
-pgrep -x keynaco && echo "keynaco running" || echo "keynaco not running — Debug ビルドを起動してください"
+pgrep -x keynaco && echo "keynaco running" || echo "keynaco not running — /deploy debug で Debug ビルドを入れてください"
 ```
 
 ソケットファイルは前回の起動時のものが残る場合がある。`pgrep` が "not running" を返したら、ユーザーに `xcodebuild` でビルド＆起動を促してスクリプトを終了すること。
