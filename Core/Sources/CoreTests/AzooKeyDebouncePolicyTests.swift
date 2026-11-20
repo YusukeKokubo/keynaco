@@ -116,8 +116,9 @@ final class AzooKeyDebouncePolicyTests: XCTestCase {
     /// 未設定・0 以下は通常ポリシーに落ちる（実験を戻し忘れても本番挙動が変わらんこと）。
     func testNilOrNonPositiveOverrideFallsBackToPolicy() {
         let input = AzooKeyDebounceInput(interKeyIntervalMs: 120, hasPendingRomaji: false, readingLength: 3)
-        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: nil, input: input), 90_000_000)
-        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: 0, input: input), 90_000_000)
-        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: -5, input: input), 90_000_000)
+        let policy = AzooKeyDebouncePolicy.nanoseconds(for: input)
+        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: nil, input: input), policy)
+        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: 0, input: input), policy)
+        XCTAssertEqual(AzooKeyDebouncePolicy.resolveNanoseconds(overrideMs: -5, input: input), policy)
     }
 }
