@@ -36,6 +36,13 @@ public extension InputHandler {
         guard modifiers.intersection([.command, .control, .option]).isEmpty else { return (false, .none) }
         guard let chars = characters, !chars.isEmpty,
               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 }) else { return (false, .none) }
+        // NSEvent が機能キー（Forward Delete = U+F728、Home/End/PageUp 等）に使う私用領域の文字は
+        // テキストではない。組成に混ぜると端末等で化けた字として確定される（macOS 更新後、Ctrl+D が
+        // 修飾なしの Forward Delete として届くようになり顕在化）。組成中は読みの末尾にカーソルがあり
+        // 前方に消すものがないので消費して無視し、組成外はホスト本来の動作に任せる。
+        if chars.unicodeScalars.contains(where: { (0xF700...0xF8FF).contains($0.value) }) {
+            return (state.isComposing, .none)
+        }
         let base = baseCharacters ?? chars
         let isNonAscii = chars.unicodeScalars.contains(where: { $0.value >= 0x80 })
 
